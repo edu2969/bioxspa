@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
 import { usePathname } from 'next/navigation'
 import { User } from 'next-auth';
+import { MdOutlinePropaneTank } from 'react-icons/md';
 
 export default function Nav({ user }: { user: User | null}) {
     const [menuActivo, setMenuActivo] = useState(false);    
@@ -26,6 +27,12 @@ export default function Nav({ user }: { user: User | null}) {
                 <AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4"
                     onClick={() => setMenuActivo(false)} />
                 <div className="mt-12 text-white space-y-6">
+                    <Link href="/modulos/operacion" onClick={() => setMenuActivo(false)}>
+                        <div className="flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2 cursor-pointer">
+                            <MdOutlinePropaneTank size="4rem" />
+                            <p className="text-2xl ml-2 mt-4">OPERACIÓN</p>
+                        </div>
+                    </Link>
                     <Link href="/modulos/about" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2 cursor-pointer">
                             <AiFillAliwangwang size="4rem" />

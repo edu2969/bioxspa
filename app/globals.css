@@ -22,6 +22,10 @@ body {
   overflow: hidden;  
 }
 
+.roboto {
+  font-family: var(--font-roboto);
+}
+
 .orbitron {
   font-family: var(--font-orbitron);
 }

@@ -48,7 +48,7 @@ export default function LoginForm() {
       </div>
       <div className="z-10 flex min-h-full flex-col justify-center py-6">
         <div className="flex sm:mx-auto sm:w-full sm:max-w-sm">                    
-          <img src="/brand.png" alt="Actionium-Brand" className="mx-auto w-80 mt-6" />          
+          <img src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" />          
           <span className="text-xs text-gray-400 mt-40">v0.9</span>
         </div>
       </div>      
