@@ -1,10 +1,9 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import User from "@/models/user";
-import Client from "@/models/client";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-export async function GET() {
+/*export async function GET() {
   try {
     console.log("getAll...");
     await connectMongoDB();
@@ -27,7 +26,7 @@ export async function GET() {
     console.log(error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-}
+}*/
 
 export async function POST(req) {
   try {

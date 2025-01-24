@@ -4,7 +4,7 @@ import * as d3 from "d3"
 import dayjs from "dayjs";
 import { COLORS_PALETTE } from "@/app/utils/colorsPalette"
 
-export function MultiLineChart({ data, width, height, colorIndexes = [], simple = false}) {
+export function MultiLineChart({ data, width, height, colorIndexes = [1, 2], simple = false}) {
     let margin = { t: 20, r: 20, b: 40, l: 40 }
     let xScale = d3.scaleTime()
         .domain([data[0].points[0].date, data[0].points.at(-1).date])
@@ -58,7 +58,7 @@ export function MultiLineChart({ data, width, height, colorIndexes = [], simple 
             animate={{ pathLength: 1 }}
             transition={{ duration: 1.4, delay: 0.5, type: "spring" }}
             d={d[index]} fill="none" 
-            stroke={COLORS_PALETTE[colorIndexes.length ? colorIndexes[index] : index]} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+            stroke={COLORS_PALETTE[colorIndexes[index]]} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
             )}
 
             {!simple && data.map((kv, index) =>  
@@ -71,16 +71,16 @@ export function MultiLineChart({ data, width, height, colorIndexes = [], simple 
             r="5"
             cx={xScale(d.date)}
             cy={yScale(d.value)}
-            fill={COLORS_PALETTE[colorIndexes.length ? colorIndexes[index] : index]}
+            fill={COLORS_PALETTE[colorIndexes[index]]}
             strokeWidth={2}
             stroke="white" />))}
 
             {data.map((kv, index) =>
-            <path key={`leyenda_${kv.category}`} d={leyendas[index]} fill="none" stroke={COLORS_PALETTE[colorIndexes.length ? colorIndexes[index] : index]} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />)}
+            <path key={`leyenda_${kv.category}`} d={leyendas[index]} fill="none" stroke={COLORS_PALETTE[colorIndexes[index]]} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />)}
 
             {data.map((kv, index) => 
             <g key={`label_${kv.category}`} transform={`translate(${width / 2 + 16}, ${10 + index * 18})`}>
-            <text className="text-sm" fill={COLORS_PALETTE[colorIndexes.length ? colorIndexes[index] : index]}>{kv.category}</text>
+            <text className="text-sm" fill={COLORS_PALETTE[colorIndexes[index]]}>{kv.category}</text>
             </g>)}
             </svg>
         </>
