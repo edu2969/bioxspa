@@ -27,7 +27,7 @@ export function MultiLineChart({ data, width, height, colorIndexes = [1, 2], sim
     return (
         <>
             <svg viewBox={`0 0 ${width} ${height}`}>
-            {yScale.ticks(2).map(max =>
+            {!simple && yScale.ticks(2).map(max =>
             <g key={max} className="text-gray-400"
             transform={`translate(0, ${yScale(max)})`}>
             <line
@@ -42,7 +42,7 @@ export function MultiLineChart({ data, width, height, colorIndexes = [1, 2], sim
             </g>
             )}
 
-            {xScale.ticks(6).map(date =>
+            {!simple && xScale.ticks(6).map(date =>
             <g className="text-gray-400" key={date.toISOString()}
             transform={`translate(${xScale(date)}, ${height - 20})`}>
             <text className="text-sm" fill="currentColor"
@@ -75,10 +75,10 @@ export function MultiLineChart({ data, width, height, colorIndexes = [1, 2], sim
             strokeWidth={2}
             stroke="white" />))}
 
-            {data.map((kv, index) =>
+            {!simple && data.map((kv, index) =>
             <path key={`leyenda_${kv.category}`} d={leyendas[index]} fill="none" stroke={COLORS_PALETTE[colorIndexes[index]]} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />)}
 
-            {data.map((kv, index) => 
+            {!simple && data.map((kv, index) => 
             <g key={`label_${kv.category}`} transform={`translate(${width / 2 + 16}, ${10 + index * 18})`}>
             <text className="text-sm" fill={COLORS_PALETTE[colorIndexes[index]]}>{kv.category}</text>
             </g>)}
