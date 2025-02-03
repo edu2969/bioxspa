@@ -6,27 +6,34 @@ import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutline
 import { usePathname } from 'next/navigation'
 import { User } from 'next-auth';
 import { MdOutlinePropaneTank } from 'react-icons/md';
+import { IoSettingsSharp } from 'react-icons/io5';
 
 export default function Nav({ user }: { user: User | null}) {
     const [menuActivo, setMenuActivo] = useState(false);    
     const path = usePathname();
     return (
-        <div className={`w-screen fixed top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
-            <div className="absolute w-full">
-                <div className="w-full flex">
+        <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
+            <div className="absolute">
+                <div className="w-80 flex">
                     <AiOutlineMenu size="1.7rem" className="m-4 text-slate-800 cursor-pointer"
                         onClick={() => setMenuActivo(true)} />
-                    <div className="w-full flex justify-end">
-                        <Link href={`/modulos`} onClick={() => setMenuActivo(false)}>
-                            <AiFillHome size="1.7rem" className="mt-4 mr-8 text-slate-800 justify-end cursor-pointer" />
-                        </Link>
-                    </div>
                 </div>
+            </div>
+            <div className="absolute right-0">                
+                <Link href={`/modulos`} onClick={() => setMenuActivo(false)}>
+                    <AiFillHome size="1.7rem" className="mt-4 mr-8 text-slate-800 justify-end cursor-pointer" />
+                </Link>                
             </div>
             <div className={`min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
                 <AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4"
                     onClick={() => setMenuActivo(false)} />
                 <div className="mt-12 text-white space-y-6">
+                    <Link href="/modulos/configuraciones" onClick={() => setMenuActivo(false)}>
+                        <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
+                            <IoSettingsSharp size="4rem" />
+                            <p className="text-2xl ml-2 mt-4">CONFIGURACIONES</p>
+                        </div>
+                    </Link>
                     <Link href="/modulos/operacion" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
                             <MdOutlinePropaneTank size="4rem" />
