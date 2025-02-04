@@ -83,10 +83,13 @@ const branches_test = () => {
     }));
 }
 
+const positions = ['top-0 left-0', 'top-0 right-0', 'bottom-0 left-0', 'bottom-0 right-0'];
+
 export default function BranchBussinessView() {
     const [branches, setBranches] = useState(null);
     const [notificationVisible, setNotificationVisible] = useState(false);
     const [messagerVisible, setMessagerVisible] = useState(false);
+    const [branchSelected, setBranchSelected] = useState(null);
     const initData = useRef(false);
 
     useEffect(() => {
@@ -101,11 +104,53 @@ export default function BranchBussinessView() {
         window.location.href = "/modulos/deudas?total=true";
     };
 
+    const handleBranchClick = (index) => {
+        setBranchSelected(branchSelected != null && branchSelected === index ? null : index);
+    };
+
+    const getBoxStyles = (index) => {
+        if (branchSelected === index) {
+            return {
+                width: '100%',
+                height: '100%',
+                transform: 'translate(0, 0)',
+            };
+        } else if (branchSelected !== null) {
+            const translateMap = [
+                'translate(-100%, -100%)',
+                'translate(100%, -100%)',
+                'translate(-100%, 100%)',
+                'translate(100%, 200%)',
+            ];
+            return {
+                width: '50%',
+                height: '50vh',
+                transform: translateMap[index],
+            };
+        } else {
+            const translateMap = [
+                'translate(0, 0)',
+                'translate(100%, 0)',
+                'translate(0, 100%)',
+                'translate(100%, 100%)',
+            ];
+            return {
+                width: '50%',
+                height: '50vh',
+                transform: translateMap[index],
+            };
+        }
+    };
+
     return (
         <main className="mt-4 h-screen overflow-y-auto">
-            <div className="grid grid-cols-2 h-full gap-4 p-4">
+            <div className={`absolute w-full h-full`}>
                 {branches && branches.map((_, index) => (
-                    <div key={index} className="flex justify-start h-full">
+                    <div
+                        key={index}
+                        className={`absolute w-full h-screen transition-all duration-500`}
+                        style={getBoxStyles(index)}
+                    >
                         <div className="relative w-full h-full bg-white rounded-lg shadow-lg p-4">
                             <RiHomeOfficeFill className="relative ml-4 -top-0.5" size="14.1rem" />
                             <div className="absolute w-40 h-40 top-24 left-28">
@@ -159,7 +204,7 @@ export default function BranchBussinessView() {
                                 <div className="text-xs">DEUDA TOTAL</div>
                             </div>
                             <div className="absolute top-4 left-56 flex items-center">
-                                <div className="flex hover:bg-slate-600 hover:text-white rounded-lg px-2 cursor-pointer">
+                                <div className="flex hover:bg-slate-600 hover:text-white rounded-lg px-2 cursor-pointer" onClick={() => handleBranchClick(index)}>
                                     <IoSettingsSharp size="1.5rem" className="text-white mt-1 mr-2"/>
                                     <span className="text-2xl font-bold">{sucursales[index]}</span>
                                 </div>
