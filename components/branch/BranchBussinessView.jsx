@@ -1,10 +1,11 @@
 "use client"
 
 import { RiHomeOfficeFill } from "react-icons/ri";
-import { MultiLineChart } from "@/components/charts/MultiLineChart";
 import dayjs from "dayjs";
 import { MdOutlinePropaneTank } from "react-icons/md";
 import BarChart from "../charts/BarChart";
+import Gaugue from "../charts/Gaugue";
+import MultiLineChart from "../charts/MultiLineChart";
 import { TbMoneybag } from "react-icons/tb";
 import { CiBellOn } from "react-icons/ci";
 import { FaWhatsappSquare } from "react-icons/fa";
@@ -12,25 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { IoSettingsSharp } from "react-icons/io5"
 import NotificationsPanel from "../NotificationsPanel";
 import MessagesPanel from "../MessagesPanel";
-
-const data = [
-    {
-        category: "Deuda",
-        points: Array.from({ length: 12 }, (_, i) => ({
-            date: dayjs().subtract(i, 'month').startOf("month").toDate(),
-            value: Math.floor(Math.random() * 1000000),
-        })).reverse(),
-    },
-    {
-        category: "Pagos",
-        points: Array.from({ length: 12 }, (_, i) => ({
-            date: dayjs().subtract(i, 'month').startOf("month").toDate(),
-            value: Math.floor(Math.random() * 1000000),
-        })).reverse(),
-    }
-];
-
-const tempeture = Array.from({ length: 7 }, () => Math.floor(Math.random() * 9));
+import { TIPO_SUCURSAL } from "@/app/utils/constants";
 
 const stateColors = [
     "bg-white",
@@ -43,70 +26,54 @@ const stateColors = [
     "bg-green-600",
 ];
 
-const sucursales = ["BARROS ARANA", "JAIME REPULLO", "SAN JOSÉ", "LOS ÁNGELES"];
-
-const branches_test = () => {
-    return sucursales.map((sucursal, index) => ({
-        tempeture: Math.floor(Math.random() * 7),
-        rentability: (Math.random() * 35 - 10).toFixed(1),
-        branchType: (index == 0 || index == 3) ? "SUCURSAL" : "OFICINA",
-        data: [
-            {
-                category: "Deuda",
-                points: Array.from({ length: 12 }, (_, i) => ({
-                    date: dayjs().subtract(i, 'month').startOf("month").toDate(),
-                    value: Math.floor(Math.random() * 1000000),
-                })).reverse(),
-            },
-            {
-                category: "Pagos",
-                points: Array.from({ length: 12 }, (_, i) => ({
-                    date: dayjs().subtract(i, 'month').startOf("month").toDate(),
-                    value: Math.floor(Math.random() * 1000000),
-                })).reverse(),
-            }
-        ],
-        clientDebts : [
-            { empresa: "Comercial Salvo SPA", deuda: Math.floor(Math.random() * 1000000), rut: "76.123.456-7" },
-            { empresa: "Maestranza SG Limitada", deuda: Math.floor(Math.random() * 1000000), rut: "77.234.567-8" },
-            { empresa: "Empresa constructora Ecocec Limitada", deuda: Math.floor(Math.random() * 1000000), rut: "78.345.678-9" },
-            { empresa: "Comercial e Industrial Central Radiadores Limitada", deuda: Math.floor(Math.random() * 1000000), rut: "79.456.789-0" },
-            { empresa: "Sociedad Constructora Cordillera Norte Sur SPA", deuda: Math.floor(Math.random() * 1000000), rut: "80.567.890-1" },
-        ],
-        gasReports: Array.from({ length: 4 }, () => ({
-            currentMonth: Math.floor(Math.random() * (560000 - 100000 + 1)) + 100000,
-            previousMonth: Math.floor(Math.random() * (560000 - 100000 + 1)) + 100000,
-            sameMonthLastYear: Math.floor(Math.random() * (560000 - 100000 + 1)) + 100000,
-            currentMonthPackaged: Math.floor(Math.random() * (560000 - 100000 + 1)) + 100000,
-        })),
-        debts: Array.from({ length: 4 }, () => Math.floor(Math.random() * 1000000)),
-    }));
-}
-
-const positions = ['top-0 left-0', 'top-0 right-0', 'bottom-0 left-0', 'bottom-0 right-0'];
-
 export default function BranchBussinessView() {
+    const [loadingAdminPanel, setLoadingAdminPanel] = useState(true);
     const [branches, setBranches] = useState(null);
     const [notificationVisible, setNotificationVisible] = useState(false);
     const [messagerVisible, setMessagerVisible] = useState(false);
     const [branchSelected, setBranchSelected] = useState(null);
+    const [graficoGases, setGraficoGases] = useState(null);
     const initData = useRef(false);
+    const [loadingMultilinear, setLoadingMultilinear] = useState(false);
+
+    const fetchMainPanelData = async () => {
+        setLoadingAdminPanel(true);
+        try {
+            const response = await fetch("/api/mainPanel");
+            const data = await response.json();
+            setBranches(data);
+            setLoadingAdminPanel(false);
+        } catch (error) {
+            console.error("Error fetching main panel data:", error);
+        }
+    };
 
     useEffect(() => {
         if (!initData.current) {
             initData.current = true;
-            const data = branches_test();
-            setBranches(data);
-          }
+            fetchMainPanelData();
+        }
     }, []);
 
     const handleDebtClick = () => {
         window.location.href = "/modulos/deudas?total=true";
     };
 
+    const fetchAdminPanelData = async () => {
+        const response = await fetch("/api/adminPanel");
+        const data = await response.json();
+
+        setGraficoGases(data);
+        setLoadingMultilinear(false);
+    };
+
     const handleBranchClick = (index) => {
         setBranchSelected(branchSelected != null && branchSelected === index ? null : index);
+        setLoadingMultilinear(true);
+
     };
+
+
 
     const getBoxStyles = (index) => {
         if (branchSelected === index) {
@@ -145,68 +112,70 @@ export default function BranchBussinessView() {
     return (
         <main className="mt-4 h-screen overflow-y-auto">
             <div className={`absolute w-full h-full`}>
-                {branches && branches.map((_, index) => (
+                {branches && branches.map((branch, index) => (
                     <div
                         key={index}
                         className={`absolute w-full h-screen transition-all duration-500`}
                         style={getBoxStyles(index)}
                     >
-                        <div className="relative w-full h-full bg-white rounded-lg shadow-lg p-4">
+                        <div className="relative w-full h-full bg-white rounded-lg p-4">
                             <RiHomeOfficeFill className="relative ml-4 -top-0.5" size="14.1rem" />
                             <div className="absolute w-40 h-40 top-24 left-28">
-                                <MultiLineChart
+                                {false && <MultiLineChart
                                     data={data}
                                     width={120}
                                     height={100}
                                     simple={true}
                                     colorIndexes={[7, 2]}
-                                />
+                                />}
                             </div>
                             <div className="absolute top-12 left-20 w-8 h-40 flex flex-col justify-end">
                                 {Array.from({ length: 7 }).map((_, i) => (
                                     <div
                                         key={`segmento_${index}_${i}`}
-                                        className={`w-full h-3 mb-1 ${i < (7 - tempeture[index]) ? 'bg-white' : stateColors[tempeture[index]]} ${i === 6 ? 'rounded-bl-md' : ''}`}
+                                        className={`w-full h-3 mb-1 ${i < (7 - branch.estado) ? 'bg-white' : stateColors[branch.estado + 1]} ${i === 6 ? 'rounded-bl-md' : ''}`}
                                     />
                                 ))}
                             </div>
-                            <div className="absolute bottom-12 left-12 text-4xl font-bold orbitron">
-                                {branches[index].rentability}%
+                            <div className="absolute bottom-8 text-center left-12 text-4xl font-bold orbitron">
+                                {branches[index].rentabilidad}%
                                 <div className="text-xs">RENTABILIDAD</div>
                             </div>
-                            {branches[index].branchType == "SUCURSAL" && <div className="absolute flex top-16 right-24 font-bold">
+                            {branches[index].tipo == TIPO_SUCURSAL.sucursal && <div className="absolute flex top-16 left-72 font-bold">
                                 <div className="text-green-600 mr-6">
                                     <div className="flex orbitron">
-                                        <span className="text-2xl">{branches[index].gasReports[0].currentMonth}</span>
+                                        <span className="text-2xl">{branches[index].despachadosHoy}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
-                                    <div className="text-xs">DESPACHADOS AL 31/ENE'25</div>
+                                    <div className="text-xs">DESPACHADOS<br/>AL 31/ENE'25</div>
                                 </div>
                                 <div className="text-blue-600">
                                     <div className="text-xl mt-1">
-                                        <span className="orbitron">{branches[index].gasReports[0].previousMonth}</span>
+                                        <span className="orbitron">{branches[index].despachadosMesAnterior}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
                                     <div className="text-xs">AL 31/DIC'24</div>
-                                    <div className="text-xl mt-1">                                        
-                                        <span className="orbitron">{branches[index].gasReports[0].sameMonthLastYear}</span>
+                                </div>
+                                <div className="ml-4 text-blue-600">
+                                    <div className="text-xl mt-1">
+                                        <span className="orbitron">{branches[index].despachadosMismoMesAnterior}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
                                     <div className="text-xs">AL 31/ENE'24</div>
                                 </div>
                             </div>}
-                            <div className="absolute bottom-6 left-48 font-bold text-red-600 hover:bg-red-200 hover:shadow-lg cursor-pointer p-4 rounded-md" onClick={handleDebtClick}>
+                            {branches[index].deudaTotal > 0 && <div className="absolute bottom-4 left-48 font-bold text-red-600 hover:bg-red-200 hover:shadow-lg cursor-pointer p-4 rounded-md" onClick={handleDebtClick}>
                                 <div className="flex orbitron">
                                     <span className="text-xs mt-2 mr-1">CLP $</span>
-                                    <span className="text-xl">{(branches[index].debts[0] / 1000).toFixed(1)}</span>
+                                    <span className="text-xl">{(branches[index].deudaTotal / 1000000).toFixed(1)}</span>
                                     <span className="text-xs ml-1 mt-2">M</span>
                                 </div>
                                 <div className="text-xs">DEUDA TOTAL</div>
-                            </div>
+                            </div>}
                             <div className="absolute top-4 left-56 flex items-center">
                                 <div className="flex hover:bg-slate-600 hover:text-white rounded-lg px-2 cursor-pointer" onClick={() => handleBranchClick(index)}>
-                                    <IoSettingsSharp size="1.5rem" className="text-white mt-1 mr-2"/>
-                                    <span className="text-2xl font-bold">{sucursales[index]}</span>
+                                    <IoSettingsSharp size="1.5rem" className="text-white mt-1 mr-2" />
+                                    <span className="text-2xl font-bold uppercase">{branch.nombre}</span>
                                 </div>
                                 <div className="flex ml-4">
                                     <div className="relative hover:scale-125 cursor-pointer" onClick={() => { setNotificationVisible(!notificationVisible); setMessagerVisible(false); }}>
@@ -223,18 +192,18 @@ export default function BranchBussinessView() {
                                     </div>
                                 </div>
                             </div>
-                            {branches[index].branchType == "OFICINA" && <div className="absolute bottom-4 right-4">
+                            {branch.tipo == TIPO_SUCURSAL.sucursal && <div className={`absolute bottom-0 right-16 ${branchSelected !== null ? 'w-[640px] h-[520px]' : ''}`}>
                                 <BarChart
-                                    data={branches[index].clientDebts}
-                                    width={320}
-                                    height={260}
+                                    data={branch.topDeudores}
+                                    width={branchSelected !== null ? 640 : 320}
+                                    height={branchSelected !== null ? 520 : 260}
                                     indexColor={7}
                                 />
                             </div>}
                             {branches[index].branchType == "SUCURSAL" && (
                                 <div className="absolute flex bottom-4 right-4 bg-green-50 shadow-md rounded-md p-4">
                                     <div className="flex text-green-700">
-                                        <TbMoneybag size="2.1em" className="mr-2 mt-2"/>
+                                        <TbMoneybag size="2.1em" className="mr-2 mt-2" />
                                         <div>
                                             <p className="text-sm mt-1">VENDIDOS</p>
                                             <div className="flex flex-nowrap text-xl">
@@ -242,12 +211,12 @@ export default function BranchBussinessView() {
                                                 <span>m<sup>3</sup></span>
                                             </div>
                                         </div>
-                                    </div>                                    
+                                    </div>
                                     <p className="text-md ml-3 text-slate-700 text-center w-full mt-4 mx-4">
                                         <b>vs</b>
                                     </p>
                                     <div className="flex text-blue-700">
-                                        <MdOutlinePropaneTank size="2.1em" className="mr-2 mt-2"/>
+                                        <MdOutlinePropaneTank size="2.1em" className="mr-2 mt-2" />
                                         <div>
                                             <p className="text-sm mt-1">ENVASADOS</p>
                                             <div className="flex flex-nowrap text-xl">
@@ -261,8 +230,45 @@ export default function BranchBussinessView() {
                         </div>
                     </div>
                 ))}
+
+                {branchSelected !== null && (
+                    <div className="absolute bottom-24 left-4">
+                        <div className="w-full">
+                            {["VENDIDO", "PRODUCIDO", "ARRIENDO", "O2", "At", "Ar", "Al", "Ac"].map((category, i) => (
+                                <button
+                                    key={`chip_${category}`}
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-0 mr-1 px-4 rounded-md"
+                                >
+                                    {category}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Gaugue
+                                    key={`gaugue_${i}`}
+                                    value={[0, 25, 50, 75, 100][Math.random() * 5 | 0]}
+                                    width={220}
+                                    height={180}
+                                    unit={`m³/${["hora", "día", "semana", "mes"][i]}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {branchSelected !== null && graficoGases != null && (
+                    <div className="absolute top-24 left-72 w-[600px] h-[320px]">
+                        <MultiLineChart
+                            data={graficoGases}
+                            width={600}
+                            height={320}
+                            colorIndexes={[1, 2, 3, 4, 5, 6, 7, 8]}
+                        />
+                    </div>
+                )}
             </div>
-            <NotificationsPanel visible={notificationVisible} onClick={() => setNotificationVisible(!notificationVisible) }/>
+            <NotificationsPanel visible={notificationVisible} onClick={() => setNotificationVisible(!notificationVisible)} />
             <MessagesPanel visible={messagerVisible} onClick={() => setMessagerVisible(!messagerVisible)} />
         </main>
     );

@@ -9,12 +9,12 @@ import { MdOutlinePropaneTank } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 
 export default function Nav({ user }: { user: User | null}) {
-    const [menuActivo, setMenuActivo] = useState(false);    
+    const [menuActivo, setMenuActivo] = useState(false);  
     const path = usePathname();
     return (
         <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
             <div className="absolute">
-                <div className="w-80 flex">
+                <div className="flex">
                     <AiOutlineMenu size="1.7rem" className="m-4 text-slate-800 cursor-pointer"
                         onClick={() => setMenuActivo(true)} />
                 </div>

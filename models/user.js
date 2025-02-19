@@ -1,42 +1,113 @@
 import mongoose, { Schema, models } from "mongoose";
-import { type } from "os";
 
 const userSchema = new Schema(
   {
-    name: {
+    id: {
       type: String,
       required: true,
+    },
+    nombre: {
+      type: String,
+      required: true,
+    },
+    rut: {
+      type: String,
+      required: true,
+    },
+    comision: {
+      type: String,
+      default: "0.00",
+    },
+    copiadte: {
+      type: String,
+      default: "Si",
+    },
+    perfil: {
+      type: String,      
     },
     email: {
       type: String,
       required: true,
     },
+    telefono: {
+      type: String,
+    },
     password: {
       type: String,
       required: true,
     },
-    role: {
-      type: Number,
+    activo: {
+      type: String,
+      default: "si",
+    },
+    sucursales_id: {
+      type: String,
+      required: true,
+    },
+    profesion: {
+      type: String,
       default: null,
     },
-    clientId: {
-      type: Schema.Types.ObjectId,
-      ref: "Client",
-      default: null
-    },
-    rut: {
+    banco: {
       type: String,
+      default: null,
     },
-    gender: {
+    cuenta: {
       type: String,
+      default: null,
     },
-    birthDate: {
+    color: {
+      type: String,
+      default: null,
+    },
+    permiso: {
+      type: String,
+      default: null,
+    },
+    intentos: {
+      type: String,
+      default: null,
+    },
+    impresora: {
+      type: String,
+      default: null,
+    },
+    api_token: {
+      type: String,
+      default: null,
+    },
+    remember_token: {
+      type: String,
+      default: null,
+    },
+    datosempresas_id: {
+      type: String,
+      required: true,
+    },
+    comi_retiro: {
+      type: String,
+      default: "0",
+    },
+    comi_entrega: {
+      type: String,
+      default: "0",
+    },
+    comi_punto_vta: {
+      type: String,
+      default: "3",
+    },
+    deleted_at: {
       type: Date,
       default: null,
     },
-    avatarImg: {
-      type: String,
-    }
+    created_at: {
+      type: Date,
+      default: Date.now,
+    },
+    updated_at: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { timestamps: true }
 );

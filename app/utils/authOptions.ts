@@ -14,7 +14,6 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         const { email, password } = credentials as { email: string; password: string };
-
         try {
           await connectMongoDB();
           const user = await User.findOne({ email });
@@ -56,7 +55,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      console.log("SESSION ->", session, token);
+      //console.log("SESSION ->", session, token);
       session.user.id = token.id;
       session.user.role = token.role;
       session.user.image = token.avatarImg;

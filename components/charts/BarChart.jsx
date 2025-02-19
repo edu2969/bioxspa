@@ -47,11 +47,10 @@ export function BarChart({ data, width, height, indexColor }) {
                     />
                     <text
                         className="text-xs uppercase"
-                        fill="currentColor"
-                        textAnchor="middle"
+                        fill="white"
+                        textAnchor="start"
                         alignmentBaseline="middle"
-                        x={xScale.bandwidth() / 2}
-                        y={yScale(d.deuda) - 5}>
+                        transform={`translate(${xScale.bandwidth() - 10}, ${yScale(d.deuda) + 5}) rotate(90)`}>
                         {d.empresa}
                     </text>
                 </g>
