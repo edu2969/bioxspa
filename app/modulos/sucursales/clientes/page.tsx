@@ -4,7 +4,7 @@ import { MdEmail, MdOutlineCompare, MdOutlineSettings, MdPriceChange } from "rea
 import useMeasure from "react-use-measure"
 import { LineChart } from "@/components/charts/LineChart"
 import { BarChart } from "@/components/charts/BarChart"
-import { MultiLineChart } from "@/components/charts/MultiLineChart"
+import MultiLineChart from "@/components/charts/MultiLineChart"
 import { CircularProgressbar } from "react-circular-progressbar";
 import { FaPlusCircle, FaUserCircle, FaWhatsapp } from "react-icons/fa";
 import { IoIosNotifications } from "react-icons/io";

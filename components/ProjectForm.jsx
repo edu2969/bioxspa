@@ -10,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AiFillHome } from 'react-icons/ai';
 import { ConfirmModal } from './modals/ConfirmModal';
-import { PROJECT_STATUS } from '@/app/utils/constants';
+//import { PROJECT_STATUS } from '@/app/utils/constants';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -241,7 +241,7 @@ export default function ProjectForm() {
             </div>
         </div>
         <ConfirmModal title="Cambio de estado"
-            confirmationQuestion={`${selectedStatus === PROJECT_STATUS.defining 
+            confirmationQuestion={`${selectedStatus === 0 //PROJECT_STATUS.defining 
                 ? 'El proyecto volverá a modo definición. Los datos actuales quedarán como reales y se cargarán los estimados. ¿Desea proceder?' 
                 : 'El proyecto terminará su fase de definición. Las tareas y sprints manejarán datos reales y los actuales, se guardarán como estimados. ¿Desea proceder?'}`}
             show={showModal}

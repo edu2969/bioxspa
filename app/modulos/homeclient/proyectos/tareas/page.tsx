@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from "next/link";
-import { PROJECT_STATUS, TASK_STATUS } from "@/app/utils/constants";
+//import { PROJECT_STATUS, TASK_STATUS } from "@/app/utils/constants";
 import { RiPencilFill } from "react-icons/ri";
 import Loader from "@/app/components/loader/loader";
 import { GiNightSleep } from "react-icons/gi";
@@ -47,7 +47,8 @@ export default function Tasks() {
     }
 
     const nombreEstado = (valor: number) => {
-        return Object.keys(TASK_STATUS).find(key => TASK_STATUS[key as keyof typeof TASK_STATUS] === valor)?.toUpperCase();
+        return 0;
+        //return Object.keys(TASK_STATUS).find(key => TASK_STATUS[key as keyof typeof TASK_STATUS] === valor)?.toUpperCase();
     }
 
     const statusColors = ["bg-yellow-300", "bg-green-500", "bg-gray-400", "bg-blue-400"];

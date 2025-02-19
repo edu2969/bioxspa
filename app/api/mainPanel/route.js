@@ -1,7 +1,7 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Sucursal from '../../../models/sucursal';
-import BiPrincipal from "../../../models/biPrincipal";
+import Sucursal from '@/models/sucursal';
+import BiPrincipal from "@/models/biPrincipal";
 import { TIPO_SUCURSAL } from "@/app/utils/constants";
 
 export async function GET() {

@@ -1,6 +1,6 @@
 import { connectMongoDB } from "@/lib/mongodb";
-import BiVentas from '../../../models/biVentas';
-import Sucursal from '../../../models/sucursal';
+import BiPrincipal from '@/models/biPrincipal';
+import Sucursal from '@/models/sucursal';
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
@@ -22,7 +22,7 @@ export async function GET(request) {
         const currentDate = new Date();
         const pastYearDate = new Date(currentDate.setFullYear(currentDate.getFullYear() - 1));
 
-        const ventas = await BiVentas.aggregate([
+        const ventas = await BiPrincipal.aggregate([
             {
                 $match: {
                     sucursalId: sucursal._id,

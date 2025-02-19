@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FaPlus, FaUserCircle } from "react-icons/fa";
 import { buildStyles, CircularProgressbar } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
-import { PROJECT_STATUS, PROJECT_TYPE } from "@/app/utils/constants";
+//import { PROJECT_STATUS, PROJECT_TYPE } from "@/app/utils/constants";
 import { RiPencilFill } from "react-icons/ri";
 import { MdTask } from "react-icons/md";
 import { TbSubtask } from "react-icons/tb";
@@ -51,11 +51,13 @@ export default function Projects() {
     }
 
     const nombreEstado = (valor: number) => {
-        return Object.keys(PROJECT_STATUS).find(key => PROJECT_STATUS[key as keyof typeof PROJECT_STATUS] === valor)?.toUpperCase();
+        return 0;
+        //return Object.keys(PROJECT_STATUS).find(key => PROJECT_STATUS[key as keyof typeof PROJECT_STATUS] === valor)?.toUpperCase();
     }
 
     const projectTypeLabel = (valor: number) => {
-        return Object.keys(PROJECT_TYPE).find(key => PROJECT_TYPE[key as keyof typeof PROJECT_TYPE] === valor)?.toUpperCase();
+        return 0;
+        //return Object.keys(PROJECT_TYPE).find(key => PROJECT_TYPE[key as keyof typeof PROJECT_TYPE] === valor)?.toUpperCase();
     }
 
     const statusColors = ["bg-yellow-300", "bg-green-500", "bg-gray-400", "bg-blue-500", "bg-yellow-500"];

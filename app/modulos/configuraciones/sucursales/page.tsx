@@ -58,7 +58,7 @@ export default function Branches() {
                         </div>
                     </div>}
                     <div>
-                        {branches.map(branch => (
+                        {branches.map((branch: any) => (
                             <div key={branch._id} className="flex bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 py-2">
                                 <div className="w-1/2 px-2 flex items-center">
                                     <div>

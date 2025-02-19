@@ -27,7 +27,7 @@ const ClientesPage = () => {
         }
     };
 
-    const handleSearch = (e) => {
+    const handleSearch = (e: any) => {
         e.preventDefault();
         fetchClientes(searchQuery);
     };
@@ -59,8 +59,8 @@ const ClientesPage = () => {
                 </form>
                 </div>
                 <div>
-                {clientes.map((cliente) => (
-                    <div key={cliente.id} className="flex justify-between items-center bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 p-4">
+                {clientes.map((cliente: any, index) => (
+                    <div key={`cliente_${index}`} className="flex justify-between items-center bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 p-4">
                     <div>
                         <p className="text-lg font-semibold">{cliente.nombre}</p>
                         <p className="text-sm text-gray-500">{cliente.email}</p>

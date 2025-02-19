@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
-import { PROJECT_STATUS } from "@/app/utils/constants";
+//import { PROJECT_STATUS } from "@/app/utils/constants";
 import SprintView from "@/components/SprintView";
 
 export default function Sprints() {
@@ -31,7 +31,7 @@ export default function Sprints() {
             let totalHours = 0;
     
             tasks.forEach((task: TaskItemListType) => {
-                const taskWeight = project?.status === PROJECT_STATUS.defining ? task.estimatedWeight : task.weight;
+                const taskWeight = project?.status === /*PROJECT_STATUS.defining*/0 ? task.estimatedWeight : task.weight;
                 totalHours += taskWeight;
                 let sprintStartDate = dayjs(task.startDate);            
                 if (currentSprintHours + taskWeight > 40) {
