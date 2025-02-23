@@ -1,6 +1,6 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Dependencia from "@/models/Dependencia";
+import Dependencia from "@/models/dependencia";
 import Direccion from "@/models/direccion";
 
 export async function GET(req, { params }) {

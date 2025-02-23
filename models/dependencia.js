@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
+import mongoose, { models } from "mongoose";
 
-const DependenciaSchema = new mongoose.Schema({
+const dependenciaSchema = new mongoose.Schema({
     nombre: { type: String },
     sucursalId: { type: mongoose.Types.ObjectId, ref: 'Sucursal' },
     direccionId: { type: mongoose.Types.ObjectId, ref: 'Direccion' },
@@ -14,6 +14,5 @@ const DependenciaSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-const Dependencia = mongoose.models.Dependencia || mongoose.model('Dependencia', DependenciaSchema);
-
+const Dependencia = models.Dependencia || mongoose.model('Dependencia', dependenciaSchema);
 export default Dependencia;
