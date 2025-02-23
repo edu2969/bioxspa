@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from "next/link";
 //import { PROJECT_STATUS, TASK_STATUS } from "@/app/utils/constants";
 import { RiPencilFill } from "react-icons/ri";
-import Loader from "@/app/components/loader/loader";
+import Loader from "@/components/Loader";
 import { GiNightSleep } from "react-icons/gi";
 import dayjs from "dayjs";
 import 'dayjs/locale/es';

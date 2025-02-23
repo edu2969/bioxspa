@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { IoSettingsSharp } from "react-icons/io5"
 import NotificationsPanel from "../NotificationsPanel";
 import MessagesPanel from "../MessagesPanel";
-import { TIPO_SUCURSAL } from "@/app/utils/constants";
+import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 
 const stateColors = [
     "bg-white",
@@ -141,7 +141,7 @@ export default function BranchBussinessView() {
                                 {branches[index].rentabilidad}%
                                 <div className="text-xs">RENTABILIDAD</div>
                             </div>
-                            {branches[index].tipo == TIPO_SUCURSAL.sucursal && <div className="absolute flex top-16 left-72 font-bold">
+                            {branches[index].tipo == TIPO_DEPENDENCIA.sucursal && <div className="absolute flex top-16 left-72 font-bold">
                                 <div className="text-green-600 mr-6">
                                     <div className="flex orbitron">
                                         <span className="text-2xl">{branches[index].despachadosHoy}</span>
@@ -192,7 +192,7 @@ export default function BranchBussinessView() {
                                     </div>
                                 </div>
                             </div>
-                            {branch.tipo == TIPO_SUCURSAL.sucursal && <div className={`absolute bottom-0 right-16 ${branchSelected !== null ? 'w-[640px] h-[520px]' : ''}`}>
+                            {branch.tipo == TIPO_DEPENDENCIA.sucursal && <div className={`absolute bottom-0 right-16 ${branchSelected !== null ? 'w-[640px] h-[520px]' : ''}`}>
                                 <BarChart
                                     data={branch.topDeudores}
                                     width={branchSelected !== null ? 640 : 320}

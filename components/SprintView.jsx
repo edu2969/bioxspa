@@ -1,7 +1,7 @@
 "use client"
 
 import { CircularProgressbar } from "react-circular-progressbar";
-import Loader from "@/app/components/loader/loader";
+import Loader from "@/components/Loader";
 import Link from "next/link";
 import { AiFillHome } from "react-icons/ai";
 import { IoIosArrowForward } from "react-icons/io";

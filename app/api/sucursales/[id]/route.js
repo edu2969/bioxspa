@@ -1,8 +1,9 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Sucursal from "@/models/sucursal";
-import Bodega from "@/models/bodega";
+import Dependencia from "@/models/dependencia";
 import Direccion from "@/models/direccion";
+import Cliente from "@/models/cliente";
 
 export async function GET(req, { params }) {
     console.log("SUCURSAL getById...", params);
@@ -11,7 +12,7 @@ export async function GET(req, { params }) {
     if (!sucursal) {
         return NextResponse.json({ error: "Sucursal not found" }, { status: 400 });
     }
-    const bodegas = await Bodega.find({ sucursalId: sucursal._id }).lean();
+    const dependencias = await Dependencia.find({ sucursalId: sucursal._id }).lean();
 
     // Fetch the direccion for the sucursal
     let direccion = null;
@@ -22,22 +23,26 @@ export async function GET(req, { params }) {
         sucursal.direccion = direccion;
     }
 
-    // Fetch the direccion for each bodega
-    for (const bodega of bodegas) {
-        if (bodega.direccionId) {
-            const bodegaDireccion = await Direccion.findById(bodega.direccionId).lean();
-            bodega.direccion = bodegaDireccion;
+    // Fetch the direccion for each dependencia
+    for (const dependencia of dependencias) {
+        if (dependencia.direccionId) {
+            const dependenciaDireccion = await Direccion.findById(dependencia.direccionId).lean();
+            dependencia.direccion = dependenciaDireccion;
+        }
+        if(dependencia.clienteId) {
+            const cliente = await Cliente.findById(dependencia.clienteId).lean();
+            dependencia.cliente = cliente;
         }
     }
 
-    console.log("SALDRÁ", { sucursal, bodegas });
+    console.log("SALDRÁ", { sucursal, dependencias });
 
-    return NextResponse.json({ sucursal, bodegas });
+    return NextResponse.json({ sucursal, dependencias });
 }
 
 export async function POST(req, { params }) {
     const body = await req.json();
-    console.log("SUCURSAL Update...", body, params);
+    console.log("SUCURSAL Update v2...", body, params);
 
     // Update or create Direccion for Sucursal
     let direccionId = body.direccionId;
@@ -56,38 +61,42 @@ export async function POST(req, { params }) {
         direccionId = savedDireccion._id;
     }
 
-    // Update Bodegas and their Direcciones
-    for (const bodega of body.bodegas) {
-        let direccionId = bodega.direccionId;
+    // Update Dependencias and their Direcciones
+    for (const dependencia of body.dependencias) {
+        let direccionId = dependencia.direccionId;
 
         // Check if direccion exists
-        if (bodega.direccion && !direccionId) {
-            const direccion = await Direccion.findOne({ apiId: bodega.direccion.apiId });
+        if (dependencia.direccion && !direccionId) {
+            const direccion = await Direccion.findOne({ apiId: dependencia.direccion.apiId });
             if (direccion) {
                 direccionId = direccion._id;
             } else {
-                const newDireccion = new Direccion(bodega.direccion);
+                const newDireccion = new Direccion(dependencia.direccion);
                 const savedDireccion = await newDireccion.save();
                 direccionId = savedDireccion._id;
             }
         }
 
-        const bodegaData = {
+        const dependenciaData = {
             sucursalId: params.id,
-            nombre: bodega.nombre,
+            nombre: dependencia.nombre,
             direccionId: direccionId,
-            operativa: bodega.operativa,
-            createdAt: bodega.createdAt ? new Date(bodega.createdAt) : new Date(),
+            operativa: dependencia.operativa,
+            tipo: dependencia.tipo,
+            createdAt: dependencia.createdAt ? new Date(dependencia.createdAt) : new Date(),
             updatedAt: new Date()
         };
+        if(dependencia.clienteId) {
+            dependenciaData.clienteId = dependencia.clienteId;
+        }
 
-        console.log("BODEGA DATA...", bodegaData);
+        console.log("DEPENDENCIA DATA...", dependenciaData);
 
-        if (bodega._id) {
-            await Bodega.findByIdAndUpdate(bodega._id, bodegaData, { new: true, upsert: true });
+        if (dependencia._id) {
+            await Dependencia.findByIdAndUpdate(dependencia._id, dependenciaData, { new: true, upsert: true });
         } else {
-            const newBodega = new Bodega(bodegaData);
-            await newBodega.save();
+            const newDependencia = new Dependencia(dependenciaData);
+            await newDependencia.save();
         }
     }
 

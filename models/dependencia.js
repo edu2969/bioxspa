@@ -1,14 +1,19 @@
 import mongoose from 'mongoose';
 
-const BodegaSchema = new mongoose.Schema({
+const DependenciaSchema = new mongoose.Schema({
     nombre: { type: String },
     sucursalId: { type: mongoose.Types.ObjectId, ref: 'Sucursal' },
     direccionId: { type: mongoose.Types.ObjectId, ref: 'Direccion' },
+    clienteId: { type: mongoose.Types.ObjectId, ref: 'Cliente' },
     operativa: { type: Boolean },
+    tipo: { 
+        type: Number,
+        default: 10,
+    },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
-const Bodega = mongoose.models.Bodega || mongoose.model('Bodega', BodegaSchema);
+const Dependencia = mongoose.models.Dependencia || mongoose.model('Dependencia', DependenciaSchema);
 
-export default Bodega;
+export default Dependencia;

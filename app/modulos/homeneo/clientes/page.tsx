@@ -1,5 +1,5 @@
 'use client'
-import Loader from "@/app/components/loader/loader";
+import Loader from "@/components/Loader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FaPlus, FaUserCircle } from "react-icons/fa";

@@ -1,21 +1,21 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Bodega from "@/models/bodega";
+import Dependencia from "@/models/Dependencia";
 import Direccion from "@/models/direccion";
 
 export async function GET(req, { params }) {
-    console.log("BODEGA getById...", params);
+    console.log("Dependencia getById...", params);
     await connectMongoDB();
-    const bodega = await Bodega.findById(params.id);
-    if (!bodega) {
-        return NextResponse.json({ error: "Bodega not found" }, { status: 400 });
+    const dependencia = await Dependencia.findById(params.id);
+    if (!dependencia) {
+        return NextResponse.json({ error: "Dependencia not found" }, { status: 400 });
     }
-    return NextResponse.json(bodega);
+    return NextResponse.json(dependencia);
 }
 
 export async function POST(req, { params }) {
     const body = await req.json();
-    console.log("BODEGA Update...", body, params);
+    console.log("DEPENDENCIA Update...", body, params);
 
     await connectMongoDB();
 
@@ -41,17 +41,18 @@ export async function POST(req, { params }) {
         await direccion.save();
     }
 
-    const bodegaData = {
+    const dependenciaData = {
         id: body.id,
         nombre: body.nombre,
         sucursalId: body.sucursalId,
         visible: body.visible,
         prioridad: body.prioridad,
         direccionId: direccion._id,
+        clienteId: body.clientId,
         createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
         updatedAt: new Date()
     };
 
-    const bodegaUpdated = await Bodega.findByIdAndUpdate(params.id, bodegaData, { new: true, upsert: true });
-    return bodegaUpdated ? NextResponse.json(bodegaUpdated) : NextResponse.json({ error: "Error updating bodega" }, { status: 404 });
+    const dependenciaUpdated = await Dependencia.findByIdAndUpdate(params.id, dependenciaData, { new: true, upsert: true });
+    return dependenciaUpdated ? NextResponse.json(dependenciaUpdated) : NextResponse.json({ error: "Error updating dependencia" }, { status: 404 });
 }

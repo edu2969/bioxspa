@@ -4,8 +4,9 @@ export const USER_ROLE = {
     client: 20,
 }
 
-export const TIPO_SUCURSAL = {
+export const TIPO_DEPENDENCIA = {
     sucursal: 1,
     bodega: 10,
-    ambas: 11,
+    sucursal_bodega: 11,
+    bodega_proveedor: 20,
 }

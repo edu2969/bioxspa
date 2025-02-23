@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AiFillHome } from "react-icons/ai";
 import { IoIosArrowForward } from "react-icons/io";
-import Loader from "@/app/components/loader/loader";
+import Loader from "@/components/Loader";
 import { FaPen } from "react-icons/fa";
 
 export default function Branches() {

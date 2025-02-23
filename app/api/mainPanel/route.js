@@ -2,7 +2,7 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Sucursal from '@/models/sucursal';
 import BiPrincipal from "@/models/biPrincipal";
-import { TIPO_SUCURSAL } from "@/app/utils/constants";
+import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 
 export async function GET() {
     await connectMongoDB();
@@ -78,8 +78,8 @@ export async function GET() {
             return {
                 nombre: sucursal.nombre,
                 _id: sucursal._id,
-                tipo: sucursal.tipoSucursal == "Sucursal" ? TIPO_SUCURSAL.sucursal
-                    : sucursal.tipoSucursal == "Bodega" ? TIPO_SUCURSAL.bodega : TIPO_SUCURSAL.ambas,
+                tipo: sucursal.tipoSucursal == "Sucursal" ? TIPO_DEPENDENCIA.sucursal
+                    : sucursal.tipoSucursal == "Bodega" ? TIPO_DEPENDENCIA.bodega : TIPO_DEPENDENCIA.ambas,
                 totalVentas: venta ? venta.totalVentas : 0,
                 deudaTotal: venta ? venta.deudaTotal : 0,
                 m3Vendidos: 0,
