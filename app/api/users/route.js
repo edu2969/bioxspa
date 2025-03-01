@@ -1,32 +1,19 @@
 import { connectMongoDB } from "@/lib/mongodb";
-import User from "@/models/user";
 import { NextResponse } from "next/server";
+import User from "@/models/user";
 import bcrypt from "bcryptjs";
 
-/*export async function GET() {
+export async function GET() {
   try {
-    console.log("getAll...");
+    console.log("getAll USERS...");
     await connectMongoDB();
     const users = await User.find();
-
-    const usersWithClientInfo = await Promise.all(users.map(async (u) => {
-      const client = await Client.findOne({ _id: u.clientId });
-      return {
-        id: u._id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        avatarImg: u.avatarImg,
-        clientImg: client?.imgLogo ?? '',
-      };
-    }));
-
-    return NextResponse.json({ users: usersWithClientInfo });
+    return NextResponse.json({ users });
   } catch (error) {
     console.log(error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-}*/
+}
 
 export async function POST(req) {
   try {
