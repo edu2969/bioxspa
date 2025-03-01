@@ -580,65 +580,56 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                     </div>
                                                 )}
                                             </div>
-
-
-
-
-
                                             <div className="px-6 py-4 whitespace-nowrap w-7/12">
-                                                {dependencia.cargos?.length > 0 ? (
-                                                    <div className="flex bg-blue-50 shadow-md p-4 rounded-md">
-                                                        <div className="w-9/12">
-                                                            <div className="grid grid-cols-6 gap-2">
-                                                                {dependencia.cargos.map((cargo, idx) => (
-                                                                    <div key={`avatar_${index}_${idx}`} className="w-14 h-14">
-                                                                        <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
-                                                                            <img
-                                                                                src={`/profiles/${cargo.user?.email.split('@')[0]}.jpg`}
-                                                                                alt="avatar"
-                                                                                className="w-14 h-14 rounded-full mr-2"
-                                                                            />
-                                                                            {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                            <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
-                                                                                const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
-                                                                                const updatedDependencias = [...dependencias];
-                                                                                updatedDependencias[index].cargos = updatedCargos;
-                                                                                setDependencias(updatedDependencias);
-                                                                            }}>
-                                                                                <MdDeleteForever className="text-lg border border-gray-400 rounded-full" />
-                                                                            </span>
-                                                                        </div>
+                                                <div className="flex bg-blue-50 shadow-md p-4 rounded-md">
+                                                    <div className="w-9/12">
+                                                        {dependencia.cargos?.length > 0 ? <div className="grid grid-cols-6 gap-2">
+                                                            {dependencia.cargos?.map((cargo, idx) => (
+                                                                <div key={`avatar_${index}_${idx}`} className="w-14 h-14">
+                                                                    <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
+                                                                        <img
+                                                                            src={`/profiles/${cargo.user?.email.split('@')[0]}.jpg`}
+                                                                            alt="avatar"
+                                                                            className="w-14 h-14 rounded-full mr-2"
+                                                                        />
+                                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
+                                                                            const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
+                                                                            const updatedDependencias = [...dependencias];
+                                                                            updatedDependencias[index].cargos = updatedCargos;
+                                                                            setDependencias(updatedDependencias);
+                                                                        }}>
+                                                                            <MdDeleteForever className="text-lg border border-gray-400 rounded-full" />
+                                                                        </span>
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                        <div className="w-3/12 text-right">
-                                                            {editingIndex === index && <button
-                                                                type="button"
-                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                                onClick={() => {
-                                                                    setValue(`newCargoDependenciaUsuario`, '');
-                                                                    setValue(`newCargoDependenciaTipo`, TIPO_CARGO.gerente);
-                                                                    setEditingCargoDependenciaIndex(dependencia.cargos.length);
-                                                                    setEditingCargoDependenciaParentIndex(index);
-                                                                }}
-                                                            >
-                                                                <TbMedal2 size="1.5rem" className="mr-2" />
-                                                                AGREGAR
-                                                            </button>}
-                                                        </div>
+                                                                </div>
+                                                            ))}
+                                                        </div> : <div className="flex items-center text-sm text-gray-500">
+                                                            <IoIosInformationCircle className="mr-2 text-lg" />
+                                                            NO HAY CARGOS DESIGNADOS AÚN
+                                                        </div>}
                                                     </div>
-                                                ) : (
-                                                    <div className="flex space-x-4">
-                                                        <FaInfoCircle className="text-gray-500 text-xl" />
-                                                        <div className="text-sm text-gray-900">No hay cargos designados aún</div>
+                                                    <div className="w-3/12 text-right">
+                                                        {editingIndex === index && <button
+                                                            type="button"
+                                                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                            onClick={() => {
+                                                                setValue(`newCargoDependenciaUsuario`, '');
+                                                                setValue(`newCargoDependenciaTipo`, TIPO_CARGO.gerente);
+                                                                setEditingCargoDependenciaIndex(dependencia.cargos.length);
+                                                                setEditingCargoDependenciaParentIndex(index);
+                                                            }}
+                                                        >
+                                                            <TbMedal2 size="1.5rem" className="mr-2" />
+                                                            AGREGAR
+                                                        </button>}
                                                     </div>
-                                                )}
+                                                </div>
 
 
 
