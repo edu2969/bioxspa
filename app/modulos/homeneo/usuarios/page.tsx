@@ -76,7 +76,7 @@ export default function Usuarios() {
                                             {user.avatarImg == "" && <FaUserCircle className="w-10 h-10 text-slate-400" size="1em" />}
                                             <div className="ps-3">
                                                 <div className="text-base font-semibold">
-                                                    {user.role == USER_ROLE.client ? <span className="bg-blue-800 rounded-md text-white p-1">CLIENTE</span>
+                                                    {user.role == USER_ROLE.cliente ? <span className="bg-blue-800 rounded-md text-white p-1">CLIENTE</span>
                                                         : <GiMoebiusStar size="2em" />}
                                                     <div className="font-normal text-gray-500">{user.email}</div>{user.name}
                                                 </div>
