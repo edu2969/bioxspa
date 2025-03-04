@@ -23,3 +23,8 @@ export const TIPO_CARGO = {
     conductor: 32,
     proveedor: 64  
 }
+
+export const TIPO_PRECIO = {
+    mayorista: 1,
+    minorista: 2
+}   

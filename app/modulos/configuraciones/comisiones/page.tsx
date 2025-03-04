@@ -194,10 +194,10 @@ const ComisionesPage = () => {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center space-x-2 uppercase">
-                                                    <p className="text-sm bg-slate-700 rounded-md text-white py-1 pl-2 pr-1 mt-2">General: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionGeneral || 0}%</span></p>
-                                                    <p className="text-sm bg-slate-700 rounded-md text-white py-1 pl-2 pr-1 mt-2">Retiro: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionRetiro || 0}%</span></p>
-                                                    <p className="text-sm bg-slate-700 rounded-md text-white py-1 pl-2 pr-1 mt-2">Entrega: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionEntrega || 0}%</span></p>
-                                                    <p className="text-sm bg-slate-700 rounded-md text-white py-1 pl-2 pr-1 mt-2">Pto Vta: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionPtoVta || 0}%</span></p>
+                                                    <p className={`text-sm bg-slate-${usuario.comision?.comisionGeneral || 0 ? '700' : '400'} rounded-md text-white py-1 pl-2 pr-1 mt-2`}>General: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionGeneral || 0}%</span></p>
+                                                    <p className={`text-sm bg-slate-${usuario.comision?.comisionRetiro || 0 ? '700' : '400'} rounded-md text-white py-1 pl-2 pr-1 mt-2`}>Retiro: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionRetiro || 0}%</span></p>
+                                                    <p className={`text-sm bg-slate-${usuario.comision?.comisionEntrega || 0 ? '700' : '400'} rounded-md text-white py-1 pl-2 pr-1 mt-2`}>Entrega: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionEntrega || 0}%</span></p>
+                                                    <p className={`text-sm bg-slate-${usuario.comision?.comisionPtoVta || 0 ? '700' : '400'} rounded-md text-white py-1 pl-2 pr-1 mt-2`}>Pto Vta: <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">{usuario.comision?.comisionPtoVta || 0}%</span></p>
                                                     <button className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 mt-2" onClick={() => handleEdit(index, usuario.comision)}>EDITAR</button>
                                                 </div>
                                             )}

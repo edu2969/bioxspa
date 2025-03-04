@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
 
-const XubcategoriaProductoSchema = new mongoose.Schema({
-    id: { type: String, required: true },
+const subcategoriaCatalogoSchema = new mongoose.Schema({
     nombre: { type: String, required: true },
-    categoria_id: { type: String, required: true },
+    categoriaId: { type: String, required: true },
     arriendo: { type: String, default: null },
     url: { type: String, required: true },
     deleted_at: { type: Date, default: null },
@@ -11,6 +10,6 @@ const XubcategoriaProductoSchema = new mongoose.Schema({
     updated_at: { type: Date }
 });
 
-const XubcategoriaProducto = mongoose.models.XubcategoriaProducto || mongoose.model('XubcategoriaProducto', XubcategoriaProductoSchema);
+const XubcategoriaProducto = mongoose.models.XubcategoriaProducto || mongoose.model('XubcategoriaProducto', subcategoriaProductoSchema);
 
 export default XubcategoriaProducto;

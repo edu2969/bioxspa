@@ -11,9 +11,7 @@ import DetalleVenta from "@/models/detalleVenta";
 import DocumentoTributario from "@/models/documentoTributario";
 import CuotaPagada from "@/models/cuotaPagada";
 import CuotaCobrada from "@/models/cuotaCobrada";
-import Producto from "@/models/producto";
 import CategoriaProducto from "@/models/categoriaProducto";
-import SubcategoriaProducto from "@/models/subcategoriaProducto";
 
 const parseDateString = (dateString) => {
     if (!dateString) {
@@ -66,12 +64,8 @@ export async function POST(req) {
                     Model = CuotaCobrada;
                 } else if (filename.includes("venta")) {
                     Model = Venta;
-                } else if (filename.includes("sub_categoria_productos")) {
-                    Model = SubcategoriaProducto;
                 } else if (filename.includes("categoria_productos")) {
                     Model = CategoriaProducto;
-                } else if (filename.includes("productos")) {
-                    Model = Producto;
                 } else {
                     return null;
                 }

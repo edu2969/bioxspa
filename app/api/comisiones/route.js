@@ -2,12 +2,13 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import User from "@/models/user";
 import Comision from "@/models/comision";
+import { USER_ROLE } from "@/app/utils/constants";
 
 // filepath: /d:/git/bioxspa/app/api/comisiones/route.js
 
 export async function GET() {
     await connectMongoDB();
-    const users = await User.find().lean();
+    const users = await User.find({ role: { $ne: USER_ROLE.neo }}).lean();
     const comisiones = await Comision.find().lean();
 
     const usersWithComision = users.map(user => {
