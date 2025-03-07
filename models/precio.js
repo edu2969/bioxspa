@@ -8,6 +8,7 @@ const HistorialSchema = new mongoose.Schema({
 
 const PrecioSchema = new mongoose.Schema({
     itemCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemCatalogo', required: true },
+    usuarioId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     dependenciaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dependencia', default: null },
     sucursalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Sucursal', default: null },
     categoriaCliente: { type: String, required: true },
@@ -16,6 +17,7 @@ const PrecioSchema = new mongoose.Schema({
     moneda: { type: String, required: true },
     valor: { type: Number, required: true },
     fechaDesde: { type: Date, required: true },
+    fechaHasta: { type: Date },
     historial: [HistorialSchema]
 }, { timestamps: true });
 

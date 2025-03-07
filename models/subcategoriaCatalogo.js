@@ -1,14 +1,18 @@
 import mongoose from 'mongoose';
 
 const SubcategoriaCatalogoSchema = new mongoose.Schema({
+    temporalId: { type: String },
     nombre: { type: String, required: true },
-    tipo: { type: Number, required: true }, // 1: Catalogo, 2: Servicio, 3: Mixto
     categoriaCatalogoId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'CategoriaCatalogo', 
         required: true 
     },
-    urlImagen: { type: String, required: true }
+    cantidad: { type: Number },
+    unidad: { type: String },
+    nombreGas: { type: String },
+    sinSifon: { type: Boolean, default: false },    
+    urlImagen: { type: String, default: null },
 }, {
     timestamps: true
 });

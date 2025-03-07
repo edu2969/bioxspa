@@ -1,148 +1,144 @@
 import { connectMongoDB } from "@/lib/mongodb";
-import Xliente from "@/models/xliente";
-import Cliente from "@/models/cliente";
-import Direccion from "@/models/direccion";
-import User from "@/models/user"; // Asegúrate de tener el modelo de User importado
-import XocumentoTributario from "@/models/xocumentoTributario";
 import { NextResponse } from "next/server";
+import XategoriaProducto from "@/models/xategoriaProducto";
+import CategoriaCatalogo from "@/models/categoriaCatalogo";
+import XubcategoriaProducto from "@/models/xubcategoriaProducto";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import ItemCatalogo from "@/models/itemCatalogo";
+import Xroducto from "@/models/xroducto";
 
 export async function GET() {
-    return NextResponse.json({ message: "Data transferred successfully" });
-    
-    try {
-        console.log("Connecting to MongoDB...");
-        await connectMongoDB();
-        console.log("Connected to MongoDB.");
+    console.log("Connecting to MongoDB...");
+    await connectMongoDB();
+    console.log("Connected to MongoDB");
 
-        const xlientes = await Xliente.find({});
-        console.log(`Found ${xlientes.length} xlientes.`);
+    /*console.log("Migrating subcategories v1.4...");
+    await migrateSubcategorias();
+    console.log("Subcategories migrated");
 
-        const apiKey = process.env.GOOGLE_API_KEY;
-        const totalXlientes = xlientes.length;
-        const startTime = Date.now();
-        let clientesBatch = [];
+    console.log("Improving subcategories v1.1...");
+    await improveSubcategorias();
+    console.log("Subcategories improved");*/
 
-        for (let i = 0; i < totalXlientes; i++) {
-            const x = xlientes[i];
-            
-            const documentoTributario = await XocumentoTributario.findOne({ id: x.tipodoc });
+    /*console.log("Migrating items categoria...");
+    await migrateItemsCategoria();
+    console.log("Items categoria migrated");*/
 
-            // Fetch address details from Google Maps API
-            const query = encodeURIComponent(x.direccion);
-            console.log(`Fetching address details for query: ${x.direccion}`);
-            const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&key=${apiKey}`;
+    return NextResponse.json({ message: "Success migrate and improve" });
+}
 
-            await new Promise(resolve => setTimeout(resolve, 200)); // Wait for 200 milliseconds
+const migrateItemsCategoria = async () => {
+    const xroductos = await Xroducto.find();
+    console.log(`Found ${xroductos.length} xroductos`);
 
-            const response = await fetch(url);
-            const data = await response.json();
-
-            let direccionId = null;
-
-            if (data.results && data.results.length > 0) {
-                console.log(`Google Maps API response for query ${query}:`, JSON.stringify(data, null, 2));
-                const place = data.results[0];
-                let direccion = await Direccion.findOne({ apiId: place.place_id });
-                const formattedAddressParts = place.formatted_address.split(',').map(part => part.trim());
-                const comuna = formattedAddressParts.length > 1 ? formattedAddressParts[1] : '';
-                const ciudad = formattedAddressParts.length > 2 ? formattedAddressParts[2] : '';
-                const region = formattedAddressParts.length > 3 ? formattedAddressParts[3] : '';
-
-                if (!direccion) {                    
-                    direccion = new Direccion({
-                        nombre: place.formatted_address,
-                        apiId: place.place_id,
-                        direccionOriginal: x.direccion,
-                        latitud: place.geometry.location.lat,
-                        longitud: place.geometry.location.lng,
-                        comuna: comuna,
-                        ciudad: ciudad,
-                        region: region,
-                        isoPais: 'CL',
-                        categoria: place.types[0] || ''
-                    });
-                    await direccion.save();
-                    console.log(`Saved new direccion for xliente ${x.nombre}: ${direccion._id}`);
-                } else {
-                    if (direccion.nombre !== place.formatted_address || !direccion.comuna) {
-                        direccion.nombre = place.formatted_address;
-                        direccion.direccionOriginal = x.direccion;
-                        direccion.comuna = comuna;
-                        direccion.ciudad = ciudad;
-                        direccion.region = region;
-                        direccion.isoPais = 'CL';
-                        direccion.categoria = place.types[0] || '';                        
-                        await direccion.save();
-                        console.log(`Updated direccion glosa for xliente ${x.nombre}: ${direccion._id}`);
-                    } else {
-                        console.log(`Found existing direccion for xliente ${x.nombre}: ${direccion._id}`);
-                    }
-                }
-
-                direccionId = direccion._id;
-            } else {
-                console.log(`No address found for query: ${query}`);
-            }
-
-            // Find the creator's user ID based on the creado_por field
-            let creadorId = null;
-            if (x.creado_por) {
-                const user = await User.findOne({ email: x.creado_por });
-                if (user) {
-                    creadorId = user._id;
-                }
-            }
-
-            clientesBatch.push({
-                creadorId: creadorId,
-                nombre: x.nombre,
-                rut: x.rut,
-                direccionId: direccionId,
-                giro: x.giro || "",
-                telefono: x.telefono || "",
-                email: x.email || "",
-                emailIntercambio: x.email_intercambio || null,
-                envioFactura: x.envio_factura?.toLowerCase() === "si",
-                envioReporte: x.envio_reporte?.toLowerCase() === "si",
-                seguimiento: x.seguimiento?.toLowerCase() === "si",
-                ordenCompra: x.orden_compra?.toLowerCase() === "si",
-                reporteDeuda: x.reporte_deuda?.toLowerCase() === "si",
-                arriendo: x.arriendo?.toLowerCase() === "si",
-                dias_de_pago: parseInt(x.dias_de_pago) || 1,
-                notificacion: x.notificacion?.toLowerCase() === "si",
-                credito: x.credito?.toLowerCase() === "si",
-                urlWeb: x.web || "",
-                comentario: x.comentario || "",
-                contacto: x.contacto || "",
-                tipoPrecio: x.tipoprecio?.toLowerCase() === "mayorista" ? 1 : 2,
-                documentoTributarioId: documentoTributario ? documentoTributario._id : null,
-                activo: x.activo === true,
-                cilindrosMin: 0,
-                cilindrosMax: parseInt(x.limite_cilindros) || 9999,
-                enQuiebra: x.quiebra?.toLowerCase() === "si",
-                mesesAumento: x.mesesaumento ? x.mesesaumento.split(',').map(Number) : null,
-                createdAt: x.created_at,
-                updatedAt: x.updated_at,
-            });
-
-            if (clientesBatch.length === 25 || i === totalXlientes - 1) {
-                console.log(`Inserting batch of ${clientesBatch.length} clientes into the database...`);
-                await Cliente.insertMany(clientesBatch);
-                console.log(`Inserted batch of ${clientesBatch.length} clientes into the database.`);
-                clientesBatch = [];
-            }
-
-            const processedPercentage = ((i + 1) / totalXlientes) * 100;
-            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-            const estimatedTotalTime = (elapsedTime / (i + 1)) * totalXlientes;
-            const estimatedRemainingTime = estimatedTotalTime - elapsedTime;
-
-            console.log(`Processed ${processedPercentage.toFixed(2)}% of xlientes. Estimated time remaining: ${estimatedRemainingTime.toFixed(2)} seconds.`);
+    for (const xroducto of xroductos) {
+        const subcategoriaCatalogo = await SubcategoriaCatalogo.findOne({ temporalId: xroducto.subcategoria_id });
+        if (!subcategoriaCatalogo) {
+            console.log(`SubcategoriaCatalogo not found for xroducto ${xroducto._id}`);
+            continue;
         }
 
-        return NextResponse.json({ message: "Data transferred successfully" });
-    } catch (error) {
-        console.log(error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        const newItem = new ItemCatalogo({
+            temporalId: xroducto.id,
+            codigo: xroducto.codigo,
+            subcategoriaCatalogoId: subcategoriaCatalogo._id,
+            nombre: xroducto.nombre,
+            descripcion: xroducto.descripcion,
+            descripcionCorta: xroducto.breve,
+            fichaTecnica: xroducto.fichatecnica,
+            urlFichaTecnica: xroducto.fichatecnica,
+            urlImagen: xroducto.url,
+            garantiaAnual: parseInt(xroducto.garantia) || 0,
+            destacado: xroducto.destacado === 'true',
+            stockMinimo: parseInt(xroducto.stockminimo) || 0,
+            stockActual: parseInt(xroducto.stock_producto) || 0,
+            visible: xroducto.visible === 'true',
+            url: xroducto.url,
+            createdAt: xroducto.created_at,
+            updatedAt: xroducto.updated_at
+        });
+
+        await newItem.save();
+        console.log(`Migrated xroducto ${xroducto.nombre} to item ${newItem._id}`);
     }
 }
+
+const migrateSubcategorias = async () => {
+    const xubcategorias = await XubcategoriaProducto.find();
+    console.log(`Found ${xubcategorias.length} xubcategorias`);
+
+    for (const xubcategoria of xubcategorias) {
+        const xategoriaProducto = await XategoriaProducto.findOne({ id: xubcategoria.categoria_id });
+        if (!xategoriaProducto) {
+            console.log(`CategoriaProducto not found for xubcategoria ${xubcategoria._id}`);
+            continue;
+        }
+
+        const categoriaCatalogo = await CategoriaCatalogo.findOne({ nombre: xategoriaProducto.nombre });
+        if (!categoriaCatalogo) {
+            console.log(`CategoriaCatalogo not found for xategoriaProducto ${xategoriaProducto._id}`);
+            continue;
+        }
+
+        const newSubcategoria = new SubcategoriaCatalogo({
+            temporalId: xubcategoria.id,
+            nombre: xubcategoria.nombre,
+            categoriaCatalogoId: categoriaCatalogo._id,
+            urlImagen: xubcategoria.url,
+            createdAt: xubcategoria.created_at,
+            updatedAt: xubcategoria.updated_at
+        });
+
+        await newSubcategoria.save();
+        console.log(`Migrated xubcategoria ${xubcategoria.nombre} to subcategoria ${newSubcategoria._id}`);
+    }
+}
+
+
+const improveSubcategorias = async () => {
+    const subcategorias = await SubcategoriaCatalogo.find();
+    console.log(`Found ${subcategorias.length} subcategories`);
+
+    for (const subcategoria of subcategorias) {
+        const nombreLower = subcategoria.nombre.toLowerCase();
+        const nombreParts = nombreLower.split(" ");
+
+        let cantidad = null;
+        let unidad = null;
+        let nombreGas = null;
+        let sinSifon = false;
+
+        for (let i = 0; i < nombreParts.length; i++) {
+            if (nombreParts[i] === "m3" || nombreParts[i] === "kgs") {
+                unidad = nombreParts[i];
+                if (i > 0 && !isNaN(parseFloat(nombreParts[i - 1].replace(",", ".")))) {
+                    cantidad = parseFloat(nombreParts[i - 1].replace(",", "."));
+                }                
+            } 
+            if (nombreParts[i] === "de") {
+                nombreGas = nombreParts.slice(0, i).join(" ");
+            } 
+            if (nombreParts[i] === "sifon") {
+                if (i > 0 && nombreParts[i - 1] === "sin") {
+                    sinSifon = true;
+                } else if (i > 0 && nombreParts[i - 1] === "con") {
+                    sinSifon = false;
+                }
+            }
+        }
+
+        if (cantidad != null) {
+            subcategoria.cantidad = cantidad;
+        }
+        if (unidad != null) {
+            subcategoria.unidad = unidad;
+        }
+        if (nombreGas != null) {
+            subcategoria.nombreGas = nombreGas;
+        }
+        if (sinSifon != null) {
+            subcategoria.sinSifon = sinSifon;
+        }
+        await subcategoria.save();
+    }
+};

@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 const ItemCatalogoSchema = new mongoose.Schema({
+    temporalId: { type: String },
     codigo: { type: String },    
-    categoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'CategoriaCatalogo', required: true },
     subcategoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubcategoriaCatalogo', required: true },
     nombre: { type: String, default: null },
     descripcion: { type: String, default: null },
