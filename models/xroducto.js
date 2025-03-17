@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
+import mongoose, { Schema, models } from "mongoose";
 
-const XroductoSchema = new mongoose.Schema({
+const XroductoSchema = new Schema({
     id: { type: String },
     codigo: { type: String },
     codigo_proveedor: { type: String, default: null },
@@ -34,6 +34,6 @@ const XroductoSchema = new mongoose.Schema({
     updated_at: { type: Date }
 });
 
-const Xroducto = mongoose.models.XroductoSchema || mongoose.model('Xroducto', XroductoSchema);
+const Xroducto = models.Xroducto || mongoose.model('Xroducto', XroductoSchema);
 
 export default Xroducto;

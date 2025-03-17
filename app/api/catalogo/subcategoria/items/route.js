@@ -13,7 +13,7 @@ export async function GET(request) {
     }
 
     await connectMongoDB();
-    const itemsCatalogo = await ItemCatalogo.find({ subcategoriaCatalogoId: id }).lean();
+    const itemsCatalogo = await ItemCatalogo.find({ subcategoriaCatalogoIds: id }).lean();
 
     const subcategoria = await SubcategoriaCatalogo.findById(id).lean();
     if (!subcategoria) {

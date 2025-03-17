@@ -4,6 +4,7 @@ const ItemCatalogoSchema = new mongoose.Schema({
     temporalId: { type: String },
     codigo: { type: String },    
     subcategoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubcategoriaCatalogo', required: true },
+    subcategoriaCatalogoIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'SubcategoriaCatalogo' },
     nombre: { type: String, default: null },
     descripcion: { type: String, default: null },
     descripcionCorta: { type: String, default: null },    

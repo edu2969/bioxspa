@@ -27,4 +27,16 @@ export const TIPO_CARGO = {
 export const TIPO_PRECIO = {
     mayorista: 1,
     minorista: 2
-}   
+} 
+
+export const TIPO_COMISION = {
+    retiro: 1, 
+    entrega: 2,
+    nuevoCliente: 4,
+    puntoVenta: 8
+}
+
+export const TIPO_UNIDAD_COMISION = {
+    porcentaje: 1, 
+    monto: 2
+}

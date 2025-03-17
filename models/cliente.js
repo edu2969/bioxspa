@@ -1,6 +1,7 @@
 import mongoose, { Schema, models } from "mongoose";
 
 const clienteSchema = new Schema({
+    temporalId: { type: String },
     creadorId: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
     nombre: { type: String, required: true },
     rut: { type: String, required: true },

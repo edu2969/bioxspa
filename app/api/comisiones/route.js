@@ -3,19 +3,40 @@ import { NextResponse } from "next/server";
 import User from "@/models/user";
 import Comision from "@/models/comision";
 import { USER_ROLE } from "@/app/utils/constants";
+import Cliente from "@/models/cliente";
 
 // filepath: /d:/git/bioxspa/app/api/comisiones/route.js
 
 export async function GET() {
+    console.log("Connecting to MongoDB...");
     await connectMongoDB();
+    console.log("Connected to MongoDB");
+
+    console.log("Fetching users...");
     const users = await User.find({ role: { $ne: USER_ROLE.neo }}).lean();
-    const comisiones = await Comision.find().lean();
+    console.log(`Fetched ${users.length} users`);
 
-    const usersWithComision = users.map(user => {
-        const comision = comisiones.find(c => c.userId.toString() === user._id.toString());
-        return { ...user, comision };
-    });
+    console.log("Mapping users with comision...");
+    const usersWithComision = await Promise.all(users.map(async user => {
+        const now = new Date();
+        const comisiones = await Comision.find({
+            userId: user._id,
+            $or: [
+                { fechaHasta: { $exists: false } },
+                { fechaHasta: { $gte: now } }
+            ],
+            fechaDesde: { $lte: now }
+        }).lean();
+        const comisionesWithCliente = await Promise.all(comisiones.map(async comision => {
+            if (comision.clienteId) {
+                comision.cliente = await Cliente.findOne({ _id: comision.clienteId }).lean();
+            }
+            return comision;
+        }));
+        return { ...user, comisiones: comisionesWithCliente };
+    }));
 
+    console.log("Returning users with comision");
     return NextResponse.json(usersWithComision);
 }
 

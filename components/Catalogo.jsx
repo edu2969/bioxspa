@@ -6,14 +6,19 @@ import { AiFillHome } from 'react-icons/ai';
 import { IoIosArrowForward } from 'react-icons/io';
 import { IoCloseSharp } from 'react-icons/io5';
 import { useEffect } from 'react';
+import Loader from './Loader';
 
 export default function Catalogo() {
     const [selectedCategoria, setSelectedCategoria] = useState(null);
     const [selectedSubcategoria, setSelectedSubcategoria] = useState(null);
     const [subcategorias, setSubcategorias] = useState([]);
     const [items, setItems] = useState([]);
+    const [loadingCategoria, setLoadingCategoria] = useState(false);
+    const [loadingSubcategoria, setLoadingSubcategoria] = useState(false);
+    const [loadingItems, setLoadingItems] = useState(false);
 
     const handleCategoriaClick = async (index) => {
+        setLoadingSubcategoria(true);
         const categoria = categorias[index];
         setSelectedCategoria(categoria);
         setSelectedSubcategoria(null);
@@ -21,13 +26,16 @@ export default function Catalogo() {
         const response = await fetch(`/api/catalogo/subcategoria?id=${categoria._id}`);
         const data = await response.json();
         setSubcategorias(data);
+        setLoadingSubcategoria(false);
     };
 
     const handleSubcategoriaClick = async (subcategoria) => {
+        setLoadingItems(true);
         setSelectedSubcategoria(subcategoria);
         const response = await fetch(`/api/catalogo/subcategoria/items?id=${subcategoria._id}`);
         const data = await response.json();
         setItems(data);
+        setLoadingItems(false);
     };
 
     const handleBackClick = () => {
@@ -45,18 +53,20 @@ export default function Catalogo() {
     const [categorias, setCategorias] = useState([]);
 
     useEffect(() => {
+        setLoadingCategoria(true);
         const fetchCategorias = async () => {
             const response = await fetch('/api/catalogo');
             const data = await response.json();
             setCategorias(data);
+            setLoadingCategoria(false);
         };
 
         fetchCategorias();
     }, []);
-    
+
     return (
         <main className="w-full h-screen">
-            <div className="py-10 w-full h-screen overflow-y-scroll">
+            <div className="py-10 w-full">
                 <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pb-4 pt-4 mx-10 bg-white dark:bg-gray-900">
                     <div className="flex items-center space-x-4 text-ship-cove-800">
                         <Link href="/modulos">
@@ -68,10 +78,12 @@ export default function Catalogo() {
                         <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">CATALOGO</span>
                     </div>
                 </div>
-                <div className="absolute w-full h-full mt-5 px-6 overflow-y-auto pb-20">
+                <div className="w-full h-full pb-20">
                     {selectedCategoria === null ? (
-                        <div className="flex flex-wrap justify-center overflow-y-auto">
-                            {categorias.map((categoria, index) => (
+                    <div className="text-center">
+                        <h1 className="text-4xl font-bold uppercase mb-4">CATEGORÍAS</h1>
+                        <div className="h-[calc(100vh-160px)] flex flex-wrap justify-center overflow-y-auto px-6">
+                            {!loadingCategoria ? categorias.map((categoria, index) => (
                                 <div
                                     key={index}
                                     className="relative w-1/6 p-2 transition-all duration-500 transform hover:text-white cursor-pointer"
@@ -86,17 +98,20 @@ export default function Catalogo() {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            )) : <div className="flex justify-center items-center h-[calc(100vh-160px)]">
+                            <Loader />
+                        </div>}
                         </div>
+                    </div>
                     ) : selectedSubcategoria === null ? (
-                        <div className="absolute w-full flex flex-col items-center justify-center bg-white overflow-y-auto px-6 pb-20">
+                        <div className="flex flex-wrap justify-center overflow-y-auto">
                             <button className="absolute top-10 right-40 text-4xl" onClick={handleBackClick}>
                                 <IoCloseSharp />
                             </button>
-                            <div className="text-center">
-                                <h1 className="text-6xl font-bold uppercase">{selectedCategoria.nombre}</h1>
-                                <div className="flex flex-wrap justify-center mt-10 overflow-y-auto">
-                                    {subcategorias.map((subcategoria, index) => (
+                            <div className="w-full text-center">
+                                <h1 className="text-4xl font-bold uppercase mb-4">{selectedCategoria.nombre}</h1>
+                                <div className="h-[calc(100vh-160px)] flex flex-wrap justify-center overflow-y-auto px-6">
+                                    {!loadingSubcategoria ? subcategorias.map((subcategoria, index) => (
                                         <div
                                             key={index}
                                             className="relative w-1/6 p-2 transition-all duration-500 transform hover:text-white cursor-pointer"
@@ -111,19 +126,21 @@ export default function Catalogo() {
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )) : <div className="flex justify-center items-center h-[calc(100vh-160px)]">
+                                    <Loader />
+                                </div>}
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="absolute w-full flex flex-col items-center justify-center bg-white overflow-y-auto pb-20">
+                        <div className="h-full flex flex-wrap justify-center overflow-y-auto">
                             <button className="absolute top-10 right-40 text-4xl" onClick={handleBackClick}>
                                 <IoCloseSharp />
                             </button>
-                            <div className="text-center">
-                                <h1 className="text-6xl font-bold uppercase">{selectedSubcategoria.nombre}</h1>
-                                <div className="flex flex-wrap justify-center mt-10 overflow-y-auto">
-                                    <div className="w-full">
+                            <div className="w-full text-center">
+                                <h1 className="text-4xl font-bold uppercase mb-4"><small>{selectedCategoria.nombre}</small> {selectedSubcategoria.nombre}</h1>
+                                <div className="h-[calc(100vh-160px)] flex flex-wrap justify-center overflow-y-auto">
+                                    <div className="w-full px-6">
                                         <div className="grid grid-cols-12 gap-4 bg-gray-200 p-4 rounded-t-lg">
                                             <div className="col-span-1 font-bold">Código</div>
                                             <div className="col-span-2 font-bold">Nombre</div>
@@ -132,7 +149,7 @@ export default function Catalogo() {
                                             <div className="col-span-2 font-bold">Garantía Anual</div>
                                             <div className="col-span-2 font-bold">Stock Actual</div>
                                         </div>
-                                        {items.map((item, index) => (
+                                        {!loadingItems ? items.map((item, index) => (
                                             <div key={index} className="grid grid-cols-12 gap-4 p-4 border-b">
                                                 <div className="col-span-1">{item.codigo}</div>
                                                 <div className="col-span-2">{item.nombre}</div>
@@ -141,7 +158,9 @@ export default function Catalogo() {
                                                 <div className="col-span-2">{item.garantiaAnual}</div>
                                                 <div className="col-span-2">{item.stockActual}</div>
                                             </div>
-                                        ))}
+                                        )) : <div className="flex justify-center items-center h-[calc(100vh-160px)]">
+                                        <Loader />
+                                    </div>}
                                     </div>
                                 </div>
                             </div>
