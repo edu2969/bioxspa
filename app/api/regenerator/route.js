@@ -16,6 +16,7 @@ import Comision from "@/models/comision";
 import User from "@/models/user";
 import UserClienteComision from "@/models/userclientecomision";
 import HistorialAumentoPrecio from "@/models/historialAumentoPrecio";
+import Trabajador from "../../../models/trabajador";
 import { TIPO_COMISION, TIPO_PRECIO, TIPO_UNIDAD_COMISION, USER_ROLE } from "@/app/utils/constants";
 
 export async function GET() {
@@ -47,23 +48,71 @@ export async function GET() {
     await migrateUsers();
     console.log("Users migrated");
 
+    console.log("Completing clientes...");
+    await completeClientes();
+    console.log("clientes completed");
+    
+    */
+
     console.log("Updating user comisiones...");
     await updateUserComisiones();
     console.log("User comisiones updated");
 
-    console.log("Completing clientes...");
-    await completeClientes();
-    console.log("clientes completed");
-
     console.log("Migrating comisiones...");
     await migrateComisions();
-    console.log("Comisiones migrated");*/
+    console.log("Comisiones migrated");
 
-
+    console.log("Creating extra comisiones...");
+    await crearComisionesExtras();
+    console.log("Extra comisiones created");
 
     return NextResponse.json({ message: "Success migrate and improve" });
 }
 
+const crearComisionesExtras = async () => {
+    const trabajadores = await Trabajador.find();
+    console.log(`Found ${trabajadores.length} trabajadores`);
+
+    for (const trabajador of trabajadores) {
+        const user = await User.findOne({ temporalId: trabajador.users_id });
+        if (!user) {
+            console.log(`User not found for trabajador ${trabajador._id}`);
+            continue;
+        }
+
+        if (trabajador.comision_retirado) {
+            const retiroComision = new Comision({
+                userId: user._id,
+                clienteId: null,
+                sucursalId: null,
+                dependenciaId: null,
+                fechaDesde: trabajador.fecha_ingreso,
+                fechaHasta: null,
+                tipo: TIPO_COMISION.retiro,
+                valor: parseFloat(trabajador.comision_retirado),
+                unidad: TIPO_UNIDAD_COMISION.monto
+            });
+            await retiroComision.save();
+            console.log(`Created retiro comision for trabajador ${trabajador._id}`);
+        }
+
+        if (trabajador.comision_vendido) {
+            const entregaComision = new Comision({
+                userId: user._id,
+                clienteId: null,
+                sucursalId: null,
+                dependenciaId: null,
+                fechaDesde: trabajador.fecha_ingreso,
+                fechaHasta: null,
+                tipo: TIPO_COMISION.entrega,
+                valor: parseFloat(trabajador.comision_vendido),
+                unidad: TIPO_UNIDAD_COMISION.monto
+            });
+            await entregaComision.save();
+            console.log(`Created entrega comision for trabajador ${trabajador._id}`);
+        }
+    }
+}
 
 
 const completeClientes = async () => {
@@ -204,12 +253,6 @@ const migrateComisions = async () => {
 }
 
 const updateUserComisiones = async () => {
-    const tipoComisionMap = {
-        "Chofer": TIPO_COMISION.chofer,
-        "Punto de venta": TIPO_COMISION.puntoVenta,
-        "Nuevo-cliente": TIPO_COMISION.nuevoCliente
-    };
-
     const registrosComision = await RegistroComision.find();
 
     const totalRegistros = registrosComision.length;

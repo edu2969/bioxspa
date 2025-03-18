@@ -30,8 +30,9 @@ export const TIPO_PRECIO = {
 } 
 
 export const TIPO_COMISION = {
-    retiro: 1, 
-    entrega: 2,
+    chofer: 1,
+    retiro: 2, 
+    entrega: 3,
     nuevoCliente: 4,
     puntoVenta: 8
 }

@@ -27,13 +27,19 @@ export async function GET() {
             const categoriaCatalogo = subcategoriaCatalogo ? await CategoriaCatalogo.findById(subcategoriaCatalogo.categoriaCatalogoId).lean() : null;
 
             return { 
-                ...precio, 
+                valor: precio.valor,
+                moneda: precio.moneda,
+                fechaDesde: precio.fechaDesde,
+                fechaHasta: precio.fechaHasta,
+                userId: precio.userId,
+                clienteId: precio.clienteId,
+                itemCatalogoId: precio.itemCatalogoId, 
                 cliente: cliente ? { nombre: cliente.nombre, _id: cliente._id, rut: cliente.rut } : null,
                 categoriaItemNombre: categoriaCatalogo ? categoriaCatalogo.nombre : null,
                 subcategoriaItemNombre: subcategoriaCatalogo ? subcategoriaCatalogo.nombre : null
             };
         }));
-        return { ...user, precios: preciosWithDetails };
+        return { _id: user._id, name: user.name, email: user.email, precios: preciosWithDetails };
     }));
 
     console.log("Returning users with precios");

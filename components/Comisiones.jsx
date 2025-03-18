@@ -7,7 +7,7 @@ import { MdSearch } from "react-icons/md";
 import { FaCheck, FaTimes, FaPencilAlt, FaPlus } from "react-icons/fa";
 import Loader from '@/components/Loader';
 import amountFormat from '@/app/utils/currency';
-import { TIPO_UNIDAD_COMISION } from '@/app/utils/constants';
+import { TIPO_COMISION, TIPO_UNIDAD_COMISION } from '@/app/utils/constants';
 
 const Comisiones = () => {
     const [usuarios, setUsuarios] = useState([]);
@@ -148,22 +148,27 @@ const Comisiones = () => {
 
     const getComisionStyles = (tipo) => {
         switch (tipo) {
-            case 1:
+            case TIPO_COMISION.chofer: 
+                return {
+                    label: "CHOFER",
+                    label: "bg-orange-500",
+                };
+            case TIPO_COMISION.retiro:                
                 return {
                     label: "RETIRO",
                     color: "bg-blue-500"
                 };
-            case 2:
+            case TIPO_COMISION.entrega:
                 return {
                     label: "ENTREGA",
                     color: "bg-green-500"
                 }
-            case 4:
+            case TIPO_COMISION.nuevoCliente:
                 return {
                     label: "CLIENTE NUEVO",
                     color: "bg-yellow-500"
                 }
-            case 8:
+            case TIPO_COMISION.puntoVenta:
                 return {
                     label: "PTO VENTA",
                     color: "bg-purple-500"

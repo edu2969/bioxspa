@@ -22,10 +22,9 @@ export async function GET() {
         const comisiones = await Comision.find({
             userId: user._id,
             $or: [
-                { fechaHasta: { $exists: false } },
+                { fechaHasta: null },
                 { fechaHasta: { $gte: now } }
             ],
-            fechaDesde: { $lte: now }
         }).lean();
         const comisionesWithCliente = await Promise.all(comisiones.map(async comision => {
             if (comision.clienteId) {
