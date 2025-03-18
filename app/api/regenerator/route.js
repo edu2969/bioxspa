@@ -52,15 +52,13 @@ export async function GET() {
     await completeClientes();
     console.log("clientes completed");
     
-    */
-
     console.log("Updating user comisiones...");
     await updateUserComisiones();
     console.log("User comisiones updated");
 
     console.log("Migrating comisiones...");
     await migrateComisions();
-    console.log("Comisiones migrated");
+    console.log("Comisiones migrated");*/
 
     console.log("Creating extra comisiones...");
     await crearComisionesExtras();

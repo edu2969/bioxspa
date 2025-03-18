@@ -151,32 +151,32 @@ const Comisiones = () => {
             case TIPO_COMISION.chofer: 
                 return {
                     label: "CHOFER",
-                    label: "bg-orange-500",
+                    color: "#F97316", // bg-orange-500
                 };
             case TIPO_COMISION.retiro:                
                 return {
                     label: "RETIRO",
-                    color: "bg-blue-500"
+                    color: "#3B82F6", // bg-blue-500
                 };
             case TIPO_COMISION.entrega:
                 return {
                     label: "ENTREGA",
-                    color: "bg-green-500"
+                    color: "#10B981", // bg-green-500
                 }
             case TIPO_COMISION.nuevoCliente:
                 return {
                     label: "CLIENTE NUEVO",
-                    color: "bg-yellow-500"
+                    color: "#F59E0B", // bg-yellow-500
                 }
             case TIPO_COMISION.puntoVenta:
                 return {
                     label: "PTO VENTA",
-                    color: "bg-purple-500"
+                    color: "#A855F7", // bg-purple-500
                 }
             default:
                 return {
                     label: "DESCONOCIDO",
-                    color: "bg-gray-500"
+                    color: "#6B7280", // bg-gray-500
                 }
         }
     };
@@ -354,15 +354,14 @@ const Comisiones = () => {
                                                                     <button className="absolute top-3 right-3 text-blue-500 hover:text-blue-600" onClick={() => handleEdit(`${index}_${comisionIndex}`, comision)}>
                                                                         <FaPencilAlt />
                                                                     </button>
-                                                                    <p className={`${getComisionStyles(comision.tipo).color} text-white text-sm bg-slate-${comision.valor || 0 ? '700' : '400'} rounded-md py-1 pl-2 pr-1`}>
+                                                                    <p className={`text-white text-sm bg-slate-${comision.valor || 0 ? '700' : '400'} rounded-md py-1 pl-2 pr-1`} style={{'background-color': getComisionStyles(comision.tipo).color}}>
                                                                         {getComisionStyles(comision.tipo).label}&nbsp;&nbsp;&nbsp;
                                                                         <span className="bg-slate-200 text-black px-2 py-0.5 rounded-r-sm font-bold">
                                                                             {comision.unidad === TIPO_UNIDAD_COMISION.porcentaje ? `${comision.valor || 0}%` : `$${amountFormat(comision.valor || 0)}`}
                                                                         </span>
                                                                     </p>
-                                                                    <p className="text-sm text-gray-500">{comision.cliente.nombre}</p>
-                                                                    {comision.fechaDesde && <p className="text-xs text-gray-500">Desde: {new Date(comision.fechaDesde).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}</p>}
-                                                                    {comision.fechaHasta && <p className="text-xs text-gray-500">Hasta: {new Date(comision.fechaHasta).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}</p>}
+                                                                    {comision.cliente && <p className="text-sm text-gray-500">{comision.cliente.nombre}</p>}
+                                                                    {comision.fechaDesde && <p className="text-xs text-gray-500">De <b>{new Date(comision.fechaDesde).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}</b>{comision.fechaHasta && <> a <b>{new Date(comision.fechaHasta).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}</b></>}</p>}
                                                                 </div>
                                                             )}
                                                         </div>
