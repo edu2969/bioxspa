@@ -50,6 +50,16 @@ export default function EditSucursal({ googleMapsApiKey }) {
         }
     };
 
+    const getUserAvatarFromUserId = (userId) => {
+        console.log("AVATAR", userId);
+        const user = users.find(user => user._id === userId);
+        console.log("USER", user);
+        if (user) {
+            return `/profiles/${user.email.split('@')[0]}.jpg`;
+        }
+        return '/profiles/undefined.jpg';
+    }
+
     const handleDelete = () => {
         const updatedDependencias = dependencias.filter((dependencia, index) => index !== selectedIndex);
         setDependencias(updatedDependencias);
@@ -75,12 +85,12 @@ export default function EditSucursal({ googleMapsApiKey }) {
     };
 
     const onSubmitDependencia = async (data) => {
-        console.log("onSubmitdependencia", data);
         const values = getValues();
         data.nombre = values.newdependenciaNombre;
         data.operativa = values.newdependenciaOperativa;
         data.direccion = dependencias[editingIndex].direccion;
         data.clienteId = dependencias[editingIndex].clienteId;
+        data.direccionId = dependencias[editingIndex].direccionId;
         data.tipo = values.newdependenciaTipo;
         const updateddependencias = dependencias.map((dependencia, index) =>
             index === editingIndex ? data : dependencia
@@ -94,6 +104,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         const response = await fetch(`/api/sucursales/${params.get("id") ?? ''}`);
         const data = await response.json();
         const sucursal = data.sucursal;
+        console.log("SUCURSAL", sucursal);
         setSucursal(sucursal);
         setDependencias(data.dependencias);
         setValue("nombre", sucursal.nombre);
@@ -105,7 +116,10 @@ export default function EditSucursal({ googleMapsApiKey }) {
 
     useEffect(() => {
         if (params.get("id")) {
-            Promise.all([fetchSucursal(), fetchUsuarios()]).then(() => setLoadingForm(true));
+            fetchUsuarios()
+                .then(() => fetchSucursal())
+                .then(() => setLoadingForm(true))
+                .catch((error) => console.error("Error loading data:", error));
         }
     }, [params, setValue]);
 
@@ -122,14 +136,14 @@ export default function EditSucursal({ googleMapsApiKey }) {
                 latitud: place.geometry.location.lat(),
                 longitud: place.geometry.location.lng(),
                 apiId: place.place_id
-            }
+            },
+            direccionId: false
         };
         setDependencias(updatedDependencias);
         setAutocompleteResults([]);
     };
 
     const handleSelectPlace = (place) => {
-        console.log("SELECTED PLACE?", place);
         const address = {
             nombre: place.formatted_address,
             apiId: place.place_id,
@@ -138,7 +152,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
             categoria: place.types[0]
         };
         const updatedDependencias = [...dependencias];
-        updatedDependencias[editingIndex] = { ...updatedDependencias[editingIndex], direccion: address };
+        updatedDependencias[editingIndex] = { ...updatedDependencias[editingIndex], direccion: address, direccionId: false };
         setDependencias(updatedDependencias);
         setAutocompleteResults([]);
     };
@@ -230,8 +244,10 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                             latitud: place.geometry.location.lat(),
                                             longitud: place.geometry.location.lng(),
                                             apiId: place.place_id
-                                        }
+                                        },
+                                        direccionId: false
                                     });
+                                    console.log("SUCURSAL", { ...sucursal, direccion: { nombre: place.formatted_address, latitud: place.geometry.location.lat(), longitud: place.geometry.location.lng(), apiId: place.place_id }, direccionId: false });
                                 }}
                                 options={{
                                     types: ['address'],
@@ -257,7 +273,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                 <div key={`sucursal_cargo_${idx}`} className="w-14 h-14">
                                                     <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
                                                         <img
-                                                            src={`/profiles/${cargo.user.email.split('@')[0]}.jpg`}
+                                                            src={getUserAvatarFromUserId(cargo.userId)}
                                                             alt="avatar"
                                                             className="w-14 h-14 rounded-full mr-2"
                                                         />
@@ -466,7 +482,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                         componentRestrictions: { country: 'cl' }
                                                                     }}
                                                                     ref={autocompleteRef}
-                                                                    defaultValue={dependencia.direccion.nombre}
+                                                                    defaultValue={dependencia.direccion?.nombre || ''}
                                                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                                 />
                                                                 {autocompleteResults.length > 0 && (
@@ -558,7 +574,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                     <div className="text-lg font-medium text-gray-900">{dependencia.nombre}</div>
                                                                 </div>
                                                             </div>
-                                                            <p className="text-xs text-gray-900">{dependencia.direccion.nombre}</p>
+                                                            <p className="text-xs text-gray-900">{dependencia.direccion?.nombre || ''}</p>
                                                             <div className="text-sm text-gray-500">
                                                                 {dependencia.cliente?.nombre}
                                                             </div>

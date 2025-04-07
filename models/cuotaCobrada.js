@@ -1,6 +1,6 @@
 import mongoose, { Schema, models } from "mongoose";
 
-const cuotaCobradaSchema = new Schema({
+const xuotaCobradaSchema = new Schema({
     id: { type: String, required: true },
     venta_id: { type: String, required: true },
     monto: { type: String, required: true },
@@ -14,5 +14,5 @@ const cuotaCobradaSchema = new Schema({
     updated_at: { type: Date, required: true }
 });
 
-const CuotaCobrada = models.CuotaCobrada || mongoose.model("CuotaCobrada", cuotaCobradaSchema);
-export default CuotaCobrada;
+const XuotaCobrada = models.XuotaCobrada || mongoose.model("XuotaCobrada", xuotaCobradaSchema);
+export default XuotaCobrada;

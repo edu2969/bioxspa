@@ -18,7 +18,7 @@ export default async function RootLayout({
 }) {
   const session = await getServerSession(authOptions as NextAuthOptions);
   return (    
-    <html lang="es_CL">
+    <html lang="es-CL">
       <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`}>      
         {children}
         <Nav user={session?.user}></Nav>      

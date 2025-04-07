@@ -17,7 +17,23 @@ import User from "@/models/user";
 import UserClienteComision from "@/models/userclientecomision";
 import HistorialAumentoPrecio from "@/models/historialAumentoPrecio";
 import Trabajador from "../../../models/trabajador";
-import { TIPO_COMISION, TIPO_PRECIO, TIPO_UNIDAD_COMISION, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_COMISION, TIPO_ESTADO_VENTA, TIPO_PRECIO, TIPO_UNIDAD_COMISION, USER_ROLE } from "@/app/utils/constants";
+import XocumentoTributario from "@/models/xocumentoTributario";
+import DocumentoTributario from "@/models/documentoTributario";
+import { TIPO_FORMATO_DOCUMENTO_TRIBUTARIO, TIPO_OPERACION_DOCUMENTO_TRIBUTARIO } from "@/app/utils/constants";
+import BIPrincipal from "@/models/biPrincipal";
+import Venta from "@/models/venta";
+import Xenta from "@/models/xenta";
+import XetalleVenta from "@/models/xetalleVenta";
+import DetalleVenta from "@/models/detalleVenta";
+import BIDeuda from "@/models/biDeuda";
+import XormasPago from "../../../models/xorma_pago";
+import FormaPago from "../../../models/formaPago";
+import XuotaCobrada from "../../../models/xuotas_cobradas";
+import Pago from "@/models/pago";
+import Dependencia from "@/models/dependencia";
+import Sucursal from "@/models/sucursal";
+import Cargo from "@/models/cargo";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
@@ -58,13 +74,357 @@ export async function GET() {
 
     console.log("Migrating comisiones...");
     await migrateComisions();
-    console.log("Comisiones migrated");*/
+    console.log("Comisiones migrated");
 
     console.log("Creating extra comisiones...");
     await crearComisionesExtras();
-    console.log("Extra comisiones created");
+    console.log("Extra comisiones created"); */
+
+    /*console.log("Migrating documentos tributarios...");
+    await migrarDocumentosTributarios();
+    console.log("Documentos tributarios migrated");*/
+
+    /*console.log("Correcting documentos tributarios...");
+    await corregirDocsTributarios();
+    console.log("Documentos tributarios corrected");*/
+
+    /*console.log("Processing ventas...");
+    await procesarVentas();
+    console.log("Ventas processed");*/
+
+    /*console.log("Building detalle ventas v2.0...");
+    await buildDetalleVentas();
+    console.log("Detalle ventas built");*/
+
+    /*console.log("Completing ventas...");
+    await completeVentas();
+    console.log("Ventas completed");*/
+
+    /*console.log("Building BIPrincipal...");
+    await buildBIPrincipal();
+    console.log("BIPrincipal built");*/
+
+    /*console.log("Migrating pagos...");
+    await migratePagos();
+    console.log("Pagos migrated");*/
+
+    /*console.log("Migrating formas de pago...");
+    await migrateFormasPago();
+    console.log("Formas de pago migrated");*/
+
+    /*console.log("Fixing precios...");
+    await fixPrecios();
+    console.log("Precios fixed");*/
 
     return NextResponse.json({ message: "Success migrate and improve" });
+}
+
+const fixPrecios = async () => {
+    const precios = await Precio.find();
+    console.log(`Found ${precios.length} precios`);
+
+    for (const precio of precios) {
+        if (precio.itemCatalogoId) {
+            const itemCatalogo = await ItemCatalogo.findById(precio.itemCatalogoId);
+            if (itemCatalogo && itemCatalogo.subcategoriaCatalogoId) {
+                precio.subcategoriaCatalogoId = itemCatalogo.subcategoriaCatalogoId;
+                precio.itemCatalogoId = undefined; // Unset itemCatalogoId
+                await precio.save();
+                console.log(`Updated Precio ${precio._id} with subcategoriaCatalogoId ${itemCatalogo.subcategoriaCatalogoId}`);
+            } else {
+                console.log(`ItemCatalogo or subcategoriaCatalogoId not found for Precio ${precio._id}`);
+            }
+        }
+    }
+}
+
+const migrateFormasPago = async () => {
+    const xormaPagos = await XormasPago.find();
+    console.log(`Found ${xormaPagos.length} xormaPagos`);
+
+    for (const xormaPago of xormaPagos) {
+        const newFormaPago = new FormaPago({
+            temporalId: xormaPago.id,
+            nombre: xormaPago.forma,
+            porPagar: xormaPago.porpagar.toLowerCase() === "si",
+        });
+
+        await newFormaPago.save();
+        console.log(`Migrated xormaPago ${xormaPago.id} to formaPago ${newFormaPago._id}`);
+    }
+}
+
+const migratePagos = async () => {
+    const cuotasCobradas = await XuotaCobrada.find();
+    console.log(`Found ${cuotasCobradas.length} cuotasCobradas`);
+
+    for (const cuotaCobrada of cuotasCobradas) {
+        const venta = await Venta.findOne({ temporalId: cuotaCobrada.venta_id });
+        if (!venta) {
+            console.log(`Venta not found for cuotaCobrada ${cuotaCobrada.id}`);
+            continue;
+        }
+
+        const formaPago = await FormaPago.findOne({ temporalId: cuotaCobrada.formapago_id });
+        if (!formaPago) {
+            console.log(`FormaPago not found for cuotaCobrada ${cuotaCobrada.id}`);
+            continue;
+        }
+
+        const newPago = new Pago({
+            temporalId: cuotaCobrada.id,
+            ventaId: venta._id,
+            monto: cuotaCobrada.monto,
+            formaPagoId: formaPago._id,
+            operacion: cuotaCobrada.operacion,
+            fecha: cuotaCobrada.fecha,
+            visible: cuotaCobrada.visible.toLowerCase() === "si",
+        });
+
+        await newPago.save();
+        console.log(`Migrated cuotaCobrada ${cuotaCobrada.id} to pago ${newPago._id}`);
+    }
+}
+
+const buildBIPrincipal = async () => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const ventas = await Venta.find({ fecha: { $gte: sixMonthsAgo } });
+    console.log(`Found ${ventas.length} ventas from the last 6 months`);
+
+    const periods = ['D', 'S', 'M', 'A'];
+    const biPrincipalData = [];
+
+    for (const venta of ventas) {
+        let sucursalDestinoId = venta.sucursalDestinoId;
+
+        if (!sucursalDestinoId && venta.vendedorId) {
+            const vendedor = await User.findById(venta.vendedorId);
+            if (vendedor) {
+                const cargo = await Cargo.findOne({ userId: vendedor._id });
+                if (cargo) {
+                    if (cargo.sucursalId) {
+                        sucursalDestinoId = cargo.sucursalId;
+                    } else if (cargo.dependenciaId) {
+                        const dependencia = await Dependencia.findById(cargo.dependenciaId);
+                        if (dependencia) {
+                            sucursalDestinoId = dependencia.sucursalId;
+                        }
+                    }
+                }
+            }
+        }
+
+        for (const period of periods) {
+            const fecha = new Date(venta.fecha);
+            let startDate, endDate;
+
+            switch (period) {
+                case 'D':
+                    startDate = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+                    endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    break;
+                case 'S':
+                    startDate = new Date(fecha);
+                    startDate.setDate(fecha.getDate() - fecha.getDay());
+                    endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 7);
+                    break;
+                case 'M':
+                    startDate = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
+                    endDate = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 1);
+                    break;
+                case 'A':
+                    startDate = new Date(fecha.getFullYear(), 0, 1);
+                    endDate = new Date(fecha.getFullYear() + 1, 0, 1);
+                    break;
+            }
+
+            const pagos = await Pago.find({
+                ventaId: venta._id,
+                fecha: { $gte: startDate, $lt: endDate },
+                visible: true,
+            });
+
+            const montoPagado = pagos.reduce((sum, pago) => sum + pago.monto, 0);
+            const montoAdeudado = venta.porCobrar ? venta.valorTotal - montoPagado : 0;
+
+            biPrincipalData.push({
+                sucursalId: sucursalDestinoId || null,
+                clienteId: venta.clienteId,
+                fecha: startDate,
+                periodo: period,
+                montoAdeudado,
+                montoVendido: venta.valorTotal,
+                montoArrendado: venta.tieneArriendo ? venta.valorTotal : 0,
+                estado: venta.estado,
+            });
+        }
+    }
+
+    if (biPrincipalData.length > 0) {
+        await BIPrincipal.insertMany(biPrincipalData);
+        console.log(`Inserted ${biPrincipalData.length} BIPrincipal records`);
+    } else {
+        console.log("No BIPrincipal records to insert");
+    }
+};
+
+const completeVentas = async () => {
+    const xentas = await Xenta.find();
+    console.log(`Found ${xentas.length} xentas`);
+
+    for (const xenta of xentas) {
+        const venta = await Venta.findOne({ temporalId: xenta.id });
+        if (!venta) {
+            console.log(`Venta not found for xenta ${xenta.id}`);
+            continue;
+        }
+
+        venta.tieneArriendo = xenta.arriendo?.toLowerCase() === "si";
+        await venta.save();
+        console.log(`Updated Venta ${venta._id} with tieneArriendo ${venta.tieneArriendo}`);
+    }
+}
+
+const buildDetalleVentas = async () => {
+    const xetalleVentas = await XetalleVenta.find();
+    console.log(`Found ${xetalleVentas.length} xetalleVentas`);
+
+    const batchSize = 10000;
+    const totalBatches = Math.ceil(xetalleVentas.length / batchSize);
+    let processedCount = 0;
+
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batch = xetalleVentas.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+        const detalleVentasToInsert = [];
+
+        for (const xetalleVenta of batch) {
+            const venta = await Venta.findOne({ codigo: xetalleVenta.codigo });
+            if (!venta) {
+                console.log(`Venta not found for xetalleVenta ${xetalleVenta.id} codigo ${xetalleVenta.codigo}`);
+                continue;
+            }
+
+            detalleVentasToInsert.push({
+                temporalId: xetalleVenta.id,
+                ventaId: venta._id,
+                glosa: xetalleVenta.producto,
+                codigo: xetalleVenta.codigo,
+                codigoProducto: xetalleVenta.codigoproducto,
+                codigoCilindro: xetalleVenta.cod_cilindro,
+                tipo: xetalleVenta.tipo === "pedido" ? 1 : xetalleVenta.tipo === "retiro" ? 2 : null,
+                cantidad: Number(xetalleVenta.cantidad),
+                especifico: Number(xetalleVenta.especifico),
+                neto: Number(xetalleVenta.neto),
+                iva: Number(xetalleVenta.iva),
+                total: Number(xetalleVenta.total),
+            });
+        }
+
+        if (detalleVentasToInsert.length > 0) {
+            await DetalleVenta.insertMany(detalleVentasToInsert);
+            processedCount += detalleVentasToInsert.length;
+            const progress = ((processedCount / xetalleVentas.length) * 100).toFixed(2);
+            console.log(`Progress: ${progress}% (${processedCount}/${xetalleVentas.length})`);
+        }
+    }
+
+    console.log("Detalle ventas migration completed");
+};
+
+const procesarVentas = async () => {
+    const xentas = await Xenta.find();
+    console.log(`Found ${xentas.length} xentas`);
+
+    for (const xenta of xentas) {
+        const cliente = await Cliente.findOne({ temporalId: xenta.clientes_id });
+        if (!cliente) {
+            console.log(`Cliente not found for xenta ${xenta.id}`);
+            continue;
+        }
+
+        const vendedor = await User.findOne({ temporalId: xenta.vendedor });
+        if (!vendedor) {
+            console.log(`Vendedor not found for xenta ${xenta.id}`);
+            continue;
+        }
+
+        const documentoTributario = await DocumentoTributario.findOne({ temporalId: xenta.documentotributario_id });
+        if (!documentoTributario) {
+            console.log(`DocumentoTributario not found for xenta ${xenta.id}`);
+            continue;
+        }
+
+        const sucursalDestino = xenta.sucursaldestino ? await SubcategoriaCatalogo.findOne({ temporalId: xenta.sucursaldestino }) : null;
+
+        const newVenta = new Venta({
+            temporalId: xenta.id,
+            clienteId: cliente._id,
+            codigo: xenta.codigo,
+            vendedorId: vendedor._id,
+            fecha: xenta.fecha,
+            estado: xenta.estado ? TIPO_ESTADO_VENTA[xenta.estado.toLowerCase()] : TIPO_ESTADO_VENTA.borrador,
+            valorNeto: xenta.valor_neto,
+            valorExento: xenta.valor_exento,
+            valorIva: xenta.valor_iva,
+            valorBruto: xenta.valor_bruto,
+            valorTotal: xenta.valor_total,
+            numeroDocumento: xenta.numdoc,
+            numeroVale: xenta.num_vale,
+            documentoTributarioId: documentoTributario._id,
+            sucursalDestinoId: sucursalDestino ? sucursalDestino._id : null,
+            tasaImpuesto: xenta.tasaimp,
+            tieneOT: xenta.ot ? xenta.ot.toLowerCase() === "si" : false,
+            controlEnvase: xenta.control_envase,
+            medioDespacho: xenta.medio_despacho,
+            numeroTraslado: xenta.numerotraslado,
+            cantidadConsultasSII: xenta.cant_consultas_sii,
+            cantidadReenviosSII: xenta.cant_reenvios_sii,
+        });
+
+        await newVenta.save();
+        console.log(`Migrated xenta ${xenta.id} to venta ${newVenta._id}`);
+    }
+}
+
+const corregirDocsTributarios = async () => {
+    const xlientes = await Xliente.find();
+    const documentosTributarios = await DocumentoTributario.find();
+
+    for (const xliente of xlientes) {
+        const documentoTributario = documentosTributarios.find(doc => doc.temporalId === xliente.tipodoc);
+        if (documentoTributario) {
+            const cliente = await Cliente.findOne({ temporalId: xliente.id });
+            if (cliente) {
+                cliente.documentoTributarioId = documentoTributario._id;
+                await cliente.save();
+                console.log(`Updated Cliente ${cliente._id} with documentoTributarioId ${documentoTributario._id}`);
+            }
+        }
+    }
+}
+
+const migrarDocumentosTributarios = async () => {
+    const xocumentos = await XocumentoTributario.find();
+    console.log(`Found ${xocumentos.length} xocumentos`);
+
+    for (const xocumento of xocumentos) {
+        const newDocumento = new DocumentoTributario({
+            temporalId: xocumento.id,
+            nombre: xocumento.descripcion,
+            stock: xocumento.stock === "si",
+            afecto: xocumento.afecto === "si",
+            compra: xocumento.compra === "si",
+            venta: xocumento.venta === "si",
+            operacion: xocumento.operacion === "suma" ? TIPO_OPERACION_DOCUMENTO_TRIBUTARIO.suma : xocumento.operacion === "resta" ? TIPO_OPERACION_DOCUMENTO_TRIBUTARIO.resta : TIPO_OPERACION_DOCUMENTO_TRIBUTARIO.ninguna,
+            formato: xocumento.formato === "p" ? TIPO_FORMATO_DOCUMENTO_TRIBUTARIO.p : TIPO_FORMATO_DOCUMENTO_TRIBUTARIO.e,
+        });
+        await newDocumento.save();
+        console.log(`Migrated xocumento ${xocumento.id} to documento ${newDocumento._id}`);
+    }
 }
 
 const crearComisionesExtras = async () => {
@@ -111,7 +471,6 @@ const crearComisionesExtras = async () => {
         }
     }
 }
-
 
 const completeClientes = async () => {
     const xlientes = await Xliente.find();

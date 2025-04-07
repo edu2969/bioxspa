@@ -1,23 +1,29 @@
 import mongoose from 'mongoose';
 
 const DetalleVentaSchema = new mongoose.Schema({
-    id: { type: String, required: true },
+    temporalId: { type: String, required: true },
+    ventaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Venta', required: true },
+    glosa: { type: String, required: true },
     codigo: { type: String },
-    codigoproducto: { type: String },
-    cod_cilindro: { type: String, default: null },
-    producto: { type: String, required: true },
-    producto_id: { type: String, default: null },
-    producto_cliente_id: { type: String, default: null },
-    tipo: { type: String, default: null },
-    cantidad: { type: String, required: true },
-    especifico: { type: String, required: true },
-    neto: { type: String, required: true },
-    iva: { type: String, required: true },
-    total: { type: String, required: true },
-    deleted_at: { type: Date, default: null },
-    created_at: { type: Date },
-    updated_at: { type: Date }
-});
+    codigoProducto: { type: String },
+    codigoCilindro: { type: String, default: null },
+    subcategoriaCatalogoId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'SubcategoriaCatalogo', 
+        default: null 
+    },
+    itemsCatalogoId: { 
+        type: [mongoose.Schema.Types.ObjectId], 
+        ref: 'ItemCatalogo', 
+        default: null
+    },
+    tipo: { type: Number }, // 1: pedido, 2: retiro
+    cantidad: { type: Number, required: true },
+    especifico: { type: Number },
+    neto: { type: Number, required: true },
+    iva: { type: Number, required: true },
+    total: { type: Number, required: true }
+}, { timestamps: true });
 
 const DetalleVenta = mongoose.models.DetalleVenta || mongoose.model('DetalleVenta', DetalleVentaSchema);
 

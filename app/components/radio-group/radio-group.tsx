@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import RadioOption from "./radio-option";
 
 interface IProps {
-  options: React.ReactElement[];
+  options: React.ReactElement<any>[];
   onChange?: (selectedIndex: number) => void;
   value?: number;
   labelText?: string;

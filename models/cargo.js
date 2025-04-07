@@ -6,9 +6,9 @@ const cargoSchema = new Schema({
     sucursalId: { type: mongoose.Types.ObjectId, ref: "Sucursal" },
     tipo: { type: Number, required: true },
     desde: { type: Date, required: true },
-    hasta: { type: Date },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    hasta: { type: Date }
+}, {
+    timestamps: true
 });
 
 const Cargo = models.Cargo || mongoose.model("Cargo", cargoSchema);

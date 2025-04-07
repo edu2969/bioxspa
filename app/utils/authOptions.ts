@@ -55,10 +55,8 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      //console.log("SESSION ->", session, token);
       session.user.id = token.id;
       session.user.role = token.role;
-      session.user.image = token.avatarImg;
       return session;
     }
   }

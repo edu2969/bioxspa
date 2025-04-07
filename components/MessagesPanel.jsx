@@ -6,25 +6,25 @@ const users = [
         id: 1,
         userId: 'cristian_rodriguez',
         name: 'Cristian Rodriguez Z',
-        avatar: 'crodriguez.jpg'
+        avatar: 'cristian.jpg'
     },
     {
         id: 2,
         userId: 'miguel_araneda',
         name: 'Miguel Araneda H',
-        avatar: 'maraneda.jpg'
+        avatar: 'miguel.jpg'
     },
     {
         id: 3,
         userId: 'lilian_carrillo',
         name: 'Lilian Carrillo Diaz',
-        avatar: 'lcarrillo.jpg'
+        avatar: 'lilian.jpg'
     },
     {
         id: 4,
         userId: 'alex_jara',
         name: 'Alex Jara',
-        avatar: 'ajara.jpg'
+        avatar: 'alex.jpg'
     }
 ];
 

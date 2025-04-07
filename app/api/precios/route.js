@@ -19,8 +19,17 @@ export async function GET() {
 
     console.log("Mapping users with precios...");
     const usersWithPrecios = await Promise.all(users.map(async user => {
-        const precios = await Precio.find({ userId: user._id }).lean();
-        const preciosWithDetails = await Promise.all(precios.map(async precio => {
+        const precios = await Precio.find({ userId: user._id }).sort({ fechaDesde: -1 }).lean();
+        const preciosMap = new Map();
+
+        precios.forEach(precio => {
+            const key = `${precio.clienteId}-${precio.itemCatalogoId}-${precio.userId}`;
+            if (!preciosMap.has(key)) {
+                preciosMap.set(key, precio);
+            }
+        });
+
+        const preciosWithDetails = await Promise.all(Array.from(preciosMap.values()).map(async precio => {
             const cliente = await Cliente.findById(precio.clienteId).lean();
             const itemCatalogo = await ItemCatalogo.findById(precio.itemCatalogoId).lean();
             const subcategoriaCatalogo = itemCatalogo ? await SubcategoriaCatalogo.findById(itemCatalogo.subcategoriaCatalogoId).lean() : null;
@@ -39,6 +48,7 @@ export async function GET() {
                 subcategoriaItemNombre: subcategoriaCatalogo ? subcategoriaCatalogo.nombre : null
             };
         }));
+
         return { _id: user._id, name: user.name, email: user.email, precios: preciosWithDetails };
     }));
 

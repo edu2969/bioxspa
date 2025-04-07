@@ -41,3 +41,21 @@ export const TIPO_UNIDAD_COMISION = {
     porcentaje: 1, 
     monto: 2
 }
+
+export const TIPO_FORMATO_DOCUMENTO_TRIBUTARIO = {
+    p: 1,
+    e: 2
+}
+
+export const TIPO_OPERACION_DOCUMENTO_TRIBUTARIO = {
+    ninguna: 0,
+    suma: 1,
+    resta: 2
+}
+
+export const TIPO_ESTADO_VENTA = {
+    borrador: 0,
+    cotizacion: 1,
+    ot: 2,
+    entregado: 64
+}

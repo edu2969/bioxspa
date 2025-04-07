@@ -22,10 +22,10 @@ const biPrincipalSchema = new Schema({
     kgPorEnvasar: { type: Number, default: 0 },
     cantidadCilindrosPrestados: { type: Number, default: 0 },
     cantidadCilindrosCliente: { type: Number, default: 0 },
-    estado: { type: Number },
-    createdAt: { type: Date, required: true, default: Date.now },
-    updatedAt: { type: Date, required: true, default: Date.now }
+    estado: { type: Number }
+}, {
+    timestamps: true
 });
 
-const BiPrincipal = models.BiPrincipal || mongoose.model("BiPrincipal", biPrincipalSchema);
-export default BiPrincipal;
+const BIPrincipal = models.BIPrincipal || mongoose.model("BIPrincipal", biPrincipalSchema);
+export default BIPrincipal;

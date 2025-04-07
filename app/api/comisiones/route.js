@@ -5,8 +5,6 @@ import Comision from "@/models/comision";
 import { USER_ROLE } from "@/app/utils/constants";
 import Cliente from "@/models/cliente";
 
-// filepath: /d:/git/bioxspa/app/api/comisiones/route.js
-
 export async function GET() {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();

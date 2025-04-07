@@ -4,7 +4,8 @@ import User from "@/models/user";
 import bcrypt from "bcryptjs";
 
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     console.log("getById...", params);
     await connectMongoDB();
     const users = await User.find({ _id: params.id }, { password: 0, __v: 0 });
@@ -13,9 +14,10 @@ export async function GET(req, { params }) {
     }));
 }
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     const body = await req.json();
-    console.log("Update...", body, params);    
+    console.log("Update...", body, params);
     const userData = {
         name: body.name,
         email: body.email,
@@ -28,7 +30,7 @@ export async function POST(req, { params }) {
     }
     if(params.id || (body.repassword == body.password)) { 
         userData.password = await bcrypt.hash(body.password, 10);
-    }    
+    }
     const userUpdated = await User.findByIdAndUpdate(params.id, userData);
     return userUpdated ? NextResponse.json(userUpdated) : NextResponse.json(error.message, {
         status: 404,

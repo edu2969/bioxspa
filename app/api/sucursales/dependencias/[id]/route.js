@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import Dependencia from "@/models/dependencia";
 import Direccion from "@/models/direccion";
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     console.log("Dependencia getById...", params);
     await connectMongoDB();
     const dependencia = await Dependencia.findById(params.id);
@@ -13,7 +14,8 @@ export async function GET(req, { params }) {
     return NextResponse.json(dependencia);
 }
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     const body = await req.json();
     console.log("DEPENDENCIA Update...", body, params);
 

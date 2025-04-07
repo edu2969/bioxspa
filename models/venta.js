@@ -7,6 +7,7 @@ const ventaSchema = new Schema({
     vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
     fecha: { type: Date, required: true },
     estado: { type: Number, required: true },
+    porCobrar: { type: Boolean, default: false },
     valorNeto: { type: Number, required: true },
     valorExento: { type: Number, default: 0 },
     valorIva: { type: Number, required: true },
@@ -14,17 +15,18 @@ const ventaSchema = new Schema({
     valorTotal: { type: Number, required: true },
     numeroDocumento: { type: String },
     numeroVale: { type: String },
-    documentoTributarioId: { type: String, required: true },
-    sucursalDestinoId: { type: String },
+    documentoTributarioId: { type: mongoose.Schema.Types.ObjectId, ref: "DocumentoTributario", required: true },
+    sucursalDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "SucursalDestinoId" },
     tasaImpuesto: { type: Number },
     tieneOT: { type: Boolean, default: false },
-    control_envase: { type: String, default: null },
+    tieneArriendo: { type: Boolean, default: false },
+    controlEnvase: { type: String, default: null },
     medioDespacho: { type: String },
-    numerotraslado: { type: String, default: "" },
+    numeroTraslado: { type: String, default: "" },
     cantidadConsultasSII: { type: Number },
-    cantidadReenviosSII: { type: Number },
-    createdAt: { type: Date, required: true },
-    updatedAt: { type: Date, required: true }
+    cantidadReenviosSII: { type: Number }
+}, {
+    timestamps: true
 });
 
 const Venta = models.Venta || mongoose.model("Venta", ventaSchema);

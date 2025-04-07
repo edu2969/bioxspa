@@ -6,7 +6,7 @@ import { MdOutlinePropaneTank } from "react-icons/md";
 import BarChart from "../charts/BarChart";
 import Gaugue from "../charts/Gaugue";
 import MultiLineChart from "../charts/MultiLineChart";
-import { TbMoneybag } from "react-icons/tb";
+import { TbMoneybag, TbShoppingBagPlus } from "react-icons/tb";
 import { CiBellOn } from "react-icons/ci";
 import { FaWhatsappSquare } from "react-icons/fa";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +14,7 @@ import { IoSettingsSharp } from "react-icons/io5"
 import NotificationsPanel from "../NotificationsPanel";
 import MessagesPanel from "../MessagesPanel";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
+import Link from "next/link";
 
 const stateColors = [
     "bg-white",
@@ -39,9 +40,10 @@ export default function BranchBussinessView() {
     const fetchMainPanelData = async () => {
         setLoadingAdminPanel(true);
         try {
-            const response = await fetch("/api/mainPanel");
+            const response = await fetch("/api/bi");
             const data = await response.json();
-            setBranches(data);
+            console.log("DATA", data.branches);
+            setBranches(data.branches);
             setLoadingAdminPanel(false);
         } catch (error) {
             console.error("Error fetching main panel data:", error);
@@ -73,9 +75,8 @@ export default function BranchBussinessView() {
 
     };
 
-
-
     const getBoxStyles = (index) => {
+        console.log("REVISANDO", index);
         if (branchSelected === index) {
             return {
                 width: '100%',
@@ -254,6 +255,16 @@ export default function BranchBussinessView() {
                                 />
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {branchSelected !== null && (
+                    <div className="absolute top-24 left-72 bg-white rounded-md p-4 border border-gray-300">
+                        <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">ACCIONES RÁPIDAS</span>
+                        <Link href={`/modulos/ventas?id=${branches[branchSelected]._id}`} className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                            <TbShoppingBagPlus size="1.5rem" className="mr-2" />
+                            NUEVA VENTA
+                        </Link>
                     </div>
                 )}
 

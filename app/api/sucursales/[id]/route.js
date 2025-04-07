@@ -7,8 +7,8 @@ import Cliente from "@/models/cliente";
 import Cargo from "@/models/cargo";
 import User from "@/models/user";
 
-export async function GET(req, { params }) {
-    console.log("SUCURSAL getById...", params);
+export async function GET(req, props) {
+    const params = await props.params;
     await connectMongoDB();
     const sucursal = await Sucursal.findById(params.id).lean();
     if (!sucursal) {
@@ -19,9 +19,7 @@ export async function GET(req, { params }) {
     // Fetch the direccion for the sucursal
     let direccion = null;
     if (sucursal.direccionId) {
-        console.log("DIRECCION ID...", sucursal.direccionId);
         direccion = await Direccion.findById(sucursal.direccionId).lean();
-        console.log("Direccion", direccion);
         sucursal.direccion = direccion;
     }
 
@@ -49,11 +47,11 @@ export async function GET(req, { params }) {
         cargo.user = user;
     }
     sucursal.cargos = cargos;
-    console.log("SALDRÁ", { sucursal, dependencias });
     return NextResponse.json({ sucursal, dependencias });
 }
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     const body = await req.json();
     console.log("SUCURSAL Update v2...", body, params);
 
@@ -65,7 +63,7 @@ export async function POST(req, { params }) {
             if (direccion._id) {
                 direccionId = direccion._id;
             }
-        }
+        } 
     }
     if (!direccionId) {
         console.log("NUEVA DIRECCION...", body.direccion);
@@ -81,13 +79,12 @@ export async function POST(req, { params }) {
             sucursalId: params.id,
             tipo: cargo.tipo,
             desde: new Date(cargo.desde),
-            hasta: new Date(cargo.hasta),
             createdAt: cargo.createdAt ? new Date(cargo.createdAt) : new Date(),
             updatedAt: new Date()
         };
-
-        console.log("CARGO DATA...", cargoData);
-
+        if(cargo.hasta != '') {
+            cargo.hasta = new Date(cargo.hasta);
+        }
         if (cargo._id) {
             await Cargo.findByIdAndUpdate(cargo._id, cargoData, { new: true, upsert: true });
         } else {
@@ -169,7 +166,6 @@ export async function POST(req, { params }) {
         createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
         updatedAt: new Date()
     };
-    console.log("SUCURSAL DATA...", sucursalData);
     const sucursalUpdated = await Sucursal.findByIdAndUpdate(params.id, sucursalData, { new: true, upsert: true });
 
     if (!sucursalUpdated) {
