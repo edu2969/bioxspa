@@ -50,6 +50,8 @@ export default function Venta({ session }) {
     const [registroSelected, setRegistroSelected] = useState(0);
     const [total, setTotal] = useState(0);
 
+    const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseFloat(item.precio) <= 0);
+
     const fetchSucursales = async () => {
         const response = await fetch('/api/sucursales');
         const data = await response.json();
@@ -97,7 +99,24 @@ export default function Venta({ session }) {
     };
 
     const onSubmit = async (data) => {
-        data.userId = getValue('usuarioId');
+
+        console.log("DATA", data);
+
+        const payload = {
+            clienteId: clienteSelected?._id,
+            sucursalId: data.sucursalId,
+            dependenciaId: data.dependenciaId,
+            usuarioId: data.usuarioId,
+            items: itemsVenta.map(item => ({
+                cantidad: parseInt(item.cantidad),
+                precio: parseInt(item.precio.replace(/\./g, '')),
+                subcategoriaId: item.subcategoriaId
+            })),
+        }
+
+        console.log("PAYLOAD", payload);
+
+        /*
         setLoadingForm(true);
         try {
             await fetch('/api/ventas', {
@@ -112,7 +131,7 @@ export default function Venta({ session }) {
             console.error(error);
         } finally {
             setLoadingForm(false);
-        }
+        }*/
     };
 
     useEffect(() => {
@@ -157,76 +176,120 @@ export default function Venta({ session }) {
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-8 space-y-6">
                         <div className="w-full flex">
-                            <div className="w-2/12 pr-4">
-                                <label htmlFor="usuarioId" className="block text-sm font-medium text-gray-700">Usuario</label>
-                                <select id="usuarioId" {...register('usuarioId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    <option value="">Seleccione un usuario</option>
-                                    {usuarios.length && usuarios.map(usuario => (
-                                        <option key={usuario._id} value={usuario._id}>{usuario.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="w-3/12 pr-4">
-                                <label htmlFor="sucursalId" className="block text-sm font-medium text-gray-700">Sucursal</label>
-                                <select id="sucursalId" {...register('sucursalId')} onChange={(e) => fetchDependencias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    <option value="">Seleccione una sucursal</option>
-                                    {sucursales.length && sucursales.map(sucursal => (
-                                        <option key={sucursal._id} value={sucursal._id}>{sucursal.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="w-3/12 pr-4">
-                                <label htmlFor="dependenciaId" className="block text-sm font-medium text-gray-700">Dependencia</label>
-                                <select id="dependenciaId" {...register('dependenciaId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    <option value="">Seleccione una dependencia</option>
-                                    {dependencias.length && dependencias.map(dependencia => (
-                                        <option key={dependencia._id} value={dependencia._id}>{dependencia.nombre}</option>
-                                    ))}
-                                </select>
+                            <div className="w-9/12">
+                                <div className="w-full flex">
+                                    <div className="w-4/12 pr-4">
+                                        <label htmlFor="usuarioId" className="block text-sm font-medium text-gray-700">Usuario</label>
+                                        <select id="usuarioId" {...register('usuarioId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            <option value="">Seleccione un usuario</option>
+                                            {usuarios.length && usuarios.map(usuario => (
+                                                <option key={usuario._id} value={usuario._id}>{usuario.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="w-4/12 pr-4">
+                                        <label htmlFor="sucursalId" className="block text-sm font-medium text-gray-700">Sucursal</label>
+                                        <select id="sucursalId" {...register('sucursalId')} onChange={(e) => fetchDependencias(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            <option value="">Seleccione una sucursal</option>
+                                            {sucursales.length && sucursales.map(sucursal => (
+                                                <option key={sucursal._id} value={sucursal._id}>{sucursal.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="w-4/12 pr-4">
+                                        <label htmlFor="dependenciaId" className="block text-sm font-medium text-gray-700">Dependencia</label>
+                                        <select id="dependenciaId" {...register('dependenciaId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            <option value="">Seleccione una dependencia</option>
+                                            {dependencias.length && dependencias.map(dependencia => (
+                                                <option key={dependencia._id} value={dependencia._id}>{dependencia.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                </div>
+                                <div className="flex mt-3">
+                                    <div className="w-4/12 relative pr-4">
+                                        <label htmlFor="cliente" className="block text-sm font-medium text-gray-700">
+                                            Cliente
+                                            {clienteSelected != null && clienteSelected.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
+                                        </label>
+                                        <input
+                                            id="cliente"
+                                            {...register('cliente')}
+                                            type="text"
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value.length > 2) {
+                                                    fetch(`/api/clientes/search?q=${value}`)
+                                                        .then(response => response.json())
+                                                        .then(data => setAutocompleteClienteResults(data.clientes));
+                                                }
+                                            }}
+                                        />
+                                        {autocompleteClienteResults.length > 0 && (
+                                            <ul className="absolute z-10 w-full border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
+                                                {autocompleteClienteResults.map(cliente => (
+                                                    <li
+                                                        key={cliente._id}
+                                                        className="px-3 py-2 cursor-pointer hover:bg-gray-200"
+                                                        onClick={() => {
+                                                            setValue('cliente', cliente.nombre);
+                                                            setClienteSelected(cliente);
+                                                            console.log("CLIENTE", cliente);
+                                                            setAutocompleteClienteResults([]);
+                                                            cliente.documentoTributarioId != null && setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
+                                                        }}
+                                                    >
+                                                        <p>{cliente.nombre}</p>
+                                                        <p className="text-xs text-gray-500">{cliente.rut}</p>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                    <div className="w-3/12 pr-4">
+                                        <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
+                                        <select id="documentoTributarioId" {...register('documentoTributarioId')}
+                                            onChange={(e) => {
+                                                console.log("VEAMOS", documentosTributarios.find(documento => documento._id == e.target.value));
+                                                setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
+                                            }}
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            <option value="">Seleccione un documento</option>
+                                            {documentosTributarios.length && documentosTributarios.map(documento => (
+                                                <option key={documento._id} value={documento._id}>{documento.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-3/12 pr-4">
+                                        <label htmlFor="tipoGuia" className="block text-sm font-medium text-gray-700">Motivo guía</label>
+                                        <select name="detalleguiadespacho" {...register('tipoGuia', { valueAsNumber: true })}
+                                            id="detalleguiadespacho" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            {TIPO_GUIA.map((guia) => (
+                                                <option key={guia.value} value={guia.value}>{guia.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>}
+                                    <div className="w-3/12 pr-4">
+                                        <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
+                                        <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
+                                            onChange={(e) => {
+                                                console.log("REGISTRO", e.target.value);
+                                                setRegistroSelected(e.target.value);
+                                            }}
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            {TIPO_REGISTRO.map((registro) => (
+                                                <option key={registro.value} value={registro.value}>{registro.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
 
-                        </div>
-                        <div className="flex">
-                            <div className="w-3/12 relative mr-4">
-                                <label htmlFor="clienteId" className="block text-sm font-medium text-gray-700">
-                                    Cliente
-                                    {clienteSelected != null && clienteSelected.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
-                                </label>
-                                <input
-                                    id="clienteId"
-                                    {...register('clienteId')}
-                                    type="text"
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (value.length > 2) {
-                                            fetch(`/api/clientes/search?q=${value}`)
-                                                .then(response => response.json())
-                                                .then(data => setAutocompleteClienteResults(data.clientes));
-                                        }
-                                    }}
-                                />
-                                {autocompleteClienteResults.length > 0 && (
-                                    <ul className="absolute z-10 w-full border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
-                                        {autocompleteClienteResults.map(cliente => (
-                                            <li
-                                                key={cliente._id}
-                                                className="px-3 py-2 cursor-pointer hover:bg-gray-200"
-                                                onClick={() => {
-                                                    setValue('clienteId', cliente.nombre);
-                                                    setClienteSelected(cliente);
-                                                    console.log("CLIENTE", cliente);
-                                                    setAutocompleteClienteResults([]);
-                                                    cliente.documentoTributarioId != null && setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
-                                                }}
-                                            >
-                                                <p>{cliente.nombre}</p>
-                                                <p className="text-xs text-gray-500">{cliente.rut}</p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                            <div className="w-3/12 text-center">
                                 {clienteSelected != null && (<div className="mt-1">
+                                    <p className="text-lg font-bold">{clienteSelected.nombre}</p>
                                     <p className="text-sm font-semibold">
                                         {clienteSelected.tipoPrecio == TIPO_PRECIO.mayorista ? <span className="bg-green-600 text-white rounded-md py-1 px-2 text-xs mr-2">MAYORISTA</span>
                                             : <span className="bg-orange-600 text-white rounded-md py-1 px-2 text-xs mx-2">MINORISTA</span>}
@@ -234,55 +297,18 @@ export default function Venta({ session }) {
                                     <p className="text-gray-400 text-xs mt-2">{clienteSelected.credito ? "CON" : "SIN"}&nbsp;CREDITO / {clienteSelected.arriendo ? "CON" : "SIN"}&nbsp;ARRIENDO</p>
                                 </div>)}
                             </div>
-                            <div className="w-2/12 pr-4">
-                                <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
-                                <select id="documentoTributarioId" {...register('documentoTributarioId')}
-                                    onChange={(e) => {
-                                        console.log("VEAMOS", documentosTributarios.find(documento => documento._id == e.target.value));
-                                        setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
-                                    }}
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    <option value="">Seleccione un documento</option>
-                                    {documentosTributarios.length && documentosTributarios.map(documento => (
-                                        <option key={documento._id} value={documento._id}>{documento.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-2/12 pr-4">
-                                <label htmlFor="tipoGuia" className="block text-sm font-medium text-gray-700">Motivo guía</label>
-                                <select name="detalleguiadespacho" {...register('tipoGuia', { valueAsNumber: true })}
-                                    id="detalleguiadespacho" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    {TIPO_GUIA.map((guia) => (
-                                        <option key={guia.value} value={guia.value}>{guia.label}</option>
-                                    ))}
-                                </select>
-                            </div>}
-                            <div className="w-2/12 pr-4">
-                                <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
-                                <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
-                                    onChange={(e) => {
-                                        console.log("REGISTRO", e.target.value);
-                                        setRegistroSelected(e.target.value);
-                                    }}
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                    {TIPO_REGISTRO.map((registro) => (
-                                        <option key={registro.value} value={registro.value}>{registro.label}</option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
+                        
 
-                        {registroSelected == 3 && <div className="w-full flex mt-6">
-                            <div className="w-2/12 pr-4 flex items-center">
+                        {registroSelected == 3 && <div className="w-full flex mt-3">
+                            <div className="w-1/12 pr-4">
+                                <label htmlFor="permanente" className="block text-sm font-medium text-gray-700">Permanente</label>
                                 <input
                                     id="permanente"
                                     type="checkbox"
                                     {...register('permanente')}
-                                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                    className="block w-6 h-6 m-2 mt-3"
                                 />
-                                <label htmlFor="permanente" className="ml-2 block text-sm font-medium text-gray-700">
-                                    Permanente
-                                </label>
                             </div>
 
                             <div className="w-3/12 pr-4">
@@ -355,6 +381,8 @@ export default function Venta({ session }) {
                                             id={`cantidad-${index}`}
                                             {...register(`itemsVenta[${index}].cantidad`)}
                                             type="number"
+                                            min={1}
+                                            max={99}
                                             defaultValue={item.cantidad}
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             onChange={(e) => {
@@ -487,8 +515,15 @@ export default function Venta({ session }) {
                                         e.preventDefault();
                                         router.back()
                                     }}>VOLVER Y CANCELAR</button>
-                                <button className="flex w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1"
-                                    type="submit" disabled={loadingForm}>CREAR VENTA</button>
+                                <button
+    className={`flex w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${
+        isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
+    }`}
+    type="submit"
+    disabled={isCreateVentaDisabled || loadingForm}
+>
+    CREAR VENTA
+</button>
                             </div>
                         </div>
                     </form>

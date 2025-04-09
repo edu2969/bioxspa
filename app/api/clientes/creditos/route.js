@@ -2,10 +2,8 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Cliente from "@/models/cliente";
 
-// filepath: d:/git/bioxspa/app/api/clientes/creditos/route.js
-
-export async function GET(req, props) {
-    const params = await props.params;
+export async function GET(req) {
+    const params = await req.nextUrl;
     console.log("CLIENTE getById...", params);
     await connectMongoDB();
     const cliente = await Cliente.findById(params.id).lean();

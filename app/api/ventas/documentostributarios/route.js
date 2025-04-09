@@ -2,14 +2,14 @@ import { connectMongoDB } from "@/lib/mongodb";
 import DocumentoTributario from "@/models/documentoTributario";
 import { NextResponse } from "next/server";
 
-export async function GET(request) {
+export async function GET(req) {
     console.log("GET request received");
     try {
         console.log("Connecting to MongoDB...");
         await connectMongoDB();
         console.log("Successfully connected to MongoDB");
 
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = req.nextUrl;
         const venta = searchParams.get("venta") === "true";
         const compra = searchParams.get("compra") === "true";
 

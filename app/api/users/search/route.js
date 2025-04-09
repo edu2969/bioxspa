@@ -5,7 +5,7 @@ import User from "@/models/user";
 export async function GET(req) {
     try {
         await connectMongoDB();
-        const { searchParams } = new URL(req.url);
+        const { searchParams } = req.nextUrl;
         const query = searchParams.get('q');
 
         if (!query) {
