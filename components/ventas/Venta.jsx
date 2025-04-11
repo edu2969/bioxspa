@@ -9,6 +9,8 @@ import { IoIosArrowForward } from 'react-icons/io';
 import { FaTrashAlt } from 'react-icons/fa';
 import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO } from '@/app/utils/constants';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -50,7 +52,7 @@ export default function Venta({ session }) {
     const [registroSelected, setRegistroSelected] = useState(0);
     const [total, setTotal] = useState(0);
 
-    const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseFloat(item.precio) <= 0);
+    const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
     const fetchSucursales = async () => {
         const response = await fetch('/api/sucursales');
@@ -150,8 +152,8 @@ export default function Venta({ session }) {
 
     useEffect(() => {
         const newTotal = itemsVenta.reduce((acc, item) => {
-            const cantidad = parseFloat(item.cantidad) || 0;
-            const precio = parseFloat(item.precio) || 0;
+            const cantidad = parseInt(item.cantidad) || 0;
+            const precio = parseInt(item.precio) || 0;
             return acc + (cantidad * precio);
         }, 0);
         setTotal(newTotal);
@@ -298,7 +300,7 @@ export default function Venta({ session }) {
                                 </div>)}
                             </div>
                         </div>
-                        
+
 
                         {registroSelected == 3 && <div className="w-full flex mt-3">
                             <div className="w-1/12 pr-4">
@@ -386,7 +388,7 @@ export default function Venta({ session }) {
                                             defaultValue={item.cantidad}
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             onChange={(e) => {
-                                                const newCantidad = parseFloat(e.target.value) || 0;
+                                                const newCantidad = parseInt(e.target.value) || 0;
                                                 const updatedItems = [...itemsVenta];
                                                 updatedItems[index].cantidad = newCantidad;
                                                 setItemsVenta(updatedItems);
@@ -436,13 +438,40 @@ export default function Venta({ session }) {
                                                                         setItemsVenta(prev => {
                                                                             const updatedItems = [...prev];
                                                                             updatedItems[index].subcategoriaId = categoria._id;
+                                                                            if (data.sugerido) {
+                                                                                updatedItems[index].precioError = true;
+                                                                            }
                                                                             updatedItems[index].precio = formattedPrice;
                                                                             return updatedItems;
                                                                         });
-                                                                    } else {
-                                                                        setValue(`itemsVenta[${index}].precio`, '');
-                                                                    }
-                                                                });
+                                                                        
+                                                                        toast.warning(<div><p><b>Precio sugerido</b></p><span className="text-xs">a <b>{data.clienteId.nombre}</b> el {new Date(data.clienteId.updatedAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
+                                                                            position: "top-right",
+                                                                            autoClose: 5000,
+                                                                            hideProgressBar: false,
+                                                                            closeOnClick: true,
+                                                                            pauseOnHover: true,
+                                                                            draggable: true,
+                                                                            progress: undefined,                                                                           
+                                                                        });
+                                                                    } else if(data.error) {
+                                                                        console.log("Error 404: Resource not found");
+                                                                        setItemsVenta(prev => {
+                                                                            const updatedItems = [...prev];
+                                                                            updatedItems[index].precioError = true;
+                                                                            return updatedItems;
+                                                                        });
+                                                                        toast.error(<div><p><b>Sin precio cargado</b></p><span className="text-xs">No hay precio para sugerir</span></div>, {
+                                                                            position: "top-right",
+                                                                            autoClose: 5000,
+                                                                            hideProgressBar: false,
+                                                                            closeOnClick: true,
+                                                                            pauseOnHover: true,
+                                                                            draggable: true,
+                                                                            progress: undefined,
+                                                                        });
+                                                                    }                                                                    
+                                                                })
                                                         }}
                                                     >
                                                         <p dangerouslySetInnerHTML={{ __html: categoria.texto }}></p>
@@ -464,10 +493,10 @@ export default function Venta({ session }) {
                                                     const numericValue = parseInt(value, 10) || 0;
                                                     const updatedItems = [...itemsVenta];
                                                     updatedItems[index].precio = numericValue;
-                                                    console.log("ITEMS", updatedItems);
                                                     setItemsVenta(updatedItems);
                                                 }}
-                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
+                                                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right ${itemsVenta[index].precioError ? 'border-red-500' : 'border-gray-300'
+                                                    }`}
                                             />
                                         </div>
                                     </div>
@@ -500,8 +529,8 @@ export default function Venta({ session }) {
                                         <span className="w-full font-bold text-xl text-right">
                                             {itemsVenta.reduce((acc, item) => {
                                                 console.log("ITEM>>>", item);
-                                                const cantidad = parseFloat(item.cantidad) || 0;
-                                                const precio = parseFloat(item.precio.replace(/\./g, '')) || 0;
+                                                const cantidad = parseInt(item.cantidad) || 0;
+                                                const precio = parseInt(("" + item.precio).replace(/\./g, '')) || 0;
                                                 return acc + (cantidad * precio);
                                             }, 0).toLocaleString('es-CL')}
                                         </span>
@@ -516,19 +545,19 @@ export default function Venta({ session }) {
                                         router.back()
                                     }}>VOLVER Y CANCELAR</button>
                                 <button
-    className={`flex w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${
-        isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
-    }`}
-    type="submit"
-    disabled={isCreateVentaDisabled || loadingForm}
->
-    CREAR VENTA
-</button>
+                                    className={`flex w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
+                                    type="submit"
+                                    disabled={isCreateVentaDisabled || loadingForm}
+                                >
+                                    CREAR VENTA
+                                </button>
                             </div>
                         </div>
                     </form>
                 </div>
-            </div>
+            </div>            
+            <ToastContainer />
         </main>
     );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { IoIosArrowBack, IoIosArrowForward, IoIosInformationCircle } from 'react-icons/io';
 import { MdAddBusiness, MdDeleteForever } from 'react-icons/md';
-import { FaCheck, FaCrown, FaHandsHelping, FaInfoCircle, FaRegSave, FaStar, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaCheck, FaCrown, FaHandsHelping, FaRegSave, FaStar, FaTimes } from 'react-icons/fa';
 import { LuPencil } from 'react-icons/lu';
 import Autocomplete from "react-google-autocomplete";
 import { SiHomeassistantcommunitystore } from 'react-icons/si';
