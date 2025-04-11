@@ -434,26 +434,37 @@ export default function Venta({ session }) {
                                                                     console.log("PRECIO", data);
                                                                     if (data && data.valor) {
                                                                         const formattedPrice = data.valor.toLocaleString('es-CL');
-                                                                        setValue(`itemsVenta[${index}].precio`, formattedPrice);
+                                                                        setValue(`itemsVenta[${index}].precio`, formattedPrice);                                                                            
                                                                         setItemsVenta(prev => {
                                                                             const updatedItems = [...prev];
                                                                             updatedItems[index].subcategoriaId = categoria._id;
                                                                             if (data.sugerido) {
-                                                                                updatedItems[index].precioError = true;
+                                                                                updatedItems[index].precioError = true;                                                                        
                                                                             }
                                                                             updatedItems[index].precio = formattedPrice;
                                                                             return updatedItems;
                                                                         });
-                                                                        
-                                                                        toast.warning(<div><p><b>Precio sugerido</b></p><span className="text-xs">a <b>{data.clienteId.nombre}</b> el {new Date(data.clienteId.updatedAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
-                                                                            position: "top-right",
-                                                                            autoClose: 5000,
-                                                                            hideProgressBar: false,
-                                                                            closeOnClick: true,
-                                                                            pauseOnHover: true,
-                                                                            draggable: true,
-                                                                            progress: undefined,                                                                           
-                                                                        });
+                                                                        if (data.sugerido) {
+                                                                            toast.warning(<div><p><b>Precio sugerido</b></p><span className="text-xs">a <b>{data.clienteId.nombre}</b> el {new Date(data.fechaDesde).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
+                                                                                position: "top-right",
+                                                                                autoClose: 5000,
+                                                                                hideProgressBar: false,
+                                                                                closeOnClick: true,
+                                                                                pauseOnHover: true,
+                                                                                draggable: true,
+                                                                                progress: undefined,                                                                           
+                                                                            });
+                                                                        } else {
+                                                                            toast.success(<div><p><b>Precio cargado exitósamente</b></p><span className="text-xs">el {new Date(data.fechaDesde).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
+                                                                                position: "top-right",
+                                                                                autoClose: 5000,
+                                                                                hideProgressBar: false,
+                                                                                closeOnClick: true,
+                                                                                pauseOnHover: true,
+                                                                                draggable: true,
+                                                                                progress: undefined,                                                                           
+                                                                            });
+                                                                        }
                                                                     } else if(data.error) {
                                                                         console.log("Error 404: Resource not found");
                                                                         setItemsVenta(prev => {
