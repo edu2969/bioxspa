@@ -59,13 +59,6 @@ export default function Venta({ session }) {
         const data = await response.json();
         console.log("SUCURSALES", data);
         setSucursales(data.sucursales);
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const sucursalId = urlParams.get('id');
-        if (sucursalId) {
-            setValue('sucursalId', sucursalId);
-            fetchDependencias(sucursalId);
-        }
     };
 
     const fetchDependencias = async (sucursalId) => {
@@ -144,6 +137,15 @@ export default function Venta({ session }) {
             console.log('usuarioId set to:', getValues('usuarioId'));
         }
     }, [usuarios]);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sucursalId = urlParams.get('id');
+        if (sucursalId) {
+            setValue('sucursalId', sucursalId);
+            fetchDependencias(sucursalId);
+        }
+    }, sucursales);
 
     useEffect(() => {
         const newTotal = itemsVenta.reduce((acc, item) => {
