@@ -80,11 +80,6 @@ export default function Venta({ session }) {
         const data = await response.json();
         console.log("USERS", data);
         setUsuarios(data.users);
-        console.log("SESSION", session);
-        if (session && session.user && session.user.id) {
-            setValue('usuarioId', session.user.id);
-            console.log('usuarioId', session.user.id);
-        }
     };
 
     const fetchCategorias = async () => {
@@ -148,7 +143,7 @@ export default function Venta({ session }) {
             setValue('usuarioId', session.user.id);
             console.log('usuarioId set to:', getValues('usuarioId'));
         }
-    }, [session, setValue, getValues]);
+    }, [usuarios]);
 
     useEffect(() => {
         const newTotal = itemsVenta.reduce((acc, item) => {
