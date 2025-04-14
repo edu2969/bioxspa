@@ -55,7 +55,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         const user = users.find(user => user._id === userId);
         console.log("USER", user);
         if (user) {
-            return `/profiles/${user.email.split('@')[0]}.jpg`;
+            return `/profiles/${user.email.split('@')[0].toLowerCase()}.jpg`;
         }
         return '/profiles/undefined.jpg';
     }
@@ -604,7 +604,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                 <div key={`avatar_${index}_${idx}`} className="w-14 h-14">
                                                                     <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
                                                                         <img
-                                                                            src={`/profiles/${cargo.user?.email.split('@')[0]}.jpg`}
+                                                                            src={`/profiles/${cargo.user?.email.split('@')[0].toLowerCase()}.jpg`}
                                                                             alt="avatar"
                                                                             className="w-14 h-14 rounded-full mr-2"
                                                                         />

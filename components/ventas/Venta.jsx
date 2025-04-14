@@ -57,21 +57,18 @@ export default function Venta({ session }) {
     const fetchSucursales = async () => {
         const response = await fetch('/api/sucursales');
         const data = await response.json();
-        console.log("SUCURSALES", data);
         setSucursales(data.sucursales);
     };
 
     const fetchDependencias = async (sucursalId) => {
         const response = await fetch(`/api/sucursales/${sucursalId}`);
         const data = await response.json();
-        console.log("DEPENDENCIAS", data);
         setDependencias(data.dependencias);
     };
 
     const fetchUsuarios = async () => {
         const response = await fetch('/api/users');
         const data = await response.json();
-        console.log("USERS", data);
         setUsuarios(data.users);
     };
 
@@ -84,7 +81,6 @@ export default function Venta({ session }) {
     const fetchDocumentosTributarios = async () => {
         const response = await fetch('/api/ventas/documentostributarios?venta=true');
         const data = await response.json();
-        console.log("DOCUMENTOS TRIBUTARIOS", data);
         setDocumentosTributarios(data.documentosTributarios);
     };
 
@@ -97,6 +93,7 @@ export default function Venta({ session }) {
             sucursalId: data.sucursalId,
             dependenciaId: data.dependenciaId,
             usuarioId: data.usuarioId,
+            documentoTributarioId: data.documentoTributarioId,
             items: itemsVenta.map(item => ({
                 cantidad: parseInt(item.cantidad),
                 precio: parseInt(item.precio.replace(/\./g, '')),
@@ -104,24 +101,32 @@ export default function Venta({ session }) {
             })),
         }
 
-        console.log("PAYLOAD", payload);
+        console.log("PAYLOAD2", payload);
 
-        /*
         setLoadingForm(true);
         try {
             await fetch('/api/ventas', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
             });
-            router.push('/ventas');
+            router.back();
         } catch (error) {
             console.error(error);
+            toast.error("Ocurrió un error al crear la venta. Por favor, inténtelo más tarde.", {
+            position: "top-right",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            progress: undefined,
+            });
         } finally {
-            setLoadingForm(false);
-        }*/
+            setLoadingForm(false);            
+        }
     };
 
     useEffect(() => {
@@ -133,8 +138,7 @@ export default function Venta({ session }) {
 
     useEffect(() => {
         if (session && session.user && session.user.id) {
-            setValue('usuarioId', session.user.id);
-            console.log('usuarioId set to:', getValues('usuarioId'));
+            setValue('usuarioId', session.user.id);            
         }
     }, [usuarios]);
 
@@ -145,7 +149,7 @@ export default function Venta({ session }) {
             setValue('sucursalId', sucursalId);
             fetchDependencias(sucursalId);
         }
-    }, sucursales);
+    }, [sucursales]);
 
     useEffect(() => {
         const newTotal = itemsVenta.reduce((acc, item) => {
@@ -234,10 +238,15 @@ export default function Venta({ session }) {
                                                         className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                         onClick={() => {
                                                             setValue('cliente', cliente.nombre);
-                                                            setClienteSelected(cliente);
-                                                            console.log("CLIENTE", cliente);
+                                                            setClienteSelected(cliente);                                                            
                                                             setAutocompleteClienteResults([]);
-                                                            cliente.documentoTributarioId != null && setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
+                                                            if(cliente.documentoTributarioId) {
+                                                                setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
+                                                            }
+                                                            if(cliente.ordenCompra == true) {
+                                                                setValue("tipoRegistro", 3);
+                                                                setRegistroSelected(3);
+                                                            }
                                                         }}
                                                     >
                                                         <p>{cliente.nombre}</p>
@@ -251,7 +260,6 @@ export default function Venta({ session }) {
                                         <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
                                         <select id="documentoTributarioId" {...register('documentoTributarioId')}
                                             onChange={(e) => {
-                                                console.log("VEAMOS", documentosTributarios.find(documento => documento._id == e.target.value));
                                                 setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
                                             }}
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
@@ -274,7 +282,6 @@ export default function Venta({ session }) {
                                         <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
                                         <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
                                             onChange={(e) => {
-                                                console.log("REGISTRO", e.target.value);
                                                 setRegistroSelected(e.target.value);
                                             }}
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
@@ -437,7 +444,7 @@ export default function Venta({ session }) {
                                                                             updatedItems[index].subcategoriaId = categoria._id;
                                                                             if (data.sugerido) {
                                                                                 updatedItems[index].precioError = true;                                                                        
-                                                                            }
+                                                                            } else delete updatedItems[index].precioError;
                                                                             updatedItems[index].precio = formattedPrice;
                                                                             return updatedItems;
                                                                         });
@@ -451,7 +458,7 @@ export default function Venta({ session }) {
                                                                                 draggable: true,
                                                                                 progress: undefined,                                                                           
                                                                             });
-                                                                        } else {
+                                                                        } else {                                                                            
                                                                             toast.success(<div><p><b>Precio cargado exitósamente</b></p><span className="text-xs">el {new Date(data.fechaDesde).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
                                                                                 position: "top-right",
                                                                                 autoClose: 5000,
@@ -467,8 +474,10 @@ export default function Venta({ session }) {
                                                                         setItemsVenta(prev => {
                                                                             const updatedItems = [...prev];
                                                                             updatedItems[index].precioError = true;
+                                                                            updatedItems[index].precio = 0;
                                                                             return updatedItems;
                                                                         });
+                                                                        setValue(`itemsVenta[${index}].precio`, 0);
                                                                         toast.error(<div><p><b>Sin precio cargado</b></p><span className="text-xs">No hay precio para sugerir</span></div>, {
                                                                             position: "top-right",
                                                                             autoClose: 5000,
@@ -536,7 +545,6 @@ export default function Venta({ session }) {
                                         <span className="text-xl font-bold px-4">$</span>
                                         <span className="w-full font-bold text-xl text-right">
                                             {itemsVenta.reduce((acc, item) => {
-                                                console.log("ITEM>>>", item);
                                                 const cantidad = parseInt(item.cantidad) || 0;
                                                 const precio = parseInt(("" + item.precio).replace(/\./g, '')) || 0;
                                                 return acc + (cantidad * precio);

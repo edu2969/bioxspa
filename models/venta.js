@@ -1,9 +1,9 @@
 import mongoose, { Schema, models } from "mongoose";
 
 const ventaSchema = new Schema({
-    temporalId: { type: String, required: true },
+    temporalId: { type: String },
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Cliente", required: true },
-    codigo: { type: String, required: true },
+    codigo: { type: String },
     vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
     fecha: { type: Date, required: true },
     estado: { type: Number, required: true },

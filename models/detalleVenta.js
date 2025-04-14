@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
 const DetalleVentaSchema = new mongoose.Schema({
-    temporalId: { type: String, required: true },
+    temporalId: { type: String },
     ventaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Venta', required: true },
-    glosa: { type: String, required: true },
+    glosa: { type: String },
     codigo: { type: String },
     codigoProducto: { type: String },
     codigoCilindro: { type: String, default: null },
