@@ -57,5 +57,10 @@ export const TIPO_ESTADO_VENTA = {
     borrador: 0,
     cotizacion: 1,
     ot: 2,
-    entregado: 64
+    preparacion: 4,
+    reparto: 8,
+    entregado: 16,
+    rechazado: 32,
+    anulado: 33,
+    pagado: 64,
 }

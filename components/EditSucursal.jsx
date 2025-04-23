@@ -14,7 +14,7 @@ import Loader from '@/components/Loader';
 import Link from 'next/link';
 import { AiFillHome } from 'react-icons/ai';
 import { RiMoneyDollarCircleFill } from 'react-icons/ri';
-import { TbMedal2, TbMoneybag } from 'react-icons/tb';
+import { TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 
 export default function EditSucursal({ googleMapsApiKey }) {
@@ -283,6 +283,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                         {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                         {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                         {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                         <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
                                                             const updatedCargos = sucursal.cargos.filter((_, i) => i !== idx);
                                                             setSucursal({ ...sucursal, cargos: updatedCargos });
@@ -614,6 +615,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                         {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                                         {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                                         {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                                         <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
                                                                             const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
                                                                             const updatedDependencias = [...dependencias];

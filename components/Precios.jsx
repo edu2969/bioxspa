@@ -10,21 +10,12 @@ import amountFormat from '@/app/utils/currency';
 
 
 const Precios = () => {
-    const [usuarios, setUsuarios] = useState([]);
-    const [copiaUsuario, setCopiaUsuario] = useState([]);
+    const [precios, setPrecios] = useState([]);
+    const [precioData, setPrecioData] = useState({});
     const [clientes, setClientes] = useState([]);
     const [sucursales, setSucursales] = useState([]);
     const [dependencias, setDependencias] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [precioData, setPrecioData] = useState({
-        fechaDesde: new Date().toISOString().split('T')[0],
-        fechaHasta: '',
-        clienteId: '',
-        sucursalId: '',
-        dependenciaId: '',
-        unidad: '',
-        valor: ''
-    });
     const [loading, setLoading] = useState(true);
     const [imageError, setImageError] = useState({});
 
@@ -33,37 +24,21 @@ const Precios = () => {
     };
 
     useEffect(() => {
-        fetchUsuarios();
-        fetchClientes();
+        fetchPrecios();
         fetchSucursales();
     }, []);
 
-    const fetchUsuarios = async (query = '') => {
+    const fetchPrecios = async (query = '') => {
         setLoading(true);
         try {
             const response = await fetch('/api/precios');
             const data = await response.json();
-            const filteredData = data.filter(usuario =>
-                usuario.name.toLowerCase().includes(query.toLowerCase()) ||
-                usuario.precios.some(precio => precio.cliente.nombre.toLowerCase().includes(query.toLowerCase()))
-            );
-            setUsuarios(filteredData);
-            setCopiaUsuario(filteredData);
-            console.log('data:', filteredData);
+            setPrecios(data);
+            console.log("PRECIOS", data);
         } catch (error) {
             console.error('Error fetching usuarios:', error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchClientes = async () => {
-        try {
-            const response = await fetch('/api/clientes');
-            const data = await response.json();
-            setClientes(data);
-        } catch (error) {
-            console.error('Error fetching clientes:', error);
         }
     };
 
@@ -85,22 +60,6 @@ const Precios = () => {
         } catch (error) {
             console.error('Error fetching dependencias:', error);
         }
-    };
-
-    const handleSearch = (q) => {
-        const filteredUsuarios = copiaUsuario.map(usuario => {
-            const filteredPrecios = usuario.precios.filter(precio =>
-                precio.cliente?.nombre.toLowerCase().includes(q.toLowerCase())
-            );
-            if (usuario.name.toLowerCase().includes(q.toLowerCase())) {
-                return usuario;
-            } else if (filteredPrecios.length > 0) {
-                return { ...usuario, precios: filteredPrecios };
-            }
-            return null;
-        }).filter(usuario => usuario !== null);
-
-        setUsuarios(filteredUsuarios);
     };
 
     const handleEdit = (index, precio) => {
@@ -162,7 +121,7 @@ const Precios = () => {
                             <div className="relative">
                                 <input
                                     type="text"
-                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onChange={(e) => {}}
                                     placeholder="Buscar usuarios..."
                                     className="pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -175,39 +134,27 @@ const Precios = () => {
                             <Loader />
                         ) : (
                             <>
-                                {usuarios.length > 0 ? (
-                                    usuarios.map((usuario, index) => (
-                                        <div key={`usuario_${index}`} className="flex flex-col bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 p-4">
+                                {precios.length > 0 ? (
+                                    precios.map((cliente, index) => (
+                                        <div key={`cliente_${index}`} className="flex flex-col bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 p-4">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center">
-                                                    {imageError[usuario.email] ? (
-                                                        <div className="w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center text-white text-lg font-semibold mr-4">
-                                                            {getInitials(usuario.name)}
-                                                        </div>
-                                                    ) : (
-                                                        <img
-                                                            src={`/profiles/${usuario.email.split('@')[0]}.jpg`}
-                                                            alt="avatar"
-                                                            className="w-10 h-10 rounded-full mr-4"
-                                                            onError={() => setImageError((prev) => ({ ...prev, [usuario.email]: true }))}
-                                                        />
-                                                    )}
                                                     <div>
-                                                        <p className="text-lg font-semibold">{usuario.name}</p>
-                                                        <p className="text-sm text-gray-500">{usuario.email}</p>
+                                                        <p className="text-lg font-semibold">{cliente.cliente.nombre}</p>
+                                                        <p className="text-sm text-gray-500">{cliente.cliente.rut}</p>
                                                     </div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     className="flex text-white bg-blue-500 hover:bg-blue-600 rounded-md px-4 py-2"
-                                                    onClick={() => handleEdit(index, { ...precioData, userId: usuario._id })}
+                                                    onClick={() => handleEdit(index, { ...cliente })}
                                                 >
                                                     <FaPlus className="mt-1" /><span className="ml-2">NUEVO PRECIO</span>
                                                 </button>
                                             </div>
-                                            {usuario.precios && usuario.precios.length > 0 ? (
+                                            {cliente.precios && cliente.precios.length > 0 ? (
                                                 <div className="flex flex-wrap">
-                                                    {usuario.precios.map((precio, precioIndex) => (
+                                                    {cliente.precios.map((precio, precioIndex) => (
                                                         <div key={`precio_${precioIndex}`} className="relative flex flex-col justify-between items-start mt-4 p-2 border rounded-md w-full md:w-1/2 lg:w-1/3">
                                                             {editingIndex === `${index}_${precioIndex}` ? (
                                                                 <div className="flex flex-col space-y-2">

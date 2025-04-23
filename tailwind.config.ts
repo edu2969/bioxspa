@@ -18,6 +18,10 @@ const config: Config = {
         spin: {
           'from': { transform: "rotate(0deg)" },
           'to': { transform: "rotate(360deg)" },
+        },
+        slideOut: {
+          '0%': { transform: 'translateX(0)', filter: "opacity(1)" },
+          '100%': { transform: 'translateX(-100%)', filter: 'opacity(0)' }
         }
       },
       colors: {
@@ -65,6 +69,7 @@ const config: Config = {
     animation: {
       'entrance': 'entrance 2s forwards',
       'spin': 'spin 1s linear infinite',
+      'animate-slide-out': 'slideOut 1s forwardss'    
     }
   },
   plugins: [],

@@ -7,8 +7,7 @@ const HistorialSchema = new mongoose.Schema({
 }, { _id: false });
 
 const PrecioSchema = new mongoose.Schema({
-    subcategoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubcategoriaCatalogo' },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    subcategoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubcategoriaCatalogo', required: true },
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: true },
     dependenciaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Dependencia', default: null },
     sucursalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Sucursal', default: null },

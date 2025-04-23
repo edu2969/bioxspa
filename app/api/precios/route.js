@@ -4,56 +4,45 @@ import User from "@/models/user";
 import Precio from "@/models/precio";
 import { USER_ROLE } from "@/app/utils/constants";
 import Cliente from "@/models/cliente";
-import ItemCatalogo from "@/models/itemCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();
     console.log("Connected to MongoDB");
 
-    console.log("Fetching users...");
-    const users = await User.find({ role: { $ne: USER_ROLE.neo }}).lean();
-    console.log(`Fetched ${users.length} users`);
+    console.log("Fetching clients...");
+    const clients = await Cliente.find().lean();
+    console.log(`Fetched ${clients.length} clients`);
 
-    console.log("Mapping users with precios...");
-    const usersWithPrecios = await Promise.all(users.map(async user => {
-        const precios = await Precio.find({ userId: user._id }).sort({ fechaDesde: -1 }).lean();
-        const preciosMap = new Map();
+    console.log("Mapping clients with precios...");
+    const clientsWithPrecios = await Promise.all(clients.map(async client => {
+        const precios = await Precio.find({ clienteId: client._id }).sort({ fechaDesde: -1 }).lean();
 
-        precios.forEach(precio => {
-            const key = `${precio.clienteId}-${precio.itemCatalogoId}-${precio.userId}`;
-            if (!preciosMap.has(key)) {
-                preciosMap.set(key, precio);
-            }
-        });
-
-        const preciosWithDetails = await Promise.all(Array.from(preciosMap.values()).map(async precio => {
-            const cliente = await Cliente.findById(precio.clienteId).lean();
-            const itemCatalogo = await ItemCatalogo.findById(precio.itemCatalogoId).lean();
-            const subcategoriaCatalogo = itemCatalogo ? await SubcategoriaCatalogo.findById(itemCatalogo.subcategoriaCatalogoId).lean() : null;
-            const categoriaCatalogo = subcategoriaCatalogo ? await CategoriaCatalogo.findById(subcategoriaCatalogo.categoriaCatalogoId).lean() : null;
-
-            return { 
-                valor: precio.valor,
-                moneda: precio.moneda,
-                fechaDesde: precio.fechaDesde,
-                fechaHasta: precio.fechaHasta,
-                userId: precio.userId,
-                clienteId: precio.clienteId,
-                itemCatalogoId: precio.itemCatalogoId, 
-                cliente: cliente ? { nombre: cliente.nombre, _id: cliente._id, rut: cliente.rut } : null,
-                categoriaItemNombre: categoriaCatalogo ? categoriaCatalogo.nombre : null,
-                subcategoriaItemNombre: subcategoriaCatalogo ? subcategoriaCatalogo.nombre : null
-            };
+        const preciosWithDetails = precios.map(precio => ({
+            valor: precio.valor,
+            moneda: precio.moneda,
+            fechaDesde: precio.fechaDesde,
+            fechaHasta: precio.fechaHasta,
+            valorBruto: precio.valorBruto,
+            impuesto: precio.impuesto,
+            historial: precio.historial,
+            subcategoriaCatalogoId: precio.subcategoriaCatalogoId,
+            dependenciaId: precio.dependenciaId,
+            sucursalId: precio.sucursalId
         }));
 
-        return { _id: user._id, name: user.name, email: user.email, precios: preciosWithDetails };
+        return { 
+            cliente: { 
+                nombre: client.nombre, 
+                _id: client._id, 
+                rut: client.rut 
+            },
+            precios: preciosWithDetails 
+        };
     }));
 
-    console.log("Returning users with precios");
-    return NextResponse.json(usersWithPrecios);
+    console.log("Returning clients with precios");
+    return NextResponse.json(clientsWithPrecios);
 }
 
 export async function POST(req) {

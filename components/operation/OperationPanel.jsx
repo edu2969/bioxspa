@@ -8,8 +8,6 @@ import { FiTrash2, FiSave, FiX } from "react-icons/fi";
 import { useState, useEffect } from 'react';
 import { PiBatteryVerticalFullBold } from 'react-icons/pi';
 
-import './OperationPanel.css';
-
 export default function OperationPanel({ session }) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [qrLeido, setQrLeido] = useState(false);

@@ -14,7 +14,6 @@ export async function POST(req) {
 
         const requiredFields = [
             "clienteId",
-            "sucursalId",
             "usuarioId",
             "documentoTributarioId",
             "items"
