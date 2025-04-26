@@ -34,7 +34,7 @@ export default function HomeAdministrador() {
                     <span>PEDIDOS</span>
                 </div>
             </Link>
-            <Link href="/modulos/flota" className="relative">
+            <Link href="/modulos/asignacion" className="relative">
                 <div className="w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center">
                     <div className="w-full inline-flex text-center text-slate-500 p-4 relative">
                         <FaSignInAlt className="mx-auto mb-1" size="6rem" />
@@ -44,7 +44,7 @@ export default function HomeAdministrador() {
                 {borradorCount > 0 && (
                     <div className="absolute top-6 -right-10 bg-red-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
                         <span className="text-sm mr-1">{borradorCount > 999999 ? '999999+' : borradorCount}</span> 
-                        <span className="text-xs">POR ASIGNAR</span>
+                        <span className="text-xs mt-0.5">x ASIGNAR</span>
                     </div>
                 )}
             </Link>            

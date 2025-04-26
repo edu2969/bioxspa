@@ -64,3 +64,14 @@ export const TIPO_ESTADO_VENTA = {
     anulado: 33,
     pagado: 64,
 }
+
+export const TIPO_ESTADO_RUTA_DESPACHO = {
+    preparacion: 0,
+    verificacion_vehiculo: 1,
+    en_ruta: 2,
+    panel: 4,
+    descarga: 8,
+    regreso: 16,
+    terminado: 32,
+    anulado: 64
+}

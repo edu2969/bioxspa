@@ -102,7 +102,6 @@ export default function Venta({ session }) {
         }
 
         console.log("PAYLOAD2", payload);
-
         setLoadingForm(true);
         try {
             await fetch('/api/ventas', {

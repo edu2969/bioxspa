@@ -420,9 +420,10 @@ export default function Pedidos({ session }) {
                                     className="rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                                     onClick={() => {
                                         const selectedItems = precios.filter(precio => precio.seleccionado);
+                                        console.log("ITEM", selectedItems);
                                         const updatedItemsVenta = selectedItems.map(item => ({
                                             cantidad: item.cantidad || 1,
-                                            subcategoriaId: item._id,
+                                            subcategoriaId: item.subcategoriaCatalogoId,
                                             subcategoria: item.nombre,
                                             precio: item.valor
                                         }));
