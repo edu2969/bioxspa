@@ -17,7 +17,7 @@ export async function GET(req) {
         const data = await response.json();
         console.log("DATA", data);
         return NextResponse.json(data);
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Error fetching data from Google Maps API" }, { status: 500 });
     }
 }

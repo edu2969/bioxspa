@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
 export function Gauge({ value, width, height, unit }) {
@@ -7,10 +7,6 @@ export function Gauge({ value, width, height, unit }) {
     const arcWidth = 14;
     const needleLength = radius - arcWidth;
     const needleRadius = 5;
-
-    const colorScale = d3.scaleLinear()
-        .domain([0, 40, 80, 100])
-        .range(['#ED4546', '#FFD700', '#32CD32']);
 
     const arc = d3.arc()
         .innerRadius(radius - arcWidth)
@@ -28,14 +24,14 @@ export function Gauge({ value, width, height, unit }) {
 
     const needleAngle = scale(value);
 
-    const needleRef = React.useRef();
+    const needleRef = useRef();
 
-    React.useEffect(() => {
+    useEffect(() => {
         d3.select(needleRef.current)
             .transition()
             .duration(500)
             .attr('transform', `rotate(${needleAngle * 180 / Math.PI})`);
-    }, [value]);
+    }, [needleRef, needleAngle]);
 
     return (
         <svg width={width} height={height}>

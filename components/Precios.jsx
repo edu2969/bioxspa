@@ -12,23 +12,18 @@ import amountFormat from '@/app/utils/currency';
 const Precios = () => {
     const [precios, setPrecios] = useState([]);
     const [precioData, setPrecioData] = useState({});
-    const [clientes, setClientes] = useState([]);
+    const [clientes] = useState([]);
     const [sucursales, setSucursales] = useState([]);
     const [dependencias, setDependencias] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [imageError, setImageError] = useState({});
-
-    const getInitials = (name) => {
-        return name.split(' ').map((n) => n[0]).join('');
-    };
-
+    
     useEffect(() => {
         fetchPrecios();
         fetchSucursales();
     }, []);
 
-    const fetchPrecios = async (query = '') => {
+    const fetchPrecios = async () => {
         setLoading(true);
         try {
             const response = await fetch('/api/precios');
@@ -121,7 +116,6 @@ const Precios = () => {
                             <div className="relative">
                                 <input
                                     type="text"
-                                    onChange={(e) => {}}
                                     placeholder="Buscar usuarios..."
                                     className="pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />

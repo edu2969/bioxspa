@@ -1,7 +1,7 @@
 'use client'
 import { signOut } from 'next-auth/react';
 import Link from 'next/link'
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
 import { usePathname } from 'next/navigation'
 import { User } from 'next-auth';
@@ -9,6 +9,9 @@ import { MdOutlinePropaneTank } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 
 export default function Nav({ user }: { user: User | null}) {
+    useEffect(() => {
+        console.log("USER", user);
+    }, [user]);
     const [menuActivo, setMenuActivo] = useState(false);  
     const path = usePathname();
     return (

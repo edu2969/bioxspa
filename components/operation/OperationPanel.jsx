@@ -4,14 +4,14 @@ import { BsFillClipboard2CheckFill, BsFire, BsQrCodeScan } from "react-icons/bs"
 import { FaB, FaLocationDot } from 'react-icons/fa6';
 import { TbAwardOff } from 'react-icons/tb';
 import { Dialog, DialogTitle } from "@headlessui/react";
-import { FiTrash2, FiSave, FiX } from "react-icons/fi";
+import { FiSave, FiX } from "react-icons/fi";
 import { useState, useEffect } from 'react';
 import { PiBatteryVerticalFullBold } from 'react-icons/pi';
 
-export default function OperationPanel({ session }) {
+export default function OperationPanel() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [qrLeido, setQrLeido] = useState(false);
-    const [inputValue, setInputValue] = useState('');
+    const [setInputValue] = useState('');
 
     const handleCloseDialog = () => {
         setIsDialogOpen(false);
@@ -39,7 +39,7 @@ export default function OperationPanel({ session }) {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isDialogOpen]);
+    }, [isDialogOpen, setInputValue]);
 
     return (
         <div className="w-full h-screen p-4">
@@ -175,7 +175,7 @@ export default function OperationPanel({ session }) {
                         <div className={`relative -left-10`}>
                             <Image className="absolute top-0 left-0 ml-12 mt-2" src="/ui/camion.png" alt="camion" width={250} height={194} />
                             {Array.from({ length: 10 }).map((_, layerIndex) => (
-                                <div key={`${layerIndex}_${patente}`} className="absolute flex" style={{
+                                <div key={`${layerIndex}_${patente}_${i}`} className="absolute flex" style={{
                                     top: (0 + layerIndex * 4) + 'px',
                                     left: (180 - 10 * layerIndex) + 'px'
                                 }}>
@@ -265,7 +265,7 @@ export default function OperationPanel({ session }) {
                                     </div>
                                     <div className="flex items-center mt-2 text-red-600">
                                         <BsFire className="mr-2" />
-                                        <p className="text-lg">VENCIDO 11/ENE '24</p>
+                                        <p className="text-lg">VENCIDO 11/ENE &apos;24</p>
                                     </div>
                                 </div>
                             </div> : <div className="flex flex-col items-center">                            

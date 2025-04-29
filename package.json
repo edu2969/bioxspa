@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:socket": "cross-env NODE_OPTIONS=\"--loader ts-node/esm --trace-warnings --no-warnings\" ts-node server.mts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -35,6 +36,9 @@
     "react-toastify": "^10.0.6",
     "react-use-measure": "^2.1.1",
     "react-webcam": "^7.2.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2",
     "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },
@@ -46,6 +50,7 @@
     "@types/react": "18.0.0",
     "@types/react-dom": "18.0.0",
     "autoprefixer": "^10.0.1",
+    "cross-env": "^7.0.3",
     "eslint": "^8",
     "eslint-config-next": "^15.2.4",
     "postcss": "^8",

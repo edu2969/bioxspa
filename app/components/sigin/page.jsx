@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { signIn } from 'next-auth/react';
 
-const SignIn = (props) => {
+const SignIn = () => {
   const [userInfo, setUserInfo] = useState({ email: '', password: ''});
   const handleSubmit = async (e) => {
     e.preventDefault();

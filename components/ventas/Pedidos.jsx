@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -12,7 +12,6 @@ import { TIPO_PRECIO } from '@/app/utils/constants';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BiCartDownload } from 'react-icons/bi';
-import { set } from 'lodash';
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -34,24 +33,18 @@ const TIPO_REGISTRO = [
 
 export default function Pedidos({ session }) {
     const router = useRouter();
-    const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm();
-    const [dependencias, setDependencias] = useState([]);
+    const { register, handleSubmit, setValue } = useForm();
     const [usuarios, setUsuarios] = useState([]);
-    const [clientes, setClientes] = useState([]);
-    const [categorias, setCategorias] = useState([]);
-    const [subcategorias, setSubcategorias] = useState([]);
-    const [items, setItems] = useState([]);
+    const [setCategorias] = useState([]);
     const [precios, setPrecios] = useState([]);
     const [loadingForm, setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
     const [itemsVenta, setItemsVenta] = useState([]);
-    const [autocompleteCategoriaResults, setAutocompleteCategoriaResults] = useState([]);
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
-    const [tipoGuiaSelected, setTipoGuiaSelected] = useState(0);
     const [documentoTributarioSeleccionado, setDocumentoTributarioSeleccionado] = useState(null);
     const [registroSelected, setRegistroSelected] = useState(0);
-    const [total, setTotal] = useState(0);
+    const [setTotal] = useState(0);
 
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
@@ -62,11 +55,11 @@ export default function Pedidos({ session }) {
         console.log("USERS", data.users);
     };
 
-    const fetchCategorias = async () => {
+    const fetchCategorias = useCallback(async () => {
         const response = await fetch('/api/catalogo');
         const data = await response.json();
         setCategorias(data);
-    };
+    }, [setCategorias]);
 
     const fetchDocumentosTributarios = async () => {
         const response = await fetch('/api/ventas/documentostributarios?venta=true');
@@ -119,13 +112,13 @@ export default function Pedidos({ session }) {
         fetchUsuarios();
         fetchDocumentosTributarios();
         fetchCategorias();
-    }, []);
+    }, [fetchCategorias]);
 
     useEffect(() => {
         if (session && session.user && session.user.id) {
             setValue('usuarioId', session.user.id);            
         }
-    }, [usuarios]);
+    }, [usuarios, session, setValue]);
 
     useEffect(() => {
         const newTotal = itemsVenta.reduce((acc, item) => {
@@ -134,7 +127,7 @@ export default function Pedidos({ session }) {
             return acc + (cantidad * precio);
         }, 0);
         setTotal(newTotal);
-    }, [itemsVenta]);
+    }, [itemsVenta, setTotal]);
 
     return (
         <main className="w-full h-screen pt-10 overflow-y-auto">

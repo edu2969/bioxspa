@@ -4,7 +4,7 @@ import BiPrincipal from "@/models/biPrincipal";
 import Sucursal from "@/models/sucursal";
 import dayjs from "dayjs";
 
-export async function GET(req) {
+export async function GET() {
     console.log("Fetching top 10 monthly debtors by branch for the last 6 months...");
     const startTime = dayjs();
     await connectMongoDB();

@@ -1,5 +1,5 @@
 export const USER_ROLE = {
-    neo: 0,
+    neo: 2969,
     manager: 1,
     cliente: 2,
     conductor: 4,
@@ -15,7 +15,7 @@ export const TIPO_DEPENDENCIA = {
 }
 
 export const TIPO_CARGO = {
-    neo: 0,
+    neo: 2969,
     gerente: 1,
     cobranza: 2,
     encargado: 8,

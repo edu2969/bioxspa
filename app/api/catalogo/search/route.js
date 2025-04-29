@@ -1,6 +1,5 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 
 // filepath: d:\git\bioxspa\app\api\catalogo\search\route.js
@@ -17,10 +16,6 @@ export async function GET(req) {
 
         const words = query.split(' ').filter(word => word);
         const regexes = words.map(word => new RegExp(word, 'i'));
-
-        const categorias = await CategoriaCatalogo.find({
-            $or: regexes.map(regex => ({ nombre: { $regex: regex } }))
-        });
 
         const subcategorias = await SubcategoriaCatalogo.find({
             $or: regexes.map(regex => ({ nombre: { $regex: regex } }))

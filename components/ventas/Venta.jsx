@@ -32,26 +32,19 @@ const TIPO_REGISTRO = [
 
 export default function Venta({ session }) {
     const router = useRouter();
-    const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm();
+    const { register, handleSubmit, setValue, getValues } = useForm();
     const [sucursales, setSucursales] = useState([]);
     const [dependencias, setDependencias] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
-    const [clientes, setClientes] = useState([]);
-    const [categorias, setCategorias] = useState([]);
-    const [subcategorias, setSubcategorias] = useState([]);
-    const [items, setItems] = useState([]);
-    const [precios, setPrecios] = useState([]);
     const [loadingForm, setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
     const [itemsVenta, setItemsVenta] = useState([{ cantidad: 1, subcategoriaId: '', precio: '' }]);
     const [autocompleteCategoriaResults, setAutocompleteCategoriaResults] = useState([]);
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
-    const [tipoGuiaSelected, setTipoGuiaSelected] = useState(0);
     const [documentoTributarioSeleccionado, setDocumentoTributarioSeleccionado] = useState(null);
     const [registroSelected, setRegistroSelected] = useState(0);
-    const [total, setTotal] = useState(0);
-
+    
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
     const fetchSucursales = async () => {
@@ -70,12 +63,6 @@ export default function Venta({ session }) {
         const response = await fetch('/api/users');
         const data = await response.json();
         setUsuarios(data.users);
-    };
-
-    const fetchCategorias = async () => {
-        const response = await fetch('/api/catalogo');
-        const data = await response.json();
-        setCategorias(data);
     };
 
     const fetchDocumentosTributarios = async () => {
@@ -132,14 +119,13 @@ export default function Venta({ session }) {
         fetchUsuarios();
         fetchSucursales();
         fetchDocumentosTributarios();
-        fetchCategorias();
     }, []);
 
     useEffect(() => {
         if (session && session.user && session.user.id) {
             setValue('usuarioId', session.user.id);            
         }
-    }, [usuarios]);
+    }, [usuarios, session, setValue]);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -148,16 +134,7 @@ export default function Venta({ session }) {
             setValue('sucursalId', sucursalId);
             fetchDependencias(sucursalId);
         }
-    }, [sucursales]);
-
-    useEffect(() => {
-        const newTotal = itemsVenta.reduce((acc, item) => {
-            const cantidad = parseInt(item.cantidad) || 0;
-            const precio = parseInt(item.precio) || 0;
-            return acc + (cantidad * precio);
-        }, 0);
-        setTotal(newTotal);
-    }, [itemsVenta]);
+    }, [sucursales, setValue]);
 
     return (
         <main className="w-full h-screen mt-10">

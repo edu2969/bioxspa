@@ -15,7 +15,6 @@ import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-
 dayjs.locale('es');
 
 var relative = require('dayjs/plugin/relativeTime');
@@ -50,22 +49,7 @@ function calculateTubePosition(layerIndex, index) {
     return { top, left, width: '14px', height: '78px' };
 }
 
-const trucks = [
-    { patente: "LLSW-71", marca: "Hyundai Porter", revisionTec: "2024-04-07", diasFaltantes: 302, tubosLlenos: 10, tubosVacios: 5, enRuta: true, direccion: "Cliente 1, Talcahuano" },
-    { patente: "RPYF-33", marca: "Volkswagen Delivery 9.160", revisionTec: "2024-09-04", diasFaltantes: 152, tubosLlenos: 8, tubosVacios: 7, enRuta: false },
-    { patente: "PHBL-23", marca: "Hyundai Porter", revisionTec: "2025-06-01", diasFaltantes: 117, tubosLlenos: 12, tubosVacios: 3, enRuta: true, direccion: "Cliente 2, Concepción" },
-    { patente: "JVHP-16", marca: "Ford Ranger XLT", revisionTec: "2025-01-01", diasFaltantes: 33, tubosLlenos: 15, tubosVacios: 0, enRuta: false },
-    { patente: "JZYY-59", marca: "Ford Ranger LTD", revisionTec: "2025-01-01", diasFaltantes: 33, tubosLlenos: 7, tubosVacios: 8, enRuta: true, direccion: "Cliente 3, Los Ángeles" },
-    { patente: "RPYF-32", marca: "Volkswagen Delivery 9.160", revisionTec: "2024-03-27", diasFaltantes: 313, tubosLlenos: 9, tubosVacios: 6, enRuta: false },
-    { patente: "RZRF-18", marca: "Volkswagen Delivery 11.180", revisionTec: "2024-06-14", diasFaltantes: 234, tubosLlenos: 11, tubosVacios: 4, enRuta: true, direccion: "Cliente 4, Talcahuano" },
-    { patente: "RPYD-85", marca: "Volkswagen Constellation 17.280", revisionTec: "2024-09-06", diasFaltantes: 150, tubosLlenos: 6, tubosVacios: 9, enRuta: false },
-    { patente: "LPHF-83", marca: "Kia Frontier", revisionTec: "2024-06-02", diasFaltantes: 246, tubosLlenos: 13, tubosVacios: 2, enRuta: true, direccion: "Cliente 5, Concepción" },
-    { patente: "SBDY-13", marca: "Mitsubishi Work L200", revisionTec: "2025-06-15", diasFaltantes: 131, tubosLlenos: 5, tubosVacios: 10, enRuta: false },
-    { patente: "SBSK64", marca: "Mitsubishi", revisionTec: "2024-07-15", diasFaltantes: 203, tubosLlenos: 14, tubosVacios: 1, enRuta: true, direccion: "Cliente 6, Los Ángeles" },
-    { patente: "SZFB24", marca: "Ford Transit", revisionTec: "2025-11-18", diasFaltantes: 287, tubosLlenos: 4, tubosVacios: 11, enRuta: false }
-];
-
-export default function AsignacionPanel({ session }) {
+export default function AsignacionPanel() {
     const [pedidos, setPedidos] = useState([]);
     const [choferes, setChoferes] = useState([]);
     const [enTransito, setEnTransito] = useState([]);
@@ -74,25 +58,34 @@ export default function AsignacionPanel({ session }) {
     const [selectedChofer, setSelectedChofer] = useState(null);
     const [selectedPedido, setSelectedPedido] = useState(null);
 
-    useEffect(() => {
-        async function fetchPedidos() {
-            try {
-                const response = await fetch("/api/pedidos/asignacion");
-                if (!response.ok) {
-                    throw new Error("Failed to fetch pedidos");
-                }
-                const data = await response.json();
-                console.log("Fetched pedidos:", data);
-                setPedidos(data.pedidos);
-                setChoferes(data.choferes);
-                setEnTransito(data.flotaEnTransito);
-            } catch (error) {
-                console.error("Error fetching pedidos:", error);
-            }
-        }
+    const nombreChofer = (choferId) => {
+        const chofer = choferes.find((chofer) => chofer._id === choferId);
+        return chofer ? chofer.nombre : "Desconocido";
+    }
 
+    async function fetchPedidos() {
+        try {
+            const response = await fetch("/api/pedidos/asignacion");
+            if (!response.ok) {
+                throw new Error("Failed to fetch pedidos");
+            }
+            const data = await response.json();
+            console.log("Fetched pedidos:", data);
+            setPedidos(data.pedidos);
+            setChoferes(data.choferes);
+            setEnTransito(data.flotaEnTransito);
+        } catch (error) {
+            console.error("Error fetching pedidos:", error);
+        }
+    }
+
+    useEffect(() => {
         fetchPedidos();
     }, []);
+
+    useEffect(() => {
+        console.log("Pedidos:", pedidos);
+    }, [pedidos]);
 
     return (
         <main className="mt-4 h-screen overflow-hidden">
@@ -123,13 +116,10 @@ export default function AsignacionPanel({ session }) {
                                 <div key={`pedido_${index}`}
                                     className="p-2 border rounded-lg mb-2 bg-gray-100 cursor-pointer flex items-start relative"
                                     draggable
-                                    onDragStart={(e) => setSelectedPedido(pedido._id)}
+                                    onDragStart={() => setSelectedPedido(pedido._id)}
                                 >
                                     <div>
-                                        <div className="flex">
-                                            <p className="text-md font-bold uppercase">{pedido.clienteNombre}</p>
-                                            <p className="text-xs text-gray-500 ml-2 mt-1.5">{pedido.clienteRut}</p>
-                                        </div>
+                                        <p className="text-md font-bold uppercase w-full">{pedido.clienteNombre}</p>
                                         <p className="text-xs text-gray-500 ml-2">{dayjs(pedido.createdAt).fromNow()}</p>
                                         <ul className="list-disc ml-4 mt-2">
                                             {pedido.items.map((item, index2) => (<li key={`item_${index2}`}>{item.cantidad}x {item.nombre}</li>))}
@@ -149,35 +139,36 @@ export default function AsignacionPanel({ session }) {
                             <div
                                 key={`en_espera_${index}`}
                                 className="p-2 border rounded-lg mb-2 bg-gray-100"
+                                data-id={`choferId_${chofer._id}`}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = "#333333";
-                                    e.currentTarget.style.color = "#ffffff";
+                                    e.currentTarget.style.backgroundColor = "rgb(209 213 219)"; // Tailwind gray-300
+                                    e.currentTarget.style.transform = "scale(1.1)";
+                                    e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = "white";
-                                    e.currentTarget.style.color = "black";
+                                    e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
+                                    e.currentTarget.style.transform = "scale(1)";
+                                    e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = "#333333";
-                                    e.currentTarget.style.color = "#ffffff";
-                                    setSelectedChofer(chofer.name); // Guarda el nombre del chofer seleccionado
-                                    setShowConfirmModal(true); // Muestra el modal
+                                    e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
+                                    e.currentTarget.style.transform = "scale(1)";
+                                    e.currentTarget.style.boxShadow = "none";
+                                    setSelectedChofer(chofer._id);
+                                    setShowConfirmModal(true); 
                                 }}
                             >
                                 <div className="font-bold uppercase flex">
-                                    <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.name}</span>
+                                    <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
                                 </div>
-                                {chofer.items.length ? <>
-                                    <p className="font-md uppercase font-bold">SIMEN LIMITADA</p>
+                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedidos_chofer_${indexPedido}`}>
+                                    <p className="font-md uppercase font-bold">{pedido.nombreCliente}</p>
                                     <ul className="list-disc ml-4">
-                                        <>
-                                            <li>1x C02 9Kgs !!!!</li>
-                                            <li>2x Atal 10m3 !!!!!</li>
-                                        </>
+                                        {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}                                        
                                     </ul>
-                                </> : <div className="relative w-32"><div className="relative -top-8 left-64 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
+                                </div>) : <div className="relative w-32"><div className="relative -top-8 left-64 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
                                     <RiZzzFill size="1rem" className="mr-1" />
                                     <p>SIN PEDIDOS</p>
                                 </div></div>}
@@ -200,15 +191,14 @@ export default function AsignacionPanel({ session }) {
                         enTransito.map((truck, index) => (
                             <div
                                 key={`truck_${index}`}
+                                data-id={truck._id}
                                 className="relative w-full border rounded-lg px-4 bg-gray-100 shadow-md mb-4 h-64 pt-4"
                                 onDragOver={(e) => {
                                     e.preventDefault();
                                     e.currentTarget.style.backgroundColor = "#333333";
-                                    e.currentTarget.style.color = "#ffffff";
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = "white";
-                                    e.currentTarget.style.color = "black";
+                                    e.currentTarget.style.backgroundColor = "#e5e7eb";
                                 }}
                                 onDrop={(e) => {
                                     alert(`SOLTADO en camión ${truck.patente}`);
@@ -255,8 +245,16 @@ export default function AsignacionPanel({ session }) {
             <ConfirmModal
                 show={showConfirmModal}
                 title="Confirmar Asignación"
-                confirmationQuestion={`¿Estás seguro de asignar este pedido a ${selectedChofer}?`}
-                onClose={() => setShowConfirmModal(false)} // Cierra el modal
+                confirmationQuestion={`¿Estás seguro de asignar este pedido a ${nombreChofer(selectedChofer)}?`}
+                onClose={() => {
+                    const item = document.querySelector(`[data-id="choferId_${selectedChofer}"]`);
+                    if (item) {
+                        item.style.backgroundColor = "#F3F4F6";
+                        item.style.transform = "scale(1)";
+                        item.style.boxShadow = "none";
+                    }
+                    setShowConfirmModal(false);
+                }} // Cierra el modal
                 onConfirm={() => {
                     const assignPedido = async () => {
                         try {
@@ -267,7 +265,7 @@ export default function AsignacionPanel({ session }) {
                                 },
                                 body: JSON.stringify({
                                     ventaId: selectedPedido,
-                                    choferId: choferes.find((chofer) => chofer.name === selectedChofer)._id,
+                                    choferId: selectedChofer,
                                 }),
                             });
 
@@ -275,24 +273,8 @@ export default function AsignacionPanel({ session }) {
                                 const errorData = await response.json();
                                 throw new Error(errorData.error || "Error al asignar el pedido");
                             }
-
                             toast.success("Pedido asignado con éxito");
-                            // Update the state to move the pedido to the chofer's items
-                            setChoferes((prevChoferes) => {
-                                return prevChoferes.map((chofer) => {
-                                    if (chofer.name === selectedChofer) {
-                                        return {
-                                            ...chofer,
-                                            items: [...chofer.items, ...pedidos.find((pedido) => pedido._id === selectedPedido).items],
-                                        };
-                                    }
-                                    return chofer;
-                                });
-                            });
-                            setPedidos((prevPedidos) => {
-                                const updatedPedidos = prevPedidos.filter((pedido) => pedido._id !== selectedPedido);
-                                return updatedPedidos;
-                            });
+                            fetchPedidos();
                         } catch (error) {
                             console.error("Error al asignar el pedido:", error);
                             toast.error(error.message || "Error al asignar el pedido");
@@ -302,7 +284,7 @@ export default function AsignacionPanel({ session }) {
                     };
                     assignPedido();
                 }}
-                confirmationLabel="Asignar"
+                confirmationLabel="ASIGNAR"
             />
             <ToastContainer/>
         </main>

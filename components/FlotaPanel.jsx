@@ -18,7 +18,7 @@ const trucks = [
     { patente: "SZFB24", marca: "Ford Transit", revisionTec: "2025-11-18", diasFaltantes: 287, tubosLlenos: 4, tubosVacios: 11, enRuta: false }
 ];
 
-export default function FlotaPanel({ session }) {
+export default function FlotaPanel() {
     return (
         <main className="mt-4 h-screen overflow-y-auto">
             <div className="grid grid-cols-4 h-full gap-4 p-4">

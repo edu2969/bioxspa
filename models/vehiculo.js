@@ -12,6 +12,7 @@ const vehiculoSchema = new Schema({
     revisionTecnica: { type: Date, required: true },
     fechaVencimientoExtintor: { type: Date, default: null },
     direccionDestinoId: { type: String, default: null },
+    choferIds: [{ type: Schema.Types.ObjectId, ref: "User", default: null }],
     posicionActual: {
         latitud: { type: Number, default: null },
         longitud: { type: Number, default: null }

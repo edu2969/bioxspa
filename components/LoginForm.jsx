@@ -3,6 +3,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
+import Image from "next/image";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function LoginForm() {
       </div>
       <div className="z-10 flex min-h-full flex-col justify-center py-6">
         <div className="flex sm:mx-auto sm:w-full sm:max-w-sm">                    
-          <img src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" />          
+          <Image width={80} height={80} src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" />          
           <span className="text-xs text-gray-400 mt-40">v0.9</span>
         </div>
       </div>      

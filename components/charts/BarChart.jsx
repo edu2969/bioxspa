@@ -1,9 +1,8 @@
 import React from 'react';
 import { scaleBand, scaleLinear } from 'd3-scale';
 import { motion } from 'framer-motion';
-import { COLORS_PALETTE } from "@/app/utils/colorsPalette";
 
-export function BarChart({ data, width, height, indexColor }) {
+export function BarChart({ data, width, height }) {
     let margin = { t: 20, r: 20, b: 40, l: 10 }; // Aumenta el margen izquierdo
     const xScale = scaleBand()
         .domain(data.map(d => d.empresa))
@@ -13,8 +12,6 @@ export function BarChart({ data, width, height, indexColor }) {
     const yScale = scaleLinear()
         .domain([0, Math.max(...data.map(d => d.deuda))])
         .range([height - margin.b, margin.t]);
-
-    const max = Math.max(...data.map(d => d.deuda));
 
     return (
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>

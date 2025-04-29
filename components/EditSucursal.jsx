@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { IoIosArrowBack, IoIosArrowForward, IoIosInformationCircle } from 'react-icons/io';
 import { MdAddBusiness, MdDeleteForever } from 'react-icons/md';
@@ -16,6 +16,7 @@ import { AiFillHome } from 'react-icons/ai';
 import { RiMoneyDollarCircleFill } from 'react-icons/ri';
 import { TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
+import Image from 'next/image';
 
 export default function EditSucursal({ googleMapsApiKey }) {
     const params = useSearchParams();
@@ -100,7 +101,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setAutocompleteResults([]);
     };
 
-    const fetchSucursal = async () => {
+    const fetchSucursal = useCallback(async () => {
         const response = await fetch(`/api/sucursales/${params.get("id") ?? ''}`);
         const data = await response.json();
         const sucursal = data.sucursal;
@@ -112,7 +113,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setValue("prioridad", sucursal.prioridad);
         setValue("direccion", sucursal.direccion?.nombre);
         setValue("newdependenciaCliente", sucursal.cliente?.nombre);
-    };
+    }, [setSucursal, setValue, params]);
 
     useEffect(() => {
         if (params.get("id")) {
@@ -121,7 +122,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                 .then(() => setLoadingForm(true))
                 .catch((error) => console.error("Error loading data:", error));
         }
-    }, [params, setValue]);
+    }, [params, setValue, fetchSucursal]);
 
     const handlePlaceChanged = (autocomplete) => {
         const place = autocomplete;
@@ -272,10 +273,11 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                             {sucursal.cargos.map((cargo, idx) => (
                                                 <div key={`sucursal_cargo_${idx}`} className="w-14 h-14">
                                                     <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
-                                                        <img
+                                                        <Image
                                                             src={getUserAvatarFromUserId(cargo.userId)}
                                                             alt="avatar"
                                                             className="w-14 h-14 rounded-full mr-2"
+                                                            width={56} height={56}
                                                         />
                                                         {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                         {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
@@ -350,7 +352,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                 {...register(`newCargoSucursalTipo`, { valueAsNumber: true })}
                                                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             >
-                                                {Object.entries(TIPO_CARGO).filter(([key, value]) => value !== 0).map(([key, value]) => (
+                                                {Object.entries(TIPO_CARGO).filter(([, value]) => value !== 0).map(([key, value]) => (
                                                     <option key={value} value={value}>{key.replace(/_/g, ' ').toUpperCase()}</option>
                                                 ))}
                                             </select>
@@ -604,10 +606,11 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                             {dependencia.cargos?.map((cargo, idx) => (
                                                                 <div key={`avatar_${index}_${idx}`} className="w-14 h-14">
                                                                     <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
-                                                                        <img
+                                                                        <Image
                                                                             src={`/profiles/${cargo.user?.email.split('@')[0].toLowerCase()}.jpg`}
                                                                             alt="avatar"
                                                                             className="w-14 h-14 rounded-full mr-2"
+                                                                            width={56} height={56}
                                                                         />
                                                                         {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
                                                                         {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
@@ -696,7 +699,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                     {...register(`newCargoDependenciaTipo`, { valueAsNumber: true })}
                                                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                                 >
-                                                                    {Object.entries(TIPO_CARGO).filter(([key, value]) => value !== 0).map(([key, value]) => (
+                                                                    {Object.entries(TIPO_CARGO).filter(([, value]) => value !== 0).map(([key, value]) => (
                                                                         <option key={value} value={value}>{key.replace(/_/g, ' ').toUpperCase()}</option>
                                                                     ))}
                                                                 </select>

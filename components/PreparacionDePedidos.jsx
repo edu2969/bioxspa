@@ -5,21 +5,9 @@ import { BsQrCodeScan } from "react-icons/bs";
 import { FaRoadCircleCheck } from "react-icons/fa6";
 import { TbTruckLoading } from "react-icons/tb";
 import Loader from "./Loader";
+import { socket } from "@/lib/socket-client";
 
-export default function PreparacionDePedidos({ session }) {
-    const ahora = new Date();
-    const formatFecha = (fecha) => {
-        return fecha.toLocaleString("es-ES", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-        });
-    };
-
+export default function PreparacionDePedidos() {
     const [pedidos, setPedidos] = useState([
         { id: 1, fecha: "2023-03-01 08:15:32", sinSifon: true, items: [
             { name: "CO2", multiplier: 2, quantity: 9, remaining: 2, unit: "kg", code: "NU0270" }, 
@@ -115,6 +103,17 @@ export default function PreparacionDePedidos({ session }) {
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, [scanMode, inputCode]);
+
+    useEffect(() => {
+        socket.on("carga_confirmada", (data) => {
+            console.log("Carga confirmada:", data);
+        })
+
+        return () => {
+            socket.off("carga_confirmada");
+        }
+
+    }, []);
 
     return (
         <div className="w-full h-screen overflow-hidden">

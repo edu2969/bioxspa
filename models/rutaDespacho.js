@@ -7,7 +7,7 @@ const rutaSchema = new Schema({
 });
 
 const estadoHistorialSchema = new Schema({
-    estado: { type: String, required: true },
+    estado: { type: Number, required: true },
     fecha: { type: Date, required: true }
 });
 
@@ -25,7 +25,7 @@ const rutaDespachoSchema = new Schema({
     direccionInicioId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     direccionDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     ruta: [rutaSchema],
-    estado: { type: String, required: true },
+    estado: { type: Number, required: true },
     historialEstado: [estadoHistorialSchema],
     checklist: [checklistSchema],
     ventaIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Venta" }] 

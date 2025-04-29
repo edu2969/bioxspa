@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import Venta from "@/models/venta";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants"; 
 
-export async function GET(req) {
+export async function GET() {
     try {
         await connectMongoDB();
 

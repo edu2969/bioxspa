@@ -8,6 +8,7 @@ import { FaCheck, FaTimes, FaPencilAlt, FaPlus } from "react-icons/fa";
 import Loader from '@/components/Loader';
 import amountFormat from '@/app/utils/currency';
 import { TIPO_COMISION, TIPO_UNIDAD_COMISION } from '@/app/utils/constants';
+import Image from 'next/image';
 
 const Comisiones = () => {
     const [usuarios, setUsuarios] = useState([]);
@@ -220,10 +221,11 @@ const Comisiones = () => {
                                                             {getInitials(usuario.name)}
                                                         </div>
                                                     ) : (
-                                                        <img
+                                                        <Image
                                                             src={`/profiles/${usuario.email.split('@')[0]}.jpg`}
                                                             alt="avatar"
                                                             className="w-10 h-10 rounded-full mr-4"
+                                                            width={40} height={40}
                                                             onError={() => setImageError((prev) => ({ ...prev, [usuario.email]: true }))}
                                                         />
                                                     )}

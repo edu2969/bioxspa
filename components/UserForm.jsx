@@ -1,6 +1,5 @@
 "use client";
 import { AiFillHome, AiOutlineUser } from 'react-icons/ai'
-import Datepicker from 'react-tailwindcss-datepicker'
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
@@ -8,24 +7,15 @@ import { USER_ROLE } from '@/app/utils/constants';
 import Link from 'next/link';
 import { IoIosArrowForward } from 'react-icons/io';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 
 export default function UserForm() {
     const router = useRouter();
     const [clientes, setClientes] = useState([]);
-    const [fechaNacimiento, setFechaNacimiento] = useState();
     const [avatarImg, setAvatarImg] = useState();
-
-    const handleFechaNacimientoChange = (newValue) => {
-        console.log("NEWVALUE", newValue);
-        setFechaNacimiento(newValue);
-        setValue('birthDate', new Date(newValue.startDate));
-    }
 
     const {
         register,
-        formState: {
-            errors
-        },
         handleSubmit,
         setValue
     } = useForm();
@@ -55,7 +45,7 @@ export default function UserForm() {
         setClientes(data.clients);
     }
 
-    async function loadUser(id) {
+    const loadUser = useCallbak(async (id) =>{
         const resp = await fetch(`/api/users/${id}`, {
             method: "GET",
             headers: {
@@ -71,7 +61,7 @@ export default function UserForm() {
         if(data.user.avatarImg != null) {
             setAvatarImg(data.user.avatarImg);
         }
-    }
+    }, [updateFormValues, setAvatarImg]);
 
     const updateFormValues = (user) => {
         console.log("user", user);
@@ -111,7 +101,7 @@ export default function UserForm() {
             if(id != null) loadUser(id);
         }
         loadData();
-    }, []);
+    }, [loadUser, params]);
 
     return (<div className="my-6 w-full h-screen">
         <div className="flex items-center space-x-4 text-ship-cove-800">
@@ -131,7 +121,7 @@ export default function UserForm() {
                             <AiOutlineUser size="8rem" />
                         </div>
                     </div>
-                        : <img className="m-auto w-40 h-40 rounded-full" src={avatarImg} alt="Avatar"/>
+                        : <Image width={100} height={100} className="m-auto w-40 h-40 rounded-full" src={avatarImg} alt="Avatar"/>
                     }
                 </div>
                 <div>

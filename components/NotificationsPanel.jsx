@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 const users = [
@@ -28,7 +29,6 @@ const users = [
     }
 ];
 
-const severities = ['info', 'warning', 'critical'];
 const notificationTypes = [{
     context: 'oficina',
     severyty: 'info',
@@ -133,7 +133,7 @@ return (
                 const user = getUserById(notification.userId);
                 return (
                     <li key={notification.id} className="p-2 rounded-lg shadow mb-2 flex items-start cursor-pointer hover:bg-gray-100">
-                        <img src={`/profiles/${user.avatar}`} alt={user.name} className="w-10 h-10 rounded-full mr-2"/>                        
+                        <Image width={24} height={24} src={`/profiles/${user.avatar}`} alt={user.name} className="w-10 h-10 rounded-full mr-2"/>                        
                         <div className="flex-1">
                             <div className="flex justify-between">
                                 <strong>{user.name}</strong>

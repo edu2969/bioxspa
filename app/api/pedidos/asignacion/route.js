@@ -2,15 +2,15 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import User from "@/models/user";
 import Vehiculo from "@/models/vehiculo";
-import Venta from "@/models/venta";
 import Cliente from "@/models/cliente";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import Cargo from "@/models/cargo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import { TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import DetalleVenta from "@/models/detalleVenta";
-import RutaDespacho from "@/models/rutaDespacho";
 import Direccion from "@/models/direccion";
+import Venta from "@/models/venta";
+import RutaDespacho from "@/models/rutaDespacho";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
@@ -65,26 +65,20 @@ export async function GET() {
             const user = await User.findById(cargo.userId).lean();
 
             // Find the rutaDespacho where the user is the chofer
-            const rutaDespacho = await RutaDespacho.findOne({ choferId: user._id }).lean();
+            const rutaDespacho = await RutaDespacho.findOne({ choferId: user._id, estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion }).lean();
 
-            let items = [];
-            let nombreCliente = "";
-            let rutCliente = "";
+            let pedidos = [];
 
             if (rutaDespacho) {
-                // Fetch related ventas
                 const ventas = await Venta.find({ _id: { $in: rutaDespacho.ventaIds } }).lean();
-
-                items = await Promise.all(
+                pedidos = await Promise.all(
                     ventas.map(async (venta) => {
-                        // Fetch cliente details
                         const cliente = await Cliente.findById(venta.clienteId).lean();
-                        nombreCliente = cliente?.nombre || "Desconocido";
-                        rutCliente = cliente?.rut || "Desconocido";
+                        const nombreCliente = cliente?.nombre || "Desconocido";
+                        const rutCliente = cliente?.rut || "Desconocido";
 
-                        // Fetch items for the venta
                         const detalleItems = await DetalleVenta.find({ ventaId: venta._id }).lean();
-                        return await Promise.all(
+                        const items = await Promise.all(
                             detalleItems.map(async (item) => {
                                 const subcategoria = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId).lean();
                                 const categoria = subcategoria
@@ -100,19 +94,21 @@ export async function GET() {
                                 };
                             })
                         );
+
+                        return {
+                            _id: venta._id,
+                            nombreCliente,
+                            rutCliente,
+                            items,
+                        };
                     })
                 );
-
-                // Flatten the items array
-                items = items.flat();
             }
 
             return {
                 _id: user._id,
-                name: user.name,
-                nombreCliente,
-                rutCliente,
-                items,
+                nombre: user.name,
+                pedidos,
             };
         })
     );
@@ -166,22 +162,36 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "No valid destinoId found for chofer" }, { status: 400 });
         }
 
-        // Create a new RutaDespacho
-        const nuevaRutaDespacho = new RutaDespacho({
-            vehiculoId: null, // Assuming no vehicle assigned initially
+        // Check if the chofer already has a RutaDespacho in 'preparacion' state
+        const rutaExistente = await RutaDespacho.findOne({
             choferId,
-            horaInicio: new Date(),
-            horaDestino: null, // Assuming no end time initially
-            direccionInicioId: destinoId,
-            direccionDestinoId: destinoId,
-            estado: "preparacion",
-            historialEstado: [{ estado: "preparacion", fecha: new Date() }],
-            checklist: [],
-            ventaIds: [ventaId],
-        });
+            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
+        }).lean();
 
-        await nuevaRutaDespacho.save();
+        if (rutaExistente) {
+            // Add the ventaId to the existing RutaDespacho
+            await RutaDespacho.findByIdAndUpdate(
+                rutaExistente._id,
+                { $addToSet: { ventaIds: ventaId } } // Ensure ventaId is not duplicated
+            );
+            return NextResponse.json({ ok: true, message: "Venta added to existing RutaDespacho" });
+        } else {
+            // Create a new RutaDespacho
+            const nuevaRutaDespacho = new RutaDespacho({
+                vehiculoId: null, // Assuming no vehicle assigned initially
+                choferId,
+                horaInicio: new Date(),
+                horaDestino: null, // Assuming no end time initially
+                direccionInicioId: destinoId,
+                direccionDestinoId: destinoId,
+                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                historialEstado: [{ estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion, fecha: new Date() }],
+                checklist: [],
+                ventaIds: [ventaId],
+            });
 
+            await nuevaRutaDespacho.save();
+        }
         return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("Error in POST /asignacion:", error);

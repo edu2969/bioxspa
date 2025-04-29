@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 const users = [
@@ -111,7 +112,6 @@ export default function MessagesPanel({ visible, onClick }) {
             <ul className="pl-2 overflow-y-auto" style={{ height: 'calc(100% - 56px)' }}>
                 {topics.map(topic => {
                     const lastMessage = topic.messages[topic.messages.length - 1];
-                    const user = getUserById(lastMessage.userId);
                     return (
                         <li key={topic.topicId} className="p-2 rounded-lg shadow mb-2 flex items-start cursor-pointer hover:bg-gray-100">
                             <div className="flex-1">
@@ -124,11 +124,11 @@ export default function MessagesPanel({ visible, onClick }) {
                                 </p>
                             </div>                            
                             <div className="flex items-center ml-2">
-                                <img src={`/profiles/${getUserById(topic.userIdOwner).avatar}`} alt={getUserById(topic.userIdOwner).name} className="w-8 h-8 rounded-full border-2 border-white -ml-4" />
+                                <Image width={8} height={8} src={`/profiles/${getUserById(topic.userIdOwner).avatar}`} alt={getUserById(topic.userIdOwner).name} className="w-8 h-8 rounded-full border-2 border-white -ml-4" />
                                 {topic.userIdsInvited.map(userId => {
                                     const invitedUser = getUserById(userId);
                                     return (
-                                        <img key={userId} src={`/profiles/${invitedUser.avatar}`} alt={invitedUser.name} className="w-8 h-8 rounded-full border-2 border-white -ml-4" />
+                                        <Image width={8} height={8} key={userId} src={`/profiles/${invitedUser.avatar}`} alt={invitedUser.name} className="w-8 h-8 rounded-full border-2 border-white -ml-4" />
                                     );
                                 })}
                             </div>

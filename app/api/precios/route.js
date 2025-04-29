@@ -1,8 +1,6 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import User from "@/models/user";
 import Precio from "@/models/precio";
-import { USER_ROLE } from "@/app/utils/constants";
 import Cliente from "@/models/cliente";
 
 export async function GET() {

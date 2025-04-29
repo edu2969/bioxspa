@@ -1,7 +1,6 @@
 "use client"
 
 import { RiHomeOfficeFill } from "react-icons/ri";
-import dayjs from "dayjs";
 import { MdOutlinePropaneTank } from "react-icons/md";
 import BarChart from "../charts/BarChart";
 import Gaugue from "../charts/Gaugue";
@@ -9,12 +8,13 @@ import MultiLineChart from "../charts/MultiLineChart";
 import { TbMoneybag, TbShoppingBagPlus } from "react-icons/tb";
 import { CiBellOn } from "react-icons/ci";
 import { FaWhatsappSquare } from "react-icons/fa";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IoSettingsSharp } from "react-icons/io5"
 import NotificationsPanel from "../NotificationsPanel";
 import MessagesPanel from "../MessagesPanel";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import Link from "next/link";
+import Loader from "../Loader";
 
 const stateColors = [
     "bg-white",
@@ -28,16 +28,16 @@ const stateColors = [
 ];
 
 export default function BranchBussinessView() {
-    const [loadingAdminPanel, setLoadingAdminPanel] = useState(true);
+    const [loadingAdmingPanel, setLoadingAdminPanel] = useState(true);
     const [branches, setBranches] = useState(null);
     const [notificationVisible, setNotificationVisible] = useState(false);
     const [messagerVisible, setMessagerVisible] = useState(false);
     const [branchSelected, setBranchSelected] = useState(null);
-    const [graficoGases, setGraficoGases] = useState(null);
+    const [graficoGases] = useState(null);
     const initData = useRef(false);
-    const [loadingMultilinear, setLoadingMultilinear] = useState(false);
+    const [loadingMultilinea, setLoadingMultilinear] = useState(false);
 
-    const fetchMainPanelData = async () => {
+    const fetchMainPanelData = useCallback(async () => {
         setLoadingAdminPanel(true);
         try {
             const response = await fetch("/api/bi");
@@ -48,25 +48,17 @@ export default function BranchBussinessView() {
         } catch (error) {
             console.error("Error fetching main panel data:", error);
         }
-    };
+    }, [setBranches, setLoadingAdminPanel]);
 
     useEffect(() => {
         if (!initData.current) {
             initData.current = true;
             fetchMainPanelData();
         }
-    }, []);
+    }, [fetchMainPanelData]);
 
     const handleDebtClick = () => {
         window.location.href = "/modulos/deudas?total=true";
-    };
-
-    const fetchAdminPanelData = async () => {
-        const response = await fetch("/api/adminPanel");
-        const data = await response.json();
-
-        setGraficoGases(data);
-        setLoadingMultilinear(false);
     };
 
     const handleBranchClick = (index) => {
@@ -148,21 +140,21 @@ export default function BranchBussinessView() {
                                         <span className="text-2xl">{branches[index].despachadosHoy}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
-                                    <div className="text-xs">DESPACHADOS<br/>AL 31/ENE'25</div>
+                                    <div className="text-xs">DESPACHADOS<br/>AL 31/ENE&apos;25</div>
                                 </div>
                                 <div className="text-blue-600">
                                     <div className="text-xl mt-1">
                                         <span className="orbitron">{branches[index].despachadosMesAnterior}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
-                                    <div className="text-xs">AL 31/DIC'24</div>
+                                    <div className="text-xs">AL 31/DIC&apos;24</div>
                                 </div>
                                 <div className="ml-4 text-blue-600">
                                     <div className="text-xl mt-1">
                                         <span className="orbitron">{branches[index].despachadosMismoMesAnterior}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
-                                    <div className="text-xs">AL 31/ENE'24</div>
+                                    <div className="text-xs">AL 31/ENE&apos;24</div>
                                 </div>
                             </div>}
                             {branches[index].deudaTotal > 0 && <div className="absolute bottom-4 left-48 font-bold text-red-600 hover:bg-red-200 hover:shadow-lg cursor-pointer p-4 rounded-md" onClick={handleDebtClick}>
@@ -237,7 +229,7 @@ export default function BranchBussinessView() {
                         <div className="w-full">
                             {["VENDIDO", "PRODUCIDO", "ARRIENDO", "O2", "At", "Ar", "Al", "Ac"].map((category, i) => (
                                 <button
-                                    key={`chip_${category}`}
+                                    key={`chip_${category}_${i}`}
                                     className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-0 mr-1 px-4 rounded-md"
                                 >
                                     {category}
@@ -268,7 +260,7 @@ export default function BranchBussinessView() {
                     </div>
                 )}
 
-                {branchSelected !== null && graficoGases != null && (
+                {branchSelected !== null && graficoGases != null && (loadingMultilinea ? <Loader /> : 
                     <div className="absolute top-24 left-72 w-[600px] h-[320px]">
                         <MultiLineChart
                             data={graficoGases}
@@ -276,6 +268,12 @@ export default function BranchBussinessView() {
                             height={320}
                             colorIndexes={[1, 2, 3, 4, 5, 6, 7, 8]}
                         />
+                    </div>
+                )}
+
+                {loadingAdmingPanel && (
+                    <div className="absolute top-0 left-0 w-full h-full bg-white flex items-center justify-center">
+                        <Loader/>
                     </div>
                 )}
             </div>
