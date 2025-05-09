@@ -65,7 +65,10 @@ export async function GET() {
             const user = await User.findById(cargo.userId).lean();
 
             // Find the rutaDespacho where the user is the chofer
-            const rutaDespacho = await RutaDespacho.findOne({ choferId: user._id, estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion }).lean();
+            const rutaDespacho = await RutaDespacho.findOne({ 
+                choferId: user._id, 
+                estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
+            }).lean();
 
             let pedidos = [];
 
@@ -135,12 +138,12 @@ export async function POST(request) {
     try {
         const { ventaId, choferId } = await request.json();
 
+        console.log(">>>>", ventaId, choferId);
         // Validate input
         if (!ventaId || !choferId) {
             return NextResponse.json({ ok: false, error: "ventaId and choferId are required" }, { status: 400 });
         }
 
-        // Update the venta state to 'preparacion'
         const venta = await Venta.findByIdAndUpdate(
             ventaId,
             { estado: TIPO_ESTADO_VENTA.preparacion }
@@ -165,10 +168,11 @@ export async function POST(request) {
         // Check if the chofer already has a RutaDespacho in 'preparacion' state
         const rutaExistente = await RutaDespacho.findOne({
             choferId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
+            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
         }).lean();
 
         if (rutaExistente) {
+            console.log("---------->", rutaExistente, ventaId);
             // Add the ventaId to the existing RutaDespacho
             await RutaDespacho.findByIdAndUpdate(
                 rutaExistente._id,
@@ -176,21 +180,26 @@ export async function POST(request) {
             );
             return NextResponse.json({ ok: true, message: "Venta added to existing RutaDespacho" });
         } else {
+            // Find vehicles assigned to the chofer
+            const vehiculosAsignados = await Vehiculo.find({ choferIds: choferId }).lean();
+
+            let vehiculoId = null;
+            if (vehiculosAsignados.length === 1) {
+                // If there is exactly one vehicle assigned, use it
+                vehiculoId = vehiculosAsignados[0]._id;
+            }
+
             // Create a new RutaDespacho
             const nuevaRutaDespacho = new RutaDespacho({
-                vehiculoId: null, // Assuming no vehicle assigned initially
+                vehiculoId, // Assign the vehicle if found
                 choferId,
-                horaInicio: new Date(),
-                horaDestino: null, // Assuming no end time initially
-                direccionInicioId: destinoId,
-                direccionDestinoId: destinoId,
                 estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
                 historialEstado: [{ estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion, fecha: new Date() }],
                 checklist: [],
                 ventaIds: [ventaId],
             });
 
-            await nuevaRutaDespacho.save();
+            await nuevaRutaDespacho.save();            
         }
         return NextResponse.json({ ok: true });
     } catch (error) {

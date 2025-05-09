@@ -8,7 +8,6 @@ import HomeConductor from "./homeConductor/page";
 
 export default async function Modulos() {
     const session = await getServerSession(authOptions);
-    console.log("SESSION", session);
     return (
         <>
             {(session && session.user.role == USER_ROLE.neo) ? <div>yGa</div> : 

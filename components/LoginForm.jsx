@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
 import Image from "next/image";
+import { socket } from "@/lib/socket-client";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export default function LoginForm() {
   const router = useRouter();
   const onError = (errors, e) => console.log(errors, e)
-
+  
   const {
     register,
     formState: {
@@ -26,10 +28,26 @@ export default function LoginForm() {
         password: data.password,
         redirect: false,
       });
-
       if (res.error) {
         setError("Invalid Credentials");
         return;
+      }     
+      const response = await fetch("/api/auth", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("DATA", data, { room: "room-pedidos", userId: data.userId });
+        if(data.cargo == TIPO_CARGO.conductor || data.cargo == TIPO_CARGO.encargado 
+          || data.cargo == TIPO_CARGO.administrador || data.cargo == TIPO_CARGO.despacho) {
+          socket.emit("join-room", { room: "room-pedidos", userId: data.userId });
+        }
+      } else {
+        console.error("Failed to fetch user role:", response.statusText);
       }
       router.replace("modulos");
     } catch (error) {
@@ -39,7 +57,7 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+    <main className="flex min-h-screen flex-col items-center justify-between py-24 px-6">
       
       <div className="area z-0">
         <ul className="circles">
@@ -48,12 +66,12 @@ export default function LoginForm() {
         </ul>
       </div>
       <div className="z-10 flex min-h-full flex-col justify-center py-6">
-        <div className="flex sm:mx-auto sm:w-full sm:max-w-sm">                    
-          <Image width={80} height={80} src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" />          
+        <div className="flex sm:mx-auto sm:w-full sm:max-w-sm px-12">                    
+          <Image width={80} height={80} src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" priority={true}/>          
           <span className="text-xs text-gray-400 mt-40">v0.9</span>
         </div>
       </div>      
-      <form className="z-10 mt-2 sm:mx-auto sm:w-full sm:max-w-sm" onSubmit={handleSubmit(onSubmit, onError)}>
+      <form className="z-10 mt-2 w-72" onSubmit={handleSubmit(onSubmit, onError)}>
         <div className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium leading-6">DIRECCIÓN EMAIL</label>
@@ -68,7 +86,7 @@ export default function LoginForm() {
             <div className="flex items-center justify-between">
               <label htmlFor="password" className="block text-sm font-medium leading-6">CONTRASEÑA</label>
               <div className="text-sm">
-                <a href="#" className="font-semibold text-sky-600 hover:text-sky-900">Olvidaste tu contraseña?</a>
+                <a href="#" className="font-semibold text-sky-600 hover:text-sky-900">¿La olvidaste?</a>
               </div>
             </div>
             <div className="mt-2">

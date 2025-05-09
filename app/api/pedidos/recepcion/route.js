@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 import ItemCatalogo from "@/models/itemCatalogo";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
-// filepath: d:\git\bioxspa\app\api\pedidos\recepcion\route.js
-
 export async function POST(request) {
     try {
         await connectMongoDB();

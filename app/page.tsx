@@ -7,7 +7,6 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   if (session) {
-    console.log("SESSION", session);
     redirect("/modulos");
   }
 

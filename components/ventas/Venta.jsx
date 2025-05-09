@@ -11,6 +11,7 @@ import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO } from '@/app/utils/constants';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { BiCartDownload } from "react-icons/bi";
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -32,19 +33,19 @@ const TIPO_REGISTRO = [
 
 export default function Venta({ session }) {
     const router = useRouter();
-    const { register, handleSubmit, setValue, getValues } = useForm();
+    const { register, handleSubmit, setValue } = useForm();
     const [sucursales, setSucursales] = useState([]);
     const [dependencias, setDependencias] = useState([]);
     const [usuarios, setUsuarios] = useState([]);
     const [loadingForm, setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
-    const [itemsVenta, setItemsVenta] = useState([{ cantidad: 1, subcategoriaId: '', precio: '' }]);
-    const [autocompleteCategoriaResults, setAutocompleteCategoriaResults] = useState([]);
+    const [itemsVenta, setItemsVenta] = useState([]);
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
     const [documentoTributarioSeleccionado, setDocumentoTributarioSeleccionado] = useState(null);
     const [registroSelected, setRegistroSelected] = useState(0);
-    
+    const [precios, setPrecios] = useState([]);
+
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
     const fetchSucursales = async () => {
@@ -72,9 +73,7 @@ export default function Venta({ session }) {
     };
 
     const onSubmit = async (data) => {
-
-        console.log("DATA", data);
-
+        console.log("DATA-SUBMIT", data);
         const payload = {
             clienteId: clienteSelected?._id,
             sucursalId: data.sucursalId,
@@ -83,11 +82,10 @@ export default function Venta({ session }) {
             documentoTributarioId: data.documentoTributarioId,
             items: itemsVenta.map(item => ({
                 cantidad: parseInt(item.cantidad),
-                precio: parseInt(item.precio.replace(/\./g, '')),
+                precio: parseInt(item.precio),
                 subcategoriaId: item.subcategoriaId
             })),
         }
-
         console.log("PAYLOAD2", payload);
         setLoadingForm(true);
         try {
@@ -116,6 +114,23 @@ export default function Venta({ session }) {
     };
 
     useEffect(() => {
+        if (clienteSelected) {
+            fetch(`/api/clientes/precios?clienteId=${clienteSelected._id}`)
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.ok) {
+                        setPrecios(data.precios.precios);
+                    } else {
+                        toast.error("Error al cargar los precios del cliente.");
+                    }
+                })
+                .catch(() => {
+                    toast.error("Error al cargar los precios del cliente.");
+                });
+        }
+    }, [clienteSelected]);
+
+    useEffect(() => {
         fetchUsuarios();
         fetchSucursales();
         fetchDocumentosTributarios();
@@ -137,7 +152,7 @@ export default function Venta({ session }) {
     }, [sucursales, setValue]);
 
     return (
-        <main className="w-full h-screen mt-10">
+        <main className="w-full h-screen mt-10 overflow-y-auto">
             <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pt-4 mx-10 bg-white dark:bg-gray-900 mb-4">
                 <div className="flex items-center space-x-4 text-ship-cove-800">
                     <Link href="/">
@@ -327,18 +342,100 @@ export default function Venta({ session }) {
                             </div>
                         </div>}
 
-
-                        <div className={`w-full ${clienteSelected != null ? '' : 'opacity-20'}`}>
+                        <div className={`w-full ${clienteSelected != null ? "" : "opacity-20"}`}>
                             <div className="flex justify-between items-center">
-                                <p className="font-bold text-lg">DETALLE</p>
+                                <p className="font-bold text-lg">PRECIOS CARGADOS</p>
+                            </div>
+                            <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase">
+                                <div className="w-2/12 pr-4">
+                                    <p className="font-bold text-sm">Cantidad</p>
+                                </div>
+                                <div className="w-4/12 pr-4">
+                                    <p className="font-bold text-sm">ITEM</p>
+                                </div>
+                                <div className="w-3/12 pr-4">
+                                    <p className="font-bold text-sm text-center">Precio</p>
+                                </div>
+                                <div className="w-3/12 pr-4">
+                                    <p className="font-bold text-sm text-center">SubTotal</p>
+                                </div>
+                            </div>
+                            {precios.map((precio, index) => (
+                                <div key={`precio_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-4 bg-gray-100 ${precios[index].seleccionado ? "" : "opacity-50"}`}>
+                                    <div className="w-2/12 pr-4">
+                                        <div className="flex items-center">
+                                            <input
+                                                id={`checkbox-${index}`}
+                                                type="checkbox"
+                                                className="block w-8 h-8 mr-4"
+                                                onClick={(e) => {
+                                                    const updatedPrecios = [...precios];
+                                                    updatedPrecios[index].seleccionado = e.target.checked;
+                                                    updatedPrecios[index].cantidad = e.target.checked ? 1 : 0;
+                                                    setValue(`precios[${index}].cantidad`, e.target.checked ? 1 : 0);
+                                                    console.log("PRECIOS", updatedPrecios);
+                                                    setPrecios(updatedPrecios);
+                                                }}
+                                                {...register(`precios[${index}].seleccionado`)}
+                                            />
+                                            <input
+                                                id={`precios-${index}`}
+                                                {...register(`precios[${index}].cantidad`)}
+                                                type="number"
+                                                min={0}
+                                                max={99}
+                                                defaultValue={precio.cantidad || 0}
+                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
+                                                onChange={(e) => {
+                                                    const newCantidad = parseInt(e.target.value) || 0;
+                                                    const updatedPrecios = [...precios];
+                                                    updatedPrecios[index].cantidad = newCantidad;
+                                                    setPrecios(updatedPrecios);
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="w-4/12 pr-4">{precio.nombre}</div>
+                                    <div className="w-3/12 pr-4">
+                                        <div className="flex">
+                                            <span className="font-bold mt-2 px-4">$</span>
+                                            <span className="w-full font-bold text-sm text-right mt-2">{(precios[index].valor || 0).toLocaleString("es-CL")}</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-3/12 pr-4">
+                                        <div className="flex">
+                                            <span className="font-bold mt-2 px-4">$</span>
+                                            <span className="w-full font-bold text-sm text-right mt-2">{(precios[index].cantidad * precios[index].valor || 0).toLocaleString("es-CL")}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="w-full flex justify-end mt-4">
                                 <button
                                     type="button"
-                                    className="rounded-md bg-green-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-green-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-                                    onClick={() => setItemsVenta([...itemsVenta, { cantidad: 1, subcategoriaId: '', precio: '' }])}
+                                    disabled={!precios.some(precio => precio.seleccionado)}
+                                    className="rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                                    onClick={() => {
+                                        const selectedItems = precios.filter(precio => precio.seleccionado);
+                                        console.log("ITEM", selectedItems);
+                                        const updatedItemsVenta = selectedItems.map(item => ({
+                                            cantidad: item.cantidad || 1,
+                                            subcategoriaId: item.subcategoriaCatalogoId,
+                                            subcategoria: item.nombre,
+                                            precio: item.valor
+                                        }));
+                                        setItemsVenta(prev => [...prev, ...updatedItemsVenta]);
+                                    }}
                                 >
-                                    Agregar línea
+                                    <div className="flex">
+                                        <BiCartDownload size="1.25rem" className="text-white mr-2" /> 
+                                        <span className="text-sm font-semibold">CARGAR SELECCIONADOS</span>
+                                    </div>                                    
                                 </button>
                             </div>
+                        </div>
+
+                        <div className={`w-full ${clienteSelected != null ? '' : 'opacity-20'}`}>
                             <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase">
                                 <div className="w-1/12 pr-4">
                                     <p className="font-bold text-sm">Cantidad</p>
@@ -376,102 +473,7 @@ export default function Venta({ session }) {
                                         />
                                     </div>
                                     <div className="w-5/12 pr-4">
-                                        <input
-                                            id={`categoriaId-${index}`}
-                                            {...register(`itemsVenta[${index}].categoriaId`)}
-                                            type="text"
-                                            defaultValue={itemsVenta[index].subcategoriaId}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (value.length > 2) {
-                                                    fetch(`/api/catalogo/search?q=${value}`)
-                                                        .then(response => response.json())
-                                                        .then(data => {
-                                                            setAutocompleteCategoriaResults(prev => ({
-                                                                ...prev,
-                                                                [index]: data.results
-                                                            }));
-                                                        });
-                                                }
-                                            }}
-                                        />
-                                        {autocompleteCategoriaResults[index]?.length > 0 && (
-                                            <ul className="absolute z-10 w-full border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
-                                                {autocompleteCategoriaResults[index].map((categoria, indice2) => (
-                                                    <li
-                                                        key={`_id_${indice2}`}
-                                                        className="px-3 py-2 cursor-pointer hover:bg-gray-200"
-                                                        onClick={() => {
-                                                            setValue(`itemsVenta[${index}].categoriaId`, categoria.original);
-                                                            setAutocompleteCategoriaResults(prev => ({
-                                                                ...prev,
-                                                                [index]: []
-                                                            }));
-                                                            fetch(`/api/precios/${categoria._id}?clienteId=${clienteSelected?._id}&usuarioId=${getValues('usuarioId')}`)
-                                                                .then(response => response.json())
-                                                                .then(data => {
-                                                                    console.log("PRECIO", data);
-                                                                    if (data && data.valor) {
-                                                                        const formattedPrice = data.valor.toLocaleString('es-CL');
-                                                                        setValue(`itemsVenta[${index}].precio`, formattedPrice);                                                                            
-                                                                        setItemsVenta(prev => {
-                                                                            const updatedItems = [...prev];
-                                                                            updatedItems[index].subcategoriaId = categoria._id;
-                                                                            if (data.sugerido) {
-                                                                                updatedItems[index].precioError = true;                                                                        
-                                                                            } else delete updatedItems[index].precioError;
-                                                                            updatedItems[index].precio = formattedPrice;
-                                                                            return updatedItems;
-                                                                        });
-                                                                        if (data.sugerido) {
-                                                                            toast.warning(<div><p><b>Precio sugerido</b></p><span className="text-xs">a <b>{data.clienteId.nombre}</b> el {new Date(data.fechaDesde).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
-                                                                                position: "top-right",
-                                                                                autoClose: 5000,
-                                                                                hideProgressBar: false,
-                                                                                closeOnClick: true,
-                                                                                pauseOnHover: true,
-                                                                                draggable: true,
-                                                                                progress: undefined,                                                                           
-                                                                            });
-                                                                        } else {                                                                            
-                                                                            toast.success(<div><p><b>Precio cargado exitósamente</b></p><span className="text-xs">el {new Date(data.fechaDesde).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>, {                                                                            
-                                                                                position: "top-right",
-                                                                                autoClose: 5000,
-                                                                                hideProgressBar: false,
-                                                                                closeOnClick: true,
-                                                                                pauseOnHover: true,
-                                                                                draggable: true,
-                                                                                progress: undefined,                                                                           
-                                                                            });
-                                                                        }
-                                                                    } else if(data.error) {
-                                                                        console.log("Error 404: Resource not found");
-                                                                        setItemsVenta(prev => {
-                                                                            const updatedItems = [...prev];
-                                                                            updatedItems[index].precioError = true;
-                                                                            updatedItems[index].precio = 0;
-                                                                            return updatedItems;
-                                                                        });
-                                                                        setValue(`itemsVenta[${index}].precio`, 0);
-                                                                        toast.error(<div><p><b>Sin precio cargado</b></p><span className="text-xs">No hay precio para sugerir</span></div>, {
-                                                                            position: "top-right",
-                                                                            autoClose: 5000,
-                                                                            hideProgressBar: false,
-                                                                            closeOnClick: true,
-                                                                            pauseOnHover: true,
-                                                                            draggable: true,
-                                                                            progress: undefined,
-                                                                        });
-                                                                    }                                                                    
-                                                                })
-                                                        }}
-                                                    >
-                                                        <p dangerouslySetInnerHTML={{ __html: categoria.texto }}></p>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
+                                        {item.subcategoria}
                                     </div>
                                     <div className="w-2/12 pr-4">
                                         <div className="flex">

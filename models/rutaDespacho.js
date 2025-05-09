@@ -1,9 +1,8 @@
 import mongoose, { Schema, models } from "mongoose";
 
 const rutaSchema = new Schema({
-    latitud: { type: Number, required: true },
-    longitud: { type: Number, required: true },
-    hora: { type: Date, required: true }
+    direccionDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
+    fechaArribo: { type: Date, default: null },
 });
 
 const estadoHistorialSchema = new Schema({
@@ -16,19 +15,25 @@ const checklistSchema = new Schema({
     fecha: { type: Date, required: true }
 });
 
+const cargaHistorialSchema = new Schema({
+    esCarga: { type: Boolean, required: true },
+    fecha: { type: Date, required: true },
+    itemMovidoIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "ItemCatalogoId" }]
+});
+
 const rutaDespachoSchema = new Schema({
     vehiculoId: { type: mongoose.Schema.Types.ObjectId, ref: "Vehiculo" },
-    choferId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
-    copilotoId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario" },
+    choferId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     horaInicio: { type: Date },
     horaDestino: { type: Date },
-    direccionInicioId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
-    direccionDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
+    dependenciaId: { type: mongoose.Schema.Types.ObjectId, ref: "Dependencia" },
     ruta: [rutaSchema],
     estado: { type: Number, required: true },
     historialEstado: [estadoHistorialSchema],
     checklist: [checklistSchema],
-    ventaIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Venta" }] 
+    ventaIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Venta" }],
+    cargaItemIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "ItemCatalogoId" }],
+    hitorialCarga: [cargaHistorialSchema], 
 }, {
     timestamps: true
 });

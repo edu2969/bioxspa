@@ -12,7 +12,7 @@ const DetalleVentaSchema = new mongoose.Schema({
         ref: 'SubcategoriaCatalogo', 
         default: null 
     },
-    itemsCatalogoId: { 
+    itemCatalogoIds: { 
         type: [mongoose.Schema.Types.ObjectId], 
         ref: 'ItemCatalogo', 
         default: null

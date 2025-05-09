@@ -17,17 +17,13 @@ export const authOptions: NextAuthOptions = {
         try {
           await connectMongoDB();
           const user = await User.findOne({ email });
-
           if (!user) {
             throw new Error("No user found with the given email");
           }
-
           const isValid = await bcrypt.compare(password, user.password);
-
           if (!isValid) {
             throw new Error("Invalid password");
           }
-
           return user;
         } catch (error: unknown) {
           if (error instanceof Error) {

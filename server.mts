@@ -8,25 +8,28 @@ const port = parseInt(process.env.SOCKET_PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+
 app.prepare().then(() => {
     const httpServer = createServer(handle);
     const io = new Server(httpServer);
+    
     io.on("connection", (socket) => {
-        console.log("User connected:", socket.id);
+        console.log("SOCKET-IO: User connected:", socket.id);
         
-        socket.on("chofer_connected", (data) => {
-            socket.join(data.choferId); 
-            console.log("Chofer connected:", data);
-            socket.emit("chofer_connected", `${data.choferId} connected`);
-        })
+        socket.on("join-room", (data) => {
+            console.log("SOCKET-IO: join-room", data);
+            socket.join(data.room); 
+            console.log(`SOCKET-IO: Ha entrado en ${data.room} el chofer ${data.userId}`);
+        });
+
+        socket.on("update-pedidos", (data) => {
+            console.log("SOCKET-IO: update-pedidos", data);
+            socket.to("room-pedidos").emit("update-pedidos", data);
+        });
 
         socket.on("disconnect", () => {
-            console.log("User disconnected:", socket.id);
+            console.log("SOCKET-IO: User disconnected:", socket.id);
         });
-    });
-
-    io.on("chofer_notification", (data) => {
-
     });
 
     httpServer.listen(port, () => {

@@ -67,11 +67,22 @@ export const TIPO_ESTADO_VENTA = {
 
 export const TIPO_ESTADO_RUTA_DESPACHO = {
     preparacion: 0,
-    verificacion_vehiculo: 1,
+    carga: 1,
     en_ruta: 2,
     panel: 4,
     descarga: 8,
     regreso: 16,
     terminado: 32,
     anulado: 64
+}
+
+export const TIPO_CATEGORIA_CATALOGO = {
+    sinCategoria: 0,
+    gas: 1,
+    arriendo: 2,
+    insumo: 4, 
+    servicio: 8,
+    flete: 16, 
+    garantia: 32,
+    producto: 64,
 }

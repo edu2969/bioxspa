@@ -8,7 +8,6 @@ export async function GET() {
     const categorias = await CategoriaCatalogo.find().lean();
     const categoriasConSubcategorias = await Promise.all(categorias.map(async (categoria) => {
         const cantidadSubcategorias = await SubcategoriaCatalogo.countDocuments({ categoriaCatalogoId: categoria._id });
-        console.log("CSC", { ...categoria, cantidadSubcategorias });
         return { ...categoria, cantidadSubcategorias };
     }));
     return NextResponse.json(categoriasConSubcategorias);

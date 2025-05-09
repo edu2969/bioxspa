@@ -144,7 +144,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setAutocompleteResults([]);
     };
 
-    const handleSelectPlace = (place) => {
+    const handleSelectPlace = (place) => {        
         const address = {
             nombre: place.formatted_address,
             apiId: place.place_id,
@@ -238,6 +238,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                             <Autocomplete
                                 apiKey={googleMapsApiKey}
                                 onPlaceSelected={(place) => {
+                                    console.log("DIRECCION", place);
                                     setValue("direccion", place.formatted_address);
                                     setSucursal({
                                         ...sucursal, direccion: {

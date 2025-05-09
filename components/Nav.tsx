@@ -24,7 +24,7 @@ export default function Nav({ user }: { user: User | null}) {
             </div>
             <div className="absolute right-0">                
                 <Link href={`/modulos`} onClick={() => setMenuActivo(false)}>
-                    <AiFillHome size="1.7rem" className="mt-4 mr-8 text-slate-800 justify-end cursor-pointer" />
+                    <AiFillHome size="1.7rem" className="mt-4 mr-4 text-slate-800 justify-end cursor-pointer" />
                 </Link>                
             </div>
             <div className={`min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>

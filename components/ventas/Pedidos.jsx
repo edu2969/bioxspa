@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -35,7 +35,6 @@ export default function Pedidos({ session }) {
     const router = useRouter();
     const { register, handleSubmit, setValue } = useForm();
     const [usuarios, setUsuarios] = useState([]);
-    const [setCategorias] = useState([]);
     const [precios, setPrecios] = useState([]);
     const [loadingForm, setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
@@ -44,7 +43,7 @@ export default function Pedidos({ session }) {
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
     const [documentoTributarioSeleccionado, setDocumentoTributarioSeleccionado] = useState(null);
     const [registroSelected, setRegistroSelected] = useState(0);
-    const [setTotal] = useState(0);
+    const [total, setTotal] = useState(0);
 
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
@@ -54,12 +53,6 @@ export default function Pedidos({ session }) {
         setUsuarios(data.users);
         console.log("USERS", data.users);
     };
-
-    const fetchCategorias = useCallback(async () => {
-        const response = await fetch('/api/catalogo');
-        const data = await response.json();
-        setCategorias(data);
-    }, [setCategorias]);
 
     const fetchDocumentosTributarios = async () => {
         const response = await fetch('/api/ventas/documentostributarios?venta=true');
@@ -110,9 +103,8 @@ export default function Pedidos({ session }) {
 
     useEffect(() => {
         fetchUsuarios();
-        fetchDocumentosTributarios();
-        fetchCategorias();
-    }, [fetchCategorias]);
+        fetchDocumentosTributarios();        
+    }, []);
 
     useEffect(() => {
         if (session && session.user && session.user.id) {
@@ -127,7 +119,7 @@ export default function Pedidos({ session }) {
             return acc + (cantidad * precio);
         }, 0);
         setTotal(newTotal);
-    }, [itemsVenta, setTotal]);
+    }, [itemsVenta, total]);
 
     return (
         <main className="w-full h-screen pt-10 overflow-y-auto">

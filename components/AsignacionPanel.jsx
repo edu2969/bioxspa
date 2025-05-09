@@ -14,6 +14,7 @@ import { ConfirmModal } from './modals/ConfirmModal';
 import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { socket } from "@/lib/socket-client";
 
 dayjs.locale('es');
 
@@ -97,7 +98,7 @@ export default function AsignacionPanel() {
                     <IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300" />
                     <Link href="/modulos">
                         <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">ASIGNACION</span>
-                    </Link>
+                    </Link>                    
                 </div>
             </div>
             <div className="grid grid-cols-12 h-[calc(100vh-80px)] gap-4 p-4 overflow-hidden">
@@ -271,8 +272,9 @@ export default function AsignacionPanel() {
 
                             if (!response.ok) {
                                 const errorData = await response.json();
-                                throw new Error(errorData.error || "Error al asignar el pedido");
+                                throw new Error(errorData.error || "Error al asignar el pedido");                                
                             }
+                            socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
                             toast.success("Pedido asignado con éxito");
                             fetchPedidos();
                         } catch (error) {
