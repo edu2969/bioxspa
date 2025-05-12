@@ -3,7 +3,7 @@ import { signOut } from 'next-auth/react';
 import Link from 'next/link'
 import { useEffect, useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { User } from 'next-auth';
 import { MdOutlinePropaneTank } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
@@ -12,6 +12,7 @@ export default function Nav({ user }: { user: User | null}) {
     useEffect(() => {
         console.log("USER", user);
     }, [user]);
+    const router = useRouter();
     const [menuActivo, setMenuActivo] = useState(false);  
     const path = usePathname();
     return (
@@ -50,7 +51,11 @@ export default function Nav({ user }: { user: User | null}) {
                         </div>
                     </Link>
                     <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2"
-                        onClick={() => signOut({ callbackUrl: '/' })}>
+                        onClick={() => { 
+                            signOut({ redirect: false }).then(() => {
+                                router.push('/'); // Redirigir a la página de inicio después de cerrar sesión
+                            });
+                        }}>
                         <AiOutlineLogout size="4rem" />
                         <p className="text-2xl ml-2 mt-4">Cerrar sesión</p>
                     </button>
