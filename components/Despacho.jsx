@@ -62,7 +62,28 @@ export default function Despacho({ session }) {
     const vehiculoPorId = (id) => {
         if (id == null) return { patente: "", marca: "" };
         return vehiculos?.find((vehiculo) => vehiculo._id === id);
-    };
+    };    
+
+    const asociarVehiculo = useCallback(async () => {        
+        try {
+            console.log("Asociando vehiculo", vehiculoSeleccionado);
+            const response = await fetch("/api/pedidos/asignacion/chofer", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ vehiculoId: vehiculoSeleccionado }),
+            });
+            const data = await response.json();
+            if (data.ok) {
+                setCertificaOk(true);
+            } else {
+                console.log("Error assigning vehicle to route:", data.error);                                            
+            }
+        } catch (error) {
+            console.log("Error in POST request:", error);
+        }   
+    }, [vehiculoSeleccionado]);
 
     const fetchRutaAsignada = useCallback(async () => {
         setLoading(true);
@@ -116,27 +137,6 @@ export default function Despacho({ session }) {
             socket.off("update-pedidos");
         };
     }, [session, fetchRutaAsignada]);
-
-    const asociarVehiculo = useCallback(async () => {        
-        try {
-            console.log("Asociando vehiculo", vehiculoSeleccionado);
-            const response = await fetch("/api/pedidos/asignacion/chofer", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ vehiculoId: vehiculoSeleccionado }),
-            });
-            const data = await response.json();
-            if (data.ok) {
-                setCertificaOk(true);
-            } else {
-                console.log("Error assigning vehicle to route:", data.error);                                            
-            }
-        } catch (error) {
-            console.log("Error in POST request:", error);
-        }   
-    }, [vehiculoSeleccionado]);
 
     return (
         <div className="w-full h-screen overflow-hidden">

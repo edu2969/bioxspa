@@ -16,6 +16,7 @@ function Nav({ user }) {
     (0, react_2.useEffect)(() => {
         console.log("USER", user);
     }, [user]);
+    const router = (0, navigation_1.useRouter)();
     const [menuActivo, setMenuActivo] = (0, react_2.useState)(false);
     const path = (0, navigation_1.usePathname)();
     return (<div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
@@ -50,7 +51,11 @@ function Nav({ user }) {
                             <p className="text-2xl ml-2 mt-4">Acerca de...</p>
                         </div>
                     </link_1.default>
-                    <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2" onClick={() => (0, react_1.signOut)({ callbackUrl: '/' })}>
+                    <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2" onClick={() => {
+            (0, react_1.signOut)({ redirect: false }).then(() => {
+                router.push('/'); // Redirigir a la página de inicio después de cerrar sesión
+            });
+        }}>
                         <ai_1.AiOutlineLogout size="4rem"/>
                         <p className="text-2xl ml-2 mt-4">Cerrar sesión</p>
                     </button>
