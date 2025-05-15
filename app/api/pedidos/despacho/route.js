@@ -113,22 +113,29 @@ export async function GET() {
                         ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
                         : null;
 
-                    items.push({
-                        nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
-                        multiplicador: detalle.cantidad,
-                        cantidad: subcategoria?.cantidad || "??",
-                        unidad: subcategoria?.unidad || null,
-                        restantes: detalle.cantidad - itemCatalogoIds.length,
-                        elemento: subcategoria?.categoriaCatalogoId?.elemento,
-                        sinSifon: subcategoria?.sinSifon || false,
-                        esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
-                        nuCode: nuCode,
-                        subcategoriaId: subcategoria?._id || null,
-                        items: itemCatalogoIds.map((item) => ({
-                            codigo: item.codigo,
-                            _id: item._id
-                        }))
-                    });
+                    const existingItem = items.find((item) => item.subcategoriaId === subcategoria?._id);
+
+                    if (existingItem) {
+                        existingItem.multiplicador += detalle.cantidad;
+                        existingItem.restantes += detalle.cantidad - itemCatalogoIds.length;
+                    } else {
+                        items.push({
+                            nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
+                            multiplicador: detalle.cantidad,
+                            cantidad: subcategoria?.cantidad || "??",
+                            unidad: subcategoria?.unidad || null,
+                            restantes: detalle.cantidad - itemCatalogoIds.length,
+                            elemento: subcategoria?.categoriaCatalogoId?.elemento,
+                            sinSifon: subcategoria?.sinSifon || false,
+                            esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
+                            nuCode: nuCode,
+                            subcategoriaId: subcategoria?._id || null,
+                            items: itemCatalogoIds.map((item) => ({
+                                codigo: item.codigo,
+                                _id: item._id
+                            }))
+                        });
+                    }
                 });
 
                 if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {

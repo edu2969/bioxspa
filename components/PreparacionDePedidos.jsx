@@ -25,15 +25,32 @@ export default function PreparacionDePedidos() {
     const [showModalCilindroErroneo, setShowModalCilindroErroneo] = useState(false);
     const [itemCatalogoEscaneado, setItemCatalogoEscaneado] = useState(null);
 
-    const handleRemoveFirst = () => {
+    const postCargamento = async (cargamento) => {
+        const response = await fetch("/api/pedidos/despacho", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ scanCodes: cargamento.scanCodes }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Error al guardar el cargamento");
+        }
+        const data = await response.json();
+        console.log("Cargamento guardado:", data);
+        return data;
+    }        
+
+    const handleRemoveFirst = async () => {
         if (animating) return; // Evita múltiples clics durante la animación
         setAnimating(true);
-
         setTimeout(() => {
-            setPedidos((prev) => prev.slice(1)); // Elimina el primer pedido después de la animación
+            setCargamentos((prev) => prev.slice(1)); // Elimina el primer pedido después de la animación
             setAnimating(false);
-            setScanMode(false); // Desactiva el modo de escaneo después de eliminar el pedido
-        }, 1000); // Duración de la animación (en ms)
+            setScanMode(false); 
+            postCargamento(cargamentos[0]);
+        }, 1000); 
     };
 
     const handleScanMode = () => {
@@ -63,6 +80,7 @@ export default function PreparacionDePedidos() {
 
         const itemIndex = cargamentoActual.items.map(i => i.subcategoriaId).indexOf(item.subcategoriaCatalogoId);
         if (itemIndex === -1) {
+            setScanMode(false);
             setShowModalCilindroErroneo(true);
             toast.warn(`CODIGO ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`);
             return;
@@ -73,26 +91,28 @@ export default function PreparacionDePedidos() {
             return;
         }
 
-        if (cargamentoActual.items[itemIndex].restantes === 0) {
-            toast.warn(`Todo ${item.categoria.nombre} ${item.subcategoria.nombre} completado`);
-            return;
+        if (cargamentoActual.items[itemIndex].restantes === -1) {
+            toast.warn(`${item.categoria.nombre} ${item.subcategoria.nombre} exedente`);
         }
-
-        setCargamentos((prevCargamentos) => {
-            const updatedCargamentos = [...prevPedidos];
-            const currentCargamento = updatedCargamentos[0];
-            const currentItem = currentCargamento.items[itemIndex];
-            if (currentItem.restantes > 0 && !currentItem.items.some(i => i.id === item._id)) {
-                currentItem.restantes -= 1;
-                currentItem.items.push({
-                    id: item._id,
-                    codigo: item.codigo,
-                });
-            }
-            return prevCargamentos;
-        });
+        var restantes = cargamentoActual.items[itemIndex].restantes;
+        var multiplicador = cargamentoActual.items[itemIndex].multiplicador;
+        setCargamentos(prev => {
+            const newCargamentos = [...prev];
+            const currentCargamento = newCargamentos[0];
+            const itemToUpdate = currentCargamento.items[itemIndex];
+            const newItem = {
+                ...itemToUpdate,
+                restantes: multiplicador < restantes ? restantes : restantes - 1,
+                multiplicador: multiplicador < restantes ? multiplicador + 1: multiplicador,
+                items: [...itemToUpdate.items, { id: item._id, codigo: item.codigo }],
+            };
+            currentCargamento.items[itemIndex] = newItem;
+            newCargamentos[0] = currentCargamento;
+            console.log("newCargamentos", newCargamentos);
+            return newCargamentos;
+        });        
         toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`);
-    }, [cargamentos, setCargamentos]);
+    }, [setCargamentos, cargamentos]);
 
     useEffect(() => {
         fetchCargamentos();
@@ -103,7 +123,7 @@ export default function PreparacionDePedidos() {
 
         const handleKeyDown = (e) => {
             console.log("Key pressed:", e.key, new Date());
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && inputCode.length > 0) {
                 console.log(`Código ingresado: ${inputCode}`);
                 const scanItem = async () => {
                     try {
@@ -190,7 +210,7 @@ export default function PreparacionDePedidos() {
                                 {cargamento.items.map((item, idx) => (
                                     <li
                                         key={`item_${idx}`}
-                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${idx === 0 ? 'rounded-t-lg' : idx === cargamento.items.length - 1 ? 'rounded-b-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${idx === 0 ? 'rounded-t-lg' : idx === cargamento.items.length - 1 ? 'rounded-b-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                     >
                                         <div className="w-full flex items-left">
                                             <div className="flex">
@@ -202,12 +222,14 @@ export default function PreparacionDePedidos() {
                                                 <div className="font-bold text-xl ml-2">
                                                     <span>
                                                         {(() => {
-                                                            const match = item.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
-                                                            if (!match) return null;
+                                                            let match = item.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
+                                                            if (!match) {
+                                                                match = [null, (item.elemento ?? item.gas ?? item.nombre.split(" ")[0]), ''];
+                                                            }
                                                             const [, p1, p2] = match;
                                                             return (
                                                                 <>
-                                                                    {p1 ? p1.charAt(0).toUpperCase() + p1.slice(1).toLowerCase() : ''}
+                                                                    {p1 ? p1.toUpperCase() : ''}
                                                                     {p2 ? <small>{p2}</small> : ''}
                                                                 </>
                                                             );
@@ -263,33 +285,37 @@ export default function PreparacionDePedidos() {
             </div>
 
 
-            {showModalCilindroErroneo && itemCatalogoEscaneado != null && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                <div className="relative top-12 mx-auto p-5 border w-11/12 md:w-96 shadow-lg rounded-md bg-white">
+            {showModalCilindroErroneo && itemCatalogoEscaneado != null && <div className="fixed flex inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center">
+                <div className="relative mx-auto p-5 border w-10/12 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-center">
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Información de Cilindro</h3>
                         <div className="mt-2">
-                            <div className="flex flex-col md:flex-row items-center">
+                            <div className="flex items-center justify-center">
                                 <Image width={20} height={64} src="/ui/tanque_biox.png" style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
-                                <div className="text-left ml-0 md:ml-4">
-                                    {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold">INDUSTRIAL</span>}
-                                    <div className="flex flex-col md:flex-row items-center">
+                                <div className="text-left ml-6">                                    
+                                    <div>
+                                        <div className="flex">
+                                            {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
+                                            <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>
+                                            {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
+                                        </div>
                                         <div className="font-bold text-4xl">
                                             <span>
                                                 {(() => {
-                                                    const match = itemCatalogoEscaneado.categoria.elemento.match(/^([a-zA-Z]*)(\d*)$/);
-                                                    if (!match) return null;
+                                                    let match = itemCatalogoEscaneado.categoria.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
+                                                    if (!match) {
+                                                        match = [null, (itemCatalogoEscaneado.categoria.elemento ?? itemCatalogoEscaneado.categoria.gas ?? itemCatalogoEscaneado.categoria.nombre.split(" ")[0]), ''];
+                                                    };
                                                     const [, p1, p2] = match;
                                                     return (
                                                         <>
-                                                            {p1 ? p1.charAt(0).toUpperCase() + p1.slice(1).toLowerCase() : ''}
+                                                            {p1 ? p1.toUpperCase() : ''}
                                                             {p2 ? <small>{p2}</small> : ''}
                                                         </>
                                                     );
                                                 })()}
                                             </span>
-                                        </div>
-                                        <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>
-                                        {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
+                                        </div>                                        
                                     </div>
                                     <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoria.cantidad} <small>{itemCatalogoEscaneado.subcategoria.unidad}</small> </p>
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
@@ -297,15 +323,60 @@ export default function PreparacionDePedidos() {
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-4">
+                        <div className="mt-4 ml-4">
+                            <div className="flex items-center mt-4">
+                                <input
+                                    type="checkbox"
+                                    id="noPreguntar"
+                                    className="w-6 h-6 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                />
+                                <label htmlFor="noPreguntar" className="ml-2 text-sm font-medium text-gray-900">
+                                    No preguntar para este tipo de cilindro
+                                </label>
+                            </div>
+                        </div>
+                        <div className="mt-4 mx-4">
                             <button
                                 onClick={() => {
                                     setShowModalCilindroErroneo(false);
-                                    setInputCode("");
+                                    const newCargamentos = [...cargamentos];
+                                    const currentCargamento = newCargamentos[0];
+
+                                    // Verificar si el item ya existe en el cargamento
+                                    const existingItemIndex = currentCargamento.items.findIndex(
+                                        (item) => item.subcategoriaId === itemCatalogoEscaneado.subcategoria._id
+                                    );
+
+                                    if (existingItemIndex === -1) {
+                                        // Agregar el nuevo item si no existe                
+                                        const newItem = {
+                                            subcategoriaId: itemCatalogoEscaneado.subcategoria._id,
+                                            nombre: `${itemCatalogoEscaneado.categoria.nombre} ${itemCatalogoEscaneado.subcategoria.nombre}`,
+                                            restantes: -1,
+                                            cantidad: itemCatalogoEscaneado.subcategoria.cantidad,
+                                            elemento: itemCatalogoEscaneado.categoria.elemento,
+                                            nuCode: getNUCode(itemCatalogoEscaneado.categoria.elemento),
+                                            esIndustrial: itemCatalogoEscaneado.categoria.esIndustrial,
+                                            sinSifon: itemCatalogoEscaneado.subcategoria.sinSifon,
+                                            unidad: itemCatalogoEscaneado.subcategoria.unidad,
+                                            multiplicador: 0,
+                                            items: [
+                                                {
+                                                    id: itemCatalogoEscaneado._id,
+                                                    codigo: itemCatalogoEscaneado.codigo,
+                                                },
+                                            ],
+                                        };
+                                        currentCargamento.items.push(newItem);
+                                    }
+                                    newCargamentos[0] = currentCargamento;
+                                    setCargamentos(newCargamentos);
                                     setScanMode(true);
                                 }}
                                 className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >CONTINUAR</button>
+                            >
+                                CONTINUAR
+                            </button>
                             <button
                                 onClick={() => {
                                     setShowModalCilindroErroneo(false);
