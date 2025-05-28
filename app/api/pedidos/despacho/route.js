@@ -15,6 +15,7 @@ import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import User from "@/models/user";
 import Vehiculo from "@/models/vehiculo";
 import Venta from "@/models/venta";
+import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {
     try {
@@ -39,6 +40,9 @@ export async function GET() {
         }
         if (!mongoose.models.Venta) {
             mongoose.model("Venta", Venta.schema);
+        }        
+        if (!mongoose.models.ItemCatalogo) {
+            mongoose.model("ItemCatalogo", ItemCatalogo.schema);
         }
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
@@ -144,6 +148,7 @@ export async function GET() {
             });
 
             return {
+                rutaId: ruta._id,
                 nombreChofer: ruta.choferId.name,
                 patenteVehiculo: ruta.vehiculoId?.patente || null,
                 fechaVentaMasReciente,
@@ -162,26 +167,39 @@ export async function GET() {
 export async function POST(request) {
     try {
         await connectMongoDB();
-        const { items } = await request.json();
+        const { rutaId, scanCodes } = await request.json();
 
-        if (!Array.isArray(items)) {
-            return NextResponse.json({ error: "Invalid payload format. 'items' should be an array." }, { status: 400 });
+        if (!Array.isArray(scanCodes) || scanCodes.length === 0 || !rutaId) {
+            return NextResponse.json({ error: "Invalid payload format. {rutaId, scanCodes[]}" }, { status: 400 });
         }
 
-        const updatePromises = items.map(async ({ codigo, nuevoEstado }) => {
-            if (!codigo || nuevoEstado === undefined || !(nuevoEstado in TIPO_ESTADO_VENTA)) {
-                throw new Error(`Invalid item data: { codigo: ${codigo}, nuevoEstado: ${nuevoEstado} }`);
-            }
+        // Buscar la ruta de despacho por rutaId
+        const ruta = await RutaDespacho.findById(rutaId);
+        if (!ruta) {
+            return NextResponse.json({ error: "RutaDespacho not found" }, { status: 404 });
+        }
 
-            return ItemCatalogo.updateOne(
-                { codigo },
-                { $set: { estado: nuevoEstado } }
-            );
+        // Agregar historial de carga
+        ruta.hitorialCarga.push({
+            esCarga: true,
+            fecha: new Date(),
+            itemMovidoIds: scanCodes
         });
 
-        await Promise.all(updatePromises);
+        ruta.cargaItemIds.push(...scanCodes);
 
-        return NextResponse.json({ message: "Estados actualizados correctamente." });
+        // Cambiar estado y agregar historial de estado
+        ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
+        ruta.historialEstado.push({
+            estado: TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+            fecha: new Date()
+        });
+
+        console.log("Updating item states...", ruta);
+
+        await ruta.save();
+
+        return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("Error updating item states:", error);
         return NextResponse.json({ error: "Error updating item states." }, { status: 500 });

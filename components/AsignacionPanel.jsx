@@ -15,54 +15,56 @@ import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
-
+import { FaCartPlus } from 'react-icons/fa';
 dayjs.locale('es');
-
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 
-function calculateTubePosition(layerIndex, index) {
-    const baseTop = 18; // Posición inicial en el eje Y
-    const baseLeft = 22; // Posición inicial en el eje X
-    const verticalSpacing = -4.5; // Espaciado vertical entre tubos en la misma columna
-    const horizontalSpacing = 3; // Espaciado horizontal entre columnas
-    const perspectiveAngle = 55; // Ángulo de perspectiva en grados
-    const rowGroupSpacing = 9; // Espaciado adicional entre los grupos de filas (0-2 y 3-5)
-
-    // Conversión del ángulo de perspectiva a radianes
-    const angleInRadians = (perspectiveAngle * Math.PI) / 180;
-
-    // Cálculo de desplazamiento en perspectiva
-    const perspectiveOffset = layerIndex * Math.tan(angleInRadians);
-
-    // Ajuste para separar los grupos de filas
-    const groupOffset = layerIndex >= 3 ? rowGroupSpacing : 0;
-
-    // Variación proporcional en top y left
-    const proportionalOffset = layerIndex >= 3 ? rowGroupSpacing * 0.25 : 0; // Ajuste proporcional para las últimas capas
-
-    // Ajuste adicional para la 2da y 5ta fila
-    const depthOffset = (layerIndex === 1 || layerIndex === 4) ? -1 : 0; // Medio tubo hacia el fondo
-
-    const top = baseTop + index * verticalSpacing + perspectiveOffset + proportionalOffset + depthOffset; // Ajuste vertical con perspectiva y separación de grupos
-    const left = baseLeft + layerIndex * horizontalSpacing + perspectiveOffset + groupOffset - depthOffset; // Ajuste horizontal con perspectiva
-
-    return { top, left, width: '14px', height: '78px' };
-}
-
-export default function AsignacionPanel() {
+export default function AsignacionPanel({ session }) {
     const [pedidos, setPedidos] = useState([]);
     const [choferes, setChoferes] = useState([]);
     const [enTransito, setEnTransito] = useState([]);
-
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showReasignacionModal, setShowReasignacionModal] = useState(false);
     const [selectedChofer, setSelectedChofer] = useState(null);
     const [selectedPedido, setSelectedPedido] = useState(null);
+    const [selectedVenta, setSelectedVenta] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [loadingPanel, setLoadingPanel] = useState(true);
 
     const nombreChofer = (choferId) => {
         const chofer = choferes.find((chofer) => chofer._id === choferId);
         return chofer ? chofer.nombre : "Desconocido";
     }
+
+    const getResumenCarga = (items = []) => {
+        const resumen = {};
+        if (!Array.isArray(items)) return [];
+
+        items.forEach((item) => {
+            // item.subcategoriaCatalogoId es un objeto poblado
+            const sub = item.subcategoriaCatalogoId;
+            if (!sub || !sub._id) return;
+
+            const key = sub._id;
+            if (!resumen[key]) {
+                resumen[key] = {
+                    subcategoriaCatalogoId: key,
+                    cantidad: sub.cantidad,
+                    unidad: sub.unidad,
+                    sinSifon: sub.sinSifon,
+                    esIndustrial: sub.categoriaCatalogoId?.esIndustrial || false,
+                    esMedicinal: sub.categoriaCatalogoId?.esMedicinal || false,
+                    elemento: sub.categoriaCatalogoId?.elemento || "",
+                    multiplicador: 1,
+                };
+            } else {
+                resumen[key].multiplicador += 1;
+            }
+        });
+
+        return Object.values(resumen);
+    };
 
     async function fetchPedidos() {
         try {
@@ -74,7 +76,13 @@ export default function AsignacionPanel() {
             console.log("Fetched pedidos:", data);
             setPedidos(data.pedidos);
             setChoferes(data.choferes);
-            setEnTransito(data.flotaEnTransito);
+            setEnTransito(data.flotaEnTransito.map((ruta) => {
+                return {
+                    ...ruta,
+                    resumenCarga: getResumenCarga(ruta.cargaItemIds)
+                };
+            }));
+            setLoadingPanel(false);
         } catch (error) {
             console.error("Error fetching pedidos:", error);
         }
@@ -88,28 +96,98 @@ export default function AsignacionPanel() {
         console.log("Pedidos:", pedidos);
     }, [pedidos]);
 
+    // Efecto para unirse a la sala al cargar el componente
+    useEffect(() => {
+        // Verifica si hay sesión y el socket está conectado
+        if (session?.user?.id && socket.connected) {
+            console.log("Re-uniendo a room-pedidos después de posible recarga");
+            socket.emit("join-room", {
+                room: "room-pedidos",
+                userId: session.user.id
+            });
+        }
+
+        // Evento para manejar reconexiones del socket
+        const handleReconnect = () => {
+            if (session?.user?.id) {
+                console.log("Socket reconectado, uniendo a sala nuevamente");
+                socket.emit("join-room", {
+                    room: "room-pedidos",
+                    userId: session.user.id
+                });
+            }
+        };
+
+        // Escucha el evento de reconexión
+        socket.on("connect", handleReconnect);
+
+        return () => {
+            socket.off("connect", handleReconnect);
+        };
+    }, [session]);
+
+    useEffect(() => {
+        socket.on("update-pedidos", (data) => {
+            fetchPedidos();
+        });
+
+        return () => {
+            socket.off("update-pedidos");
+        };
+    }, []);
+
+
+    function calculateTubePosition(index) {
+        console.log("index", index);
+        const baseTop = 36;
+        const baseLeft = 42;
+
+        const verticalIncrement = 3;
+
+        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+
+        return { top, left, width: '14px', height: '78px' };
+    }
+
     return (
-        <main className="mt-4 h-screen overflow-hidden">
-            <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pt-4 mx-10 bg-white dark:bg-gray-900 mb-4">
-                <div className="flex items-center space-x-4 text-ship-cove-800">
-                    <Link href="/">
-                        <AiFillHome size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                    </Link>
-                    <IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300" />
-                    <Link href="/modulos">
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">ASIGNACION</span>
-                    </Link>                    
-                </div>
-            </div>
-            <div className="grid grid-cols-12 h-[calc(100vh-80px)] gap-4 p-4 overflow-hidden">
+        <main className="mt-10 h-screen overflow-hidden">
+            <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 p-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>
                 <div className="col-span-7 flex flex-col md:flex-row gap-4">
-                    <div className="w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4">PEDIDOS</h2>
+                    <div className="relative w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto"
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.style.backgroundColor = "rgb(209 213 219)";
+                            e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+                        }}
+                        onDragLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "white";
+                            e.currentTarget.style.boxShadow = "none";
+                        }}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.style.backgroundColor = "white";
+                            e.currentTarget.style.boxShadow = "none";
+                            console.log("PArams", selectedChofer, selectedPedido, selectedVenta);
+                            if (selectedVenta) {
+                                setShowReasignacionModal(true);
+                            }
+                        }}
+                    >
+                        <div className="flex items-center mb-4">
+                            <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                                PEDIDOS
+                            </div>
+                            <Link href="/modulos/pedidos/nuevo" className="relative ml-auto -mt-2">
+                                <button className="flex items-center bg-blue-500 text-white h-12 w-12 rounded hover:bg-blue-600 transition-colors font-semibold">
+                                    <FaCartPlus size={38} className="pl-0.5 ml-0.5" />
+                                </button>
+                            </Link>
+                        </div>
                         {pedidos.length === 0 ? (
                             <div
                                 className="flex items-center justify-center"
-                                style={{ height: "calc(100vh - 200px)" }}
-                            >
+                                style={{ height: "calc(100vh - 200px)" }}>
                                 <p className="text-gray-500 text-lg font-semibold">SIN PEDIDOS</p>
                             </div>
                         ) : (
@@ -134,8 +212,10 @@ export default function AsignacionPanel() {
                         )}
                     </div>
 
-                    <div className="w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4">EN ESPERA</h2>
+                    <div className="relative w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto pt-14">
+                        <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                            EN ESPERA
+                        </div>
                         {choferes.map((chofer, index) => (
                             <div
                                 key={`en_espera_${index}`}
@@ -144,43 +224,52 @@ export default function AsignacionPanel() {
                                 onDragOver={(e) => {
                                     e.preventDefault();
                                     e.currentTarget.style.backgroundColor = "rgb(209 213 219)"; // Tailwind gray-300
-                                    e.currentTarget.style.transform = "scale(1.1)";
                                     e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
                                 }}
                                 onDragLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
-                                    e.currentTarget.style.transform = "scale(1)";
                                     e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
                                     e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
-                                    e.currentTarget.style.transform = "scale(1)";
                                     e.currentTarget.style.boxShadow = "none";
-                                    setSelectedChofer(chofer._id);
-                                    setShowConfirmModal(true); 
+                                    if (selectedPedido) {
+                                        setSelectedChofer(chofer._id);
+                                        setShowConfirmModal(true);
+                                    }
                                 }}
                             >
                                 <div className="font-bold uppercase flex">
                                     <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
                                 </div>
-                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedidos_chofer_${indexPedido}`}>
-                                    <p className="font-md uppercase font-bold">{pedido.nombreCliente}</p>
+                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div className="bg-gray-200 rounded shadow-md p-1 mb-2"
+                                    onDragStart={() => {
+                                        setSelectedChofer(chofer._id);
+                                        setSelectedVenta(pedido.items[0].ventaId);
+                                        console.log("Venta seleccionada:", pedido.items[0].ventaId);
+                                    }}
+                                    draggable="true" key={`pedidos_chofer_${indexPedido}`}>
+                                    <p className="font-md upper</div>case font-bold">{pedido.nombreCliente}</p>
                                     <ul className="list-disc ml-4">
-                                        {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}                                        
+                                        {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
                                     </ul>
-                                </div>) : <div className="relative w-32"><div className="relative -top-8 left-64 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
-                                    <RiZzzFill size="1rem" className="mr-1" />
-                                    <p>SIN PEDIDOS</p>
-                                </div></div>}
+                                </div>) : <div className="relative w-32">
+                                    <div className="relative -top-8 left-64 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
+                                        <RiZzzFill size="1rem" className="mr-1" />
+                                        <p>SIN PEDIDOS</p>
+                                    </div>
+                                </div>}
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {/* EN TRÁNSITO */}
-                <div className="col-span-5 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto">
-                    <h2 className="text-xl font-bold mb-4">EN TRÁNSITO</h2>
+                <div className="relative col-span-5 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto overflow-x-hidden pt-12">
+                    <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                        EN TRÁNSITO
+                    </div>
                     {enTransito.length === 0 ? (
                         <div
                             className="flex items-center justify-center"
@@ -189,10 +278,10 @@ export default function AsignacionPanel() {
                             <p className="text-gray-500 text-lg font-semibold">NADIE EN RUTA</p>
                         </div>
                     ) : (
-                        enTransito.map((truck, index) => (
+                        enTransito.map((ruta, index) => (
                             <div
-                                key={`truck_${index}`}
-                                data-id={truck._id}
+                                key={`ruta_${index}`}
+                                data-id={ruta._id}
                                 className="relative w-full border rounded-lg px-4 bg-gray-100 shadow-md mb-4 h-64 pt-4"
                                 onDragOver={(e) => {
                                     e.preventDefault();
@@ -202,49 +291,70 @@ export default function AsignacionPanel() {
                                     e.currentTarget.style.backgroundColor = "#e5e7eb";
                                 }}
                                 onDrop={(e) => {
-                                    alert(`SOLTADO en camión ${truck.patente}`);
+                                    alert(`SOLTADO en camión ${ruta.vehiculoId.patent}`);
                                     e.preventDefault();
                                     e.currentTarget.style.backgroundColor = "green";
                                 }}
                             >
-                                <Image className="absolute top-4 left-0 ml-12" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
-                                <div className="absolute top-0 left-0 ml-12 mt-2 w-full h-fit">
-                                    {Array.from({ length: 6 }).map((_, layerIndex) => (
-                                        <div key={`${layerIndex}_${truck.patente}`} className="absolute flex" style={calculateTubePosition(layerIndex, 0)}>
-                                            {Array.from({ length: 6 }).map((_, index) => (
-                                                <Image
-                                                    key={index}
-                                                    src={`/ui/tanque_biox${(index + layerIndex * 6 > 40) ? '_verde' : (index + layerIndex * 6 > 20) ? '_azul' : ''}.png`}
-                                                    alt={`tank_${layerIndex * 6 + index}`}
-                                                    width={14}
-                                                    height={78}
-                                                    className='relative'
-                                                    style={calculateTubePosition(layerIndex, index)}
-                                                    priority={false}
-                                                />
-                                            ))}
-                                        </div>
+                                <Image className="absolute top-4 left-0 ml-8" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
+                                <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
+                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => (
+                                        <Image
+                                            key={index}
+                                            src={`/ui/tanque_biox${(index == 0) ? '_verde' : (index == 1) ? '_azul' : ''}.png`}
+                                            alt={`tank_${index}`}
+                                            width={14 * 2}
+                                            height={78 * 2}
+                                            className="absolute"
+                                            style={calculateTubePosition(index)}
+                                            priority={false}
+                                        />
                                     ))}
                                 </div>
-                                <Image className="absolute top-4 left-0 ml-12" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
+                                <Image className="absolute top-4 left-0 ml-8" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
                                 <div className="absolute ml-16 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>
                                     <div className="ml-4 text-slate-800">
-                                        <p className="text-xl font-bold">{truck.patente}</p>
-                                        <p className="text-xs">{truck.marca.split(" ")[0]}</p>
+                                        <p className="text-xl font-bold">{ruta.vehiculoId.patente}</p>
+                                        <p className="text-xs">{ruta.vehiculoId.marca}</p>
+                                        <div className="flex items-center mb-2">
+                                            <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                                            <span className="text-xs font-semibold text-green-700">En ruta</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="absolute bottom-4 flex items-center ml-4 mb-2">
+                                <div className="absolute bottom-4 flex items-center ml-4">
                                     <BsGeoAltFill size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                                    <p className="text-xs text-gray-500 ml-2">{truck.direccion}</p>
+                                    <p className="text-xs text-gray-500 ml-2">{ruta.ruta.find(r => !r.fechaArribo).direccionDestinoId.nombre}</p>
+                                </div>
+                                <div className="ml-72">
+                                    <p className="text-xs">Conductor</p>
+                                    <p className="text-lg uppercase font-bold -mt-1 mb-2">{ruta.choferId.name}</p>
+                                    <div></div>
+                                    <div className="flex flex-wrap">
+                                        {ruta.resumenCarga?.map((item, idx) => (
+                                            <div key={idx} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1">
+                                                <b>{item.multiplicador}</b>x {item.elemento.toUpperCase()} {item.cantidad}{item.unidad}
+                                                {item.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
+                                                {item.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         ))
                     )}
                 </div>
+                {loadingPanel && (
+                    <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
+                        <p className="text-xl font-bold">CARGANDO PANEL</p>
+                    </div>
+                )}
             </div>
 
             <ConfirmModal
                 show={showConfirmModal}
+                loading={loading}
                 title="Confirmar Asignación"
                 confirmationQuestion={`¿Estás seguro de asignar este pedido a ${nombreChofer(selectedChofer)}?`}
                 onClose={() => {
@@ -255,8 +365,11 @@ export default function AsignacionPanel() {
                         item.style.boxShadow = "none";
                     }
                     setShowConfirmModal(false);
+                    setSelectedPedido(null);
+                    setSelectedChofer(null);
                 }} // Cierra el modal
                 onConfirm={() => {
+                    setLoading(true);
                     const assignPedido = async () => {
                         try {
                             const response = await fetch("/api/pedidos/asignacion", {
@@ -272,23 +385,76 @@ export default function AsignacionPanel() {
 
                             if (!response.ok) {
                                 const errorData = await response.json();
-                                throw new Error(errorData.error || "Error al asignar el pedido");                                
+                                throw new Error(errorData.error || "Error al asignar el pedido");
                             }
                             socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
                             toast.success("Pedido asignado con éxito");
+                            setLoadingPanel(true);
                             fetchPedidos();
                         } catch (error) {
                             console.error("Error al asignar el pedido:", error);
                             toast.error(error.message || "Error al asignar el pedido");
                         } finally {
                             setShowConfirmModal(false); // Cierra el modal después de confirmar
+                            setLoading(false);
+                            setSelectedPedido(null);
+                            setSelectedChofer(null);
                         }
                     };
                     assignPedido();
                 }}
                 confirmationLabel="ASIGNAR"
             />
-            <ToastContainer/>
+
+            <ConfirmModal
+                show={showReasignacionModal}
+                title="Confirmar operación crítica"
+                confirmationQuestion={`¿Estás seguro de deshacer la asignación de este pedido?`}
+                loading={loading}
+                onClose={() => {
+                    setShowReasignacionModal(false);
+                    setSelectedVenta(null);
+                    setSelectedChofer(null);
+                }} // Cierra el modal
+                onConfirm={() => {
+                    setLoading(true);
+                    const deshacerAsignarPedido = async () => {
+                        try {
+                            const response = await fetch("/api/pedidos/reasignacion", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    ventaId: selectedVenta,
+                                    choferId: selectedChofer,
+                                }),
+                            });
+
+                            if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || "Error al deshacer la asignación del pedido");
+                            }
+                            socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
+                            toast.success("Pedido listo para asignar");
+                            fetchPedidos();
+                        } catch (error) {
+                            toast.error(error.message || "Error al deshacer la asignación del pedido");
+                        } finally {
+                            setShowReasignacionModal(false); // Cierra el modal después de confirmar                            
+                            setLoading(false);
+                            setLoadingPanel(true);
+                            setSelectedVenta(null);
+                            setSelectedChofer(null);
+                            socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
+                        }
+                    };
+                    deshacerAsignarPedido();
+                }}
+                confirmationLabel="ASIGNAR"
+            />
+
+            <ToastContainer />
         </main>
     );
 }

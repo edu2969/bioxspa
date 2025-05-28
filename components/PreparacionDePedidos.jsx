@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { BsQrCodeScan } from "react-icons/bs";
 import { FaRoadCircleCheck } from "react-icons/fa6";
-import { TbTruckLoading } from "react-icons/tb";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
 import { FaClipboardCheck, FaTruck } from "react-icons/fa";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
+import { useRef } from "react";
 import dayjs from "dayjs";
 import 'dayjs/locale/es';
 import Image from "next/image";
@@ -18,50 +17,85 @@ dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 
-export default function PreparacionDePedidos() {
+export default function PreparacionDePedidos({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
     const [animating, setAnimating] = useState(false);
     const [scanMode, setScanMode] = useState(false);
     const [showModalCilindroErroneo, setShowModalCilindroErroneo] = useState(false);
     const [itemCatalogoEscaneado, setItemCatalogoEscaneado] = useState(null);
+    const hiddenInputRef = useRef(null);
 
-    const postCargamento = async (cargamento) => {
+    const postCargamento = async () => {
+        console.log("Cargamento a guardar:", cargamentos[0]);
+        if (!isCompleted()) {
+            console.log("Eeeeepa!");
+            return;
+        }
+        // Unir todos los ids de scanCodes de todos los items
+        const scanCodes = cargamentos[0].items
+            .flatMap(item => Array.isArray(item.scanCodes) ? item.scanCodes : [])
+            .map(scan => scan.id);
+
         const response = await fetch("/api/pedidos/despacho", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ scanCodes: cargamento.scanCodes }),
+            body: JSON.stringify({
+                rutaId: cargamentos[0].rutaId,
+                scanCodes
+            }),
         });
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || "Error al guardar el cargamento");
+            toast.error(`Error al guardar el cargamento: ${errorData.error}`, {
+                position: "bottom-right",
+            });
+        } else {
+            handleRemoveFirst();
+            toast.success(`Cargamento confirmado con éxito`, {
+                position: "bottom-right",
+            });
+            socket.emit("update-pedidos", {
+                userId: session.user.id
+            });
         }
-        const data = await response.json();
-        console.log("Cargamento guardado:", data);
-        return data;
-    }        
+    }
 
-    const handleRemoveFirst = async () => {
+    const handleRemoveFirst = async (posted) => {
         if (animating) return; // Evita múltiples clics durante la animación
         setAnimating(true);
         setTimeout(() => {
             setCargamentos((prev) => prev.slice(1)); // Elimina el primer pedido después de la animación
             setAnimating(false);
-            setScanMode(false); 
-            postCargamento(cargamentos[0]);
-        }, 1000); 
+            setScanMode(false);
+        }, 1000);
     };
 
+    const handleShowNext = () => {
+        if (animating) return; // Evita múltiples clics durante la animación
+        setAnimating(true);
+        setTimeout(() => {
+            setCargamentos((prev) => {
+                if (prev.length <= 1) return prev;
+                const [first, ...rest] = prev;
+                return [...rest, first];
+            });
+            setAnimating(false);
+            setScanMode(false);
+        }, 1000); // Cambia el tiempo de la animación aquí
+    }
+
     const handleScanMode = () => {
+        toast.info(`Modo escaneo ${scanMode ? "desactivado" : "activado"}`, {
+            position: "bottom-right",
+        });
         setScanMode(!scanMode);
     };
 
-    const [inputCode, setInputCode] = useState("");
-
     const isCompleted = () => {
         if (cargamentos.length === 0) return false;
-        return cargamentos[0].items.every((item) => item.restantes === 0);
+        return cargamentos[0].items.every((item) => item.restantes <= 0);
     }
 
     const [loadingCargamentos, setLoadingCargamentos] = useState(true);
@@ -74,60 +108,76 @@ export default function PreparacionDePedidos() {
         setLoadingCargamentos(false);
     }
 
-    const cargarItem = useCallback(async (item) => {
+    const cargarItem = useCallback(async (item, codigo) => {
         const cargamentoActual = cargamentos[0];
+        console.log("CARGAMENTO ACTUAL", cargamentoActual);
         if (!cargamentoActual) return false;
 
         const itemIndex = cargamentoActual.items.map(i => i.subcategoriaId).indexOf(item.subcategoriaCatalogoId);
         if (itemIndex === -1) {
             setScanMode(false);
             setShowModalCilindroErroneo(true);
-            toast.warn(`CODIGO ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`);
+            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`, {
+                position: "bottom-right",
+            });
             return;
         }
 
-        if (cargamentoActual.items[itemIndex].items.map(i => i.codigo).includes(item.codigo)) {
-            toast.warn(`CODIGO ${item.codigo} ya escaneado`);
+        if (cargamentoActual.items[itemIndex].scanCodes && cargamentoActual.items[itemIndex].scanCodes.map(sc => sc.codigo).includes(codigo)) {
+            toast.warn(`CODIGO ${codigo} ya escaneado`, {
+                position: "bottom-right",
+            });
             return;
         }
 
-        if (cargamentoActual.items[itemIndex].restantes === -1) {
-            toast.warn(`${item.categoria.nombre} ${item.subcategoria.nombre} exedente`);
-        }
-        var restantes = cargamentoActual.items[itemIndex].restantes;
-        var multiplicador = cargamentoActual.items[itemIndex].multiplicador;
         setCargamentos(prev => {
+            // Solo actualiza si hay cargamentos
+            if (!prev.length) return prev;
             const newCargamentos = [...prev];
-            const currentCargamento = newCargamentos[0];
-            const itemToUpdate = currentCargamento.items[itemIndex];
+            const currentCargamento = { ...newCargamentos[0] };
+            const items = [...currentCargamento.items];
+            const itemToUpdate = { ...items[itemIndex] };
+
+            // Cambia el nombre del arreglo de items a scanCodes y agrega el nuevo código escaneado
+            const scanCodes = Array.isArray(itemToUpdate.scanCodes) ? [...itemToUpdate.scanCodes] : [];
+            scanCodes.push({ id: item._id, codigo: item.codigo });
+
+            // Actualiza restantes y multiplicador si corresponde
+            const updatedRestantes = itemToUpdate.multiplicador < itemToUpdate.restantes
+                ? itemToUpdate.restantes
+                : itemToUpdate.restantes - 1;
+            const updatedMultiplicador = itemToUpdate.multiplicador < itemToUpdate.restantes
+                ? itemToUpdate.multiplicador + 1
+                : itemToUpdate.multiplicador;
+
+            // Actualiza el item
             const newItem = {
                 ...itemToUpdate,
-                restantes: multiplicador < restantes ? restantes : restantes - 1,
-                multiplicador: multiplicador < restantes ? multiplicador + 1: multiplicador,
-                items: [...itemToUpdate.items, { id: item._id, codigo: item.codigo }],
+                restantes: updatedRestantes,
+                multiplicador: updatedMultiplicador,
+                scanCodes,
             };
-            currentCargamento.items[itemIndex] = newItem;
+            items[itemIndex] = newItem;
+            currentCargamento.items = items;
             newCargamentos[0] = currentCargamento;
-            console.log("newCargamentos", newCargamentos);
             return newCargamentos;
-        });        
-        toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`);
+        });
+        toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`, {
+            position: "bottom-right",
+        });
     }, [setCargamentos, cargamentos]);
 
     useEffect(() => {
         fetchCargamentos();
-    }, []);
+    }, []);    
 
     useEffect(() => {
-        if (!scanMode) return;
-
-        const handleKeyDown = (e) => {
-            console.log("Key pressed:", e.key, new Date());
-            if (e.key === "Enter" && inputCode.length > 0) {
-                console.log(`Código ingresado: ${inputCode}`);
+        const handleTextInput = (e) => {            
+            if (scanMode) {
+                const codigo = e.data;
                 const scanItem = async () => {
                     try {
-                        const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${inputCode}`);
+                        const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
                         console.log("RESPONSE", response);
                         if (!response.ok) {
                             const errorData = await response.json();
@@ -141,34 +191,84 @@ export default function PreparacionDePedidos() {
                             subcategoria: data.subcategoria,
                         }
                         setItemCatalogoEscaneado(item);
-                        cargarItem(item);
+                        cargarItem(item, codigo);
                     } catch {
-                        toast.error(`Cilindro ${inputCode} no existe`);
+                        toast.error(`Cilindro ${codigo} no existe`, {
+                            position: "bottom-right",
+                        });
                         return;
-                    } finally {
-                        setInputCode(""); // Limpia el código ingresado
                     }
                 };
                 scanItem();
-            } else if (!isNaN(e.key)) {
-                setInputCode((prev) => prev + e.key); // Agrega el número al código
+            }
+        }
+
+        const inputElement = hiddenInputRef.current;
+        if (inputElement) {
+            // textInput event (supported by some mobile browsers)
+            inputElement.addEventListener('textInput', handleTextInput);
+
+            inputElement.focus();
+        }
+
+        return () => {
+            if (inputElement) {
+                inputElement.removeEventListener('textInput', handleTextInput);
+            }
+        };
+    }, [scanMode]);
+
+    // Mantener el foco en el input oculto para capturar eventos
+    useEffect(() => {
+        if (!scanMode) return;
+        const keepFocus = setInterval(() => {
+            if (hiddenInputRef.current && document.activeElement !== hiddenInputRef.current) {
+                hiddenInputRef.current.focus();
+            }
+        }, 300);
+
+        return () => clearInterval(keepFocus);
+    }, [scanMode]);
+
+    // Efecto para unirse a la sala al cargar el componente
+    useEffect(() => {
+        // Verifica si hay sesión y el socket está conectado
+        if (session?.user?.id && socket.connected) {
+            console.log("Re-uniendo a room-pedidos después de posible recarga");
+            socket.emit("join-room", { 
+                room: "room-pedidos", 
+                userId: session.user.id 
+            });
+        }
+
+        // Evento para manejar reconexiones del socket
+        const handleReconnect = () => {
+            if (session?.user?.id) {
+                console.log("Socket reconectado, uniendo a sala nuevamente");
+                socket.emit("join-room", { 
+                    room: "room-pedidos", 
+                    userId: session.user.id 
+                });
             }
         };
 
-        window.addEventListener("keydown", handleKeyDown);
+        // Escucha el evento de reconexión
+        socket.on("connect", handleReconnect);
+
         return () => {
-            window.removeEventListener("keydown", handleKeyDown);
+            socket.off("connect", handleReconnect);
         };
-    }, [scanMode, inputCode, cargarItem]);
+    }, [session]); // Dependencia de session para que se ejecute cuando cambie
 
+    // Mantén tu efecto existente para escuchar "update-pedidos"
     useEffect(() => {
-        socket.on("carga_confirmada", (data) => {
-            console.log("Carga confirmada:", data);
-        })
+        socket.on("update-pedidos", (data) => {
+            fetchCargamentos();
+        });
 
         return () => {
-            socket.off("carga_confirmada");
-        }
+            socket.off("update-pedidos");
+        };
     }, []);
 
     return (
@@ -176,9 +276,9 @@ export default function PreparacionDePedidos() {
             <div className="w-full">
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
                     <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
-                        <div className={`absolute w-11/12 md:w-9/12 h-5/6 bg-white shadow-lg rounded-lg p-4 transition-all duration-500`}
+                        <div className={`absolute w-11/12 md:w-9/12 h-5/6 bg-gray-100 shadow-lg rounded-lg p-4 ${animating ? "transition-all duration-500" : ""}`}
                             style={{
-                                top: `${index * 10 + 72}px`,
+                                top: `${index * 10 + 52}px`,
                                 left: `${index * 10 + 16}px`,
                                 zIndex: cargamentos.length - index,
                                 scale: 1 - index * 0.009,
@@ -186,27 +286,19 @@ export default function PreparacionDePedidos() {
                                 opacity: animating && index == 0 ? 0 : 1,
                             }}
                         >
-                            <h1 className="flex flex-row text-xl font-bold mt-8">
-                                <TbTruckLoading className="text-6xl mx-4 mt-4" />
-                                <div className="mt-2 text-left">
-                                    <p className="text-sm font-light">venta más reciente</p>
-                                    <div className="flex flex-col md:flex-row items-start">
-                                        <p className="text-2xl orbitron">{dayjs(cargamento.fechaVentaMasReciente).format("ddd DD/MMM HH:mm")}</p>
-                                        <span className="font-extralight text-sm ml-0 md:ml-2 mt-0 md:mt-3.5">{dayjs(cargamento.fecha).fromNow()}</span>
+                            <div className="flex flex-row text-xl font-bold">
+                                <div>
+                                    <p className="text-xs">CHOFER</p>
+                                    <p className="font-bold text-lg uppercase -mt-2">{cargamento.nombreChofer}</p>
+                                </div>
+                                <div className="ml-2 mt-3 text-gray-500">
+                                    <div className="flex justify-start md:justify-start">
+                                        <FaTruck className="text-xl mr-2" />
+                                        <p className="font-bold text-sm">{cargamento.patenteVehiculo}</p>
                                     </div>
                                 </div>
-                            </h1>                            
-                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-4">
-                                <li className={`w-full flex text-sm border border-gray-300 rounded-xl px-6 py-3 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
-                                    onClick={() => {
-                                        if (!isCompleted()) {
-                                            handleScanMode();
-                                        }
-                                    }}>
-                                    <BsQrCodeScan className="text-4xl" />
-                                    <p className="ml-8 mt-1 text-xl mr-8">{scanMode ? (!isCompleted() ? 'ESCANEO ACTVO' : 'ESCANEO COMPLETO') : 'INICIAR ESCANEO'}</p>
-                                    {!isCompleted() && scanMode && <Loader texto="" />}
-                                </li>
+                            </div>
+                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2">
                                 {cargamento.items.map((item, idx) => (
                                     <li
                                         key={`item_${idx}`}
@@ -244,27 +336,21 @@ export default function PreparacionDePedidos() {
                                 ))}
                             </ul>
 
-                            <div className="absolute bottom-2 w-full pr-8"
-                                onClick={index === 0 ? handleRemoveFirst : undefined}>
-                                <div className={`flex justify-center text-white border border-gray-300 rounded-xl py-3 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}>
+                            <div className="absolute bottom-3 flex w-full pr-8"
+                                onClick={index === 0 ? postCargamento : undefined}>
+                                <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
+                                    onClick={() => {
+                                        handleScanMode();
+                                    }}>
+                                    <BsQrCodeScan className="text-4xl" />
+                                    {scanMode && !isCompleted() && <div className="absolute top-2 left-2">
+                                        <Loader texto="" />
+                                    </div>}
+                                </button>
+                                <button className={`ml-14 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}>
                                     <FaRoadCircleCheck className="text-4xl pb-0" />
-                                    <p className="ml-4 mt-1 text-xl">CONFIRMAR CARGA</p>
-                                </div>
-                            </div>
-
-                            <div className="absolute top-0 right-0 bg-blue-200 text-black rounded-xl rounded-tl-none rounded-br-none px-6 text-left">
-                                <div className="w-full flex">
-                                    <div>
-                                        <p className="text-xs mt-2">CHOFER</p>
-                                        <p className="font-bold text-2xl uppercase -mt-2">{cargamento.nombreChofer}</p>
-                                    </div>
-                                    <div className="ml-2 mt-5 text-gray-500">
-                                        <div className="flex justify-start md:justify-start">
-                                            <FaTruck className="text-2xl mr-2" />
-                                            <p className="font-bold text-lg">{cargamento.patenteVehiculo}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                    <p className="ml-2 mt-1 text-lg">CONFIRMAR CARGA</p>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -284,6 +370,16 @@ export default function PreparacionDePedidos() {
                 )}
             </div>
 
+            {cargamentos?.length > 1 && <div className="fixed bottom-4 right-4 z-40">
+                <button
+                    className="flex items-center px-6 py-3 bg-white text-gray-500 border border-gray-300 rounded-xl shadow-lg font-bold text-lg hover:bg-gray-100 transition duration-200"
+                    style={{ minWidth: 220 }}
+                    onClick={handleShowNext}
+                    disabled={animating || cargamentos.length === 0}
+                >
+                    PASAR SIGUIENTE &gt;&gt;
+                </button>
+            </div>}
 
             {showModalCilindroErroneo && itemCatalogoEscaneado != null && <div className="fixed flex inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center">
                 <div className="relative mx-auto p-5 border w-10/12 shadow-lg rounded-md bg-white">
@@ -292,7 +388,7 @@ export default function PreparacionDePedidos() {
                         <div className="mt-2">
                             <div className="flex items-center justify-center">
                                 <Image width={20} height={64} src="/ui/tanque_biox.png" style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
-                                <div className="text-left ml-6">                                    
+                                <div className="text-left ml-6">
                                     <div>
                                         <div className="flex">
                                             {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
@@ -315,24 +411,12 @@ export default function PreparacionDePedidos() {
                                                     );
                                                 })()}
                                             </span>
-                                        </div>                                        
+                                        </div>
                                     </div>
                                     <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoria.cantidad} <small>{itemCatalogoEscaneado.subcategoria.unidad}</small> </p>
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
                                     <p className="text-sm text-gray-600"><small>Mantención:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>
                                 </div>
-                            </div>
-                        </div>
-                        <div className="mt-4 ml-4">
-                            <div className="flex items-center mt-4">
-                                <input
-                                    type="checkbox"
-                                    id="noPreguntar"
-                                    className="w-6 h-6 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                />
-                                <label htmlFor="noPreguntar" className="ml-2 text-sm font-medium text-gray-900">
-                                    No preguntar para este tipo de cilindro
-                                </label>
                             </div>
                         </div>
                         <div className="mt-4 mx-4">
@@ -360,7 +444,7 @@ export default function PreparacionDePedidos() {
                                             sinSifon: itemCatalogoEscaneado.subcategoria.sinSifon,
                                             unidad: itemCatalogoEscaneado.subcategoria.unidad,
                                             multiplicador: 0,
-                                            items: [
+                                            scanCodes: [
                                                 {
                                                     id: itemCatalogoEscaneado._id,
                                                     codigo: itemCatalogoEscaneado.codigo,
@@ -380,7 +464,6 @@ export default function PreparacionDePedidos() {
                             <button
                                 onClick={() => {
                                     setShowModalCilindroErroneo(false);
-                                    setInputCode("");
                                     setScanMode(true);
                                 }}
                                 className="mt-2 px-4 py-2 bg-yellow-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -388,7 +471,6 @@ export default function PreparacionDePedidos() {
                             <button
                                 onClick={() => {
                                     setShowModalCilindroErroneo(false);
-                                    setInputCode("");
                                     setScanMode(true);
                                 }}
                                 className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -396,10 +478,15 @@ export default function PreparacionDePedidos() {
                         </div>
                     </div>
                 </div>
+
             </div>}
-
-
             <ToastContainer />
+            <input
+                ref={hiddenInputRef}
+                type="text"
+                className="opacity-0 h-0 w-0 absolute"
+                inputMode="none"
+            />
         </div>
     );
 }

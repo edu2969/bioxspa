@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import User from "@/models/user";
@@ -9,6 +10,7 @@ import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import DetalleVenta from "@/models/detalleVenta";
 import Direccion from "@/models/direccion";
+import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
 import RutaDespacho from "@/models/rutaDespacho";
 
@@ -16,6 +18,22 @@ export async function GET() {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();
     console.log("Connected to MongoDB");
+
+    if (!mongoose.models.ItemCatalogo) {
+        mongoose.model("ItemCatalogo", ItemCatalogo.schema);
+    }
+    if (!mongoose.models.Direccion) {
+        mongoose.model("Direccion", Direccion.schema);
+    }
+    if (!mongoose.models.CategoriaCatalogo) {
+        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
+    }
+    if (!mongoose.models.SubcategoriaCatalogo) {
+        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
+    }
+    if (!mongoose.models.Vehiculo) {
+        mongoose.model("Vehiculo", Vehiculo.schema);
+    }
 
     console.log("Fetching ventas in 'borrador' state...");
     const ventas = await Venta.find({ estado: TIPO_ESTADO_VENTA.borrador }).lean();
@@ -59,7 +77,20 @@ export async function GET() {
         })
     );
 
-    const cargosChoferes = await Cargo.find({ tipo: TIPO_CARGO.conductor }).lean();
+    const choferesEnRuta = await RutaDespacho.find({
+        estado: { 
+            $gte: TIPO_ESTADO_RUTA_DESPACHO.en_ruta, 
+            $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado 
+        }
+    }).lean();
+    const choferesIds = choferesEnRuta.map((ruta) => ruta.choferId);
+    let qry = {
+        tipo: TIPO_CARGO.conductor
+    };
+    if(choferesIds.length > 0) {
+        qry.userId = { $nin: choferesIds };
+    }
+    const cargosChoferes = await Cargo.find(qry).lean();
     const choferes = await Promise.all(
         cargosChoferes.map(async (cargo) => {
             const user = await User.findById(cargo.userId).lean();
@@ -67,7 +98,10 @@ export async function GET() {
             // Find the rutaDespacho where the user is the chofer
             const rutaDespacho = await RutaDespacho.findOne({ 
                 choferId: user._id, 
-                estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
+                estado: { 
+                    $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
+                    $lt: TIPO_ESTADO_RUTA_DESPACHO.en_ruta 
+                }
             }).lean();
 
             let pedidos = [];
@@ -116,16 +150,46 @@ export async function GET() {
         })
     );
 
-    const vehiculosEnTransito = await Vehiculo.find({ direccionDestinoId: { $ne: null } }).lean();
-    const flotaEnTransito = await Promise.all(
-        vehiculosEnTransito.map(async (vehiculo) => {
-            const direccionDestino = await Direccion.findById(vehiculo.direccionDestinoId).lean();
-            return {
-                ...vehiculo,
-                direccionDestinoNombre: direccionDestino?.nombre || "Desconocida"
-            };
-        })
-    );
+    const flotaEnTransito = await RutaDespacho.find({
+        estado: { 
+            $gte: TIPO_ESTADO_RUTA_DESPACHO.en_ruta, 
+            $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
+    })
+    // Poblar cada dirección de cada ruta
+    .populate({
+        path: "ruta.direccionDestinoId",
+        model: "Direccion",
+        select: "nombre"
+    })
+    // Poblar el vehículo asignado
+    .populate({
+        path: "vehiculoId",
+        model: "Vehiculo",
+        select: "patente marca"
+    })
+    // Poblar el chofer asignado
+    .populate({
+        path: "choferId",
+        model: "User",
+        select: "name"
+    })
+    // Poblar los items de carga y su jerarquía de catálogo
+    .populate({
+        path: "cargaItemIds",
+        model: "ItemCatalogo",
+        select: "subcategoriaCatalogoId codigo nombre",
+        populate: {
+            path: "subcategoriaCatalogoId",
+            model: "SubcategoriaCatalogo",
+            select: "cantidad unidad sinSifon nombreGas",
+            populate: {
+                path: "categoriaCatalogoId",
+                model: "CategoriaCatalogo",
+                select: "elemento esIndustrial esMedicinal"
+            }
+        }
+    })
+    .lean();
 
     return NextResponse.json({
         pedidos,
@@ -168,11 +232,14 @@ export async function POST(request) {
         // Check if the chofer already has a RutaDespacho in 'preparacion' state
         const rutaExistente = await RutaDespacho.findOne({
             choferId,
-            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
+            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lt: TIPO_ESTADO_RUTA_DESPACHO.en_ruta }
         }).lean();
 
         if (rutaExistente) {
-            console.log("---------->", rutaExistente, ventaId);
+            // Check if the ventaId is already in the existing RutaDespacho
+            if (rutaExistente.ventaIds && rutaExistente.ventaIds.includes(ventaId)) {
+                return NextResponse.json({ ok: false, error: "La venta ya fue previamente agregada a la ruta del chofer" }, { status: 400 });
+            }
             // Add the ventaId to the existing RutaDespacho
             await RutaDespacho.findByIdAndUpdate(
                 rutaExistente._id,

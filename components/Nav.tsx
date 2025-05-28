@@ -52,6 +52,7 @@ export default function Nav({ user }: { user: User | null}) {
                     </Link>
                     <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2"
                         onClick={() => { 
+                            setMenuActivo(false);
                             signOut({ redirect: false }).then(() => {
                                 router.push('/'); // Redirigir a la página de inicio después de cerrar sesión
                             });

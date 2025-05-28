@@ -13,6 +13,7 @@ import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
+import { path } from "d3";
 
 export async function GET() {
     try {
@@ -52,63 +53,42 @@ export async function GET() {
         console.log(`Fetching rutasDespacho for choferId: ${choferId}`);
         const rutaDespacho = await RutaDespacho.findOne({
             choferId: choferId,
-            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
-        }).lean();
+            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lte: TIPO_ESTADO_RUTA_DESPACHO.regreso }
+        }).populate({
+            path: "cargaItemIds",
+            model: "ItemCatalogo",
+            select: "_id codigo subcategoriaCatalogoId",
+            populate: {
+                path: "subcategoriaCatalogoId",
+                model: "SubcategoriaCatalogo",
+                select: "cantidad unidad nombreGas sinSifon",
+                populate: {
+                    path: "categoriaCatalogoId",
+                    model: "CategoriaCatalogo",
+                    select: "elemento esIndustrial esMedicinal"
+                }
+            }
+        }).populate({
+            path: "ventaIds",
+            model: "Venta",
+            select: "_id clienteId",
+            populate: {
+                path: "clienteId",
+                model: "Cliente",
+                select: "_id nombre",
+                populate: {
+                    path: "direccionId",
+                    model: "Direccion",
+                    select: "_id nombre latitud longitud",
+                }
+            }
+        })
+        .lean();
 
         console.log(`Fetching vehiculos for choferId: ${choferId}`);
         const vehiculos = await Vehiculo.find({
             choferIds: new mongoose.mongo.ObjectId(choferId)
         }).lean();
-
-        if (rutaDespacho) {
-            console.log(`RutasDespacho found. Fetching ventas for rutaDespacho ID: ${rutaDespacho._id}`);
-            const ventas = await Venta.find({ _id: { $in: rutaDespacho.ventaIds } })
-                .populate({
-                    path: "clienteId",
-                    select: "nombre rut direccionId",
-                    populate: {
-                        path: "direccionId",
-                        model: "Direccion",
-                        select: "nombre direccionOriginal comuna ciudad region"
-                    }
-                })
-                .select("createdAt itemCatalogoIds clienteId")
-                .lean();
-
-            for (const venta of ventas) {
-                console.log(`Fetching detalleVentas for venta ID: ${venta._id}`);
-                const detalleVentas = await DetalleVenta.find({ ventaId: venta._id })
-                    .populate({
-                        path: "subcategoriaCatalogoId",
-                        model: "SubcategoriaCatalogo",
-                        select: "nombre categoriaCatalogoId",
-                        populate: {
-                            path: "categoriaCatalogoId",
-                            model: "CategoriaCatalogo",
-                            select: "nombre"
-                        }
-                    })
-                    .lean();
-
-                venta.items = detalleVentas.map(detalle => ({
-                    nombre: `${detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${detalle.subcategoriaCatalogoId.nombre}`,
-                    cantidad: detalle.cantidad
-                }));
-            }
-
-            console.log("Mapping ventas to rutasDespacho.");
-            rutaDespacho.ventas = ventas.map(venta => ({
-                cliente: {
-                    nombre: venta.clienteId.nombre,
-                    rut: venta.clienteId.rut,
-                    direccion: venta.clienteId.direccionId
-                },
-                fecha: venta.createdAt,
-                items: venta.items
-            }));
-        } else {
-            console.log("No rutasDespacho found for the chofer.");
-        }
 
         console.log("Returning response with rutasDespacho, vehiculos");
         return NextResponse.json({ ok: true, rutaDespacho, vehiculos });
@@ -146,18 +126,16 @@ export async function POST(req) {
         console.log(`Fetching rutaDespacho for choferId: ${choferId}`);
         const rutaDespacho = await RutaDespacho.findOne({
             choferId: choferId,
-            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.carga] }
+            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada] }
         });
         
         if (!rutaDespacho) {
-            console.warn(`RutaDespacho not found or not in 'preparacion' or "carga' state for choferId: ${choferId}`);
+            console.warn(`RutaDespacho not found or not in "orden_confirmada' state for choferId: ${choferId}`);
             return NextResponse.json({ ok: true, rutaDespacho: null });
         }
 
         console.log(`Assigning choferId: ${choferId} to rutaDespacho ID: ${rutaDespacho._id}`);
         rutaDespacho.vehiculoId = vehiculoId;
-        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.carga;
-        console.log("SAVING", rutaDespacho);
         await rutaDespacho.save();
 
         console.log("Returning updated rutaDespacho.");

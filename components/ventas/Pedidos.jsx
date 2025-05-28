@@ -122,20 +122,7 @@ export default function Pedidos({ session }) {
     }, [itemsVenta, total]);
 
     return (
-        <main className="w-full h-screen pt-10 overflow-y-auto">
-            <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pt-4 mx-10 bg-white dark:bg-gray-900 mb-4">
-                <div className="flex items-center space-x-4 text-ship-cove-800">
-                    <Link href="/">
-                        <AiFillHome size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                    </Link>
-                    <IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300" />
-                    <Link href="/modulos">
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">PEDIDOS</span>
-                    </Link>
-                    <IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300" />
-                    <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">NUEVO PEDIDO</span>
-                </div>
-            </div>
+        <main className="w-full h-screen pt-14 overflow-y-auto">            
             <div className="w-full pb-12 pt-0">
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-8 space-y-6">
