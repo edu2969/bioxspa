@@ -62,7 +62,7 @@ export default function PreparacionDePedidos({ session }) {
         }
     }
 
-    const handleRemoveFirst = async (posted) => {
+    const handleRemoveFirst = async () => {
         if (animating) return; // Evita múltiples clics durante la animación
         setAnimating(true);
         setTimeout(() => {
@@ -216,7 +216,7 @@ export default function PreparacionDePedidos({ session }) {
                 inputElement.removeEventListener('textInput', handleTextInput);
             }
         };
-    }, [scanMode]);
+    }, [scanMode, cargarItem]);
 
     // Mantener el foco en el input oculto para capturar eventos
     useEffect(() => {
@@ -262,7 +262,7 @@ export default function PreparacionDePedidos({ session }) {
 
     // Mantén tu efecto existente para escuchar "update-pedidos"
     useEffect(() => {
-        socket.on("update-pedidos", (data) => {
+        socket.on("update-pedidos", () => {
             fetchCargamentos();
         });
 

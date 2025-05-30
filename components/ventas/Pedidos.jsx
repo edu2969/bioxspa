@@ -3,9 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { AiFillHome } from 'react-icons/ai';
-import { IoIosArrowForward } from 'react-icons/io';
 import { FaTrashAlt } from 'react-icons/fa';
 import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO } from '@/app/utils/constants';

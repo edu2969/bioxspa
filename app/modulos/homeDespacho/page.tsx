@@ -1,9 +1,0 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import HomeDespacho from "@/components/HomeDespacho";
-
-export default async function PedidosPage() {
-    const session = await getServerSession(authOptions);
-    
-    return <HomeDespacho session={session}/>;
-}

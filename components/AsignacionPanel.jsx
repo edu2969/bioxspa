@@ -1,10 +1,8 @@
 "use client";
 import Image from 'next/image';
 import Link from 'next/link';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { BsGeoAltFill } from 'react-icons/bs';
-import { AiFillHome } from 'react-icons/ai';
-import { IoIosArrowForward } from 'react-icons/io';
 import { MdDragIndicator } from 'react-icons/md';
 import { GoCopilot } from 'react-icons/go';
 import { useEffect, useState } from "react";
@@ -66,7 +64,7 @@ export default function AsignacionPanel({ session }) {
         return Object.values(resumen);
     };
 
-    async function fetchPedidos() {
+    const fetchPedidos = useCallback(async () {
         try {
             const response = await fetch("/api/pedidos/asignacion");
             if (!response.ok) {
@@ -86,11 +84,19 @@ export default function AsignacionPanel({ session }) {
         } catch (error) {
             console.error("Error fetching pedidos:", error);
         }
-    }
+    }, [setPedidos, setChoferes, setEnTransito, setLoadingPanel]);
 
     useEffect(() => {
         fetchPedidos();
-    }, []);
+
+        socket.on("update-pedidos", () => {
+            fetchPedidos();
+        });
+
+        return () => {
+            socket.off("update-pedidos");
+        };
+    }, [fetchPedidos]);
 
     useEffect(() => {
         console.log("Pedidos:", pedidos);
@@ -125,17 +131,6 @@ export default function AsignacionPanel({ session }) {
             socket.off("connect", handleReconnect);
         };
     }, [session]);
-
-    useEffect(() => {
-        socket.on("update-pedidos", (data) => {
-            fetchPedidos();
-        });
-
-        return () => {
-            socket.off("update-pedidos");
-        };
-    }, []);
-
 
     function calculateTubePosition(index) {
         console.log("index", index);
@@ -298,10 +293,15 @@ export default function AsignacionPanel({ session }) {
                             >
                                 <Image className="absolute top-4 left-0 ml-8" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
                                 <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
-                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => (
+                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
+                                        const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2", ];
+                                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
+                                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
+                                        return (
                                         <Image
                                             key={index}
-                                            src={`/ui/tanque_biox${(index == 0) ? '_verde' : (index == 1) ? '_azul' : ''}.png`}
+                                            src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
                                             alt={`tank_${index}`}
                                             width={14 * 2}
                                             height={78 * 2}
@@ -309,7 +309,7 @@ export default function AsignacionPanel({ session }) {
                                             style={calculateTubePosition(index)}
                                             priority={false}
                                         />
-                                    ))}
+                                    )})}
                                 </div>
                                 <Image className="absolute top-4 left-0 ml-8" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
                                 <div className="absolute ml-16 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>

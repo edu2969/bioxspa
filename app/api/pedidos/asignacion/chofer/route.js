@@ -6,14 +6,11 @@ import { connectMongoDB } from "@/lib/mongodb";
 import User from "@/models/user";
 import RutaDespacho from "@/models/rutaDespacho";
 import Vehiculo from "@/models/vehiculo";
-import Venta from "@/models/venta";
-import DetalleVenta from "@/models/detalleVenta";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import { path } from "d3";
 
 export async function GET() {
     try {

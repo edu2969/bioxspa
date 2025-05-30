@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import { TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CARGO } from "@/app/utils/constants";
 import { getNUCode } from "@/lib/nuConverter";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";

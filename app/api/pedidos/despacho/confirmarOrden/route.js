@@ -6,7 +6,7 @@ import RutaDespacho from "@/models/rutaDespacho";
 import Cargo from "@/models/cargo";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 
-export async function POST(req) {
+export async function POST() {
     try {
         console.log("[CONFIRMAR ORDEN] Iniciando proceso de confirmación de orden");
 

@@ -11,7 +11,6 @@ import { FaMapLocationDot, FaTruckArrowRight } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { set } from "lodash";
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -158,7 +157,7 @@ export default function Despacho({ session }) {
         } finally {
             setLoadingState(-1);
         }
-    }, [rutaDespacho, setRutaDespacho, setLoadingState]);
+    }, [rutaDespacho, setRutaDespacho, setLoadingState, session]);
 
     const handleIniciarViaje = useCallback(async () => {
         setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.en_ruta);
@@ -193,11 +192,11 @@ export default function Despacho({ session }) {
         } finally {
             setLoadingState(-1);
         }
-    });
+    }, [setRutaDespacho, setLoadingState, rutaDespacho, session]);
 
     useEffect(() => {
         fetchRutaAsignada();
-    }, []);
+    }, [fetchRutaAsignada]);
 
     useEffect(() => {
         // Verifica si hay sesión y el socket está conectado
