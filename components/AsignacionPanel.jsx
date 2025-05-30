@@ -64,7 +64,7 @@ export default function AsignacionPanel({ session }) {
         return Object.values(resumen);
     };
 
-    const fetchPedidos = useCallback(async () {
+    const fetchPedidos = useCallback(async () => {
         try {
             const response = await fetch("/api/pedidos/asignacion");
             if (!response.ok) {
