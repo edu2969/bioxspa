@@ -9,7 +9,6 @@ import Cargo from "@/models/cargo";
 import DetalleVenta from "@/models/detalleVenta";
 import RutaDespacho from "@/models/rutaDespacho";
 import Dependencia from "@/models/dependencia";
-import ItemCatalogo from "@/models/itemCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import User from "@/models/user";
@@ -72,7 +71,22 @@ export async function GET() {
 
         const choferIds = choferes.map((chofer) => chofer.userId._id);
         console.log("Fetching rutasDespacho for choferes...");
-        const rutasDespacho = await RutaDespacho.find({ choferId: { $in: choferIds } })
+        
+        // Create a query that handles both cases
+        const rutaQuery = { 
+            choferId: { $in: choferIds },
+            $or: [
+                // For routes in preparacion state, no additional conditions
+                { estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion },
+                // For routes in descarga state, check that direccionId matches dependenciaId
+                { 
+                    estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
+                    direccionId: dependenciaId 
+                }
+            ]
+        };
+        
+        const rutasDespacho = await RutaDespacho.find(rutaQuery)
             .populate("choferId vehiculoId ventaIds")
             .lean();
 
@@ -194,7 +208,7 @@ export async function POST(request) {
             estado: TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
             fecha: new Date()
         });
-
+        
         console.log("Updating item states...", ruta);
 
         await ruta.save();

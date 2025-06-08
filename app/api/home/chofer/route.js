@@ -21,7 +21,6 @@ export async function GET() {
         });
         return NextResponse.json({ ok: true, tienePedidos: unaRuta ? true : false });
     } catch (error) {
-        console.error("ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

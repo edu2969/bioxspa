@@ -1,46 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { MdCleaningServices, MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
-import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
+import { FaClipboardCheck, FaFlagCheckered, FaUndo } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
-import { FaMapLocationDot, FaTruckArrowRight } from "react-icons/fa6";
-import { BsFillGeoAltFill } from "react-icons/bs";
+import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckArrowRight } from "react-icons/fa6";
+import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { LuFlagOff } from "react-icons/lu";
+import { getNUCode } from "@/lib/nuConverter";
+import { TbHomeShare } from "react-icons/tb";
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
     const [vehiculos, setVehiculos] = useState([]);
     const [resumenCarga, setResumenCarga] = useState([]);
     const [loadingState, setLoadingState] = useState(-2);
+    const [scanMode, setScanMode] = useState(false);
+    const hiddenInputRef = useRef(null);
+    
+    function calculateTubePosition(index) {
+        const baseTop = 36;
+        const baseLeft = 66;
+        const scaleFactor = 1.5;
 
-    function calculateTubePosition(layerIndex, index) {
-        const scaleFactor = 1.5; // Factor de escala basado en el tamaño triplicado del camión
-        const baseTop = 18 * scaleFactor; // Escalar la posición inicial en el eje Y
-        const baseLeft = 22 * scaleFactor; // Escalar la posición inicial en el eje X
-        const verticalSpacing = -4.5 * scaleFactor; // Escalar el espaciado vertical entre tubos
-        const horizontalSpacing = 3 * scaleFactor; // Escalar el espaciado horizontal entre columnas
-        const perspectiveAngle = 55; // Ángulo de perspectiva en grados (sin cambios)
-        const rowGroupSpacing = 9 * scaleFactor; // Escalar el espaciado adicional entre grupos de filas
+        const verticalIncrement = 3;
 
-        // Conversión del ángulo de perspectiva a radianes
-        const angleInRadians = (perspectiveAngle * Math.PI) / 180;
+        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
 
-        // Cálculo de desplazamiento en perspectiva
-        const perspectiveOffset = layerIndex * Math.tan(angleInRadians) * scaleFactor;
+        return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
+    }
 
-        // Ajuste para separar los grupos de filas
-        const groupOffset = layerIndex >= 3 ? rowGroupSpacing : 0;
+    function calculateUploadTubePosition(index) {
+        const baseTop = 176;
+        const baseLeft = 156;
+        const scaleFactor = 1.5;
 
-        // Cálculo de las posiciones escaladas
-        const top = baseTop + index * verticalSpacing + perspectiveOffset;
-        const left = baseLeft + layerIndex * horizontalSpacing + perspectiveOffset + groupOffset;
+        const verticalIncrement = 3;
 
-        return { top, left, width: `${14 * scaleFactor}px`, height: `${78 * scaleFactor}px` }; // Escalar el tamaño de los tanques
+        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+
+        return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
     }
 
     // items corresponde a cargaItemIds del backend (ver route.js)
@@ -65,6 +71,7 @@ export default function Despacho({ session }) {
                     esMedicinal: sub.categoriaCatalogoId?.esMedicinal || false,
                     elemento: sub.categoriaCatalogoId?.elemento || "",
                     multiplicador: 1,
+                    restantes: 0
                 };
             } else {
                 resumen[key].multiplicador += 1;
@@ -73,6 +80,83 @@ export default function Despacho({ session }) {
 
         return Object.values(resumen);
     };
+
+    const handleScanMode = () => {
+        toast.info(`Modo escaneo ${scanMode ? "desactivado" : "activado"}`, {
+            position: "top-center",
+        });
+        setScanMode(!scanMode);
+    };
+
+    const getResumenDescarga = (rd) => {
+        // If no rutaDespacho or no items, return empty array
+        if (!rd || !Array.isArray(rd.cargaItemIds)) return [];
+
+        // Find the current destination from the route
+        if (!rd.ruta || rd.ruta.length === 0) return [];
+
+        // Get current route that hasn't been delivered yet (no fechaArribo)
+        const currentRoute = rd.ruta.find(r => !r.fechaArribo) || rd.ruta[rd.ruta.length - 1];
+
+        // Find which client corresponds to this destination
+        const currentClient = rd.ventaIds?.find(venta => {
+            const clientDestId = venta.clienteId.direccionId._id;
+            const routeDestId = typeof currentRoute.direccionDestinoId === 'object'
+                ? currentRoute.direccionDestinoId._id
+                : currentRoute.direccionDestinoId;
+
+            return clientDestId === routeDestId;
+        });
+
+        if (!currentClient) return [];
+
+        // Group items by subcategory and client
+        const itemsBySubcategory = {};
+
+        // First pass: count total items for each subcategory
+        rd.cargaItemIds.forEach((item) => {
+            const sub = item.subcategoriaCatalogoId;
+            if (!sub || !sub._id) return;
+
+            // Check if this item belongs to the current client's orders
+            const itemClientId = item.ventaId?.clienteId || currentClient.clienteId._id;
+            if (itemClientId !== currentClient.clienteId._id) return;
+
+            const key = sub._id;
+
+            if (!itemsBySubcategory[key]) {
+                itemsBySubcategory[key] = {
+                    subcategoriaCatalogoId: sub,
+                    cantidad: sub.cantidad,
+                    unidad: sub.unidad,
+                    sinSifon: sub.sinSifon,
+                    esIndustrial: sub.categoriaCatalogoId?.esIndustrial || false,
+                    esMedicinal: sub.categoriaCatalogoId?.esMedicinal || false,
+                    elemento: sub.categoriaCatalogoId?.elemento || "",
+                    multiplicador: 0,
+                    restantes: 0,
+                    clienteId: currentClient.clienteId._id,
+                    clienteNombre: currentClient.clienteId.nombre
+                };
+            }
+            
+            // Increment the total count (multiplicador)
+            itemsBySubcategory[key].multiplicador += 1;
+            
+            // If not marked as downloaded, increment the remaining count
+            if (!item.descargado) {
+                itemsBySubcategory[key].restantes += 1;
+            }
+        });
+
+        return Object.values(itemsBySubcategory);
+    };
+
+    const isCompleted = (rd) => {
+        const descarga = getResumenDescarga(rd);
+        if (descarga.length === 0) return false;
+        return descarga.every((item) => item.restantes <= 0);
+    }
 
     const vehiculoPorId = (id) => {
         if (id == null) return { patente: "", marca: "" };
@@ -99,7 +183,7 @@ export default function Despacho({ session }) {
                         direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionId
                     }];
                 }
-                setRutaDespacho({...rutaDespacho, ...nuevaRuta } );
+                setRutaDespacho({ ...rutaDespacho, ...nuevaRuta });
                 setLoadingState(-1);
             } else {
                 toast.error("No se pudo asignar el vehiculo");
@@ -116,8 +200,30 @@ export default function Despacho({ session }) {
             if (data.ok) {
                 console.log("Data result:", data);
                 setRutaDespacho(data.rutaDespacho);
-                if(data.rutaDespacho && data.rutaDespacho.cargaItemIds && data.rutaDespacho.cargaItemIds.length > 0) {
+                if (data.rutaDespacho && data.rutaDespacho.cargaItemIds && data.rutaDespacho.cargaItemIds.length > 0) {
                     setResumenCarga(getResumenCarga(data.rutaDespacho.cargaItemIds));
+                }
+                if (data.rutaDespacho && data.rutaDespacho.ruta && data.rutaDespacho.ruta.length > 0) {
+                    // Ensure each route has complete direccionDestinoId from the corresponding client
+                    const enrichedRuta = data.rutaDespacho.ruta.map(r => {
+                        // Try to find matching client from ventaIds
+                        const matchingVenta = data.rutaDespacho.ventaIds.find(venta =>
+                            venta.clienteId.direccionId._id === r.direccionDestinoId
+                        );
+
+                        console.log("Matching venta for ruta:", r, matchingVenta);
+
+                        // If found, use client's complete direccionId, otherwise keep original with fallback name
+                        return {
+                            ...r,
+                            direccionDestinoId: matchingVenta.clienteId.direccionId
+                        };
+                    });
+
+                    setRutaDespacho({
+                        ...data.rutaDespacho,
+                        ruta: enrichedRuta
+                    });
                 }
                 setVehiculos(data.vehiculos);
             } else {
@@ -194,6 +300,241 @@ export default function Despacho({ session }) {
         }
     }, [setRutaDespacho, setLoadingState, rutaDespacho, session]);
 
+    const handleHeLlegado = () => {
+        console.log("He llegado");
+        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga);
+    };
+
+    const handleConfirmarDestino = () => {
+        const postConfirmarDestino = async () => {
+            try {
+                setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga);
+                const response = await fetch("/api/pedidos/confirmarArribo", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        rutaId: rutaDespacho._id
+                    }),
+                });
+
+                const data = await response.json();
+                if (data.ok) {
+                    // Update the rutaDespacho state
+                    const now = new Date();
+                    const updatedRuta = [...rutaDespacho.ruta];
+                    const rutaIndex = updatedRuta.findIndex(r => r.fechaArribo === null);
+
+                    if (rutaIndex >= 0) {
+                        updatedRuta[rutaIndex].fechaArribo = now;
+                    }
+
+                    setRutaDespacho({
+                        ...rutaDespacho,
+                        estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
+                        ruta: updatedRuta
+                    });
+
+                    toast.success("Arribo confirmado correctamente");
+                    socket.emit("update-pedidos", {
+                        userId: session.user.id
+                    });
+                } else {
+                    toast.error(data.error || "Error al confirmar el arribo");
+                }
+            } catch (error) {
+                console.error("Error al confirmar el arribo:", error);
+                toast.error("Error de conexión al confirmar el arribo");
+            } finally {
+                setLoadingState(-1);
+            }
+        }
+        postConfirmarDestino();
+    }
+
+    const handleCrregirDestino = () => {
+        setRutaDespacho({
+            ...rutaDespacho,
+            estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
+            ruta: rutaDespacho.ruta.filter(r => r.fechaArribo)
+        });
+    }
+
+    const postDescarga = async () => {
+        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada);
+        if (!isCompleted(rutaDespacho)) {
+            console.log("Eeeeepa!");
+            return;
+        }
+
+        const response = await fetch("/api/pedidos/confirmarDescarga", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                rutaId: rutaDespacho._id
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            toast.error(`Error al guardar el cargamento: ${errorData.error}`, {
+                position: "top-center",
+            });
+        } else {
+            toast.success(`Descarga confirmado con éxito`, {
+                position: "top-center",
+            });
+            socket.emit("update-pedidos", {
+                userId: session.user.id
+            });
+            setRutaDespacho({
+                ...rutaDespacho,
+                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada,
+            });
+        }
+    }
+
+    const descargarItem = useCallback(async (codigo) => {
+        // Encontrar el item que corresponde al código escaneado
+        const itemIndex = rutaDespacho.cargaItemIds.findIndex(
+            cargaItem => cargaItem.codigo === codigo
+        );
+
+        if (itemIndex === -1) {
+            toast.error(`El código ${codigo} no corresponde a ningún item de esta entrega`, {
+                position: "top-center",
+            });
+            return;
+        }
+
+        // Verificar si el item ya ha sido descargado
+        if (rutaDespacho.cargaItemIds[itemIndex].descargado) {
+            toast.warn(`El item con código ${codigo} ya ha sido descargado`, {
+                position: "top-center",
+            });
+            return;
+        }
+
+        // Crear una copia profunda del rutaDespacho para modificarlo
+        const rutaDespachoActualizado = { 
+            ...rutaDespacho,
+            cargaItemIds: [...rutaDespacho.cargaItemIds]
+        };
+
+        // Marcar el item como descargado
+        rutaDespachoActualizado.cargaItemIds[itemIndex] = {
+            ...rutaDespachoActualizado.cargaItemIds[itemIndex],
+            descargado: true
+        };
+        setRutaDespacho(rutaDespachoActualizado);
+
+        toast.success(`Item ${codigo} descargado correctamente`, {
+            position: "top-center",
+        });
+
+        setLoadingState(-1);
+    }, [rutaDespacho, setRutaDespacho]);
+
+    const handleGoingBackToBase = async () => {
+        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.regreso);
+
+        const response = await fetch("/api/pedidos/volverABase", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                rutaId: rutaDespacho._id
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            toast.error(`Error al marcar el regreso: ${errorData.error}`, {
+                position: "top-center",
+            });
+        } else {
+            toast.success(`Regreso informado con éxito`, {
+                position: "top-center",
+            });
+            socket.emit("update-pedidos", {
+                userId: session.user.id
+            });
+            setRutaDespacho({
+                ...rutaDespacho,
+                estado: TIPO_ESTADO_RUTA_DESPACHO.regreso,
+            });
+            setLoadingState(-1);
+        }
+    }
+
+    const handleFinish = async () => {
+        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.terminado);
+        const response = await fetch("/api/pedidos/terminarRuta", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                rutaId: rutaDespacho._id
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            toast.error(`Error al terminar la ruta: ${errorData.error}`, {
+                position: "top-center",
+            });
+        } else {
+            toast.success(`Ruta terminada con éxito`, {
+                position: "top-center",
+            });
+            socket.emit("update-pedidos", {
+                userId: session.user.id
+            });
+            setRutaDespacho(null);
+            setLoadingState(-2);
+        }
+    }
+
+    useEffect(() => {
+        const handleTextInput = (e) => {            
+            if (scanMode) {
+                const codigo = e.data;
+                const scanItem = async () => {                    
+                    descargarItem(codigo);
+                }
+                scanItem();
+            }
+        }
+
+        const inputElement = hiddenInputRef.current;
+        if (inputElement) {
+            // textInput event (supported by some mobile browsers)
+            inputElement.addEventListener('textInput', handleTextInput);
+
+            inputElement.focus();
+        }
+
+        return () => {
+            if (inputElement) {
+                inputElement.removeEventListener('textInput', handleTextInput);
+            }
+        };
+    }, [scanMode, descargarItem]);
+
+    // Mantener el foco en el input oculto para capturar eventos
+    useEffect(() => {
+        if (!scanMode) return;
+        const keepFocus = setInterval(() => {
+            if (hiddenInputRef.current && document.activeElement !== hiddenInputRef.current) {
+                hiddenInputRef.current.focus();
+            }
+        }, 300);
+
+        return () => clearInterval(keepFocus);
+    }, [scanMode]);
+
     useEffect(() => {
         fetchRutaAsignada();
     }, [fetchRutaAsignada]);
@@ -251,7 +592,7 @@ export default function Despacho({ session }) {
                     ))}
                 </select>
             </div>}
-            <div className={`${loadingState == -2 || !rutaDespacho ? "opacity-20" : ""}`}>
+            <div className={`${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? "opacity-20" : ""}`}>
                 <Image
                     className="absolute top-6 left-8 ml-2"
                     src="/ui/camion.png"
@@ -262,22 +603,24 @@ export default function Despacho({ session }) {
                     priority
                 />
                 <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
-                    {Array.from({ length: 6 }).map((_, layerIndex) => (
-                        <div key={layerIndex} className="absolute flex" style={calculateTubePosition(layerIndex, 0)}>
-                            {Array.from({ length: 6 }).map((_, index) => (
-                                <Image
-                                    key={index}
-                                    src={`/ui/tanque_biox${(index + layerIndex * 6 > 40) ? '_verde' : (index + layerIndex * 6 > 20) ? '_azul' : ''}.png`}
-                                    alt={`tank_${layerIndex * 6 + index}`}
-                                    width={14 * 2}
-                                    height={78 * 2}
-                                    className="relative"
-                                    style={calculateTubePosition(layerIndex, index)}
-                                    priority={false}
-                                />
-                            ))}
-                        </div>
-                    ))}
+                    {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
+                        const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
+                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
+                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
+                        return (
+                            <Image
+                                key={index}
+                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                alt={`tank_${index}`}
+                                width={14 * 4}
+                                height={78 * 4}
+                                className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "opacity-30" : ""}`}
+                                style={calculateTubePosition(index)}
+                                priority={false}
+                            />
+                        )
+                    })}
                 </div>
                 <Image
                     className="absolute top-6 left-8 ml-2"
@@ -293,9 +636,29 @@ export default function Despacho({ session }) {
                         <p className="text-xs">{vehiculoPorId(rutaDespacho.vehiculoId).marca || ""}</p>
                     </div>
                 </div>}
+                {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
+                    {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
+                        const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
+                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
+                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
+                        return (
+                            <Image
+                                key={index}
+                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                alt={`tank_${index}`}
+                                width={14 * 3}
+                                height={78 * 3}
+                                className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "" : "opacity-40"}`}
+                                style={calculateUploadTubePosition(index)}
+                                priority={false}
+                            />
+                        )
+                    })}
+                </div>}
             </div>
 
-            {loadingState == -1 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">
+            {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">
 
 
                 {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion
@@ -358,22 +721,47 @@ export default function Despacho({ session }) {
                 </div>}
 
                 {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta
-                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
-                    && (<div className="text-center mt-4 mx-6">
-                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div><button
-                            className="w-full flex justify-center mt-6 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md mb-4 h-12">
+                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga)
+                    && (<div className="w-full text-center mt-4 mx-6">
+
+                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga && <div><button
+                            className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md mb-4 h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
+                            onClick={() => handleHeLlegado()}>
                             <FaFlagCheckered className="mt-1 mr-2" /><span>HE LLEGADO</span>
+                            {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga &&
+                                <div className="absolute -mt-1">
+                                    <Loader texto="" />
+                                </div>
+                            }
                         </button></div>}
 
-                        <div className="flex flex-row items-start justify-center gap-4 mb-6">
-                            {/* Columna 1: Iconos */}
+                        {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="w-full mb-4">
+                            <FaBuildingFlag size="9rem" className="text-green-500 mb-4 mx-auto" />
+                            <div>
+                                <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
+                                <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
+                                <span className="text-2xl">{rutaDespacho.ruta?.find(r => !r.fechaArribo).direccionDestinoId.nombre || "un destino"}</span>
+                            </div>
+                            <button
+                                className={`w-full flex justify-center mt-4 py-3 px-8 bg-gray-400 text-white font-bold rounded-lg shadow-md h-12`}
+                                onClick={handleCrregirDestino}>
+                                <LuFlagOff className="mt-1 mr-2" /><span>ES OTRO DESTINO</span>
+                            </button>
+                            <button
+                                className={`w-full flex justify-center mt-4 py-3 px-8 bg-green-400 text-white font-bold rounded-lg shadow-md h-12`}
+                                onClick={handleConfirmarDestino}>
+                                <FaBuildingFlag className="mt-1 mr-2" /><span>CONFIRMO</span>
+                            </button>
+                        </div>}
+
+                        {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="flex flex-row items-start justify-center gap-4 mb-6">
                             <div className="flex flex-col items-center mt-1 ml-2">
                                 <FaFlagCheckered className="text-xl mb-4" />
                                 <div className="h-4" />
                                 {/* Línea y puntos */}
                                 <FaTruckArrowRight className="text-xl mt-1" />
                             </div>
-                            {/* Columna 2: Camino vertical */}
                             <div className="flex flex-col items-center justify-start h-full">
                                 {/* Camino vertical */}
                                 <div className="flex flex-col items-center mt-1">
@@ -385,7 +773,6 @@ export default function Despacho({ session }) {
                                     <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
                                 </div>
                             </div>
-                            {/* Columna 3: Direcciones */}
                             <div className="flex flex-col justify-start text-left mt-1">
                                 <div className="flex mt-1">
                                     <BsFillGeoAltFill size="1.1rem" /><span className="text-sm ml-2">Barros Arana</span>
@@ -415,12 +802,16 @@ export default function Despacho({ session }) {
                                                 const selectedVentaId = e.target.value;
                                                 const selectedVenta = rutaDespacho.ventaIds.find((venta) => venta._id === selectedVentaId);
                                                 if (selectedVenta) {
-                                                    console.log("SETEADO", { ...rutaDespacho, ruta: [{
-                                                        direccionDestinoId: selectedVenta.clienteId.direccionId,
-                                                    }] }); 
-                                                    setRutaDespacho({ ...rutaDespacho, ruta: [{
-                                                        direccionDestinoId: selectedVenta.clienteId.direccionId,
-                                                    }] });
+                                                    console.log("SETEADO", {
+                                                        ...rutaDespacho, ruta: [{
+                                                            direccionDestinoId: selectedVenta.clienteId.direccionId,
+                                                        }]
+                                                    });
+                                                    setRutaDespacho({
+                                                        ...rutaDespacho, ruta: [{
+                                                            direccionDestinoId: selectedVenta.clienteId.direccionId,
+                                                        }]
+                                                    });
                                                 }
                                             }}
                                         >
@@ -433,21 +824,111 @@ export default function Despacho({ session }) {
                                         </select>
                                     </div>)}
                             </div>
-                        </div>
-
+                        </div>}
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && <div className="flex flex-row items-center justify-center">
                             <button className="flex w-full justify-center py-3 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4"
                                 onClick={handleIniciarViaje}>
-                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <Loader texto="INICIANDO VIAJE" /> : <div className="flex"><FaFlagCheckered className="mt-1 mr-3" /><span>INICIAR VIAJE</span></div>}
+                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <Loader texto=""/> : <div className="flex"><FaFlagCheckered className="mt-1 mr-3" /><span>INICIAR VIAJE</span></div>}
+                            </button>
+                        </div>}
+
+                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (
+                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">
+                                {getResumenDescarga(rutaDespacho).map((item, idx) => (
+                                    <li
+                                        key={`item_${idx}`}
+                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${idx === 0 ? 'rounded-t-lg' : idx === getResumenDescarga(rutaDespacho).length - 1 ? 'rounded-b-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                    >
+                                        <div className="w-full flex items-left">
+                                            <div className="flex">
+                                                <div>
+                                                    <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
+                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                                </div>
+                                                <div className="font-bold text-xl ml-2">
+                                                    <span>
+                                                        {(() => {
+                                                            const elem = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                                            let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
+                                                            if (!match) {
+                                                                match = [null, (elem ?? item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.split(" ")[0]), ''];
+                                                            }
+                                                            const [, p1, p2] = match;
+                                                            return (
+                                                                <>
+                                                                    {p1 ? p1.toUpperCase() : ''}
+                                                                    {p2 ? <small>{p2}</small> : ''}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-2xl orbitron ml-2"><b>{item.subcategoriaCatalogoId.cantidad}</b> <small>{item.subcategoriaCatalogoId.unidad}</small></p>
+                                        </div>
+                                        <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{item.multiplicador - item.restantes} <small>/</small> {item.multiplicador}</div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
+                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute bottom-3 flex w-full pr-8">
+                            <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted(rutaDespacho)) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
+                                onClick={() => {
+                                    handleScanMode();
+                                }}>
+                                <BsQrCodeScan className="text-4xl" />
+                                {scanMode && !isCompleted() && <div className="absolute top-2 left-2">
+                                    <Loader texto="" />
+                                </div>}
+                            </button>
+                            <button className={`w-full ml-16 mr-4 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted(rutaDespacho) ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+                                disabled={!isCompleted(rutaDespacho)}                            
+                                onClick={postDescarga}>
+                                <FaRoadCircleCheck className="text-4xl pb-0" />
+                                <p className="ml-2 mt-1 text-lg">FIN DESCARGA</p>
+                                {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && 
+                                    <div className="absolute mt-1"><Loader texto="" /></div>}
                             </button>
                         </div>}
                     </div>
-                    )}                 
+                    )}
 
-                
+
+                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && <div className="w-full px-6 mb-4 bg-white mx-auto">
+                    <button
+                        className={`w-full flex justify-center mt-4 py-3 bg-green-400 text-white font-bold rounded-lg shadow-md h-12`}
+                        onClick={handleGoingBackToBase}>
+                        <TbHomeShare className="text-2xl mt-0 mr-2" /><span>REGRESO A BASE</span>
+                    </button>
+                    <button
+                        className={`w-full flex justify-center mt-4 py-3 bg-red-400 text-white font-bold rounded-lg shadow-md h-12`}
+                        onClick={() => {
+                            setRutaDespacho({
+                                ...rutaDespacho,
+                                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
+                            })
+                        }}>
+                        <FaUndo className="mt-1 mr-2" /><span>ME FALTA CARGA</span>
+                    </button>
+                </div>}
+
             </div>}
-            
+
+            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
+                <button
+                    className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
+                    onClick={() => handleFinish()}>
+                    <FaHouseFlag className="mt-1 mr-2" /><span>HE REGRESADO</span>
+                    {loadingState == TIPO_ESTADO_RUTA_DESPACHO.terminado &&
+                        <div className="absolute -mt-1">
+                            <Loader texto="" />
+                        </div>
+                    }
+                </button>
+            </div>}
 
             {loadingState == -1 && !rutaDespacho && (
                 <div className="w-full py-6 px-12 mt-64 bg-white mx-auto">
@@ -456,8 +937,17 @@ export default function Despacho({ session }) {
                     <p className="text-center uppercase font-xl">No tienes pedidos asignados</p>
                 </div>
             )}
+
             {loadingState == -2 && <div className="fixed w-full top-72 mt-16"><Loader texto="CARGANDO TUS PEDIDOS..." /></div>}
+
             <ToastContainer />
+
+            <input
+                ref={hiddenInputRef}
+                type="text"
+                className="opacity-0 h-0 w-0 absolute"
+                inputMode="none"
+            />
         </div>
     );
 }

@@ -42,8 +42,7 @@ async function GET(request) {
             subcategoria: subcategoria || null,
         });
     }
-    catch (error) {
-        console.error("Error fetching ItemCatalogo:", error);
+    catch (_a) {
         return server_1.NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
 }

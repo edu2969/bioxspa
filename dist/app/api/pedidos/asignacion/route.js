@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GET = GET;
 exports.POST = POST;
+const mongoose_1 = __importDefault(require("mongoose"));
 const mongodb_1 = require("@/lib/mongodb");
 const server_1 = require("next/server");
 const user_1 = __importDefault(require("@/models/user"));
@@ -16,12 +17,28 @@ const subcategoriaCatalogo_1 = __importDefault(require("@/models/subcategoriaCat
 const constants_1 = require("@/app/utils/constants");
 const detalleVenta_1 = __importDefault(require("@/models/detalleVenta"));
 const direccion_1 = __importDefault(require("@/models/direccion"));
+const itemCatalogo_1 = __importDefault(require("@/models/itemCatalogo"));
 const venta_1 = __importDefault(require("@/models/venta"));
 const rutaDespacho_1 = __importDefault(require("@/models/rutaDespacho"));
 async function GET() {
     console.log("Connecting to MongoDB...");
     await (0, mongodb_1.connectMongoDB)();
     console.log("Connected to MongoDB");
+    if (!mongoose_1.default.models.ItemCatalogo) {
+        mongoose_1.default.model("ItemCatalogo", itemCatalogo_1.default.schema);
+    }
+    if (!mongoose_1.default.models.Direccion) {
+        mongoose_1.default.model("Direccion", direccion_1.default.schema);
+    }
+    if (!mongoose_1.default.models.CategoriaCatalogo) {
+        mongoose_1.default.model("CategoriaCatalogo", categoriaCatalogo_1.default.schema);
+    }
+    if (!mongoose_1.default.models.SubcategoriaCatalogo) {
+        mongoose_1.default.model("SubcategoriaCatalogo", subcategoriaCatalogo_1.default.schema);
+    }
+    if (!mongoose_1.default.models.Vehiculo) {
+        mongoose_1.default.model("Vehiculo", vehiculo_1.default.schema);
+    }
     console.log("Fetching ventas in 'borrador' state...");
     const ventas = await venta_1.default.find({ estado: constants_1.TIPO_ESTADO_VENTA.borrador }).lean();
     console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
@@ -51,13 +68,29 @@ async function GET() {
             createdAt: venta.createdAt,
         };
     }));
-    const cargosChoferes = await cargo_1.default.find({ tipo: constants_1.TIPO_CARGO.conductor }).lean();
+    const choferesEnRuta = await rutaDespacho_1.default.find({
+        estado: {
+            $gte: constants_1.TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
+            $lt: constants_1.TIPO_ESTADO_RUTA_DESPACHO.terminado
+        }
+    }).lean();
+    const choferesIds = choferesEnRuta.map((ruta) => ruta.choferId);
+    let qry = {
+        tipo: constants_1.TIPO_CARGO.conductor
+    };
+    if (choferesIds.length > 0) {
+        qry.userId = { $nin: choferesIds };
+    }
+    const cargosChoferes = await cargo_1.default.find(qry).lean();
     const choferes = await Promise.all(cargosChoferes.map(async (cargo) => {
         const user = await user_1.default.findById(cargo.userId).lean();
         // Find the rutaDespacho where the user is the chofer
         const rutaDespacho = await rutaDespacho_1.default.findOne({
             choferId: user._id,
-            estado: { $in: [constants_1.TIPO_ESTADO_RUTA_DESPACHO.preparacion, constants_1.TIPO_ESTADO_RUTA_DESPACHO.carga] }
+            estado: {
+                $gte: constants_1.TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                $lt: constants_1.TIPO_ESTADO_RUTA_DESPACHO.en_ruta
+            }
         }).lean();
         let pedidos = [];
         if (rutaDespacho) {
@@ -90,11 +123,48 @@ async function GET() {
             pedidos,
         };
     }));
-    const vehiculosEnTransito = await vehiculo_1.default.find({ direccionDestinoId: { $ne: null } }).lean();
-    const flotaEnTransito = await Promise.all(vehiculosEnTransito.map(async (vehiculo) => {
-        const direccionDestino = await direccion_1.default.findById(vehiculo.direccionDestinoId).lean();
-        return Object.assign(Object.assign({}, vehiculo), { direccionDestinoNombre: (direccionDestino === null || direccionDestino === void 0 ? void 0 : direccionDestino.nombre) || "Desconocida" });
-    }));
+    const flotaEnTransito = await rutaDespacho_1.default.find({
+        estado: {
+            $gte: constants_1.TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
+            $lt: constants_1.TIPO_ESTADO_RUTA_DESPACHO.terminado
+        }
+    })
+        .select("ruta vehiculoId choferId cargaItemIds estado")
+        // Poblar cada dirección de cada ruta
+        .populate({
+        path: "ruta.direccionDestinoId",
+        model: "Direccion",
+        select: "nombre"
+    })
+        // Poblar el vehículo asignado
+        .populate({
+        path: "vehiculoId",
+        model: "Vehiculo",
+        select: "patente marca"
+    })
+        // Poblar el chofer asignado
+        .populate({
+        path: "choferId",
+        model: "User",
+        select: "name"
+    })
+        // Poblar los items de carga y su jerarquía de catálogo
+        .populate({
+        path: "cargaItemIds",
+        model: "ItemCatalogo",
+        select: "subcategoriaCatalogoId codigo nombre",
+        populate: {
+            path: "subcategoriaCatalogoId",
+            model: "SubcategoriaCatalogo",
+            select: "cantidad unidad sinSifon nombreGas",
+            populate: {
+                path: "categoriaCatalogoId",
+                model: "CategoriaCatalogo",
+                select: "elemento esIndustrial esMedicinal"
+            }
+        }
+    })
+        .lean();
     return server_1.NextResponse.json({
         pedidos,
         choferes,
@@ -126,10 +196,13 @@ async function POST(request) {
         // Check if the chofer already has a RutaDespacho in 'preparacion' state
         const rutaExistente = await rutaDespacho_1.default.findOne({
             choferId,
-            estado: { $in: [constants_1.TIPO_ESTADO_RUTA_DESPACHO.preparacion, constants_1.TIPO_ESTADO_RUTA_DESPACHO.carga] }
+            estado: { $gte: constants_1.TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lt: constants_1.TIPO_ESTADO_RUTA_DESPACHO.en_ruta }
         }).lean();
         if (rutaExistente) {
-            console.log("---------->", rutaExistente, ventaId);
+            // Check if the ventaId is already in the existing RutaDespacho
+            if (rutaExistente.ventaIds && rutaExistente.ventaIds.includes(ventaId)) {
+                return server_1.NextResponse.json({ ok: false, error: "La venta ya fue previamente agregada a la ruta del chofer" }, { status: 400 });
+            }
             // Add the ventaId to the existing RutaDespacho
             await rutaDespacho_1.default.findByIdAndUpdate(rutaExistente._id, { $addToSet: { ventaIds: ventaId } } // Ensure ventaId is not duplicated
             );

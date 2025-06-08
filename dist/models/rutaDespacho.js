@@ -36,21 +36,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const rutaSchema = new mongoose_1.Schema({
     direccionDestinoId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "Direccion" },
-    fechaArribo: { type: Date, default: null },
-});
+    fechaArribo: { type: Date, default: null }
+}, { _id: false });
 const estadoHistorialSchema = new mongoose_1.Schema({
     estado: { type: Number, required: true },
     fecha: { type: Date, required: true }
-});
+}, { _id: false });
 const checklistSchema = new mongoose_1.Schema({
     tarea: { type: Number, required: true },
     fecha: { type: Date, required: true }
-});
+}, { _id: false });
 const cargaHistorialSchema = new mongoose_1.Schema({
     esCarga: { type: Boolean, required: true },
     fecha: { type: Date, required: true },
     itemMovidoIds: [{ type: mongoose_1.default.Schema.Types.ObjectId, ref: "ItemCatalogoId" }]
-});
+}, { _id: false });
 const rutaDespachoSchema = new mongoose_1.Schema({
     vehiculoId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "Vehiculo" },
     choferId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "User", required: true },
@@ -62,7 +62,7 @@ const rutaDespachoSchema = new mongoose_1.Schema({
     historialEstado: [estadoHistorialSchema],
     checklist: [checklistSchema],
     ventaIds: [{ type: mongoose_1.default.Schema.Types.ObjectId, ref: "Venta" }],
-    cargaItemIds: [{ type: mongoose_1.default.Schema.Types.ObjectId, ref: "ItemCatalogoId" }],
+    cargaItemIds: [{ type: mongoose_1.default.Schema.Types.ObjectId, ref: "ItemCatalogo" }],
     hitorialCarga: [cargaHistorialSchema],
 }, {
     timestamps: true

@@ -14,6 +14,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import { FaCartPlus } from 'react-icons/fa';
+import { TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
@@ -136,12 +137,18 @@ export default function AsignacionPanel({ session }) {
         console.log("index", index);
         const baseTop = 36;
         const baseLeft = 42;
-
         const verticalIncrement = 3;
-
         const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
         const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+        return { top, left, width: '14px', height: '78px' };
+    }
 
+    function calculateUploadTubePosition(index) {
+        const baseTop = 76;
+        const baseLeft = 156;        
+        const verticalIncrement = 3;
+        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
         return { top, left, width: '14px', height: '78px' };
     }
 
@@ -293,51 +300,78 @@ export default function AsignacionPanel({ session }) {
                             >
                                 <Image className="absolute top-4 left-0 ml-8" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
                                 <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
-                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
+                                    {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
                                         const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2", ];
+                                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
                                         const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
                                         const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
                                         return (
-                                        <Image
-                                            key={index}
-                                            src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
-                                            alt={`tank_${index}`}
-                                            width={14 * 2}
-                                            height={78 * 2}
-                                            className="absolute"
-                                            style={calculateTubePosition(index)}
-                                            priority={false}
-                                        />
-                                    )})}
+                                            <Image
+                                                key={index}
+                                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                                alt={`tank_${index}`}
+                                                width={14 * 2}
+                                                height={78 * 2}
+                                                className={`absolute ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga ? "" : "opacity-20"}`}
+                                                style={calculateTubePosition(index)}
+                                                priority={false}
+                                            />
+                                        )
+                                    })}
                                 </div>
                                 <Image className="absolute top-4 left-0 ml-8" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
                                 <div className="absolute ml-16 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>
                                     <div className="ml-4 text-slate-800">
                                         <p className="text-xl font-bold">{ruta.vehiculoId.patente}</p>
                                         <p className="text-xs">{ruta.vehiculoId.marca}</p>
-                                        <div className="flex items-center mb-2">
-                                            <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                                            <span className="text-xs font-semibold text-green-700">En ruta</span>
+                                        <div className={`flex items-center mb-2 ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'text-green-700' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'text-orange-500' : 'text-gray-500'}`}>
+                                            {ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>}
+                                            {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
+                                                || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>}
+                                            {ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>}
+                                            <span className="text-xs font-semibold">{ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'EN RUTA'
+                                                : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'DESCARGA' 
+                                                : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESO' : 'OTRO'}</span>
                                         </div>
                                     </div>
                                 </div>
+                                {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
+                                    || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
+                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
+                                        const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
+                                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
+                                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
+                                        return (
+                                            <Image
+                                                key={index}
+                                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                                alt={`tank_${index}`}
+                                                width={14 * 3}
+                                                height={78 * 3}
+                                                className={`absolute ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? "" : "opacity-40"}`}
+                                                style={calculateUploadTubePosition(index)}
+                                                priority={false}
+                                            />
+                                        )
+                                    })}
+                                </div>}
                                 <div className="absolute bottom-4 flex items-center ml-4">
                                     <BsGeoAltFill size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                                    <p className="text-xs text-gray-500 ml-2">{ruta.ruta.find(r => !r.fechaArribo).direccionDestinoId.nombre}</p>
+                                    <p className="text-xs text-gray-500 ml-2">{ruta.ruta[ruta.ruta.length - 1].direccionDestinoId.nombre || '??'}</p>
                                 </div>
                                 <div className="ml-72">
                                     <p className="text-xs">Conductor</p>
                                     <p className="text-lg uppercase font-bold -mt-1 mb-2">{ruta.choferId.name}</p>
                                     <div></div>
                                     <div className="flex flex-wrap">
-                                        {ruta.resumenCarga?.map((item, idx) => (
+                                        {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso ? ruta.resumenCarga?.map((item, idx) => (
                                             <div key={idx} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1">
                                                 <b>{item.multiplicador}</b>x {item.elemento.toUpperCase()} {item.cantidad}{item.unidad}
                                                 {item.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
                                                 {item.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
                                             </div>
-                                        ))}
+                                        )) : (<div className="text-gray-500 text-xs">REGRESANDO</div>)}
                                     </div>
                                 </div>
                             </div>

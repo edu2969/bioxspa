@@ -61,12 +61,20 @@ exports.TIPO_ESTADO_VENTA = {
 };
 exports.TIPO_ESTADO_RUTA_DESPACHO = {
     preparacion: 0,
-    carga: 1,
-    en_ruta: 2,
-    panel: 4,
+    orden_cargada: 1,
+    orden_confirmada: 2,
+    checklist_vehiculo: 3,
+    seleccion_destino: 4,
+    en_ruta: 5,
     descarga: 8,
+    descarga_confirmada: 9,
+    carga: 10,
+    carga_confirmada: 11,
     regreso: 16,
+    regreso_confirmado: 17,
     terminado: 32,
+    cancelado: 33,
+    a_reasignar: 34,
     anulado: 64
 };
 exports.TIPO_CATEGORIA_CATALOGO = {

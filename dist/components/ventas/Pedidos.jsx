@@ -8,9 +8,6 @@ exports.default = Pedidos;
 const react_1 = require("react");
 const react_hook_form_1 = require("react-hook-form");
 const navigation_1 = require("next/navigation");
-const link_1 = __importDefault(require("next/link"));
-const ai_1 = require("react-icons/ai");
-const io_1 = require("react-icons/io");
 const fa_1 = require("react-icons/fa");
 const idetificationDocument_1 = __importDefault(require("@/app/utils/idetificationDocument"));
 const constants_1 = require("@/app/utils/constants");
@@ -117,20 +114,7 @@ function Pedidos({ session }) {
         }, 0);
         setTotal(newTotal);
     }, [itemsVenta, total]);
-    return (<main className="w-full h-screen pt-10 overflow-y-auto">
-            <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pt-4 mx-10 bg-white dark:bg-gray-900 mb-4">
-                <div className="flex items-center space-x-4 text-ship-cove-800">
-                    <link_1.default href="/">
-                        <ai_1.AiFillHome size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2"/>
-                    </link_1.default>
-                    <io_1.IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300"/>
-                    <link_1.default href="/modulos">
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">PEDIDOS</span>
-                    </link_1.default>
-                    <io_1.IoIosArrowForward size="1.25rem" className="text-gray-700 dark:text-gray-300"/>
-                    <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">NUEVO PEDIDO</span>
-                </div>
-            </div>
+    return (<main className="w-full h-screen pt-14 overflow-y-auto">            
             <div className="w-full pb-12 pt-0">
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-8 space-y-6">

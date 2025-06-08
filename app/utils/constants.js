@@ -77,6 +77,7 @@ export const TIPO_ESTADO_RUTA_DESPACHO = {
     carga: 10,
     carga_confirmada: 11,
     regreso: 16,
+    regreso_confirmado: 17,
     terminado: 32,
     cancelado: 33,
     a_reasignar: 34,

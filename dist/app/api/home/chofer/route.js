@@ -26,7 +26,6 @@ async function GET() {
         return server_1.NextResponse.json({ ok: true, tienePedidos: unaRuta ? true : false });
     }
     catch (error) {
-        console.error("ERROR!", error);
         return server_1.NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

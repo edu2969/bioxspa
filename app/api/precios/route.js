@@ -2,6 +2,7 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Precio from "@/models/precio";
 import Cliente from "@/models/cliente";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
@@ -14,21 +15,18 @@ export async function GET() {
 
     console.log("Mapping clients with precios...");
     const clientsWithPrecios = await Promise.all(clients.map(async client => {
-        const precios = await Precio.find({ clienteId: client._id }).sort({ fechaDesde: -1 }).lean();
-
-        const preciosWithDetails = precios.map(precio => ({
-            valor: precio.valor,
-            moneda: precio.moneda,
-            fechaDesde: precio.fechaDesde,
-            fechaHasta: precio.fechaHasta,
-            valorBruto: precio.valorBruto,
-            impuesto: precio.impuesto,
-            historial: precio.historial,
-            subcategoriaCatalogoId: precio.subcategoriaCatalogoId,
-            dependenciaId: precio.dependenciaId,
-            sucursalId: precio.sucursalId
+        const precios = await Precio.find({ clienteId: client._id }).sort({ createdAt: -1 }).lean();
+        const preciosWithDetails = await Promise.all(precios.map(async precio => {
+            // Asegúrate de importar el modelo SubcategoriaCatalogo arriba:
+            // import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+            const subcategoria = await SubcategoriaCatalogo.findById(precio.subcategoriaCatalogoId).lean();
+            return {
+                valor: precio.valor,
+                fechaDesde: precio.fechaDesde,
+                subcategoriaCatalogoId: precio.subcategoriaCatalogoId,
+                categoriaId: subcategoria ? subcategoria.categoriaCatalogoId : null
+            };
         }));
-
         return { 
             cliente: { 
                 nombre: client.nombre, 
@@ -44,32 +42,73 @@ export async function GET() {
 }
 
 export async function POST(req) {
-    const body = await req.json();
+    console.log("Connecting to MongoDB...");
     await connectMongoDB();
+    console.log("Connected to MongoDB");
 
-    const precioData = {
-        itemCatalogoId: body.itemCatalogoId,
-        usuarioId: body.usuarioId,
-        dependenciaId: body.dependenciaId || null,
-        sucursalId: body.sucursalId || null,
-        valorBruto: body.valorBruto,
-        impuesto: body.impuesto,
-        moneda: body.moneda,
-        valor: body.valor,
-        fechaDesde: new Date(body.fechaDesde),
-        fechaHasta: body.fechaHasta ? new Date(body.fechaHasta) : null,
-        historial: body.historial || []
-    };
+    const body = await req.json();
+    console.log("Received body:", body);
 
-    const precioUpdated = await Precio.findOneAndUpdate(
-        { usuarioId: body.usuarioId, itemCatalogoId: body.itemCatalogoId },
-        precioData,
-        { new: true, upsert: true }
-    );
+    // Extraer datos del payload
+    const {
+        precioId,
+        subcategoriaCatalogoId,
+        valor,
+        clienteId
+    } = body;
 
-    if (!precioUpdated) {
-        return NextResponse.json({ error: "Error updating precio" }, { status: 404 });
+    // Validación básica
+    if (!subcategoriaCatalogoId || !clienteId) {
+        console.warn("Missing subcategoriaCatalogoId or clienteId");
+        return NextResponse.json({ error: "subcategoriaCatalogoId y clienteId son requeridos" }, { status: 400 });
     }
 
-    return NextResponse.json(precioUpdated);
+    // Buscar si existe el precio (por _id si es update, o por clienteId+subcategoriaCatalogoId si es nuevo)
+    let precio;
+    if (precioId) {
+        console.log(`Looking for Precio by precioId: ${precioId}`);
+        precio = await Precio.findById(precioId);
+    } else {        
+        console.log(`Looking for Precio by clienteId: ${clienteId} and subcategoriaCatalogoId: ${subcategoriaCatalogoId}`);
+        precio = await Precio.findOne({ clienteId, subcategoriaCatalogoId });
+        if(precio) {
+            console.warn("Precio already exists for this clienteId and subcategoriaCatalogoId, updating instead of creating a new one");
+            return NextResponse.json({ error: "Ya existe un precio para este cliente y subcategoría" });
+        }
+    }
+
+    if (precio) {
+        console.log("Precio found, updating historial and fields");
+        // Actualizar historial
+        if (!Array.isArray(precio.historial)) precio.historial = [];
+        const valorAnterior = precio.valor || 0;
+        const varianza = valorAnterior !== 0 ? ((valor - valorAnterior) / valorAnterior) * 100 : 0;
+        precio.historial.push({
+            valor: valorAnterior,
+            fecha: precio.fechaDesde,
+            varianza
+        });
+
+        // Actualizar campos
+        precio.categoriaId = categoriaId;
+        precio.subcategoriaCatalogoId = subcategoriaCatalogoId;
+        precio.valor = valor;
+        precio.clienteId = clienteId;
+        precio.fechaDesde = new Date();
+        await precio.save();
+        console.log("Precio updated:", precio);
+        return NextResponse.json({ ok: true, precio });
+    } else {
+        console.log("Precio not found, creating new Precio");
+        // Crear nuevo precio
+        const nuevoPrecio = await Precio.create({
+            clienteId,
+            subcategoriaCatalogoId,
+            valor,
+            fechaDesde: new Date(),
+            historial: [],
+        });
+        console.log("Nuevo Precio created:", nuevoPrecio);
+        return NextResponse.json({ ok: true, precio: nuevoPrecio });
+    }
 }

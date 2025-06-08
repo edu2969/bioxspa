@@ -42,7 +42,6 @@ async function GET(req) {
         return server_1.NextResponse.json({ ok: true, results });
     }
     catch (error) {
-        console.log("ERROR!", error);
         return server_1.NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

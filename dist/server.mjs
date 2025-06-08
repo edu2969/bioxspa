@@ -26,6 +26,6 @@ app.prepare().then(() => {
         });
     });
     httpServer.listen(port, () => {
-        console.log(`Server is running on http://${hostname}:${port}`);
+        console.log(`SOCKET-IO: ServeR is running on http://${hostname}:${port}`);
     });
 });

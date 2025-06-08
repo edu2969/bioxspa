@@ -11,6 +11,8 @@ import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
+import ItemCatalogo from "@/models/itemCatalogo";
+import Venta from "@/models/venta";
 
 export async function GET() {
     try {
@@ -29,6 +31,12 @@ export async function GET() {
         }
         if (!mongoose.models.CategoriaCatalogo) {
             mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
+        }        
+        if (!mongoose.models.ItemCatalogo) {
+            mongoose.model("ItemCatalogo", ItemCatalogo.schema);
+        }
+        if (!mongoose.models.Venta) {
+            mongoose.model("Venta", Venta.schema);
         }
 
         console.log("Fetching server session...");
@@ -50,7 +58,7 @@ export async function GET() {
         console.log(`Fetching rutasDespacho for choferId: ${choferId}`);
         const rutaDespacho = await RutaDespacho.findOne({
             choferId: choferId,
-            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lte: TIPO_ESTADO_RUTA_DESPACHO.regreso }
+            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
         }).populate({
             path: "cargaItemIds",
             model: "ItemCatalogo",

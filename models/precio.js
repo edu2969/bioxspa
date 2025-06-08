@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const HistorialSchema = new mongoose.Schema({
     valor: { type: Number, required: true },
-    fechaDesde: { type: Date, required: true },
+    fecha: { type: Date, required: true },
     varianza: { type: Number, required: true }
 }, { _id: false });
 
@@ -15,9 +15,8 @@ const PrecioSchema = new mongoose.Schema({
     impuesto: { type: Number, required: true },
     moneda: { type: String, required: true },
     valor: { type: Number, required: true },
-    fechaDesde: { type: Date, required: true },
-    fechaHasta: { type: Date },
-    historial: [HistorialSchema]
+    historial: [HistorialSchema],
+    fechaDesde: { type: Date, default: Date.now },
 }, { timestamps: true });
 
 const Precio = mongoose.models.Precio || mongoose.model('Precio', PrecioSchema);

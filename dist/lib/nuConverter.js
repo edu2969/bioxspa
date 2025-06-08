@@ -25,6 +25,9 @@ exports.GasToNuMap = {
     "cargal": "NU012",
 };
 function getNUCode(gas) {
+    if (!gas) {
+        return "NU???";
+    }
     const normalizedGas = gas.toLowerCase().trim();
     return exports.GasToNuMap[normalizedGas] || null;
 }

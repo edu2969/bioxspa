@@ -3,31 +3,23 @@ import mongoose, { Schema, models } from "mongoose";
 const rutaSchema = new Schema({
     direccionDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     fechaArribo: { type: Date, default: null }
-}, {
-    _id: false
-});
+}, { _id: false });
 
 const estadoHistorialSchema = new Schema({
     estado: { type: Number, required: true },
     fecha: { type: Date, required: true }
-}, {
-    _id: false
-});
+}, { _id: false });
 
 const checklistSchema = new Schema({
     tarea: { type: Number, required: true },
     fecha: { type: Date, required: true }
-}, {
-    _id: false
-});
+}, { _id: false });
 
 const cargaHistorialSchema = new Schema({
     esCarga: { type: Boolean, required: true },
     fecha: { type: Date, required: true },
     itemMovidoIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "ItemCatalogoId" }]
-}, {
-    _id: false
-});
+}, { _id: false });
 
 const rutaDespachoSchema = new Schema({
     vehiculoId: { type: mongoose.Schema.Types.ObjectId, ref: "Vehiculo" },

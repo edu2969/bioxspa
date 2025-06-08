@@ -26,8 +26,7 @@ async function GET(req) {
         console.log("Successfully fetched documentos tributarios");
         return server_1.NextResponse.json({ documentosTributarios });
     }
-    catch (error) {
-        console.error("Error fetching documentos tributarios:", error);
+    catch (_a) {
         return server_1.NextResponse.json({ error: "Error fetching documentos tributarios" }, { status: 500 });
     }
 }

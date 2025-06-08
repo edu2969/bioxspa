@@ -16,12 +16,12 @@ const cargo_1 = __importDefault(require("@/models/cargo"));
 const detalleVenta_1 = __importDefault(require("@/models/detalleVenta"));
 const rutaDespacho_1 = __importDefault(require("@/models/rutaDespacho"));
 const dependencia_1 = __importDefault(require("@/models/dependencia"));
-const itemCatalogo_1 = __importDefault(require("@/models/itemCatalogo"));
 const categoriaCatalogo_1 = __importDefault(require("@/models/categoriaCatalogo"));
 const subcategoriaCatalogo_1 = __importDefault(require("@/models/subcategoriaCatalogo"));
 const user_1 = __importDefault(require("@/models/user"));
 const vehiculo_1 = __importDefault(require("@/models/vehiculo"));
 const venta_1 = __importDefault(require("@/models/venta"));
+const constants_2 = require("@/app/utils/constants");
 async function GET() {
     try {
         console.log("Connecting to MongoDB...");
@@ -45,6 +45,9 @@ async function GET() {
         if (!mongoose_1.default.models.Venta) {
             mongoose_1.default.model("Venta", venta_1.default.schema);
         }
+        if (!mongoose_1.default.models.ItemCatalogo) {
+            mongoose_1.default.model("ItemCatalogo", ItemCatalogo.schema);
+        }
         console.log("Fetching server session...");
         const session = await (0, next_auth_1.getServerSession)(authOptions_1.authOptions);
         if (!session || !session.user || !session.user.id) {
@@ -67,7 +70,20 @@ async function GET() {
         }
         const choferIds = choferes.map((chofer) => chofer.userId._id);
         console.log("Fetching rutasDespacho for choferes...");
-        const rutasDespacho = await rutaDespacho_1.default.find({ choferId: { $in: choferIds } })
+        // Create a query that handles both cases
+        const rutaQuery = {
+            choferId: { $in: choferIds },
+            $or: [
+                // For routes in preparacion state, no additional conditions
+                { estado: constants_2.TIPO_ESTADO_RUTA_DESPACHO.preparacion },
+                // For routes in descarga state, check that direccionId matches dependenciaId
+                {
+                    estado: constants_2.TIPO_ESTADO_RUTA_DESPACHO.descarga,
+                    direccionId: dependenciaId
+                }
+            ]
+        };
+        const rutasDespacho = await rutaDespacho_1.default.find(rutaQuery)
             .populate("choferId vehiculoId ventaIds")
             .lean();
         if (rutasDespacho.length === 0) {
@@ -106,28 +122,36 @@ async function GET() {
                     const nuCode = ((_a = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _a === void 0 ? void 0 : _a.elemento)
                         ? (0, nuConverter_1.getNUCode)(subcategoria.categoriaCatalogoId.elemento)
                         : null;
-                    items.push({
-                        nombre: (((_b = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _b === void 0 ? void 0 : _b.nombre) + (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.nombre)) || null,
-                        multiplicador: detalle.cantidad,
-                        cantidad: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.cantidad) || "??",
-                        unidad: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.unidad) || null,
-                        restantes: detalle.cantidad - itemCatalogoIds.length,
-                        elemento: (_c = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _c === void 0 ? void 0 : _c.elemento,
-                        sinSifon: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.sinSifon) || false,
-                        esIndustrial: ((_d = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _d === void 0 ? void 0 : _d.esIndustrial) || false,
-                        nuCode: nuCode,
-                        subcategoriaId: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria._id) || null,
-                        items: itemCatalogoIds.map((item) => ({
-                            codigo: item.codigo,
-                            _id: item._id
-                        }))
-                    });
+                    const existingItem = items.find((item) => item.subcategoriaId === (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria._id));
+                    if (existingItem) {
+                        existingItem.multiplicador += detalle.cantidad;
+                        existingItem.restantes += detalle.cantidad - itemCatalogoIds.length;
+                    }
+                    else {
+                        items.push({
+                            nombre: (((_b = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _b === void 0 ? void 0 : _b.nombre) + (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.nombre)) || null,
+                            multiplicador: detalle.cantidad,
+                            cantidad: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.cantidad) || "??",
+                            unidad: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.unidad) || null,
+                            restantes: detalle.cantidad - itemCatalogoIds.length,
+                            elemento: (_c = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _c === void 0 ? void 0 : _c.elemento,
+                            sinSifon: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.sinSifon) || false,
+                            esIndustrial: ((_d = subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria.categoriaCatalogoId) === null || _d === void 0 ? void 0 : _d.esIndustrial) || false,
+                            nuCode: nuCode,
+                            subcategoriaId: (subcategoria === null || subcategoria === void 0 ? void 0 : subcategoria._id) || null,
+                            items: itemCatalogoIds.map((item) => ({
+                                codigo: item.codigo,
+                                _id: item._id
+                            }))
+                        });
+                    }
                 });
                 if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
                     fechaVentaMasReciente = venta.createdAt;
                 }
             });
             return {
+                rutaId: ruta._id,
                 nombreChofer: ruta.choferId.name,
                 patenteVehiculo: ((_a = ruta.vehiculoId) === null || _a === void 0 ? void 0 : _a.patente) || null,
                 fechaVentaMasReciente,
@@ -145,18 +169,31 @@ async function GET() {
 async function POST(request) {
     try {
         await (0, mongodb_1.connectMongoDB)();
-        const { items } = await request.json();
-        if (!Array.isArray(items)) {
-            return server_1.NextResponse.json({ error: "Invalid payload format. 'items' should be an array." }, { status: 400 });
+        const { rutaId, scanCodes } = await request.json();
+        if (!Array.isArray(scanCodes) || scanCodes.length === 0 || !rutaId) {
+            return server_1.NextResponse.json({ error: "Invalid payload format. {rutaId, scanCodes[]}" }, { status: 400 });
         }
-        const updatePromises = items.map(async ({ codigo, nuevoEstado }) => {
-            if (!codigo || nuevoEstado === undefined || !(nuevoEstado in constants_1.TIPO_ESTADO_VENTA)) {
-                throw new Error(`Invalid item data: { codigo: ${codigo}, nuevoEstado: ${nuevoEstado} }`);
-            }
-            return itemCatalogo_1.default.updateOne({ codigo }, { $set: { estado: nuevoEstado } });
+        // Buscar la ruta de despacho por rutaId
+        const ruta = await rutaDespacho_1.default.findById(rutaId);
+        if (!ruta) {
+            return server_1.NextResponse.json({ error: "RutaDespacho not found" }, { status: 404 });
+        }
+        // Agregar historial de carga
+        ruta.hitorialCarga.push({
+            esCarga: true,
+            fecha: new Date(),
+            itemMovidoIds: scanCodes
         });
-        await Promise.all(updatePromises);
-        return server_1.NextResponse.json({ message: "Estados actualizados correctamente." });
+        ruta.cargaItemIds.push(...scanCodes);
+        // Cambiar estado y agregar historial de estado
+        ruta.estado = constants_2.TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
+        ruta.historialEstado.push({
+            estado: constants_2.TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+            fecha: new Date()
+        });
+        console.log("Updating item states...", ruta);
+        await ruta.save();
+        return server_1.NextResponse.json({ ok: true });
     }
     catch (error) {
         console.error("Error updating item states:", error);
