@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import Venta from "@/models/venta";
 import Cliente from "@/models/cliente";
 import DetalleVenta from "@/models/detalleVenta";
-import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, USER_ROLE } from "@/app/utils/constants";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/utils/authOptions";
 
 export async function POST(req) {
     try {
@@ -28,11 +30,17 @@ export async function POST(req) {
         }
 
         for (const item of body.items) {
-            if (!item.cantidad || !item.precio || !item.subcategoriaId) {
+            if (!item.cantidad || item.precio == undefined || !item.subcategoriaId) {
             const errorMessage = "Each item must have 'cantidad', 'precio', and 'subcategoriaId'";
             console.error("Validation Error:", errorMessage);
             return NextResponse.json({ error: errorMessage }, { status: 400 });
             }
+        }
+
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user || !session.user.id) {
+            console.warn("Unauthorized access attempt.");
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
         
         const valorNeto = body.items.reduce((total, item) => {
@@ -52,7 +60,7 @@ export async function POST(req) {
             clienteId: body.clienteId,
             vendedorId: body.usuarioId,
             fecha: new Date(),
-            estado: TIPO_ESTADO_VENTA.borrador,
+            estado: session.role == USER_ROLE.manager ? TIPO_ESTADO_VENTA.por_asignar : TIPO_ESTADO_VENTA.borrador,
             valorNeto,
             valorIva: valorNeto * 0.19,
             valorBruto: valorNeto * (1 - 0.19),

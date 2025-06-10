@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
-import Pedidos from "@/components/ventas/Pedidos";
+import GestionPedidos from "@/components/GestionPedidos";
 
 export default async function PedidosPage() {
     const session = await getServerSession(authOptions);
     
-    return <Pedidos session={session}/>;
+    return <GestionPedidos session={session}/>;
 }

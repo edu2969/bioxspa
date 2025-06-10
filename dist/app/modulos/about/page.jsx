@@ -8,7 +8,7 @@ const image_1 = __importDefault(require("next/image"));
 function About() {
     return (<div className="w-screen h-screen">
             <div className="h-screen flex justify-center items-center animate-entrance">
-                <div className="ml-6">
+                <div className="scale-75 sm:scale-100">
                     <div className="flex">
                         <p className="text-6xl text-gray-700 mb-6">B I O X</p>
                         <span className="text-xs ml-7 text-gray-400 mt-10">versión 0.9</span>

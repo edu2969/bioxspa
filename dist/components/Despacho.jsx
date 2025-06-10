@@ -754,7 +754,7 @@ function Despacho({ session }) {
 
             </div>}
 
-            {rutaDespacho.estado == constants_1.TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
+            {rutaDespacho && rutaDespacho.estado == constants_1.TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
                 <button className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == constants_1.TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`} onClick={() => handleFinish()}>
                     <fa6_1.FaHouseFlag className="mt-1 mr-2"/><span>HE REGRESADO</span>
                     {loadingState == constants_1.TIPO_ESTADO_RUTA_DESPACHO.terminado &&

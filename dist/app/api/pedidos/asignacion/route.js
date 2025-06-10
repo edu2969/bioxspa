@@ -40,7 +40,7 @@ async function GET() {
         mongoose_1.default.model("Vehiculo", vehiculo_1.default.schema);
     }
     console.log("Fetching ventas in 'borrador' state...");
-    const ventas = await venta_1.default.find({ estado: constants_1.TIPO_ESTADO_VENTA.borrador }).lean();
+    const ventas = await venta_1.default.find({ estado: constants_1.TIPO_ESTADO_VENTA.por_asignar }).lean();
     console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
     const pedidos = await Promise.all(ventas.map(async (venta) => {
         // Fetch cliente details

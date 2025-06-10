@@ -36,7 +36,7 @@ export async function GET() {
     }
 
     console.log("Fetching ventas in 'borrador' state...");
-    const ventas = await Venta.find({ estado: TIPO_ESTADO_VENTA.borrador }).lean();
+    const ventas = await Venta.find({ estado: TIPO_ESTADO_VENTA.por_asignar }).lean();
     console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
 
     const pedidos = await Promise.all(

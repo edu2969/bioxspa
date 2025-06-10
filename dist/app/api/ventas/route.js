@@ -10,6 +10,8 @@ const venta_1 = __importDefault(require("@/models/venta"));
 const cliente_1 = __importDefault(require("@/models/cliente"));
 const detalleVenta_1 = __importDefault(require("@/models/detalleVenta"));
 const constants_1 = require("@/app/utils/constants");
+const next_auth_1 = require("next-auth");
+const authOptions_1 = require("@/app/utils/authOptions");
 async function POST(req) {
     try {
         await (0, mongodb_1.connectMongoDB)();
@@ -29,11 +31,16 @@ async function POST(req) {
             }
         }
         for (const item of body.items) {
-            if (!item.cantidad || !item.precio || !item.subcategoriaId) {
+            if (!item.cantidad || item.precio == undefined || !item.subcategoriaId) {
                 const errorMessage = "Each item must have 'cantidad', 'precio', and 'subcategoriaId'";
                 console.error("Validation Error:", errorMessage);
                 return server_1.NextResponse.json({ error: errorMessage }, { status: 400 });
             }
+        }
+        const session = await (0, next_auth_1.getServerSession)(authOptions_1.authOptions);
+        if (!session || !session.user || !session.user.id) {
+            console.warn("Unauthorized access attempt.");
+            return server_1.NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
         const valorNeto = body.items.reduce((total, item) => {
             return total + (item.cantidad * item.precio);
@@ -49,7 +56,7 @@ async function POST(req) {
             clienteId: body.clienteId,
             vendedorId: body.usuarioId,
             fecha: new Date(),
-            estado: constants_1.TIPO_ESTADO_VENTA.borrador,
+            estado: session.role == constants_1.USER_ROLE.manager ? constants_1.TIPO_ESTADO_VENTA.por_asignar : constants_1.TIPO_ESTADO_VENTA.borrador,
             valorNeto,
             valorIva: valorNeto * 0.19,
             valorBruto: valorNeto * (1 - 0.19),

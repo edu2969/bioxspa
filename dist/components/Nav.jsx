@@ -12,13 +12,15 @@ const ai_1 = require("react-icons/ai");
 const navigation_1 = require("next/navigation");
 const md_1 = require("react-icons/md");
 const io5_1 = require("react-icons/io5");
+const constants_1 = require("@/app/utils/constants");
 function Nav({ user }) {
     (0, react_2.useEffect)(() => {
-        console.log("USER", user);
+        console.log("!!!USER", user);
     }, [user]);
     const router = (0, navigation_1.useRouter)();
     const [menuActivo, setMenuActivo] = (0, react_2.useState)(false);
     const path = (0, navigation_1.usePathname)();
+    const [role] = (0, react_2.useState)((user === null || user === void 0 ? void 0 : user.role) || 0);
     return (<div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
             <div className="absolute">
                 <div className="flex">
@@ -30,9 +32,10 @@ function Nav({ user }) {
                     <ai_1.AiFillHome size="1.7rem" className="mt-4 mr-4 text-slate-800 justify-end cursor-pointer"/>
                 </link_1.default>                
             </div>
-            <div className={`min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
+            <div className={`w-full h-screen min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
                 <ai_1.AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4" onClick={() => setMenuActivo(false)}/>
                 <div className="mt-12 text-white space-y-6">
+                    {role == constants_1.USER_ROLE.manager && <>
                     <link_1.default href="/modulos/configuraciones" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
                             <io5_1.IoSettingsSharp size="4rem"/>
@@ -45,6 +48,15 @@ function Nav({ user }) {
                             <p className="text-2xl ml-2 mt-4">OPERACIÓN</p>
                         </div>
                     </link_1.default>
+                    </>}
+                    {(role == constants_1.USER_ROLE.seller || role == constants_1.USER_ROLE.conductor || role == constants_1.USER_ROLE.supplier) && <>
+                    <link_1.default href="/modulos/pedidos/nuevo" onClick={() => setMenuActivo(false)}>
+                        <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
+                            <md_1.MdSell size="4rem"/>
+                            <p className="text-2xl ml-2 mt-4">VENTA</p>
+                        </div>
+                    </link_1.default>
+                    </>}
                     <link_1.default href="/modulos/about" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
                             <ai_1.AiFillAliwangwang size="4rem"/>

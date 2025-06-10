@@ -917,7 +917,7 @@ export default function Despacho({ session }) {
 
             </div>}
 
-            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
+            {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
                 <button
                     className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
                     onClick={() => handleFinish()}>

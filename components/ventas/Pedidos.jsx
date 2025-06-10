@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { FaTrashAlt } from 'react-icons/fa';
 import formatRUT from '@/app/utils/idetificationDocument';
-import { TIPO_PRECIO } from '@/app/utils/constants';
+import { TIPO_PRECIO, USER_ROLE } from '@/app/utils/constants';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { BiCartDownload } from 'react-icons/bi';
+import { LiaTimesSolid } from 'react-icons/lia';
+import Loader from '../Loader';
+import { socket } from "@/lib/socket-client";
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -36,11 +37,18 @@ export default function Pedidos({ session }) {
     const [loadingForm, setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
-    const [itemsVenta, setItemsVenta] = useState([]);
+    const [itemsVenta] = useState([]);
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
     const [documentoTributarioSeleccionado, setDocumentoTributarioSeleccionado] = useState(null);
     const [registroSelected, setRegistroSelected] = useState(0);
     const [total, setTotal] = useState(0);
+    const [modalSolicitudPrecio, setModalSolicitudPrecio] = useState(false);
+    const [precioData, setPrecioData] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [categoriaIdSeleccionada, setCategoriaIdSeleccionada] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [categorias, setCategorias] = useState([]);
+    const [subcategorias, setSubcategorias] = useState([]);
 
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
@@ -57,55 +65,166 @@ export default function Pedidos({ session }) {
         setDocumentosTributarios(data.documentosTributarios);
     };
 
+    const fetchCategorias = async () => {
+        try {
+            const response = await fetch('/api/catalogo');
+            const data = await response.json();
+            console.log("CATEGORIAS", data);
+            setCategorias(data);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching categorias:', error);
+        }
+    }
+
+    const fetchSubcategorias = async () => {
+        try {
+            const response = await fetch('/api/catalogo/subcategoria');
+            const data = await response.json();
+            console.log("SUBCATEGORIAS", data);
+            setSubcategorias(data);
+        } catch (error) {
+            console.error('Error fetching subcategorias:', error);
+        }
+    }
+
     const onSubmit = async (data) => {
         console.log("DATA-SUBMIT", data);
+        // Solo incluir los precios seleccionados como items de la venta
         const payload = {
             clienteId: clienteSelected?._id,
-            sucursalId: data.sucursalId,
-            dependenciaId: data.dependenciaId,
             usuarioId: data.usuarioId,
             documentoTributarioId: data.documentoTributarioId,
-            items: itemsVenta.map(item => ({
+            items: precios
+            .filter(item => item.seleccionado && item.cantidad > 0)
+            .map(item => ({
                 cantidad: parseInt(item.cantidad),
-                precio: parseInt(item.precio),
-                subcategoriaId: item.subcategoriaId
+                precio: parseInt(item.valor),
+                subcategoriaId: item.subcategoriaCatalogoId
             })),
         }
         console.log("PAYLOAD2", payload);
         setLoadingForm(true);
         try {
-            await fetch('/api/ventas', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+            const resp = await fetch('/api/ventas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
             });
-            router.back();
+            const result = await resp.json();
+            console.log("RESULT", result);
+            if(resp.ok && result.ok) {
+                toast.success("Venta creada exitosamente.", {
+                    position: "top-center"
+                });
+                socket.emit("update-pedidos", { userId: session.user.id });
+                router.push('/modulos');
+            } else {
+                toast.error(result.error || "Error al crear la venta. Por favor, inténtelo más tarde.", {
+                    position: "top-center"
+                });
+            }         
         } catch (error) {
             console.error(error);
             toast.error("Ocurrió un error al crear la venta. Por favor, inténtelo más tarde.", {
-            position: "top-right",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
+                position: "top-center"
             });
         } finally {
-            setLoadingForm(false);            
+            setLoadingForm(false);
         }
     };
 
+    const handleCancel = () => {
+        setModalSolicitudPrecio(false);
+        setPrecioData({});
+        setCategoriaIdSeleccionada("");
+        setValue("categoriaId", "");
+        setValue("subcategoriaCatalogoId", "");
+        setValue("valor", "");
+    };
+
+    const handleSave = async () => {
+        setSaving(true);        
+        const sc = precioData.subcategoriaCatalogoId;
+        const exists = precios.some((p) => p.subcategoriaCatalogoId === sc);
+        if (exists) {
+            toast.error("Ya existe un precio para esta categoría y subcategoría.");
+            setSaving(false);
+            return;
+        }
+        setPrecios(prev => [
+            ...prev,
+            {
+            ...precioData,
+            valor: parseInt(precioData.valor) || 0,
+            cantidad: 0,
+            seleccionado: false,
+            nombre: (
+                (() => {
+                const subcat = subcategorias.find(sc => sc._id === precioData.subcategoriaCatalogoId);
+                const categoria = categorias.find(cat => cat._id === subcat?.categoriaCatalogoId);
+                return `${categoria?.nombre || ""}-${subcat?.nombre || ""}`;
+                })()
+            ),
+            }
+        ]);
+        setSaving(false);
+        handleCancel();
+    }
+
     useEffect(() => {
-        fetchUsuarios();
-        fetchDocumentosTributarios();        
+        // Verifica si hay sesión y el socket está conectado
+        if (session?.user?.id && socket.connected) {
+            console.log("Re-uniendo a room-pedidos después de posible recarga");
+            socket.emit("join-room", {
+                room: "room-pedidos",
+                userId: session.user.id
+            });
+        }
+
+        // Evento para manejar reconexiones del socket
+        const handleReconnect = () => {
+            if (session?.user?.id) {
+                console.log("Socket reconectado, uniendo a sala nuevamente");
+                socket.emit("join-room", {
+                    room: "room-pedidos",
+                    userId: session.user.id
+                });
+            }
+        };
+
+        // Escucha el evento de reconexión
+        socket.on("connect", handleReconnect);
+
+        return () => {
+            socket.off("connect", handleReconnect);
+        };
+    }, [session]);
+
+    useEffect(() => {
+        const fetchAll = async () => {
+            setLoading(true);            
+            try {
+                await Promise.all([
+                    fetchUsuarios(),
+                    fetchDocumentosTributarios(),
+                ]);
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+            } finally {                            
+                setLoading(false);
+                fetchCategorias();
+                fetchSubcategorias();
+            }
+        };
+        fetchAll();
     }, []);
 
     useEffect(() => {
         if (session && session.user && session.user.id) {
-            setValue('usuarioId', session.user.id);            
+            setValue('usuarioId', session.user.id);
         }
     }, [usuarios, session, setValue]);
 
@@ -119,14 +238,14 @@ export default function Pedidos({ session }) {
     }, [itemsVenta, total]);
 
     return (
-        <main className="w-full h-screen pt-14 overflow-y-auto">            
-            <div className="w-full pb-12 pt-0">
+        <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
+            <div className="w-full pb-2 pt-14 h-screen overflow-y-auto">
                 <div className="mx-auto">
-                    <form onSubmit={handleSubmit(onSubmit)} className="px-8 space-y-6">
-                        <div className="w-full flex">
-                            <div className="w-9/12">
-                                <div className="w-full flex">
-                                    <div className="w-4/12 pr-4">
+                    <form onSubmit={handleSubmit(onSubmit)} className="px-2 sm:px-4 md:px-8 space-y-4 md:space-y-6">
+                        <div className="w-full flex flex-col md:flex-row">
+                            <div className="w-full md:w-9/12">
+                                {session.role == USER_ROLE.manager && <div className="w-full flex">
+                                    <div className="w-full md:w-4/12 pr-0 md:pr-4">
                                         <label htmlFor="usuarioId" className="block text-sm font-medium text-gray-700">Usuario</label>
                                         <select id="usuarioId" {...register('usuarioId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
                                             <option value="">Seleccione un usuario</option>
@@ -135,9 +254,9 @@ export default function Pedidos({ session }) {
                                             ))}
                                         </select>
                                     </div>
-                                </div>
-                                <div className="flex mt-3">
-                                    <div className="w-4/12 relative pr-4">
+                                </div>}
+                                <div className="w-full md:flex mt-3 space-y-4 md:space-y-0">
+                                    <div className="w-full md:w-4/12 pr-0 md:pr-4">
                                         <label htmlFor="cliente" className="block text-sm font-medium text-gray-700">
                                             Cliente
                                             {clienteSelected != null && clienteSelected.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
@@ -164,12 +283,12 @@ export default function Pedidos({ session }) {
                                                         className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                         onClick={() => {
                                                             setValue('cliente', cliente.nombre);
-                                                            setClienteSelected(cliente);                                                            
+                                                            setClienteSelected(cliente);
                                                             setAutocompleteClienteResults([]);
-                                                            if(cliente.documentoTributarioId) {
+                                                            if (cliente.documentoTributarioId) {
                                                                 setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
                                                             }
-                                                            if(cliente.ordenCompra == true) {
+                                                            if (cliente.ordenCompra == true) {
                                                                 setValue("tipoRegistro", 3);
                                                                 setRegistroSelected(3);
                                                             }
@@ -213,7 +332,7 @@ export default function Pedidos({ session }) {
                                             </ul>
                                         )}
                                     </div>
-                                    <div className="w-3/12 pr-4">
+                                    <div className="w-full md:w-3/12 pr-0 md:pr-4">
                                         <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
                                         <select id="documentoTributarioId" {...register('documentoTributarioId')}
                                             onChange={(e) => {
@@ -226,7 +345,7 @@ export default function Pedidos({ session }) {
                                             ))}
                                         </select>
                                     </div>
-                                    {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-3/12 pr-4">
+                                    {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-full md:w-3/12 pr-0 md:pr-4">
                                         <label htmlFor="tipoGuia" className="block text-sm font-medium text-gray-700">Motivo guía</label>
                                         <select name="detalleguiadespacho" {...register('tipoGuia', { valueAsNumber: true })}
                                             id="detalleguiadespacho" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
@@ -235,7 +354,7 @@ export default function Pedidos({ session }) {
                                             ))}
                                         </select>
                                     </div>}
-                                    <div className="w-3/12 pr-4">
+                                    <div className="w-full md:w-3/12 pr-0 md:pr-4">
                                         <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
                                         <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
                                             onChange={(e) => {
@@ -250,7 +369,7 @@ export default function Pedidos({ session }) {
                                 </div>
                             </div>
 
-                            <div className="w-3/12 text-center">
+                            <div className="w-full md:w-3/12 text-center">
                                 {clienteSelected != null && (<div className="mt-1">
                                     <p className="text-lg font-bold">{clienteSelected.nombre}</p>
                                     <p className="text-sm font-semibold">
@@ -264,7 +383,7 @@ export default function Pedidos({ session }) {
 
 
                         {registroSelected == 3 && <div className="w-full flex mt-3">
-                            <div className="w-1/12 pr-4">
+                            <div className="w-full md:w-1/12 pr-4">
                                 <label htmlFor="permanente" className="block text-sm font-medium text-gray-700">Permanente</label>
                                 <input
                                     id="permanente"
@@ -274,7 +393,7 @@ export default function Pedidos({ session }) {
                                 />
                             </div>
 
-                            <div className="w-3/12 pr-4">
+                            <div className="w-full md:w-3/12 pr-4">
                                 <label htmlFor="patente" className="block text-sm font-medium text-gray-700">Patente</label>
                                 <input
                                     id="patente"
@@ -283,7 +402,7 @@ export default function Pedidos({ session }) {
                                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm uppercase"
                                 />
                             </div>
-                            <div className="w-3/12 pr-4">
+                            <div className="w-full md:w-3/12 pr-4">
                                 <label htmlFor="motivo" className="block text-sm font-medium text-gray-700">Motivo</label>
                                 <select
                                     id="motivo"
@@ -297,7 +416,7 @@ export default function Pedidos({ session }) {
                                     <option value="4">Recarga cilindros</option>
                                 </select>
                             </div>
-                            <div className="w-6/12 pr-4">
+                            <div className="w-full md:w-6/12 pr-4">
                                 <label htmlFor="descripcion" className="block text-sm font-medium text-gray-700">Descripción</label>
                                 <textarea
                                     id="descripcion"
@@ -310,30 +429,37 @@ export default function Pedidos({ session }) {
 
                         <div className={`w-full ${clienteSelected != null ? '' : 'opacity-20'}`}>
                             <div className="flex justify-between items-center">
-                                <p className="font-bold text-lg">PRECIOS CARGADOS</p>                                
+                                <p className="font-bold text-lg">PRECIOS CARGADOS</p>
+                                <button
+                                    type="button"
+                                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                                    onClick={() => setModalSolicitudPrecio(true)}
+                                >
+                                    SOLICITAR PRECIO
+                                </button>
                             </div>
-                            <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase">
-                                <div className="w-2/12 pr-4">
-                                    <p className="font-bold text-sm">Cantidad</p>
-                                </div>
-                                <div className="w-4/12 pr-4">
-                                    <p className="font-bold text-sm">ITEM</p>
+                            <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
+                                <div className="w-3/12 pr-4">
+                                    <p className="font-bold">Cantidad</p>
                                 </div>
                                 <div className="w-3/12 pr-4">
-                                    <p className="font-bold text-sm text-center">Precio</p>
+                                    <p className="font-bold">ITEM</p>
                                 </div>
                                 <div className="w-3/12 pr-4">
-                                    <p className="font-bold text-sm text-center">SubTotal</p>
+                                    <p className="font-bold text-center">Precio</p>
+                                </div>
+                                <div className="w-3/12 pr-4">
+                                    <p className="font-bold text-center">SubTotal</p>
                                 </div>
                             </div>
                             {precios.map((precio, index) => (
-                                <div key={`precio_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-4 bg-gray-100 ${precios[index].seleccionado==true ? '' : 'opacity-50'}`}>
-                                    <div className="w-2/12 pr-4">
-                                        <div className="flex items-center">
+                                <div key={`precio_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-2 bg-gray-100 ${precios[index].seleccionado == true ? '' : 'opacity-50'}`}>
+                                    <div className="w-3/12">
+                                        <div className="flex">
                                             <input
                                                 id={`checkbox-${index}`}
                                                 type="checkbox"
-                                                className="block w-8 h-8 mr-4"
+                                                className="block w-10 h-10 mr-2"
                                                 onClick={(e) => {
                                                     const updatedPrecios = [...precios];
                                                     updatedPrecios[index].seleccionado = e.target.checked;
@@ -351,7 +477,7 @@ export default function Pedidos({ session }) {
                                                 min={0}
                                                 max={99}
                                                 defaultValue={precio.cantidad || 0}
-                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
+                                                className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
                                                 onChange={(e) => {
                                                     const newCantidad = parseInt(e.target.value) || 0;
                                                     const updatedPrecios = [...precios];
@@ -359,17 +485,18 @@ export default function Pedidos({ session }) {
                                                     setPrecios(updatedPrecios);
                                                 }}
                                             />
-                                        </div>                                        
+                                        </div>
                                     </div>
-                                    <div className="w-4/12 pr-4">
-                                        {precio.nombre}                                      
+                                    <div className="w-3/12 pr-4">
+                                        <p className="font-bold text-lg">{precio.nombre.split("-")[0]}</p>
+                                        <span className="relative -top-1">{precio.nombre.split("-")[1]}</span>
                                     </div>
                                     <div className="w-3/12 pr-4">
                                         <div className="flex">
                                             <span className="font-bold mt-2 px-4">$</span>
                                             <span className="w-full font-bold text-sm text-right mt-2">
                                                 {(precios[index].valor || 0).toLocaleString('es-CL')}
-                                            </span>                                           
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="w-3/12 pr-4">
@@ -382,7 +509,22 @@ export default function Pedidos({ session }) {
                                     </div>
                                 </div>
                             ))}
-                            <div className="w-full flex justify-end mt-4">
+                            <div className="w-full flex mt-6 justify-end">
+                                <button className="flex w-full md:w-3/12 justify-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        router.back()
+                                    }}>&lt;&lt; CANCELAR</button>
+                                <button
+                                    className={`flex w-full md:w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
+                                    type="submit"
+                                    disabled={isCreateVentaDisabled || loadingForm}
+                                >
+                                    CREAR VENTA
+                                </button>
+                            </div>
+                            {/*<div className="w-full flex justify-end mt-4">
                                 <button
                                     type="button"
                                     disabled={!precios.some(precio => precio.seleccionado)}
@@ -400,134 +542,114 @@ export default function Pedidos({ session }) {
                                     }}
                                 >
                                     <div className="flex">
-                                        <BiCartDownload size="1.25rem" className="text-white mr-2" /> 
+                                        <BiCartDownload size="1.25rem" className="text-white mr-2" />
                                         <span className="text-sm font-semibold">CARGAR SELECCIONADOS</span>
-                                    </div>                                    
+                                    </div>
                                 </button>
-                            </div>
+                            </div>*/}
                         </div>
 
-
-                        <div className={`w-full ${clienteSelected != null ? '' : 'opacity-20'}`}>
-                            <div className="flex justify-between items-center">
-                                <p className="font-bold text-lg">DETALLE</p>                                
-                            </div>
-                            <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase">
-                                <div className="w-1/12 pr-4">
-                                    <p className="font-bold text-sm">Cantidad</p>
-                                </div>
-                                <div className="w-5/12 pr-4">
-                                    <p className="font-bold text-sm">ITEM</p>
-                                </div>
-                                <div className="w-2/12 pr-4">
-                                    <p className="font-bold text-sm text-center">Precio</p>
-                                </div>
-                                <div className="w-3/12 pr-4">
-                                    <p className="font-bold text-sm text-center">Subtotal</p>
-                                </div>
-                                <div className="w-1/12 flex justify-center items-right">
-                                    <p className="font-bold text-sm">Acciones</p>
-                                </div>
-                            </div>
-                            {itemsVenta.map((item, index) => (
-                                <div key={`itemVenta_${index}`} className="w-full flex items-center bg-green-200 mb-0.5 py-1 px-4">
-                                    <div className="w-1/12 pr-4">
-                                        <input
-                                            id={`cantidad-${index}`}
-                                            {...register(`itemsVenta[${index}].cantidad`)}
-                                            type="number"
-                                            min={1}
-                                            max={99}
-                                            defaultValue={item.cantidad}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                            onChange={(e) => {
-                                                const newCantidad = parseInt(e.target.value) || 0;
-                                                const updatedItems = [...itemsVenta];
-                                                updatedItems[index].cantidad = newCantidad;
-                                                setItemsVenta(updatedItems);
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="w-5/12 pr-4">
-                                        {item.subcategoria}
-                                    </div>
-                                    <div className="w-2/12 pr-4">
-                                        <div className="flex">
-                                            <span className="font-bold mt-2 px-4">$</span>
-                                            <input
-                                                id={`precio-${index}`}
-                                                {...register(`itemsVenta[${index}].precio`)}
-                                                type="text"
-                                                value={item.precio.toLocaleString('es-CL')}
-                                                onChange={(e) => {
-                                                    const value = e.target.value.replace(/\./g, '');
-                                                    const numericValue = parseInt(value, 10) || 0;
-                                                    const updatedItems = [...itemsVenta];
-                                                    updatedItems[index].precio = numericValue;
-                                                    setItemsVenta(updatedItems);
-                                                }}
-                                                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right ${itemsVenta[index].precioError ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="w-3/12 pr-4">
-                                        <div className="flex">
-                                            <span className="font-bold mt-2 px-4">$</span>
-                                            <span className="w-full font-bold text-sm text-right mt-2">
-                                                {(itemsVenta[index].cantidad * itemsVenta[index].precio || 0).toLocaleString('es-CL')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="w-1/12 flex justify-center">
-                                        <button
-                                            type="button"
-                                            className="bg-red-400 text-white hover:bg-red-200 hover:text-red-800 rounded-md px-2 py-2"
-                                            onClick={() => setItemsVenta(itemsVenta.filter((_, i) => i !== index))}
-                                        >
-                                            <FaTrashAlt />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-0.5 rounded-b-md uppercase">
-                                <div className="w-8/12 pr-4">
-                                    <p className="font-bold text-sm">Total</p>
-                                </div>
-                                <div className="w-3/12 pr-4">
-                                    <div className="flex">
-                                        <span className="text-xl font-bold px-4">$</span>
-                                        <span className="w-full font-bold text-xl text-right">
-                                            {itemsVenta.reduce((acc, item) => {
-                                                const cantidad = parseInt(item.cantidad) || 0;
-                                                const precio = parseInt(("" + item.precio).replace(/\./g, '')) || 0;
-                                                return acc + (cantidad * precio);
-                                            }, 0).toLocaleString('es-CL')}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="w-1/12"></div>
-                            </div>
-                            <div className="w-full flex mt-6 justify-end">
-                                <button className="flex w-3/12 justify-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        router.back()
-                                    }}>VOLVER Y CANCELAR</button>
-                                <button
-                                    className={`flex w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}
-                                    type="submit"
-                                    disabled={isCreateVentaDisabled || loadingForm}
-                                >
-                                    CREAR VENTA
-                                </button>
-                            </div>
-                        </div>
                     </form>
                 </div>
-            </div>            
+            </div>
             <ToastContainer />
+
+            {modalSolicitudPrecio && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                    <div className="relative top-12 p-5 border w-80 mx-auto shadow-lg rounded-md bg-white">
+                        <div className="absolute top-2 right-2">
+                            <button
+                                onClick={handleCancel}
+                                className="text-gray-400 hover:text-gray-700 text-2xl focus:outline-none"
+                                aria-label="Cerrar"
+                                type="button"
+                            >
+                                <LiaTimesSolid />
+                            </button>
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900">Solicitar precio</h3>
+                            <div className="mt-2">
+                                <div className="mt-4 space-y-3 text-left">
+                                    <div className="flex flex-col">
+                                        <label htmlFor="categoriaId" className="text-sm text-gray-500">Categoría</label>
+                                        <select
+                                            {...register("categoriaId")}
+                                            value={categoriaIdSeleccionada || ""}
+                                            onChange={async (e) => {
+                                                const categoriaId = e.target.value;
+                                                setPrecioData((prev) => ({
+                                                    ...prev,
+                                                    categoriaId,
+                                                    subcategoriaCatalogoId: ""
+                                                }));
+                                                setCategoriaIdSeleccionada(categoriaId);
+                                                setValue("categoriaId", categoriaId);
+                                                setValue("subcategoriaCatalogoId", "");
+                                                if (categoriaId) {
+                                                    await fetchSubcategorias(categoriaId);
+                                                } else {
+                                                    setSubcategorias([]);
+                                                }
+                                            }}
+                                            className="border rounded-md px-3 py-2 text-base"
+                                        >
+                                            <option value="">Seleccione una categoría</option>
+                                            {categorias && categorias.map((categoria) => (
+                                                <option key={categoria._id} value={categoria._id}>
+                                                    {categoria.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <label htmlFor="subcategoriaId" className="text-sm text-gray-500">Subcategoría</label>
+                                        <select
+                                            {...register("subcategoriaCatalogoId")}
+                                            value={precioData.subcategoriaCatalogoId || ""}
+                                            onChange={(e) => {
+                                                setPrecioData((prev) => ({
+                                                    ...prev,
+                                                    subcategoriaCatalogoId: e.target.value
+                                                }));
+                                                setValue("subcategoriaCatalogoId", e.target.value);
+                                            }}
+                                            className="border rounded-md px-3 py-2 text-base"
+                                        >
+                                            <option value="">Seleccione una subcategoría</option>
+                                            {subcategorias &&
+                                                subcategorias.filter(sc => sc.categoriaCatalogoId === categoriaIdSeleccionada).map((subcategoria) => (
+                                                    <option key={subcategoria._id} value={subcategoria._id}>
+                                                        {subcategoria.nombre}
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={loading}
+                                    className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
+                                    {saving && <div className="absolute -mt-1"><Loader texto="" /></div>}
+                                    SOLICITAR PRECIO
+                                </button>
+                                <button
+                                    onClick={handleCancel}
+                                    disabled={loading}
+                                    className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    CANCELAR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
         </main>
     );
 }
