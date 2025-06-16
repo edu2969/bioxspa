@@ -36,7 +36,7 @@ export default function AsignacionPanel({ session }) {
         return chofer ? chofer.nombre : "Desconocido";
     }
 
-    const getResumenCarga = (items = []) => {
+    /*const getResumenCarga = (items = []) => {
         const resumen = {};
         if (!Array.isArray(items)) return [];
 
@@ -63,7 +63,7 @@ export default function AsignacionPanel({ session }) {
         });
 
         return Object.values(resumen);
-    };
+    };*/
 
     const fetchPedidos = useCallback(async () => {
         try {
@@ -75,12 +75,7 @@ export default function AsignacionPanel({ session }) {
             console.log("Fetched pedidos:", data);
             setPedidos(data.pedidos);
             setChoferes(data.choferes);
-            setEnTransito(data.flotaEnTransito.map((ruta) => {
-                return {
-                    ...ruta,
-                    resumenCarga: getResumenCarga(ruta.cargaItemIds)
-                };
-            }));
+            setEnTransito(data.flotaEnTransito);
             setLoadingPanel(false);
         } catch (error) {
             console.error("Error fetching pedidos:", error);
@@ -134,7 +129,6 @@ export default function AsignacionPanel({ session }) {
     }, [session]);
 
     function calculateTubePosition(index) {
-        console.log("index", index);
         const baseTop = 36;
         const baseLeft = 42;
         const verticalIncrement = 3;
@@ -365,13 +359,39 @@ export default function AsignacionPanel({ session }) {
                                     <p className="text-lg uppercase font-bold -mt-1 mb-2">{ruta.choferId.name}</p>
                                     <div></div>
                                     <div className="flex flex-wrap">
-                                        {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso ? ruta.resumenCarga?.map((item, idx) => (
-                                            <div key={idx} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1">
-                                                <b>{item.multiplicador}</b>x {item.elemento.toUpperCase()} {item.cantidad}{item.unidad}
-                                                {item.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
-                                                {item.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                        {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
+                                            <div key={venta._id || idxVenta} className="border border-blue-400 rounded-lg mb-2 px-2 py-1 bg-white/80 shadow">
+                                                <div className="font-bold text-blue-800 text-xs mb-1 flex items-center">
+                                                    <span className="mr-2">Cliente:</span>
+                                                    <span className="uppercase">{venta.clienteId?.nombre || "Desconocido"}</span>
+                                                </div>
+                                                <div className="flex flex-wrap">
+                                                    {/* Mostrar cada carga de la venta */}
+                                                    {Array.isArray(venta.detalles) && venta.detalles.map((detalle, idxDetalle) => {
+                                                        // Buscar el item de carga correspondiente por subcategoriaCatalogoId
+                                                        const carga = Array.isArray(ruta.cargaItemIds)
+                                                            ? ruta.cargaItemIds.find(
+                                                                (item) =>
+                                                                    item.subcategoriaCatalogoId &&
+                                                                    detalle.subcategoriaCatalogoId &&
+                                                                    String(item.subcategoriaCatalogoId._id || item.subcategoriaCatalogoId) === String(detalle.subcategoriaCatalogoId._id || detalle.subcategoriaCatalogoId)
+                                                            )
+                                                            : null;
+                                                        // Si no hay carga, mostrar igual el elemento con datos mínimos
+                                                        const sub = carga?.subcategoriaCatalogoId || {};
+                                                        const cat = sub.categoriaCatalogoId || {};
+                                                        return (
+                                                            <div key={idxDetalle} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1 flex items-center bg-blue-50">
+                                                                <b>{detalle.cantidad}</b>x {cat.elemento?.toUpperCase() || "?"} {sub.cantidad}{sub.unidad}
+                                                                {sub.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
+                                                                {cat.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                                                {cat.esMedicinal && <span className="bg-green-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">MED</span>}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        )) : (<div className="text-gray-500 text-xs">REGRESANDO</div>)}
+                                        ))}
                                     </div>
                                 </div>
                             </div>

@@ -96,7 +96,7 @@ export default function Despacho({ session }) {
         if (!rd.ruta || rd.ruta.length === 0) return [];
 
         // Get current route that hasn't been delivered yet (no fechaArribo)
-        const currentRoute = rd.ruta.find(r => !r.fechaArribo) || rd.ruta[rd.ruta.length - 1];
+        const currentRoute = rd.ruta[rd.ruta.length - 1];
 
         // Find which client corresponds to this destination
         const currentClient = rd.ventaIds?.find(venta => {
@@ -275,7 +275,7 @@ export default function Despacho({ session }) {
                 },
                 body: JSON.stringify({
                     rutaId: rutaDespacho._id,
-                    direccionId: rutaDespacho.ruta.find(r => !r.fechaArribo).direccionDestinoId
+                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
                 }),
             });
 
@@ -755,7 +755,10 @@ export default function Despacho({ session }) {
                             </button>
                         </div>}
 
-                        {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="flex flex-row items-start justify-center gap-4 mb-6">
+                        {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga 
+                        && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ||
+                            rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
+                        && <div className="flex flex-row items-start justify-center gap-4 mb-6">
                             <div className="flex flex-col items-center mt-1 ml-2">
                                 <FaFlagCheckered className="text-xl mb-4" />
                                 <div className="h-4" />

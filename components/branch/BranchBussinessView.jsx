@@ -253,7 +253,7 @@ export default function BranchBussinessView() {
                 {branchSelected !== null && (
                     <div className="absolute top-24 left-72 bg-white rounded-md p-4 border border-gray-300">
                         <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">ACCIONES RÁPIDAS</span>
-                        <Link href={`/modulos/ventas?id=${branches[branchSelected]._id}`} className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                        <Link href={`/modulos/pedidos/nuevo`} className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
                             <TbShoppingBagPlus size="1.5rem" className="mr-2" />
                             NUEVA VENTA
                         </Link>

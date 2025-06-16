@@ -155,7 +155,7 @@ export async function GET() {
             $gte: TIPO_ESTADO_RUTA_DESPACHO.en_ruta, 
             $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
     })
-    .select("ruta vehiculoId choferId cargaItemIds estado")
+    .select("ruta vehiculoId choferId cargaItemIds estado ventaIds")
     // Poblar cada dirección de cada ruta
     .populate({
         path: "ruta.direccionDestinoId",
@@ -190,7 +190,31 @@ export async function GET() {
             }
         }
     })
+    .populate({
+        path: "ventaIds",
+        model: "Venta",
+        select: "clienteId",
+        populate: {
+            path: "clienteId",
+            model: "Cliente",
+            select: "nombre"
+        }
+    })
     .lean();
+
+    // Para cada ruta, poblar los detalles de venta con subcategoriaCatalogoId y cantidad
+    for (const ruta of flotaEnTransito) {
+        if (ruta.ventaIds && Array.isArray(ruta.ventaIds)) {
+            for (const venta of ruta.ventaIds) {
+                // Buscar los detalles de venta para esta venta
+                const detalles = await DetalleVenta.find({ ventaId: venta._id })
+                    .select("subcategoriaCatalogoId cantidad")
+                    .lean();
+                // Agregar los detalles al objeto venta
+                venta.detalles = detalles;
+            }
+        }
+    }
 
     return NextResponse.json({
         pedidos,

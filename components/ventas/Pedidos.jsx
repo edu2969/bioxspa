@@ -88,6 +88,18 @@ export default function Pedidos({ session }) {
         }
     }
 
+    function amountFormat(num) {
+        if (!num && num !== 0) return "";
+        return num.toLocaleString("es-CL");
+    }
+
+    const handlePrecioInputChange = (e) => {
+        const value = e.target.value;
+        const clean = value.replace(/\D/g, "");
+        // Si el input está vacío, deja string vacío, si no, número
+        setValue("precio", amountFormat(clean) || "");
+    };
+
     const onSubmit = async (data) => {
         console.log("DATA-SUBMIT", data);
         // Solo incluir los precios seleccionados como items de la venta
@@ -435,7 +447,7 @@ export default function Pedidos({ session }) {
                                     className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                                     onClick={() => setModalSolicitudPrecio(true)}
                                 >
-                                    SOLICITAR PRECIO
+                                    {session.user.role == USER_ROLE.manager ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                             </div>
                             <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
@@ -459,7 +471,7 @@ export default function Pedidos({ session }) {
                                             <input
                                                 id={`checkbox-${index}`}
                                                 type="checkbox"
-                                                className="block w-10 h-10 mr-2"
+                                                className="block w-8 h-8 mt-1 mr-2"
                                                 onClick={(e) => {
                                                     const updatedPrecios = [...precios];
                                                     updatedPrecios[index].seleccionado = e.target.checked;
@@ -626,6 +638,22 @@ export default function Pedidos({ session }) {
                                             }
                                         </select>
                                     </div>
+                                    <div className="flex flex-col">
+                                        <label htmlFor="valor" className="text-sm text-gray-500">Precio</label>
+                                        <div className="flex items-center">
+                                            <span className="text-gray-500 mr-1">$</span>
+                                            <input
+                                                type="text"
+                                                id="valor"
+                                                name="valor"
+                                                className="border rounded-md px-3 py-2 text-base w-full text-right"
+                                                placeholder="Precio"
+                                                value={precioData.valorFormateado}
+                                                onChange={handlePrecioInputChange}
+                                                inputMode="numeric"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -634,7 +662,7 @@ export default function Pedidos({ session }) {
                                     disabled={loading}
                                     className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
                                     {saving && <div className="absolute -mt-1"><Loader texto="" /></div>}
-                                    SOLICITAR PRECIO
+                                    {session.user.role == USER_ROLE.manager ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                                 <button
                                     onClick={handleCancel}

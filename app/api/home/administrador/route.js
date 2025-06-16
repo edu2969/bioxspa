@@ -7,10 +7,12 @@ export async function GET() {
     try {
         await connectMongoDB();
 
-        const borradorCount = await Venta.countDocuments({ estado: TIPO_ESTADO_VENTA.borrador, porCobrar: true });
+        const porAsignarCount = await Venta.countDocuments({ 
+            estado: TIPO_ESTADO_VENTA.por_asignar
+        });
 
         const resultado = [
-            { pedido: 0, flota: borradorCount, deudas: 0 }
+            { pedido: 0, flota: porAsignarCount, deudas: 0 }
         ];
 
         return NextResponse.json({ ok: true, resultado });
