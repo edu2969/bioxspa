@@ -18,6 +18,7 @@ export async function POST(req) {
             "clienteId",
             "usuarioId",
             "documentoTributarioId",
+            "direccionDespachoId",
             "items"
         ];
 
@@ -67,7 +68,8 @@ export async function POST(req) {
             valorTotal: valorNeto * 1.19,
             documentoTributarioId: body.documentoTributarioId,
             porCobrar: true,
-            tieneArriendo
+            tieneArriendo,
+            direccionDespachoId: body.direccionDespachoId
         });
         const savedVenta = await nuevaVenta.save();
 

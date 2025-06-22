@@ -15,6 +15,7 @@ import MessagesPanel from "../MessagesPanel";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import Link from "next/link";
 import Loader from "../Loader";
+import MapaCilindros from "../maps/MapaCilindros";
 
 const stateColors = [
     "bg-white",
@@ -36,6 +37,12 @@ export default function BranchBussinessView() {
     const [graficoGases] = useState(null);
     const initData = useRef(false);
     const [loadingMultilinea, setLoadingMultilinear] = useState(false);
+    const mapRef = useRef(null);
+    const [mapData, setMapData] = useState([]);
+    const [selectedCategories, setSelectedCategories] = useState(null);
+    const [propios, setPropios] = useState(true);
+    const [llenos, setLlenos] = useState(true);
+    const [categorias, setCategorias] = useState(null);    
 
     const fetchMainPanelData = useCallback(async () => {
         setLoadingAdminPanel(true);
@@ -50,25 +57,65 @@ export default function BranchBussinessView() {
         }
     }, [setBranches, setLoadingAdminPanel]);
 
+
+    const fetchCategorias = useCallback(async () => {
+        try {
+            const response = await fetch("/api/categoriasGases");
+            const data = await response.json();
+            console.log("CATEGORIAS", data.categorias);
+            setCategorias(data.categorias);
+            // Inicializa selectedCategories con todas las categorías en true
+            const initialSelected = {};
+            (data.categorias || []).forEach(cat => {
+                initialSelected[cat] = true;
+            });
+            setSelectedCategories(initialSelected);
+        } catch (error) {
+            console.error("Error fetching categorias:", error);
+        }
+    }, [setCategorias, setSelectedCategories]);
+
+    const fetchMapData = useCallback(async () => {
+        try {
+            let qry = "?";
+            if (categorias) {
+                qry += `categorias=${categorias.map(c => c._id).join(",")}&`;
+            }
+            if (propios) {
+                qry += `propios=${propios}&`;
+            }
+            if (llenos !== null) {
+                qry += `llenos=${llenos}`;
+            }
+            console.log("QUERY", qry);
+            const response = await fetch(`/api/bi/cilindros${qry}`);
+            const mapData = await response.json();
+            console.log("MAP DATA", mapData);
+            setMapData(mapData.cilindros);
+        } catch (error) {
+            console.error("Error fetching map data:", error);
+        }
+    }, [setMapData, categorias, propios, llenos]);
+
     useEffect(() => {
         if (!initData.current) {
             initData.current = true;
             fetchMainPanelData();
+            fetchCategorias();
         }
-    }, [fetchMainPanelData]);
+    }, [fetchMainPanelData, fetchCategorias]);
 
     const handleDebtClick = () => {
         window.location.href = "/modulos/deudas?total=true";
     };
 
-    const handleBranchClick = (index) => {
+    const handleBranchClick = async (index) => {
+        await fetchMapData();
         setBranchSelected(branchSelected != null && branchSelected === index ? null : index);
         setLoadingMultilinear(true);
-
     };
 
     const getBoxStyles = (index) => {
-        console.log("REVISANDO", index);
         if (branchSelected === index) {
             return {
                 width: '100%',
@@ -140,7 +187,7 @@ export default function BranchBussinessView() {
                                         <span className="text-2xl">{branches[index].despachadosHoy}</span>
                                         <span className="text-xs mt-3 ml-2">m<sup>3</sup></span>
                                     </div>
-                                    <div className="text-xs">DESPACHADOS<br/>AL 31/ENE&apos;25</div>
+                                    <div className="text-xs">DESPACHADOS<br />AL 31/ENE&apos;25</div>
                                 </div>
                                 <div className="text-blue-600">
                                     <div className="text-xl mt-1">
@@ -260,7 +307,98 @@ export default function BranchBussinessView() {
                     </div>
                 )}
 
-                {branchSelected !== null && graficoGases != null && (loadingMultilinea ? <Loader /> : 
+                <div className={`absolute top-10 right-6 w-1/2 h-[calc(100vh-14rem)] bg-white rounded-md border border-gray-300 ${branchSelected != null ? '' : 'hidden'}`} ref={mapRef}>
+                    <MapaCilindros data={mapData} />
+
+                    <div className="relativebg-white rounded-md px-2 pt-2 pb-0 border border-gray-300 mt-4">
+                        <span className="position absolute text-xs font-bold mb-2 -mt-4 bg-white px-2 text-gray-400">TIPOS DE GASES</span>
+                        {categorias && categorias.map((categoria, i) =>
+                            <button
+                                key={`chip_${categoria}_${i}`}
+                                className="bg-blue-500 hover:bg-gray-300 text-white font-bold py-0 mr-1 px-4 rounded-md mb-2"
+                            >
+                                {categoria.elemento}
+                            </button>
+                        )}
+                    </div>
+                    <div className="relativebg-white rounded-md px-2 pt-4 pb-2 border border-gray-300 mt-4">
+                        <span className="position absolute text-xs font-bold mb-2 -mt-6 bg-white px-2 text-gray-400">DUEÑO / ESTADO</span>                        
+                        <div className="flex">
+                            <div className="flex items-center space-x-2 ml-6 mr-10">
+                                <span className="text-lg font-semibold">Clientes</span>
+                                <label className="relative inline-flex items-center cursor-pointer w-12">
+                                    <input
+                                        type="checkbox"
+                                        checked={propios}
+                                        onChange={() => {
+                                            const newPropios = !propios;
+                                            setPropios(newPropios);
+                                            fetchMapData({
+                                                subcategoriaIds: Object.keys(selectedCategories).filter(k => selectedCategories[k]),
+                                                llenos,
+                                                propios: newPropios
+                                            });
+                                        }}
+                                        className="sr-only peer"
+                                    />
+                                    <div
+                                        className={`
+                                        w-12 h-6 rounded-full transition-colors
+                                        ${propios ? 'bg-blue-600' : 'bg-gray-200'}
+                                    `}
+                                    ></div>
+                                    <span
+                                        className={`
+                                        absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
+                                        ${propios ? 'translate-x-6 left-1' : 'translate-x-0 left-1'}
+                                    `}
+                                        style={{
+                                            transition: 'transform 0.2s',
+                                        }}
+                                    ></span>
+                                </label>
+                                <span className="text-lg font-semibold">BIOX</span>
+                            </div>
+                            <div className="flex items-center space-x-2 ml-6">
+                                <span className="text-lg font-semibold">Vacío</span>
+                                <label className="relative inline-flex items-center cursor-pointer w-12">
+                                    <input
+                                        type="checkbox"
+                                        checked={llenos}
+                                        onChange={() => {
+                                            const newLlenos = !llenos;
+                                            setLlenos(newLlenos);
+                                            fetchMapData({
+                                                subcategoriaIds: Object.keys(selectedCategories).filter(k => selectedCategories[k]),
+                                                propios: propios,
+                                                llenos: newLlenos
+                                            });
+                                        }}
+                                        className="sr-only peer"
+                                    />
+                                    <div
+                                        className={`
+                                        w-12 h-6 rounded-full transition-colors 
+                                        ${llenos ? 'bg-blue-600' : 'bg-gray-200'}
+                                    `}
+                                    ></div>
+                                    <span
+                                        className={`
+                                        absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
+                                        ${llenos ? 'translate-x-6 left-1' : 'translate-x-0 left-1'}
+                                    `}
+                                        style={{
+                                            transition: 'transform 0.2s',
+                                        }}
+                                    ></span>
+                                </label>
+                                <span className="text-lg font-semibold">Lleno</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {branchSelected !== null && graficoGases != null && (loadingMultilinea ? <Loader /> :
                     <div className="absolute top-24 left-72 w-[600px] h-[320px]">
                         <MultiLineChart
                             data={graficoGases}
@@ -273,7 +411,7 @@ export default function BranchBussinessView() {
 
                 {loadingAdmingPanel && (
                     <div className="absolute top-0 left-0 w-full h-full bg-white flex items-center justify-center">
-                        <Loader/>
+                        <Loader texto="Cargando..." />
                     </div>
                 )}
             </div>

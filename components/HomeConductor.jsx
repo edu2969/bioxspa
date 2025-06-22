@@ -26,7 +26,7 @@ export default function HomeConductor({ session }) {
         }
     }
 
-        useEffect(() => {
+    useEffect(() => {
         // Verifica si hay sesión y el socket está conectado
         if (session?.user?.id && socket.connected) {
             console.log("Re-uniendo a room-pedidos después de posible recarga");
@@ -92,7 +92,7 @@ export default function HomeConductor({ session }) {
                     </Link>
                     {routingIndex == 0 && <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                         <div className="w-full h-full flex items-center justify-center">
-                            <Loader texto="Texto1" />
+                            <Loader texto="" />
                         </div>
                     </div>}
                 </div>

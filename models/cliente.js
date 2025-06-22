@@ -29,6 +29,7 @@ const clienteSchema = new Schema({
     cilindrosMax: { type: Number, default: 9999 },
     enQuiebra: { type: Boolean, default: false },
     mesesAumento: { type: [Number], default: null },
+    direccionDespachoIds: [{ type: Schema.Types.ObjectId, ref: 'Direccion', default: [] }],
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
 });

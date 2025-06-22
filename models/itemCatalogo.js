@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const ItemCatalogoSchema = new mongoose.Schema({
     temporalId: { type: String },
     codigo: { type: String },    
+    estado: { type: Number, default: 0 },
     subcategoriaCatalogoId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubcategoriaCatalogo', required: true },
     subcategoriaCatalogoIds: { type: [mongoose.Schema.Types.ObjectId], ref: 'SubcategoriaCatalogo' },
     nombre: { type: String, default: null },
@@ -16,7 +17,10 @@ const ItemCatalogoSchema = new mongoose.Schema({
     stockMinimo: { type: Number, default: 0 },
     stockActual: { type: Number, required: true },
     visible: { type: Boolean, default: true },
-    url: { type: String }
+    url: { type: String },
+    tipo: { type: Number, required: false },
+    direccionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Direccion', required: false },
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: false },
 }, { timestamps: true });
 
 const ItemCatalogo = mongoose.models.ItemCatalogo || mongoose.model('ItemCatalogo', ItemCatalogoSchema);

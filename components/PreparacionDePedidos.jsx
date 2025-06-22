@@ -24,6 +24,8 @@ export default function PreparacionDePedidos({ session }) {
     const [showModalCilindroErroneo, setShowModalCilindroErroneo] = useState(false);
     const [itemCatalogoEscaneado, setItemCatalogoEscaneado] = useState(null);
     const hiddenInputRef = useRef(null);
+    const temporalRef = useRef(null);
+    const [inputTemporalVisible, setInputTemporalVisible] = useState(false);    
 
     const postCargamento = async () => {
         console.log("Cargamento a guardar:", cargamentos[0]);
@@ -169,37 +171,48 @@ export default function PreparacionDePedidos({ session }) {
 
     useEffect(() => {
         fetchCargamentos();
-    }, []);    
+    }, []);
+    
+    const scanItem = useCallback(async (codigo) => {
+        try {
+            const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
+            console.log("RESPONSE", response);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Error al escanear el código");
+            }
+            const data = await response.json();
+            console.log("Scan exitoso:", data);
+            const item = {
+                ...data.item,
+                categoria: data.categoria,
+                subcategoria: data.subcategoria,
+            }
+            setItemCatalogoEscaneado(item);
+            cargarItem(item, codigo);
+        } catch {
+            toast.error(`Cilindro ${codigo} no existe`, {
+                position: "bottom-right",
+            });
+            return;
+        }
+    }, [cargarItem, setItemCatalogoEscaneado]);
 
     useEffect(() => {
         const handleTextInput = (e) => {            
             if (scanMode) {
                 const codigo = e.data;
-                const scanItem = async () => {
-                    try {
-                        const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
-                        console.log("RESPONSE", response);
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || "Error al escanear el código");
-                        }
-                        const data = await response.json();
-                        console.log("Scan exitoso:", data);
-                        const item = {
-                            ...data.item,
-                            categoria: data.categoria,
-                            subcategoria: data.subcategoria,
-                        }
-                        setItemCatalogoEscaneado(item);
-                        cargarItem(item, codigo);
-                    } catch {
-                        toast.error(`Cilindro ${codigo} no existe`, {
-                            position: "bottom-right",
-                        });
-                        return;
-                    }
-                };
-                scanItem();
+                console.log("Código escaneado:", codigo);
+                if (codigo === "x") {
+                    setScanMode(false);
+                    setInputTemporalVisible(true);
+                    setTimeout(() => {
+                        if(temporalRef.current)
+                            temporalRef.current.focus();
+                    }, 0);
+                    return;
+                }
+                scanItem(codigo);
             }
         }
 
@@ -216,7 +229,7 @@ export default function PreparacionDePedidos({ session }) {
                 inputElement.removeEventListener('textInput', handleTextInput);
             }
         };
-    }, [scanMode, cargarItem]);
+    }, [scanMode, cargarItem, scanItem, temporalRef]);
 
     // Mantener el foco en el input oculto para capturar eventos
     useEffect(() => {
@@ -336,7 +349,7 @@ export default function PreparacionDePedidos({ session }) {
                                 ))}
                             </ul>
 
-                            <div className="absolute bottom-3 flex w-full pr-8"
+                            {!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8"
                                 onClick={index === 0 ? postCargamento : undefined}>
                                 <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
                                     onClick={() => {
@@ -351,7 +364,23 @@ export default function PreparacionDePedidos({ session }) {
                                     <FaRoadCircleCheck className="text-4xl pb-0" />
                                     <p className="ml-2 mt-1 text-lg">CONFIRMAR CARGA</p>
                                 </button>
-                            </div>
+                            </div> :
+                            <div className="flex flex-col justify-center items-center h-4/5">
+                                <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
+                                <input
+                                    ref={temporalRef}
+                                    type="text"
+                                    className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            console.log("Código temporal ingresado:", e.target.value);
+                                            setInputTemporalVisible(false);
+                                            scanItem(e.target.value);
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                />
+                            </div>}
                         </div>
                     </div>
                 ))}

@@ -8,7 +8,7 @@ import { TIPO_PRECIO, USER_ROLE } from '@/app/utils/constants';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { LiaTimesSolid } from 'react-icons/lia';
-import Loader from '../Loader';
+import Loader from '@/components/Loader';
 import { socket } from "@/lib/socket-client";
 
 const TIPO_GUIA = [
@@ -49,6 +49,7 @@ export default function Pedidos({ session }) {
     const [loading, setLoading] = useState(false);
     const [categorias, setCategorias] = useState([]);
     const [subcategorias, setSubcategorias] = useState([]);
+    const [creandoVenta, setCreandoVenta] = useState(false);
 
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
 
@@ -101,12 +102,14 @@ export default function Pedidos({ session }) {
     };
 
     const onSubmit = async (data) => {
+        setCreandoVenta(true);
         console.log("DATA-SUBMIT", data);
         // Solo incluir los precios seleccionados como items de la venta
         const payload = {
             clienteId: clienteSelected?._id,
             usuarioId: data.usuarioId,
             documentoTributarioId: data.documentoTributarioId,
+            direccionDespachoId: data.direccionDespachoId,
             items: precios
             .filter(item => item.seleccionado && item.cantidad > 0)
             .map(item => ({
@@ -251,7 +254,7 @@ export default function Pedidos({ session }) {
 
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
-            <div className="w-full pb-2 pt-14 h-screen overflow-y-auto">
+            <div className="w-full pb-2 mt-14 h-[calc(100vh-56px)] overflow-y-auto">
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-2 sm:px-4 md:px-8 space-y-4 md:space-y-6">
                         <div className="w-full flex flex-col md:flex-row">
@@ -288,31 +291,52 @@ export default function Pedidos({ session }) {
                                             }}
                                         />
                                         {autocompleteClienteResults.length > 0 && (
-                                            <ul className="absolute z-10 w-full border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
+                                            <ul className="absolute z-10 w-1/4 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
                                                 {autocompleteClienteResults.map(cliente => (
                                                     <li
                                                         key={cliente._id}
                                                         className="px-3 py-2 cursor-pointer hover:bg-gray-200"
-                                                        onClick={() => {
-                                                            setValue('cliente', cliente.nombre);
-                                                            setClienteSelected(cliente);
-                                                            setAutocompleteClienteResults([]);
-                                                            if (cliente.documentoTributarioId) {
-                                                                setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == cliente.documentoTributarioId)?._id);
-                                                            }
-                                                            if (cliente.ordenCompra == true) {
-                                                                setValue("tipoRegistro", 3);
-                                                                setRegistroSelected(3);
-                                                            }
-                                                            fetch(`/api/clientes/precios?clienteId=${cliente._id}`)
-                                                                .then(response => response.json())
-                                                                .then(data => {
-                                                                    console.log("PRECIOS", data);
-                                                                    if (data.ok) {
-                                                                        setPrecios(data.precios.precios);
+                                                        onClick={async () => {
+                                                                try {
+                                                                    // Primero, obtener el cliente completo desde la API
+                                                                    const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
+                                                                    const clienteData = await clienteResp.json();
+                                                                    if (clienteResp.ok && clienteData.ok) {
+                                                                        setClienteSelected(clienteData.cliente);
+                                                                        setValue('cliente', clienteData.cliente.nombre);
+                                                                        setAutocompleteClienteResults([]);
+                                                                        // Setear documentoTributarioId si corresponde
+                                                                        if (clienteData.cliente.documentoTributarioId) {
+                                                                            setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == clienteData.cliente.documentoTributarioId)?._id);
+                                                                        }
+                                                                        // Setear tipoRegistro si corresponde
+                                                                        if (clienteData.cliente.ordenCompra === true) {
+                                                                            setValue("tipoRegistro", 3);
+                                                                            setRegistroSelected(3);
+                                                                        }
+                                                                        // Setear dirección de despacho si solo hay una
+                                                                        if (clienteData.cliente.direccionDespachoIds && clienteData.cliente.direccionDespachoIds.length === 1) {
+                                                                            setValue("direccionDespachoId", clienteData.cliente.direccionDespachoIds[0]._id);
+                                                                        }
+                                                                        // Ahora cargar los precios
+                                                                        const preciosResp = await fetch(`/api/clientes/precios?clienteId=${cliente._id}`);
+                                                                        const preciosData = await preciosResp.json();
+                                                                        if (preciosResp.ok && preciosData.ok) {
+                                                                            setPrecios(preciosData.precios.precios);
+                                                                        } else {
+                                                                            console.error("Error fetching precios:", preciosData.error);
+                                                                            toast.error("Error al cargar los precios del cliente.", {
+                                                                                position: "top-right",
+                                                                                autoClose: 5000,
+                                                                                hideProgressBar: false,
+                                                                                closeOnClick: true,
+                                                                                pauseOnHover: true,
+                                                                                draggable: true,
+                                                                                progress: undefined,
+                                                                            });
+                                                                        }
                                                                     } else {
-                                                                        console.error("Error fetching precios:", data.error);
-                                                                        toast.error("Error al cargar los precios del cliente.", {
+                                                                        toast.error("No se pudo cargar el cliente seleccionado.", {
                                                                             position: "top-right",
                                                                             autoClose: 5000,
                                                                             hideProgressBar: false,
@@ -322,10 +346,9 @@ export default function Pedidos({ session }) {
                                                                             progress: undefined,
                                                                         });
                                                                     }
-                                                                })
-                                                                .catch(error => {
+                                                                } catch (error) {
                                                                     console.error("Fetch error:", error);
-                                                                    toast.error("Error al cargar los precios del cliente.", {
+                                                                    toast.error("Error al cargar los datos del cliente.", {
                                                                         position: "top-right",
                                                                         autoClose: 5000,
                                                                         hideProgressBar: false,
@@ -334,8 +357,8 @@ export default function Pedidos({ session }) {
                                                                         draggable: true,
                                                                         progress: undefined,
                                                                     });
-                                                                });
-                                                        }}
+                                                                }
+                                                            }}
                                                     >
                                                         <p>{cliente.nombre}</p>
                                                         <p className="text-xs text-gray-500">{cliente.rut}</p>
@@ -344,40 +367,61 @@ export default function Pedidos({ session }) {
                                             </ul>
                                         )}
                                     </div>
-                                    <div className="w-full md:w-3/12 pr-0 md:pr-4">
-                                        <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
-                                        <select id="documentoTributarioId" {...register('documentoTributarioId')}
-                                            onChange={(e) => {
-                                                setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
-                                            }}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                            <option value="">Seleccione un documento</option>
-                                            {documentosTributarios.length && documentosTributarios.map(documento => (
-                                                <option key={documento._id} value={documento._id}>{documento.nombre}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-full md:w-3/12 pr-0 md:pr-4">
-                                        <label htmlFor="tipoGuia" className="block text-sm font-medium text-gray-700">Motivo guía</label>
-                                        <select name="detalleguiadespacho" {...register('tipoGuia', { valueAsNumber: true })}
-                                            id="detalleguiadespacho" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                            {TIPO_GUIA.map((guia) => (
-                                                <option key={guia.value} value={guia.value}>{guia.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>}
-                                    <div className="w-full md:w-3/12 pr-0 md:pr-4">
-                                        <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
-                                        <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
-                                            onChange={(e) => {
-                                                setRegistroSelected(e.target.value);
-                                            }}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                            {TIPO_REGISTRO.map((registro) => (
-                                                <option key={registro.value} value={registro.value}>{registro.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {clienteSelected && <>
+                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                            {clienteSelected.direccionDespachoIds && clienteSelected.direccionDespachoIds.length > 0 && (
+                                                <>
+                                                    <label htmlFor="direccionDespachoId" className="block text-sm font-medium text-gray-700">Dirección de despacho</label>
+                                                    <select
+                                                        id="direccionDespachoId"
+                                                        {...register('direccionDespachoId')}
+                                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                                    >
+                                                        <option value="">Seleccione dirección</option>
+                                                        {clienteSelected.direccionDespachoIds.map(dir => (
+                                                            <option key={dir._id} value={dir._id}>
+                                                                {dir.nombre}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </>
+                                            )}
+                                        </div>
+                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                            <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
+                                            <select id="documentoTributarioId" {...register('documentoTributarioId')}
+                                                onChange={(e) => {
+                                                    setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
+                                                }}
+                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                                <option value="">Seleccione un documento</option>
+                                                {documentosTributarios.length && documentosTributarios.map(documento => (
+                                                    <option key={documento._id} value={documento._id}>{documento.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {documentoTributarioSeleccionado != null && documentoTributarioSeleccionado.nombre.startsWith("Guia") && <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                            <label htmlFor="tipoGuia" className="block text-sm font-medium text-gray-700">Motivo guía</label>
+                                            <select name="detalleguiadespacho" {...register('tipoGuia', { valueAsNumber: true })}
+                                                id="detalleguiadespacho" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                                {TIPO_GUIA.map((guia) => (
+                                                    <option key={guia.value} value={guia.value}>{guia.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>}
+                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                            <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
+                                            <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
+                                                onChange={(e) => {
+                                                    setRegistroSelected(e.target.value);
+                                                }}
+                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                                {TIPO_REGISTRO.map((registro) => (
+                                                    <option key={registro.value} value={registro.value}>{registro.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>}
                                 </div>
                             </div>
 
@@ -528,37 +572,13 @@ export default function Pedidos({ session }) {
                                         router.back()
                                     }}>&lt;&lt; CANCELAR</button>
                                 <button
-                                    className={`flex w-full md:w-3/12 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1 ${isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}
-                                    type="submit"
+                                    className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${creandoVenta || isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    type="submit"                                    
                                     disabled={isCreateVentaDisabled || loadingForm}
                                 >
-                                    CREAR VENTA
+                                    {creandoVenta ? <div className="absolute -mt-1"><Loader texto="CREANDO VENTA" /></div> : "CREAR VENTA"}
                                 </button>
-                            </div>
-                            {/*<div className="w-full flex justify-end mt-4">
-                                <button
-                                    type="button"
-                                    disabled={!precios.some(precio => precio.seleccionado)}
-                                    className="rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                                    onClick={() => {
-                                        const selectedItems = precios.filter(precio => precio.seleccionado);
-                                        console.log("ITEM", selectedItems);
-                                        const updatedItemsVenta = selectedItems.map(item => ({
-                                            cantidad: item.cantidad || 1,
-                                            subcategoriaId: item.subcategoriaCatalogoId,
-                                            subcategoria: item.nombre,
-                                            precio: item.valor
-                                        }));
-                                        setItemsVenta(prev => [...prev, ...updatedItemsVenta]);
-                                    }}
-                                >
-                                    <div className="flex">
-                                        <BiCartDownload size="1.25rem" className="text-white mr-2" />
-                                        <span className="text-sm font-semibold">CARGAR SELECCIONADOS</span>
-                                    </div>
-                                </button>
-                            </div>*/}
+                            </div>                            
                         </div>
 
                     </form>

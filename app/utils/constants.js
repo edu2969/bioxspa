@@ -96,3 +96,23 @@ export const TIPO_CATEGORIA_CATALOGO = {
     garantia: 32,
     producto: 64,
 }
+
+export const TIPO_ITEM_CATALOGO = {
+    producto: 1,
+    servicio: 2,
+    flete: 3,
+    garantia: 4,
+    arriendo: 5,
+    insumo: 6,
+    cilindro: 7,
+}
+
+export const ESTADO_ITEM_CATALOGO = {
+    no_aplica: 0,
+    en_mantenimiento: 1,
+    en_arriendo: 2,
+    en_garantia: 4,    
+    vacio: 8,
+    en_llenado: 9,    
+    lleno: 16,
+}

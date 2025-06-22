@@ -362,7 +362,6 @@ export default function AsignacionPanel({ session }) {
                                         {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
                                             <div key={venta._id || idxVenta} className="border border-blue-400 rounded-lg mb-2 px-2 py-1 bg-white/80 shadow">
                                                 <div className="font-bold text-blue-800 text-xs mb-1 flex items-center">
-                                                    <span className="mr-2">Cliente:</span>
                                                     <span className="uppercase">{venta.clienteId?.nombre || "Desconocido"}</span>
                                                 </div>
                                                 <div className="flex flex-wrap">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { MdCleaningServices, MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
-import { FaClipboardCheck, FaFlagCheckered, FaUndo } from "react-icons/fa";
+import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckArrowRight } from "react-icons/fa6";
@@ -22,7 +22,9 @@ export default function Despacho({ session }) {
     const [loadingState, setLoadingState] = useState(-2);
     const [scanMode, setScanMode] = useState(false);
     const hiddenInputRef = useRef(null);
-    
+    const temporalRef = useRef(null);
+    const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
+
     function calculateTubePosition(index) {
         const baseTop = 36;
         const baseLeft = 66;
@@ -139,10 +141,10 @@ export default function Despacho({ session }) {
                     clienteNombre: currentClient.clienteId.nombre
                 };
             }
-            
+
             // Increment the total count (multiplicador)
             itemsBySubcategory[key].multiplicador += 1;
-            
+
             // If not marked as downloaded, increment the remaining count
             if (!item.descargado) {
                 itemsBySubcategory[key].restantes += 1;
@@ -162,6 +164,8 @@ export default function Despacho({ session }) {
         if (id == null) return { patente: "", marca: "" };
         return vehiculos?.find((vehiculo) => vehiculo._id === id) || { patente: "", marca: "" };
     };
+
+
 
     const checkListVehiculo = useCallback(async () => {
         try {
@@ -418,7 +422,7 @@ export default function Despacho({ session }) {
         }
 
         // Crear una copia profunda del rutaDespacho para modificarlo
-        const rutaDespachoActualizado = { 
+        const rutaDespachoActualizado = {
             ...rutaDespacho,
             cargaItemIds: [...rutaDespacho.cargaItemIds]
         };
@@ -498,13 +502,19 @@ export default function Despacho({ session }) {
     }
 
     useEffect(() => {
-        const handleTextInput = (e) => {            
+        const handleTextInput = (e) => {
             if (scanMode) {
                 const codigo = e.data;
-                const scanItem = async () => {                    
-                    descargarItem(codigo);
+                if (codigo === "x") {
+                    setScanMode(false);
+                    setInputTemporalVisible(true);
+                    setTimeout(() => {
+                        if (temporalRef.current)
+                            temporalRef.current.focus();
+                    }, 0);
+                    return;
                 }
-                scanItem();
+                descargarItem(codigo);
             }
         }
 
@@ -521,7 +531,7 @@ export default function Despacho({ session }) {
                 inputElement.removeEventListener('textInput', handleTextInput);
             }
         };
-    }, [scanMode, descargarItem]);
+    }, [scanMode, descargarItem, scanItem, temporalRef]);
 
     // Mantener el foco en el input oculto para capturar eventos
     useEffect(() => {
@@ -722,7 +732,8 @@ export default function Despacho({ session }) {
 
                 {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta
                     || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga)
+                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
+                    || (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length))
                     && (<div className="w-full text-center mt-4 mx-6">
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga && <div><button
@@ -755,84 +766,89 @@ export default function Despacho({ session }) {
                             </button>
                         </div>}
 
-                        {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga 
-                        && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ||
-                            rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
-                        && <div className="flex flex-row items-start justify-center gap-4 mb-6">
-                            <div className="flex flex-col items-center mt-1 ml-2">
-                                <FaFlagCheckered className="text-xl mb-4" />
-                                <div className="h-4" />
-                                {/* Línea y puntos */}
-                                <FaTruckArrowRight className="text-xl mt-1" />
-                            </div>
-                            <div className="flex flex-col items-center justify-start h-full">
-                                {/* Camino vertical */}
-                                <div className="flex flex-col items-center mt-1">
-                                    {/* Punto lleno */}
-                                    <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
-                                    {/* Línea vertical */}
-                                    <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2" />
-                                    {/* Punto hueco */}
-                                    <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
+                        {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga
+                            && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ||
+                                rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino ||
+                                (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length))
+                            && <div className="flex flex-row items-start justify-center gap-4 mb-6">
+                                <div className="flex flex-col items-center mt-1 ml-2">
+                                    <FaFlagCheckered className="text-xl mb-4" />
+                                    <div className="h-4" />
+                                    {/* Línea y puntos */}
+                                    <FaTruckArrowRight className="text-xl mt-1" />
                                 </div>
-                            </div>
-                            <div className="flex flex-col justify-start text-left mt-1">
-                                <div className="flex mt-1">
-                                    <BsFillGeoAltFill size="1.1rem" /><span className="text-sm ml-2">Barros Arana</span>
+                                <div className="flex flex-col items-center justify-start h-full">
+                                    {/* Camino vertical */}
+                                    <div className="flex flex-col items-center mt-1">
+                                        {/* Punto lleno */}
+                                        <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
+                                        {/* Línea vertical */}
+                                        <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2" />
+                                        {/* Punto hueco */}
+                                        <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
+                                    </div>
                                 </div>
-                                {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta) => (<div key={`ruta_${ruta._id}`} className="flex mt-2">
-                                    <BsFillGeoAltFill size="1.1rem" className="w-8 h-8 mt-4" /><span className="text-sm ml-2 mt-3">
-                                        {ruta.direccionDestinoId.nombre}</span>
-                                    <button
-                                        className="bg-blue-400 text-white font-bold rounded-lg shadow-md w-12 h-12"
-                                        onClick={() => {
-                                            const destino = `${ruta.direccionDestinoId.latitud},${ruta.direccionDestinoId.longitud}`;
-                                            // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
-                                            window.open(
-                                                `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`,
-                                                "_blank"
-                                            );
-                                        }}
-                                    >
-                                        <FaMapLocationDot className="mt-0.5 mr-2 w-12" size="1.5rem" />
-                                    </button>
-                                </div>))}
-                                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && rutaDespacho.ruta.length == 0 && (
-                                    <div className="flex mt-2">
-                                        <select
-                                            className="border rounded-lg shadow-sm w-full py-2 mt-3"
-                                            onChange={(e) => {
-                                                const selectedVentaId = e.target.value;
-                                                const selectedVenta = rutaDespacho.ventaIds.find((venta) => venta._id === selectedVentaId);
-                                                if (selectedVenta) {
-                                                    console.log("SETEADO", {
-                                                        ...rutaDespacho, ruta: [{
-                                                            direccionDestinoId: selectedVenta.clienteId.direccionId,
-                                                        }]
-                                                    });
-                                                    setRutaDespacho({
-                                                        ...rutaDespacho, ruta: [{
-                                                            direccionDestinoId: selectedVenta.clienteId.direccionId,
-                                                        }]
-                                                    });
-                                                }
+                                <div className="flex flex-col justify-start text-left mt-1">
+                                    <div className="flex mt-1">
+                                        <BsFillGeoAltFill size="1.1rem" /><span className="text-sm ml-2">Barros Arana</span>
+                                    </div>
+                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta) => (<div key={`ruta_${ruta._id}`} className="flex mt-2">
+                                        <BsFillGeoAltFill size="1.1rem" className="w-8 h-8 mt-4" /><span className="text-sm ml-2 mt-3">
+                                            {ruta.direccionDestinoId.nombre}</span>
+                                        <button
+                                            className="bg-blue-400 text-white font-bold rounded-lg shadow-md w-12 h-12"
+                                            onClick={() => {
+                                                const destino = `${ruta.direccionDestinoId.latitud},${ruta.direccionDestinoId.longitud}`;
+                                                // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
+                                                window.open(
+                                                    `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`,
+                                                    "_blank"
+                                                );
                                             }}
                                         >
-                                            <option value="">Selecciona un destino</option>
-                                            {rutaDespacho.ventaIds.map((venta) => (
-                                                <option key={`venta_${venta._id}`} value={venta._id}>
-                                                    {venta.clienteId.nombre} - {venta.clienteId.direccionId.nombre}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>)}
-                            </div>
-                        </div>}
+                                            <FaMapLocationDot className="mt-0.5 mr-2 w-12" size="1.5rem" />
+                                        </button>
+                                    </div>))}
+
+                                    {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino || rutaDespacho.ruta.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length - 1) && (
+                                        <div className="flex mt-2">
+                                            <select
+                                                className="border rounded-lg shadow-sm w-full py-2 mt-3"
+                                                onChange={(e) => {
+                                                    const selectedVentaId = e.target.value;
+                                                    const selectedVenta = rutaDespacho.ventaIds.find((venta) => venta._id === selectedVentaId);
+                                                    if (selectedVenta) {
+                                                        setRutaDespacho({
+                                                            ...rutaDespacho,
+                                                            ruta: [
+                                                                ...rutaDespacho.ruta,
+                                                                { direccionDestinoId: selectedVenta.clienteId.direccionId }
+                                                            ]
+                                                        });
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Selecciona un destino</option>
+                                                {rutaDespacho.ventaIds
+                                                    .filter(venta =>
+                                                        !rutaDespacho.ruta
+                                                            .map(r => typeof r.direccionDestinoId === 'object' ? r.direccionDestinoId._id : r.direccionDestinoId)
+                                                            .includes(venta.clienteId.direccionId._id)
+                                                    )
+                                                    .map((venta) => (
+                                                        <option key={`venta_${venta._id}`} value={venta._id}>
+                                                            {venta.clienteId.nombre} - {venta.clienteId.direccionId.nombre}
+                                                        </option>
+                                                    ))}
+                                            </select>
+                                        </div>)}
+                                </div>
+                            </div>}
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && <div className="flex flex-row items-center justify-center">
                             <button className="flex w-full justify-center py-3 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4"
                                 onClick={handleIniciarViaje}>
-                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <Loader texto=""/> : <div className="flex"><FaFlagCheckered className="mt-1 mr-3" /><span>INICIAR VIAJE</span></div>}
+                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <Loader texto="" /> : <div className="flex"><FaFlagCheckered className="mt-1 mr-3" /><span>INICIAR VIAJE</span></div>}
                             </button>
                         </div>}
 
@@ -877,7 +893,7 @@ export default function Despacho({ session }) {
                             </ul>
                         )}
 
-                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute bottom-3 flex w-full pr-8">
+                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8">
                             <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted(rutaDespacho)) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
                                 onClick={() => {
                                     handleScanMode();
@@ -888,33 +904,39 @@ export default function Despacho({ session }) {
                                 </div>}
                             </button>
                             <button className={`w-full ml-16 mr-4 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted(rutaDespacho) ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
-                                disabled={!isCompleted(rutaDespacho)}                            
+                                disabled={!isCompleted(rutaDespacho)}
                                 onClick={postDescarga}>
                                 <FaRoadCircleCheck className="text-4xl pb-0" />
                                 <p className="ml-2 mt-1 text-lg">FIN DESCARGA</p>
-                                {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && 
+                                {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada &&
                                     <div className="absolute mt-1"><Loader texto="" /></div>}
                             </button>
-                        </div>}
+                        </div> :
+                            <div className="flex flex-col justify-center items-center h-4/5">
+                                <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
+                                <input
+                                    ref={temporalRef}
+                                    type="text"
+                                    className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            console.log("Código temporal ingresado:", e.target.value);
+                                            setInputTemporalVisible(false);
+                                            scanItem(e.target.value);
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                />
+                            </div>)}
                     </div>
                     )}
 
 
-                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && <div className="w-full px-6 mb-4 bg-white mx-auto">
+                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.filter(r => r.fechaArribo != null).length == rutaDespacho.ventaIds.length && <div className="w-full px-6 mb-4 bg-white mx-auto">
                     <button
                         className={`w-full flex justify-center mt-4 py-3 bg-green-400 text-white font-bold rounded-lg shadow-md h-12`}
                         onClick={handleGoingBackToBase}>
                         <TbHomeShare className="text-2xl mt-0 mr-2" /><span>REGRESO A BASE</span>
-                    </button>
-                    <button
-                        className={`w-full flex justify-center mt-4 py-3 bg-red-400 text-white font-bold rounded-lg shadow-md h-12`}
-                        onClick={() => {
-                            setRutaDespacho({
-                                ...rutaDespacho,
-                                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
-                            })
-                        }}>
-                        <FaUndo className="mt-1 mr-2" /><span>ME FALTA CARGA</span>
                     </button>
                 </div>}
 
