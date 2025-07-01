@@ -56,7 +56,9 @@ export async function POST(request) {
         // Find the rutaDespacho that contains this venta
         const rutaDespacho = await RutaDespacho.findOne({
             ventaIds: ventaId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
+            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
+                TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+                TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada] }
         });
 
         if (!rutaDespacho) {
@@ -77,7 +79,7 @@ export async function POST(request) {
         // Update the venta status back to borrador
         await Venta.findByIdAndUpdate(
             ventaId,
-            { estado: TIPO_ESTADO_VENTA.borrador }
+            { estado: TIPO_ESTADO_VENTA.por_asignar }
         );
 
         return NextResponse.json({ 

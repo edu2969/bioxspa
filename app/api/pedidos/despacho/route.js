@@ -14,6 +14,7 @@ import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import User from "@/models/user";
 import Vehiculo from "@/models/vehiculo";
 import Venta from "@/models/venta";
+import ItemCatalogo from "@/models/itemCatalogo";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {

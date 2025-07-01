@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -6,18 +7,18 @@ import BICilindro from "@/models/biCilindro";
 import Cargo from "@/models/cargo";
 import Sucursal from "@/models/sucursal";
 import Dependencia from "@/models/dependencia";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 
 // Helper para obtener direcciones propias
 async function getDireccionesPropias(userId) {
     console.log(`[getDireccionesPropias] Buscando cargo activo para userId: ${userId}`);
-    // Cargo activo
+    // Cargo activo    
     const cargo = await Cargo.findOne({ userId, hasta: null });
     if (!cargo) {
         console.warn(`[getDireccionesPropias] No se encontró cargo activo para userId: ${userId}`);
         return [];
     }
-
     // Sucursal y dependencias válidas
     const sucursalId = cargo.sucursalId;
     console.log(`[getDireccionesPropias] sucursalId: ${sucursalId}`);
@@ -61,6 +62,10 @@ export async function GET(req) {
         const userId = session.user.id;
         console.log(`[GET /api/bi/cilindros] userId: ${userId}`);
 
+        if (!mongoose.models.SubcategoriaCatalogo) {
+            mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
+        }
+
         // 2. Direcciones propias
         const direccionIdsPropias = await getDireccionesPropias(userId);
         console.log(`[GET /api/bi/cilindros] Direcciones propias:`, direccionIdsPropias);
@@ -95,8 +100,8 @@ export async function GET(req) {
         
         // Filtrar cilindros propios
         cilindros = cilindros.filter(c => 
-            propios ? direccionIdsPropias.includes(c.direccionId.toString())
-            : !direccionIdsPropias.includes(c.direccionId.toString())
+            propios ? !direccionIdsPropias.includes(c.direccionId.toString())
+            : direccionIdsPropias.includes(c.direccionId.toString())
         );
         console.log(`[GET /api/bi/cilindros] Filtrado por propios: ${cilindros.length} resultados`);
 

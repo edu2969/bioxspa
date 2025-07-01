@@ -13,9 +13,11 @@ import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
+import CheckList from "@/models/checklist";
 
 export async function GET() {
     try {
+        console.log("GET request received for asignacion chofer.");
         console.log("Connecting to MongoDB...");
         await connectMongoDB();
         console.log("MongoDB connected.");
@@ -60,6 +62,10 @@ export async function GET() {
             choferId: choferId,
             estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
         }).populate({
+            path: "vehiculoId",
+            model: "Vehiculo",
+            select: "_id patente modelo marca",
+        }).populate({
             path: "cargaItemIds",
             model: "ItemCatalogo",
             select: "_id codigo subcategoriaCatalogoId",
@@ -82,11 +88,15 @@ export async function GET() {
                 model: "Cliente",
                 select: "_id nombre",
                 populate: {
-                    path: "direccionId",
+                    path: "direccionDespachoIds",
                     model: "Direccion",
                     select: "_id nombre latitud longitud",
                 }
             }
+        }).populate({
+            path: "ruta.direccionDestinoId",
+            model: "Direccion",
+            select: "_id nombre latitud longitud"
         })
         .lean();
 
@@ -103,7 +113,7 @@ export async function GET() {
     }
 }
 
-export async function POST(req) {
+export async function POST() {
     try {
         console.log("POST request received for asignacion chofer.");
         console.log("Connecting to MongoDB...");
@@ -120,18 +130,29 @@ export async function POST(req) {
 
         const choferId = session.user.id;
         
-        const body = await req.json();
-        const { vehiculoId } = body;
+        // Buscar el checklist del usuario para hoy con passed: true y obtener vehiculoId
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
 
-        if (!vehiculoId) {
-            console.warn("vehiculoId is missing in the request body.");
-            return NextResponse.json({ ok: false, error: "vehiculoId is required" }, { status: 400 });
+        const checklist = await CheckList.findOne({
+            userId: choferId,
+            passed: true,
+            fecha: { $gte: today }
+        }).lean();
+
+        if (!checklist || !checklist.vehiculoId) {
+            console.warn("No se encontró un checklist válido para el usuario hoy.");
+            return NextResponse.json({ ok: false, error: "No se encontró un checklist válido para el usuario hoy" }, { status: 400 });
         }
+
+        const vehiculoId = checklist.vehiculoId;
 
         console.log(`Fetching rutaDespacho for choferId: ${choferId}`);
         const rutaDespacho = await RutaDespacho.findOne({
             choferId: choferId,
-            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada] }
+            estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
         });
         
         if (!rutaDespacho) {
@@ -141,10 +162,22 @@ export async function POST(req) {
 
         console.log(`Assigning choferId: ${choferId} to rutaDespacho ID: ${rutaDespacho._id}`);
         rutaDespacho.vehiculoId = vehiculoId;
+        if(rutaDespacho.ventaIds.length === 1) {
+            const venta = await Venta.findById(rutaDespacho.ventaIds[0])
+                .select("clienteId").populate("clienteId")
+                .select("direccionDespachoIds").populate("direccionDespachoIds").lean();
+            if(venta.clienteId.direccionDespachoIds.length === 1) {
+                rutaDespacho.ruta = [{
+                    direccionId: venta.clienteId.direccionDespachoIds[0],
+                    fechaArribo: null
+                }]
+            }
+            rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino;
+        }
         await rutaDespacho.save();
 
         console.log("Returning updated rutaDespacho.");
-        return NextResponse.json({ ok: true, rutaDespacho });
+        return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("ERROR", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });

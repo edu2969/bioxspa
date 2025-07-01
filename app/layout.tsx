@@ -21,7 +21,7 @@ export default async function RootLayout({
     <html lang="es-CL">
       <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`}>      
         {children}
-        <Nav user={session?.user}></Nav>      
+        <Nav session={session}></Nav>
       </body>
     </html>
   )

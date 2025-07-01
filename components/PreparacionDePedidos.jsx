@@ -362,7 +362,7 @@ export default function PreparacionDePedidos({ session }) {
                                 </button>
                                 <button className={`ml-14 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}>
                                     <FaRoadCircleCheck className="text-4xl pb-0" />
-                                    <p className="ml-2 mt-1 text-lg">CONFIRMAR CARGA</p>
+                                    <p className="ml-2 mt-2 text-md font-bold">CONFIRMAR CARGA</p>
                                 </button>
                             </div> :
                             <div className="flex flex-col justify-center items-center h-4/5">

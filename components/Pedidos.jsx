@@ -50,8 +50,9 @@ export default function Pedidos({ session }) {
     const [categorias, setCategorias] = useState([]);
     const [subcategorias, setSubcategorias] = useState([]);
     const [creandoVenta, setCreandoVenta] = useState(false);
-
     const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
+    const [redirecting, setRedirecting] = useState(false);
+    const [loadingClients, setLoadingClients] = useState(false);
 
     const fetchUsuarios = async () => {
         const response = await fetch('/api/users');
@@ -65,6 +66,8 @@ export default function Pedidos({ session }) {
         const data = await response.json();
         setDocumentosTributarios(data.documentosTributarios);
     };
+
+    
 
     const fetchCategorias = async () => {
         try {
@@ -103,7 +106,6 @@ export default function Pedidos({ session }) {
 
     const onSubmit = async (data) => {
         setCreandoVenta(true);
-        console.log("DATA-SUBMIT", data);
         // Solo incluir los precios seleccionados como items de la venta
         const payload = {
             clienteId: clienteSelected?._id,
@@ -135,6 +137,7 @@ export default function Pedidos({ session }) {
                     position: "top-center"
                 });
                 socket.emit("update-pedidos", { userId: session.user.id });
+                setRedirecting(true);
                 router.push('/modulos');
             } else {
                 toast.error(result.error || "Error al crear la venta. Por favor, inténtelo más tarde.", {
@@ -276,6 +279,7 @@ export default function Pedidos({ session }) {
                                             Cliente
                                             {clienteSelected != null && clienteSelected.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
                                         </label>
+                                        <div className="relative">
                                         <input
                                             id="cliente"
                                             {...register('cliente')}
@@ -283,15 +287,22 @@ export default function Pedidos({ session }) {
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             onChange={(e) => {
                                                 const value = e.target.value;
+                                                setLoadingClients(true);
                                                 if (value.length > 2) {
                                                     fetch(`/api/clientes/search?q=${value}`)
                                                         .then(response => response.json())
-                                                        .then(data => setAutocompleteClienteResults(data.clientes));
+                                                        .then(data => {
+                                                            setAutocompleteClienteResults(data.clientes);
+                                                            setLoadingClients(false);
+                                                        });
                                                 }
                                             }}
-                                        />
+                                        />                                        
+                                        {loadingClients && <div className="absolute -right-2 top-0.5">
+                                            <Loader texto=""/>
+                                        </div>}
                                         {autocompleteClienteResults.length > 0 && (
-                                            <ul className="absolute z-10 w-1/4 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
+                                            <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
                                                 {autocompleteClienteResults.map(cliente => (
                                                     <li
                                                         key={cliente._id}
@@ -366,6 +377,7 @@ export default function Pedidos({ session }) {
                                                 ))}
                                             </ul>
                                         )}
+                                        </div>
                                     </div>
                                     {clienteSelected && <>
                                         <div className="w-full md:w-3/12 pr-0 md:pr-4">
@@ -566,17 +578,17 @@ export default function Pedidos({ session }) {
                                 </div>
                             ))}
                             <div className="w-full flex mt-6 justify-end">
-                                <button className="flex w-full md:w-3/12 justify-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
+                                <button className="flex w-full md:w-3/12 justify-center rounded-md bg-orange-500 px-3 h-10 pt-2 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         router.back()
-                                    }}>&lt;&lt; CANCELAR</button>
+                                    }}>&lt;&lt;&nbsp;&nbsp;CANCELAR</button>
                                 <button
-                                    className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${creandoVenta || isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${creandoVenta || isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     type="submit"                                    
                                     disabled={isCreateVentaDisabled || loadingForm}
                                 >
-                                    {creandoVenta ? <div className="absolute -mt-1"><Loader texto="CREANDO VENTA" /></div> : "CREAR VENTA"}
+                                    {creandoVenta ? <div className="relative mt-0"><Loader texto={redirecting ? "REDIRECCIONANDO" : "CREANDO VENTA"} /></div> : "CREAR VENTA"}
                                 </button>
                             </div>                            
                         </div>
@@ -696,8 +708,6 @@ export default function Pedidos({ session }) {
                     </div>
                 </div>
             )}
-
-
         </main>
     );
 }

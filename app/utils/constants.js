@@ -116,3 +116,53 @@ export const ESTADO_ITEM_CATALOGO = {
     en_llenado: 9,    
     lleno: 16,
 }
+
+export const TIPO_CHECKLIST = {
+    vehiculo: 1,
+    personal: 2
+}
+
+export const TIPO_CHECKLIST_ITEM = {
+    tarjeta_combustible: 1,
+    hoja_seguridad_transporte: 3,
+    permiso_circulacion: 5,
+    seguro_obligatorio: 7,
+    botiquien: 9,
+    limpieza_cabina: 10,
+    bocina: 13,
+    cinturon_conductor: 14,
+    estado_pedal_freno: 16,
+    luz_emergencia: 19,
+    luz_bocina_retroceso: 20,
+    luz_navegacion_posicion: 23,
+    luces_altas: 25,
+    luces_bajas: 26,
+    intermitentes: 28,
+    luz_patente: 31,
+    luz_freno: 32,
+    freno_mano: 34,
+    espejos_laterales: 36,
+    cintas_reflectantes: 39,
+    regulador_oxigeno_argon: 40,
+    neumaticos_delanteros: 42,
+    neumaticos_traseros: 44,
+    neumatico_repuesto: 46,
+    limpieza_exterior: 49,
+    conos_seguridad: 50,
+
+    zapatos_seguridad: 128,
+    polera_geologo: 130,
+    guantes_seguridad: 133,
+    bloqueador_solar: 135,
+    intercomunicador: 137,
+    pantalon: 138,
+    casco: 140,
+    lentes: 142,
+    impresora: 144
+}
+
+export const TIPO_ESTADO_CHECKLIST = {
+    pendiente: 0,
+    aprobado: 1,
+    rechazado: 2
+}

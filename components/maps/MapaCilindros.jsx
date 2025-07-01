@@ -139,9 +139,7 @@ export default function MapaCilindros({ data }) {
                                     icon={
                                         isLoaded && window.google && window.google.maps
                                             ? {
-                                                url: cliente.llenos > 1 
-                                                    ? "https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m5.png"
-                                                    : "./ui/tanque_biox.png",
+                                                url: `https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m${cliente.llenos > 50 ? 5 : Math.floor(cliente.llenos / 10) + 1}.png`,
                                                 scaledSize: new window.google.maps.Size(40, 40),
                                             }
                                             : undefined
@@ -181,8 +179,8 @@ export default function MapaCilindros({ data }) {
                                     <br />
                                     <span>{selectedCilindro.direccionId.nombre}</span>
                                     <ul>
-                                        {zoomedCluster.categorias.map((cat) => (
-                                            <li key={cat._id}><b>{cat.llenos}</b>x {cat.categoriaCatalogoId.nombre}</li>
+                                        {zoomedCluster.categorias.map((cat, idx) => (
+                                            <li key={`categ_${idx}`}><b>{cat.llenos}</b>x {cat.categoriaCatalogoId.nombre}</li>
                                         ))}
                                     </ul>
                                 </div>

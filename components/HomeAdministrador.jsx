@@ -6,20 +6,33 @@ import { TbReportMoney } from 'react-icons/tb';
 import { useEffect, useState } from 'react';
 import { socket } from '@/lib/socket-client';
 import Loader from './Loader';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function HomeAdministrador({ session }) {
-    const [borradorCount, setBorradorCount] = useState(0);
+    const [counters, setCounters] = useState({
+        pedidosCount: 0,
+        asignacionCounts: {
+            porAsignar: 0,
+            preparacion: 0,
+            enRuta: 0,
+        },
+        deudasCount: 0,
+    });
     const [routingIndex, setRoutingIndex] = useState(-2);
 
     useEffect(() => {
         async function fetchCounters() {
             try {
                 const response = await fetch('/api/home/administrador');
-                const data = await response.json();
-                if (data.ok && data.resultado) {
-                    setBorradorCount(data.resultado[0].flota || 0);
-                    setRoutingIndex(-1);
+                const data = await response.json();                
+                console.log("Fetched counters:", data);
+                if(data.ok) {
+                    setCounters(data.resultado);
+                } else {
+                    toast.warn("No se pudieron cargar los contadores");
                 }
+                setRoutingIndex(-1);
             } catch (error) {
                 console.error('Error fetching counters:', error);
             }
@@ -80,6 +93,12 @@ export default function HomeAdministrador({ session }) {
                             </div>
                             <span>PEDIDOS</span>
                         </div>
+                        {counters.pedidosCount > 0 && (
+                            <div className="absolute top-6 -left-10 bg-red-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
+                                <span className="text-sm mr-1">{counters.pedidosCount > 999999 ? '999999+' : counters.pedidosCount}</span>
+                                <span className="text-xs mt-0.5">x APROBAR</span>
+                            </div>
+                        )}
                     </Link>
                     {routingIndex == 0 && <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                         <div className="w-full h-full flex items-center justify-center">
@@ -95,10 +114,23 @@ export default function HomeAdministrador({ session }) {
                             </div>
                             <span>ASIGNACION</span>
                         </div>
-                        {borradorCount > 0 && (
+                        {counters.asignacionCounts.porAsignar > 0 && (
                             <div className="absolute top-6 -right-10 bg-red-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
-                                <span className="text-sm mr-1">{borradorCount > 999999 ? '999999+' : borradorCount}</span>
-                                <span className="text-xs mt-0.5">x ASIGNAR</span>
+                                <span className="text-sm mr-1">{counters.asignacionCounts.porAsignar > 999999 ? '999999+' : counters.asignacionCounts.porAsignar}</span>
+                                <span className="text-xs mt-0.5">x POR ASIGNAR</span>
+                            </div>
+                        )}
+                        {counters.asignacionCounts.preparacion > 0 && (
+                            <div className="absolute top-6 -right-10 bg-yellow-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
+                                <span className="text-sm mr-1">{counters.asignacionCounts.preparacion > 999999 ? '999999+' : counters.asignacionCounts.preparacion}</span>
+                                <span className="text-xs mt-0.5">x EN PREPARACION</span>
+                            </div>
+                        )}
+                        
+                        {counters.asignacionCounts.enRuta > 0 && (
+                            <div className="absolute top-6 -right-10 bg-blue-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
+                                <span className="text-sm mr-1">{counters.asignacionCounts.enRuta > 999999 ? '999999+' : counters.asignacionCounts.enRuta}</span>
+                                <span className="text-xs mt-0.5">x EN RUTA</span>
                             </div>
                         )}
                     </Link>
@@ -127,6 +159,7 @@ export default function HomeAdministrador({ session }) {
                     <Loader texto="Cargando panel" />
                 </div>}
             </div>
+            <ToastContainer />
         </main>
     );
 }

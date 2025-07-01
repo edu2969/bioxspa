@@ -13,6 +13,7 @@ import Direccion from "@/models/direccion";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
 import RutaDespacho from "@/models/rutaDespacho";
+import Checklist from "@/models/checklist";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
@@ -91,6 +92,9 @@ export async function GET() {
         qry.userId = { $nin: choferesIds };
     }
     const cargosChoferes = await Cargo.find(qry).lean();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const choferes = await Promise.all(
         cargosChoferes.map(async (cargo) => {
             const user = await User.findById(cargo.userId).lean();
@@ -142,10 +146,22 @@ export async function GET() {
                 );
             }
 
+            // Check if checklist exists for today
+            const Checklist = (await import('@/models/checklist')).default;
+            const checklistExists = await Checklist.findOne({
+                userId: user._id,
+                fecha: {
+                    $gte: today,
+                    $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+                },
+                passed: true
+            }).lean();
+
             return {
                 _id: user._id,
                 nombre: user.name,
                 pedidos,
+                checklist: !!checklistExists
             };
         })
     );
@@ -271,15 +287,24 @@ export async function POST(request) {
                 { $addToSet: { ventaIds: ventaId } } // Ensure ventaId is not duplicated
             );
             return NextResponse.json({ ok: true, message: "Venta added to existing RutaDespacho" });
-        } else {
-            // Find vehicles assigned to the chofer
-            const vehiculosAsignados = await Vehiculo.find({ choferIds: choferId }).lean();
-
+        } else {            
             let vehiculoId = null;
-            if (vehiculosAsignados.length === 1) {
-                // If there is exactly one vehicle assigned, use it
-                vehiculoId = vehiculosAsignados[0]._id;
+            // Buscar el checklist de hoy para el chofer con passed=true
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+            const checklist = await Checklist.findOne({
+                userId: choferId,
+                fecha: { $gte: today, $lt: tomorrow },
+                passed: true
+            }).lean();
+
+            if (!checklist || !checklist.vehiculoId) {
+                return NextResponse.json({ ok: false, error: "No existe checklist aprobado para el chofer hoy" }, { status: 500 });
             }
+
+            vehiculoId = checklist.vehiculoId;
 
             // Create a new RutaDespacho
             const nuevaRutaDespacho = new RutaDespacho({

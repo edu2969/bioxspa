@@ -7,13 +7,22 @@ export async function GET() {
     try {
         await connectMongoDB();
 
-        const porAsignarCount = await Venta.countDocuments({ 
-            estado: TIPO_ESTADO_VENTA.por_asignar
+        const ventas = await Venta.find({ 
+            estado: { $gte: TIPO_ESTADO_VENTA.borrador, $lte: TIPO_ESTADO_VENTA.reparto },
         });
-
-        const resultado = [
-            { pedido: 0, flota: porAsignarCount, deudas: 0 }
-        ];
+        const pedidosCount = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.borrador).length;
+        const porAsignar = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.por_asignar).length;
+        const preparacion = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.preparacion).length;
+        const enRuta = ventas.length - pedidosCount - porAsignar - preparacion;
+        const resultado = { 
+            pedidosCount, 
+            asignacionCounts: {
+                porAsignar,
+                preparacion,
+                enRuta,
+            },
+            deudasCount: 0,
+        }
 
         return NextResponse.json({ ok: true, resultado });
     } catch (error) {

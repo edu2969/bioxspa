@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { MdCleaningServices, MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
+import { MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
 import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckArrowRight } from "react-icons/fa6";
 import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
@@ -14,6 +14,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { LuFlagOff } from "react-icons/lu";
 import { getNUCode } from "@/lib/nuConverter";
 import { TbHomeShare } from "react-icons/tb";
+import CheckList from './CheckList';
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -24,10 +25,78 @@ export default function Despacho({ session }) {
     const hiddenInputRef = useRef(null);
     const temporalRef = useRef(null);
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
+    const [loadingChecklist, setLoadingChecklist] = useState(false);
+    const [checkListPassed, setCheckListPassed] = useState(true);
+
+    const fetchEstadoChecklist = async () => {
+        try {
+            const response = await fetch('/api/users/checklist', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al obtener el estado del checklist');
+            }
+            
+            const data = await response.json();
+            console.log("Estado del checklist:", data);            
+            setLoadingChecklist(false);
+            setCheckListPassed(data.passed);
+        } catch (error) {
+            console.error('Error fetching checklist status:', error);
+            return false;
+        }
+    }
+
+    useEffect(() => {
+        if (
+            session &&
+            session.user &&
+            (session.user?.role === USER_ROLE.conductor ||
+                session.user?.role === USER_ROLE.supervisor ||
+                session.user?.role === USER_ROLE.supplier)
+        ) {
+            fetchEstadoChecklist();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session]);
+
+    const onFinish = (checklist) => {
+        console.log("Checklist completed", checklist);
+        checklist.tipo = TIPO_CHECKLIST.vehiculo;
+        if(vehiculos.length === 1) {
+            checklist.vehiculoId = vehiculos[0]._id;
+        }
+        fetch('/api/users/checklist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(checklist),
+        })
+        .then(async (res) => {
+            setCheckListPassed(res.ok);
+            setLoadingChecklist(false);
+            if(res.ok) {
+                socket.emit("update-pedidos", {
+                    userId: session.user.id
+                });
+            }
+        })
+        .catch((err) => {
+            console.error('Error al guardar el checklist:', err);
+            toast.error("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
+                position: "top-center"
+            });
+        });
+    };
 
     function calculateTubePosition(index) {
         const baseTop = 36;
-        const baseLeft = 66;
+        const baseLeft = 96;
         const scaleFactor = 1.5;
 
         const verticalIncrement = 3;
@@ -40,7 +109,7 @@ export default function Despacho({ session }) {
 
     function calculateUploadTubePosition(index) {
         const baseTop = 176;
-        const baseLeft = 156;
+        const baseLeft = 176;
         const scaleFactor = 1.5;
 
         const verticalIncrement = 3;
@@ -101,8 +170,8 @@ export default function Despacho({ session }) {
         const currentRoute = rd.ruta[rd.ruta.length - 1];
 
         // Find which client corresponds to this destination
-        const currentClient = rd.ventaIds?.find(venta => {
-            const clientDestId = venta.clienteId.direccionId._id;
+        const currentClient = rd.ventaIds?.find(() => {
+            const clientDestId = rd.ruta[rd.ruta.length - 1].direccionDestinoId._id;
             const routeDestId = typeof currentRoute.direccionDestinoId === 'object'
                 ? currentRoute.direccionDestinoId._id
                 : currentRoute.direccionDestinoId;
@@ -160,74 +229,15 @@ export default function Despacho({ session }) {
         return descarga.every((item) => item.restantes <= 0);
     }
 
-    const vehiculoPorId = (id) => {
-        if (id == null) return { patente: "", marca: "" };
-        return vehiculos?.find((vehiculo) => vehiculo._id === id) || { patente: "", marca: "" };
-    };
-
-
-
-    const checkListVehiculo = useCallback(async () => {
-        try {
-            const response = await fetch("/api/pedidos/asignacion/chofer", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ vehiculoId: rutaDespacho.vehiculoId }),
-            });
-            const data = await response.json();
-            console.log("Response from POST /api/pedidos/asignacion/chofer:", data);
-            if (data.ok) {
-                const nuevaRuta = {
-                    estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                }
-                if (rutaDespacho.ventaIds.length == 1) {
-                    nuevaRuta.ruta = [{
-                        direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionId
-                    }];
-                }
-                setRutaDespacho({ ...rutaDespacho, ...nuevaRuta });
-                setLoadingState(-1);
-            } else {
-                toast.error("No se pudo asignar el vehiculo");
-            }
-        } catch (error) {
-            console.log("Error in POST request:", error);
-        }
-    }, [rutaDespacho, setRutaDespacho]);
-
     const fetchRutaAsignada = useCallback(async () => {
         try {
             const response = await fetch("/api/pedidos/asignacion/chofer");
             const data = await response.json();
             if (data.ok) {
-                console.log("Data result:", data);
+                console.log("Ruta asignada:", data.rutaDespacho);
                 setRutaDespacho(data.rutaDespacho);
                 if (data.rutaDespacho && data.rutaDespacho.cargaItemIds && data.rutaDespacho.cargaItemIds.length > 0) {
-                    setResumenCarga(getResumenCarga(data.rutaDespacho.cargaItemIds));
-                }
-                if (data.rutaDespacho && data.rutaDespacho.ruta && data.rutaDespacho.ruta.length > 0) {
-                    // Ensure each route has complete direccionDestinoId from the corresponding client
-                    const enrichedRuta = data.rutaDespacho.ruta.map(r => {
-                        // Try to find matching client from ventaIds
-                        const matchingVenta = data.rutaDespacho.ventaIds.find(venta =>
-                            venta.clienteId.direccionId._id === r.direccionDestinoId
-                        );
-
-                        console.log("Matching venta for ruta:", r, matchingVenta);
-
-                        // If found, use client's complete direccionId, otherwise keep original with fallback name
-                        return {
-                            ...r,
-                            direccionDestinoId: matchingVenta.clienteId.direccionId
-                        };
-                    });
-
-                    setRutaDespacho({
-                        ...data.rutaDespacho,
-                        ruta: enrichedRuta
-                    });
+                    setResumenCarga(getResumenCarga(data.rutaDespacho.cargaItemIds));                    
                 }
                 setVehiculos(data.vehiculos);
             } else {
@@ -251,10 +261,23 @@ export default function Despacho({ session }) {
             const data = await response.json();
             if (data.ok) {
                 toast.success("Carga confirmada correctamente");
-                setRutaDespacho({
-                    ...rutaDespacho,
-                    estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
-                });
+                if (rutaDespacho.ventaIds.length === 1 && rutaDespacho.ventaIds[0].clienteId.direccionDespachoIds.length == 1) {
+                    setRutaDespacho({
+                        ...rutaDespacho,
+                        estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
+                        ruta: [{
+                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionDespachoIds[0],
+                            fechaArribo: null,
+                        }]
+                    });
+                } else {
+                    setRutaDespacho({
+                        ...rutaDespacho,
+                        estado: rutaDespacho.ruta.length === rutaDespacho.ventaIds.length
+                        ? TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                        : TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                    });                  
+                }
                 socket.emit("update-pedidos", {
                     userId: session.user.id
                 });
@@ -279,7 +302,7 @@ export default function Despacho({ session }) {
                 },
                 body: JSON.stringify({
                     rutaId: rutaDespacho._id,
-                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
+                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId._id
                 }),
             });
 
@@ -531,7 +554,7 @@ export default function Despacho({ session }) {
                 inputElement.removeEventListener('textInput', handleTextInput);
             }
         };
-    }, [scanMode, descargarItem, scanItem, temporalRef]);
+    }, [scanMode, descargarItem, temporalRef]);
 
     // Mantener el foco en el input oculto para capturar eventos
     useEffect(() => {
@@ -591,20 +614,10 @@ export default function Despacho({ session }) {
 
     return (
         <div className="w-full h-screen overflow-hidden">
-            {loadingState == -1 && rutaDespacho?.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && vehiculos.length >= 2 && <div className="w-full text-center">
-                <select className="text-2xl font-bold mb-4 border rounded-lg bg-white shadow-sm w-1/3 mt-10"
-                    onChange={(e) => setVehiculoSeleccionado(e.target.value)}>
-                    <option>Selecciona un vehiculo</option>
-                    {vehiculos.map((vehiculo) => (
-                        <option key={`vehiculo_${vehiculo._id}`} value={vehiculo._id}>
-                            {vehiculo.patente} - {vehiculo.marca}
-                        </option>
-                    ))}
-                </select>
-            </div>}
-            <div className={`${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? "opacity-20" : ""}`}>
+            
+            <div className={`${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
                 <Image
-                    className="absolute top-6 left-8 ml-2"
+                    className="absolute top-6 left-0 pl-8"
                     src="/ui/camion.png"
                     alt="camion_atras"
                     width={355}
@@ -612,7 +625,7 @@ export default function Despacho({ session }) {
                     style={{ width: "355px", height: "275px" }}
                     priority
                 />
-                <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
+                <div className="absolute top-6 mt-2 w-full">
                     {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
                         const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
                         const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
@@ -633,20 +646,20 @@ export default function Despacho({ session }) {
                     })}
                 </div>
                 <Image
-                    className="absolute top-6 left-8 ml-2"
+                    className="absolute top-6 pl-8"
                     src="/ui/camion_front.png"
                     alt="camion"
                     width={355}
                     height={275}
                     style={{ width: "355px", height: "275px" }}
                 />
-                {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-52 ml-2 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(2)" }}>
+                {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-48 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.8)" }}>
                     <div className="ml-4 text-slate-800">
-                        <p className="text-xs font-bold">{vehiculoPorId(rutaDespacho.vehiculoId).patente || ""}</p>
-                        <p className="text-xs">{vehiculoPorId(rutaDespacho.vehiculoId).marca || ""}</p>
+                        <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
+                        <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
                     </div>
                 </div>}
-                {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
+                {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute top-6 left-0 mt-2 w-full">
                     {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
                         const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
                         const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
@@ -667,6 +680,7 @@ export default function Despacho({ session }) {
                     })}
                 </div>}
             </div>
+            
 
             {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">
 
@@ -684,7 +698,7 @@ export default function Despacho({ session }) {
                                 </div>
                             </div>}
 
-                            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div>
+                            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
                                 <p className="text-center text-xl font-bold">CONFIRMA{`${loadingState == TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada ? 'NDO' : ''}`} LA CARGA</p>
                                 <div className="flex flex-col md:flex-row px-4 py-2">
                                     <div className="w-full md:w-1/3">
@@ -699,41 +713,18 @@ export default function Despacho({ session }) {
                                         </div>
                                     </div>
                                 </div>
-                                <button className={`flex w-full justify-center py-3 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada ? "opacity-50 cursor-not-allowed" : ""}`}
+                                <button className={`w-full text-center h-10 px-4 bg-green-400 text-white rounded-lg shadow-md cursor-pointer mb-4 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada ? "opacity-50 cursor-not-allowed" : ""}`}
                                     onClick={handleCargaConfirmada}>
-                                    <FaFlagCheckered className="mt-1 mr-3" /><span>CONFIRMAR CARGA</span>
-                                    {loadingState == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada &&
-                                        <div className="absolute -mt-1"><Loader texto="" /></div>}
+                                    {loadingState == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada 
+                                        ? <div className="mt-0"><Loader texto="CONFIRMANDO" /></div> 
+                                        : <div className="flex justify-center"><FaFlagCheckered className="mt-1 mr-3" /><span className="mt-0">CONFIRMAR CARGA</span></div>}
                                 </button>
                             </div>}
                         </div>
                     )}
 
-                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada && <div className="mb-8">
-                    <div className="text-center bg-gray-200 py-2 px-4 rounded-xl shadow-lg">
-                        <p className="text-xl font-bold text-gray-700 mb-4">INICIO DE DESPACHO</p>
-                        <MdCleaningServices className="inline-block mr-2 mb-6 text-8xl" />
-                        <div className="flex">
-                            <input
-                                onChange={() => {
-                                    if (rutaDespacho.ventaIds.length > 1) {
-                                        setRutaDespacho({ ...rutaDespacho, estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino });
-                                        return;
-                                    }
-                                    checkListVehiculo();
-                                }}
-                                type="checkbox"
-                                className="h-8 w-8 text-green-500 mx-auto"
-                            />
-                            <p className="w-72 text-left text-xl ml-4">Certifico que el interior del vehiculo está limpio</p>
-                        </div>
-                    </div>
-                </div>}
-
-                {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta
-                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                    || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
-                    || (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length))
+                {rutaDespacho.estado >= TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                    && rutaDespacho.estado < TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada
                     && (<div className="w-full text-center mt-4 mx-6">
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga && <div><button
@@ -742,7 +733,7 @@ export default function Despacho({ session }) {
                             <FaFlagCheckered className="mt-1 mr-2" /><span>HE LLEGADO</span>
                             {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga &&
                                 <div className="absolute -mt-1">
-                                    <Loader texto="" />
+                                    <Loader texto="REPORTANDO" />
                                 </div>
                             }
                         </button></div>}
@@ -767,9 +758,8 @@ export default function Despacho({ session }) {
                         </div>}
 
                         {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga
-                            && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ||
-                                rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino ||
-                                (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length))
+                            && (rutaDespacho.estado >= TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada &&
+                                rutaDespacho.estado <= TIPO_ESTADO_RUTA_DESPACHO.en_ruta) 
                             && <div className="flex flex-row items-start justify-center gap-4 mb-6">
                                 <div className="flex flex-col items-center mt-1 ml-2">
                                     <FaFlagCheckered className="text-xl mb-4" />
@@ -792,7 +782,7 @@ export default function Despacho({ session }) {
                                     <div className="flex mt-1">
                                         <BsFillGeoAltFill size="1.1rem" /><span className="text-sm ml-2">Barros Arana</span>
                                     </div>
-                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta) => (<div key={`ruta_${ruta._id}`} className="flex mt-2">
+                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-2">
                                         <BsFillGeoAltFill size="1.1rem" className="w-8 h-8 mt-4" /><span className="text-sm ml-2 mt-3">
                                             {ruta.direccionDestinoId.nombre}</span>
                                         <button
@@ -810,7 +800,8 @@ export default function Despacho({ session }) {
                                         </button>
                                     </div>))}
 
-                                    {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino || rutaDespacho.ruta.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length - 1) && (
+                                    {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino 
+                                        && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length) && (
                                         <div className="flex mt-2">
                                             <select
                                                 className="border rounded-lg shadow-sm w-full py-2 mt-3"
@@ -830,30 +821,40 @@ export default function Despacho({ session }) {
                                             >
                                                 <option value="">Selecciona un destino</option>
                                                 {rutaDespacho.ventaIds
-                                                    .filter(venta =>
-                                                        !rutaDespacho.ruta
-                                                            .map(r => typeof r.direccionDestinoId === 'object' ? r.direccionDestinoId._id : r.direccionDestinoId)
-                                                            .includes(venta.clienteId.direccionId._id)
-                                                    )
-                                                    .map((venta) => (
-                                                        <option key={`venta_${venta._id}`} value={venta._id}>
-                                                            {venta.clienteId.nombre} - {venta.clienteId.direccionId.nombre}
-                                                        </option>
-                                                    ))}
+                                                        .flatMap(venta =>
+                                                            venta.clienteId.direccionDespachoIds
+                                                                .filter(dir =>
+                                                                    !rutaDespacho.ruta
+                                                                        .map(r => typeof r.direccionDestinoId === 'object' ? r.direccionDestinoId._id : r.direccionDestinoId)
+                                                                        .includes(dir._id)
+                                                                )
+                                                                .map(dir => ({
+                                                                    ventaId: venta._id,
+                                                                    clienteNombre: venta.clienteId.nombre,
+                                                                    direccion: dir
+                                                                }))
+                                                        )
+                                                        .map(({ ventaId, clienteNombre, direccion }) => (
+                                                            <option key={`venta_${ventaId}_dir_${direccion._id}`} value={ventaId + '|' + direccion._id}>
+                                                                {clienteNombre} - {direccion.nombre}
+                                                            </option>
+                                                        ))}
                                             </select>
                                         </div>)}
                                 </div>
                             </div>}
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && <div className="flex flex-row items-center justify-center">
-                            <button className="flex w-full justify-center py-3 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4"
+                            <button className="flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4"
                                 onClick={handleIniciarViaje}>
-                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <Loader texto="" /> : <div className="flex"><FaFlagCheckered className="mt-1 mr-3" /><span>INICIAR VIAJE</span></div>}
+                                {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <div className="mt-1"><Loader texto="INICIANDO" /></div> : <div className="flex"><FaFlagCheckered className="mt-3 mr-3" />
+                                    <span className="mt-2">INICIAR VIAJE</span>
+                                </div>}
                             </button>
                         </div>}
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (
-                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">
+                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">                                
                                 {getResumenDescarga(rutaDespacho).map((item, idx) => (
                                     <li
                                         key={`item_${idx}`}
@@ -922,14 +923,13 @@ export default function Despacho({ session }) {
                                         if (e.key === 'Enter') {
                                             console.log("Código temporal ingresado:", e.target.value);
                                             setInputTemporalVisible(false);
-                                            scanItem(e.target.value);
+                                            descargarItem(e.target.value);
                                             e.target.value = '';
                                         }
                                     }}
                                 />
                             </div>)}
-                    </div>
-                    )}
+                    </div>)}
 
 
                 {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.filter(r => r.fechaArribo != null).length == rutaDespacho.ventaIds.length && <div className="w-full px-6 mb-4 bg-white mx-auto">
@@ -973,6 +973,9 @@ export default function Despacho({ session }) {
                 className="opacity-0 h-0 w-0 absolute"
                 inputMode="none"
             />
+
+
+            {!loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} />}
         </div>
     );
 }

@@ -1,9 +1,8 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import ItemCatalogo from "@/models/itemCatalogo";
-import Producto from "@/models/producto";
-import HistorialGas from "@/models/historial_gas";
-import { ESTADO_ITEM_CATALOGO, TIPO_ITEM_CATALOGO } from "@/app/utils/constants";
+import RutaDespacho from "@/models/rutaDespacho";
+import DetalleVenta from "@/models/detalleVenta";
+import Venta from "@/models/venta";
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
@@ -17,13 +16,18 @@ export async function GET() {
     //await createBICilindro();
     //console.log("BICilindro created successfully.");
 
-    console.log("Calling fixItemCatalogo...");
+    /*console.log("Calling fixItemCatalogo...");
     await fixItemCatalogo();
-    console.log("fixItemCatalogo completed.");
+    console.log("fixItemCatalogo completed.");*/
+
+    console.log("Calling cleanVentas...");
+    await cleanVentas();
+    console.log("cleanVentas completed.");
 
     return NextResponse.json({ message: "Success migrate and improve" });
 }
 
+/*
 const fixItemCatalogo = async () => {
     const estadoMap = {
         "1": ESTADO_ITEM_CATALOGO.lleno,
@@ -81,7 +85,7 @@ const fixItemCatalogo = async () => {
     console.log(`Estados no válidos: ${resumen.estadoNoValido}`);
     console.log(`Items actualizados: ${resumen.actualizados}`);
     console.log("Actualizados por estado:", resumen.porEstado);
-}
+}*/
 
 /*const fixOwners = async () => {
     const productos = await Producto.find({});
@@ -256,3 +260,12 @@ const createBICilindro = async () => {
         });
     }
 }*/
+
+const cleanVentas = async () => {
+    // Borra todas las rutas de despacho
+    await RutaDespacho.deleteMany({});
+    // Borra todos los detalles de venta
+    await DetalleVenta.deleteMany({});
+    // Borra todas las ventas
+    await Venta.deleteMany({});
+}

@@ -34,36 +34,7 @@ export default function AsignacionPanel({ session }) {
     const nombreChofer = (choferId) => {
         const chofer = choferes.find((chofer) => chofer._id === choferId);
         return chofer ? chofer.nombre : "Desconocido";
-    }
-
-    /*const getResumenCarga = (items = []) => {
-        const resumen = {};
-        if (!Array.isArray(items)) return [];
-
-        items.forEach((item) => {
-            // item.subcategoriaCatalogoId es un objeto poblado
-            const sub = item.subcategoriaCatalogoId;
-            if (!sub || !sub._id) return;
-
-            const key = sub._id;
-            if (!resumen[key]) {
-                resumen[key] = {
-                    subcategoriaCatalogoId: key,
-                    cantidad: sub.cantidad,
-                    unidad: sub.unidad,
-                    sinSifon: sub.sinSifon,
-                    esIndustrial: sub.categoriaCatalogoId?.esIndustrial || false,
-                    esMedicinal: sub.categoriaCatalogoId?.esMedicinal || false,
-                    elemento: sub.categoriaCatalogoId?.elemento || "",
-                    multiplicador: 1,
-                };
-            } else {
-                resumen[key].multiplicador += 1;
-            }
-        });
-
-        return Object.values(resumen);
-    };*/
+    }   
 
     const fetchPedidos = useCallback(async () => {
         try {
@@ -175,8 +146,8 @@ export default function AsignacionPanel({ session }) {
                                 PEDIDOS
                             </div>
                             <Link href="/modulos/pedidos/nuevo" className="relative ml-auto -mt-2">
-                                <button className="flex items-center bg-blue-500 text-white h-12 w-12 rounded hover:bg-blue-600 transition-colors font-semibold">
-                                    <FaCartPlus size={38} className="pl-0.5 ml-0.5" />
+                                <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3">
+                                    <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO
                                 </button>
                             </Link>
                         </div>
@@ -213,23 +184,28 @@ export default function AsignacionPanel({ session }) {
                             EN ESPERA
                         </div>
                         {choferes.map((chofer, index) => (
-                            <div
-                                key={`en_espera_${index}`}
-                                className="p-2 border rounded-lg mb-2 bg-gray-100"
+                            <div key={`en_espera_${index}`}
+                                className={`relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-gray-100' : 'bg-green-100'}`}
                                 data-id={`choferId_${chofer._id}`}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = "rgb(209 213 219)"; // Tailwind gray-300
-                                    e.currentTarget.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
+                                    e.currentTarget.style.boxShadow = chofer.checklist
+                                        ? "0 4px 6px rgba(0, 0, 0, 0.1)"
+                                        : "0 4px 12px 0 rgba(239, 68, 68, 0.5)"; // rojo-500
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
                                     e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = "rgb(243 244 246)"; // Tailwind gray-100
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
                                     e.currentTarget.style.boxShadow = "none";
+                                    if(!chofer.checklist) {
+                                        toast.warning("El chofer no tiene checklist completo, no se puede asignar.");
+                                        return;
+                                    };                                    
                                     if (selectedPedido) {
                                         setSelectedChofer(chofer._id);
                                         setShowConfirmModal(true);
@@ -237,9 +213,15 @@ export default function AsignacionPanel({ session }) {
                                 }}
                             >
                                 <div className="font-bold uppercase flex">
-                                    <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
+                                    <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>                                    
                                 </div>
-                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div className="bg-gray-200 rounded shadow-md p-1 mb-2"
+                                {!chofer.checklist && (
+                                    <div className="flex items-center text-red-600 text-xs font-semibold">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-red-600 mr-2"></span>
+                                        Sin checklist
+                                    </div>
+                                )}
+                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div className="bg-green-300 rounded shadow-md py-1 px-2 mb-2 mt-2"
                                     onDragStart={() => {
                                         setSelectedChofer(chofer._id);
                                         setSelectedVenta(pedido.items[0].ventaId);
@@ -250,8 +232,8 @@ export default function AsignacionPanel({ session }) {
                                     <ul className="list-disc ml-4">
                                         {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
                                     </ul>
-                                </div>) : <div className="relative w-32">
-                                    <div className="relative -top-8 left-64 bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
+                                </div>) : <div className="absolute w-32 -top-0 right-0">
+                                    <div className="bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
                                         <RiZzzFill size="1rem" className="mr-1" />
                                         <p>SIN PEDIDOS</p>
                                     </div>
@@ -490,21 +472,21 @@ export default function AsignacionPanel({ session }) {
                             }
                             socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
                             toast.success("Pedido listo para asignar");
-                            fetchPedidos();
-                        } catch (error) {
-                            toast.error(error.message || "Error al deshacer la asignación del pedido");
-                        } finally {
-                            setShowReasignacionModal(false); // Cierra el modal después de confirmar                            
-                            setLoading(false);
                             setLoadingPanel(true);
                             setSelectedVenta(null);
                             setSelectedChofer(null);
                             socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
+                            fetchPedidos();                            
+                        } catch (error) {
+                            toast.error(error.message || "Error al deshacer la asignación del pedido");
+                        } finally {
+                            setShowReasignacionModal(false); // Cierra el modal después de confirmar                            
+                            setLoading(false);                            
                         }
                     };
                     deshacerAsignarPedido();
                 }}
-                confirmationLabel="ASIGNAR"
+                confirmationLabel="DESHASIGNAR"
             />
 
             <ToastContainer />

@@ -57,7 +57,6 @@ export default function BranchBussinessView() {
         }
     }, [setBranches, setLoadingAdminPanel]);
 
-
     const fetchCategorias = useCallback(async () => {
         try {
             const response = await fetch("/api/categoriasGases");

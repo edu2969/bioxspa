@@ -33,9 +33,10 @@ export async function POST(req) {
         const rutaDespacho = await RutaDespacho.findOne({
             _id: rutaId,
             choferId: choferId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
+                TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino] }
         });
-        
+
         if (!rutaDespacho) {
             console.warn(`RutaDespacho not found or not in 'carga_confirmada' state for ID: ${rutaId}`);
             return NextResponse.json({ 

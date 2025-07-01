@@ -5,6 +5,8 @@ import { connectMongoDB } from "@/lib/mongodb";
 import RutaDespacho from "@/models/rutaDespacho";
 import Cargo from "@/models/cargo";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
+import Venta from "@/models/venta";
+import Cliente from "@/models/cliente";
 
 export async function POST() {
     try {
@@ -56,6 +58,36 @@ export async function POST() {
             estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
             fecha: new Date()
         });
+
+        if (
+            rutaDespacho.ventaIds &&
+            rutaDespacho.ventaIds.length === 1
+        ) {
+            // Buscar la venta
+            const venta = await Venta.findById(rutaDespacho.ventaIds[0]);
+            if (venta && venta.clienteId) {
+                // Buscar el cliente
+                const cliente = await Cliente.findById(venta.clienteId);
+                if (
+                    cliente &&
+                    cliente.direccionDespachoIds &&
+                    cliente.direccionDespachoIds.length === 1
+                ) {
+                    // Agregar la ruta si no existe ya esa dirección en la ruta
+                    const direccionId = cliente.direccionDespachoIds[0];
+                    const yaExiste = rutaDespacho.ruta.some(
+                        r => r.direccionDestinoId?.toString() === direccionId.toString()
+                    );
+                    if (!yaExiste) {
+                        rutaDespacho.ruta.push({
+                            direccionDestinoId: direccionId,
+                            fechaArribo: null
+                        });
+                    }
+                    rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino;
+                }
+            }
+        }
 
         await rutaDespacho.save();
         console.log(`[CONFIRMAR ORDEN] Estado de la ruta actualizado a 'orden_confirmada' y guardado en base de datos`);
