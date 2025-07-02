@@ -15,9 +15,7 @@ export default function Nav({ session }) {
     const path = usePathname();    
 
     useEffect(() => {
-        if(session && session.user && (session.user?.role == USER_ROLE.conductor 
-            || session.user?.role == USER_ROLE.supervisor
-            || session.user?.role == USER_ROLE.supplier)) {
+        if(session && session.user && session.user?.role) {
             setRole(session.user.role);
         }
     }, [session, setRole]);
@@ -64,7 +62,7 @@ export default function Nav({ session }) {
                     <Link href="/modulos/about" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer">
                             <AiFillAliwangwang size="4rem" />
-                            <p className="text-2xl ml-2 mt-4">Acerca de...</p>
+                            <p className="text-2xl ml-2 mt-4">Acerca de...({role})</p>
                         </div>
                     </Link>
                     <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2"
