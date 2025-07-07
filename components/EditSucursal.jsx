@@ -52,9 +52,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
     };
 
     const getUserAvatarFromUserId = (userId) => {
-        console.log("AVATAR", userId);
         const user = users.find(user => user._id === userId);
-        console.log("USER", user);
         if (user) {
             return `/profiles/${user.email.split('@')[0].toLowerCase()}.jpg`;
         }

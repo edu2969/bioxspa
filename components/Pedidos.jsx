@@ -1,15 +1,18 @@
 "use client"
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO, USER_ROLE } from '@/app/utils/constants';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { LiaTimesSolid } from 'react-icons/lia';
+import { LiaPencilAltSolid, LiaTimesSolid } from 'react-icons/lia';
 import Loader from '@/components/Loader';
 import { socket } from "@/lib/socket-client";
+import { MdAddLocationAlt } from 'react-icons/md';
+import Autocomplete from "react-google-autocomplete";
+import { FaCheck, FaTimes } from 'react-icons/fa';
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -29,12 +32,12 @@ const TIPO_REGISTRO = [
     { value: 4, label: "Venta Firmada" }
 ]
 
-export default function Pedidos({ session }) {
+export default function Pedidos({ session, googleMapsApiKey }) {
     const router = useRouter();
-    const { register, handleSubmit, setValue } = useForm();
+    const { register, handleSubmit, setValue, getValues } = useForm();
     const [usuarios, setUsuarios] = useState([]);
     const [precios, setPrecios] = useState([]);
-    const [loadingForm, setLoadingForm] = useState(false);
+    const [setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
     const [itemsVenta] = useState([]);
@@ -50,9 +53,45 @@ export default function Pedidos({ session }) {
     const [categorias, setCategorias] = useState([]);
     const [subcategorias, setSubcategorias] = useState([]);
     const [creandoVenta, setCreandoVenta] = useState(false);
-    const isCreateVentaDisabled = itemsVenta.some(item => !item.precio || parseInt(item.precio) <= 0);
     const [redirecting, setRedirecting] = useState(false);
     const [loadingClients, setLoadingClients] = useState(false);
+    const [role, setRole] = useState(-1);
+    const [editDireccionDespacho, setEditDireccionDespacho] = useState(false);
+    const [autocompleteResults, setAutocompleteResults] = useState([]);
+    const autocompleteRef = useRef(null);
+    const [selectedPlace, setSelectedPlace] = useState(null);
+    const [savingPlace, setSavingPlace] = useState(false);
+
+    const isVentaDisabled = () => {
+        return !precios.length  
+            || !precios.some(precio => precio.seleccionado) 
+            || precios.some(precio => precio.cantidad <= 0 && precio.seleccionado) 
+            || !clienteSelected || !getValues("direccionDespachoId") 
+            || !getValues("usuarioId") || !getValues("documentoTributarioId");
+    }
+
+    const handlePlaceChanged = (autocomplete) => {
+        const place = autocomplete;
+        console.log("Selected Place:", place);
+        setSelectedPlace(place);
+        if (!place || !place.geometry) {
+            return;
+        }
+        setAutocompleteResults([]);
+    };
+
+    const handleSelectPlace = (place) => {
+        const address = {
+            nombre: place.formatted_address,
+            apiId: place.place_id,
+            latitud: place.geometry.location.lat(),
+            longitud: place.geometry.location.lng(),
+            categoria: place.types[0]
+        };
+        console.log("Selected Place:", address);
+        setSelectedPlace(address);
+        setAutocompleteResults([]);
+    };
 
     const fetchUsuarios = async () => {
         const response = await fetch('/api/users');
@@ -66,8 +105,6 @@ export default function Pedidos({ session }) {
         const data = await response.json();
         setDocumentosTributarios(data.documentosTributarios);
     };
-
-    
 
     const fetchCategorias = async () => {
         try {
@@ -112,13 +149,14 @@ export default function Pedidos({ session }) {
             usuarioId: data.usuarioId,
             documentoTributarioId: data.documentoTributarioId,
             direccionDespachoId: data.direccionDespachoId,
+            comentario: data.comentario || "",
             items: precios
-            .filter(item => item.seleccionado && item.cantidad > 0)
-            .map(item => ({
-                cantidad: parseInt(item.cantidad),
-                precio: parseInt(item.valor),
-                subcategoriaId: item.subcategoriaCatalogoId
-            })),
+                .filter(item => item.seleccionado && item.cantidad > 0)
+                .map(item => ({
+                    cantidad: parseInt(item.cantidad),
+                    precio: parseInt(item.valor),
+                    subcategoriaId: item.subcategoriaCatalogoId
+                })),
         }
         console.log("PAYLOAD2", payload);
         setLoadingForm(true);
@@ -132,7 +170,7 @@ export default function Pedidos({ session }) {
             });
             const result = await resp.json();
             console.log("RESULT", result);
-            if(resp.ok && result.ok) {
+            if (resp.ok && result.ok) {
                 toast.success("Venta creada exitosamente.", {
                     position: "top-center"
                 });
@@ -143,7 +181,7 @@ export default function Pedidos({ session }) {
                 toast.error(result.error || "Error al crear la venta. Por favor, inténtelo más tarde.", {
                     position: "top-center"
                 });
-            }         
+            }
         } catch (error) {
             console.error(error);
             toast.error("Ocurrió un error al crear la venta. Por favor, inténtelo más tarde.", {
@@ -164,7 +202,7 @@ export default function Pedidos({ session }) {
     };
 
     const handleSave = async () => {
-        setSaving(true);        
+        setSaving(true);
         const sc = precioData.subcategoriaCatalogoId;
         const exists = precios.some((p) => p.subcategoriaCatalogoId === sc);
         if (exists) {
@@ -175,17 +213,17 @@ export default function Pedidos({ session }) {
         setPrecios(prev => [
             ...prev,
             {
-            ...precioData,
-            valor: parseInt(precioData.valor) || 0,
-            cantidad: 0,
-            seleccionado: false,
-            nombre: (
-                (() => {
-                const subcat = subcategorias.find(sc => sc._id === precioData.subcategoriaCatalogoId);
-                const categoria = categorias.find(cat => cat._id === subcat?.categoriaCatalogoId);
-                return `${categoria?.nombre || ""}-${subcat?.nombre || ""}`;
-                })()
-            ),
+                ...precioData,
+                valor: parseInt(precioData.valor) || 0,
+                cantidad: 0,
+                seleccionado: false,
+                nombre: (
+                    (() => {
+                        const subcat = subcategorias.find(sc => sc._id === precioData.subcategoriaCatalogoId);
+                        const categoria = categorias.find(cat => cat._id === subcat?.categoriaCatalogoId);
+                        return `${categoria?.nombre || ""}-${subcat?.nombre || ""}`;
+                    })()
+                ),
             }
         ]);
         setSaving(false);
@@ -193,6 +231,7 @@ export default function Pedidos({ session }) {
     }
 
     useEffect(() => {
+        setRole(session?.user?.role || -1);
         // Verifica si hay sesión y el socket está conectado
         if (session?.user?.id && socket.connected) {
             console.log("Re-uniendo a room-pedidos después de posible recarga");
@@ -223,7 +262,7 @@ export default function Pedidos({ session }) {
 
     useEffect(() => {
         const fetchAll = async () => {
-            setLoading(true);            
+            setLoading(true);
             try {
                 await Promise.all([
                     fetchUsuarios(),
@@ -231,7 +270,7 @@ export default function Pedidos({ session }) {
                 ]);
             } catch (error) {
                 console.error('Error fetching initial data:', error);
-            } finally {                            
+            } finally {
                 setLoading(false);
                 fetchCategorias();
                 fetchSubcategorias();
@@ -257,7 +296,7 @@ export default function Pedidos({ session }) {
 
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
-            <div className="w-full pb-2 mt-14 h-[calc(100vh-56px)] overflow-y-auto">
+            <div className="w-full pb-2 mt-14 h-[calc(100vh-106px)] overflow-y-auto">
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-2 sm:px-4 md:px-8 space-y-4 md:space-y-6">
                         <div className="w-full flex flex-col md:flex-row">
@@ -280,54 +319,64 @@ export default function Pedidos({ session }) {
                                             {clienteSelected != null && clienteSelected.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
                                         </label>
                                         <div className="relative">
-                                        <input
-                                            id="cliente"
-                                            {...register('cliente')}
-                                            type="text"
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setLoadingClients(true);
-                                                if (value.length > 2) {
-                                                    fetch(`/api/clientes/search?q=${value}`)
-                                                        .then(response => response.json())
-                                                        .then(data => {
-                                                            setAutocompleteClienteResults(data.clientes);
-                                                            setLoadingClients(false);
-                                                        });
-                                                }
-                                            }}
-                                        />                                        
-                                        {loadingClients && <div className="absolute -right-2 top-0.5">
-                                            <Loader texto=""/>
-                                        </div>}
-                                        {autocompleteClienteResults.length > 0 && (
-                                            <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white">
-                                                {autocompleteClienteResults.map(cliente => (
-                                                    <li
-                                                        key={cliente._id}
-                                                        className="px-3 py-2 cursor-pointer hover:bg-gray-200"
-                                                        onClick={async () => {
+                                            <div className="w-full pr-0 flex items-end">
+                                                <input
+                                                    id="cliente"
+                                                    {...register('cliente')}
+                                                    type="text"
+                                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setLoadingClients(true);
+                                                        if (value.length > 2) {
+                                                            fetch(`/api/clientes/search?q=${value}`)
+                                                                .then(response => response.json())
+                                                                .then(data => {
+                                                                    setAutocompleteClienteResults(data.clientes);
+                                                                    setLoadingClients(false);
+                                                                });
+                                                        } else setLoadingClients(false);
+                                                    }}
+                                                />
+                                                {loadingClients && <div className="absolute -right-2 top-1">
+                                                    <Loader texto="" />
+                                                </div>}
+                                                <button
+                                                    type="button"
+                                                    className={`ml-2 flex items-center px-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${loadingClients ? 'cursor-not-allowed opacity-50' : ''}`}
+                                                    onClick={() => {
+                                                        router.push('/modulos/configuraciones/clientes');
+                                                    }}
+                                                >
+                                                    <LiaPencilAltSolid size="1.6rem" />
+                                                </button>
+                                            </div>
+                                            {autocompleteClienteResults.length > 0 && (
+                                                <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full">
+                                                    {autocompleteClienteResults.map(cliente => (
+                                                        <li
+                                                            key={cliente._id}
+                                                            className="px-3 py-2 cursor-pointer hover:bg-gray-200"
+                                                            onClick={async () => {
                                                                 try {
                                                                     // Primero, obtener el cliente completo desde la API
                                                                     const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
                                                                     const clienteData = await clienteResp.json();
+                                                                    console.log("Cliente Data:", clienteData);
                                                                     if (clienteResp.ok && clienteData.ok) {
                                                                         setClienteSelected(clienteData.cliente);
-                                                                        setValue('cliente', clienteData.cliente.nombre);
                                                                         setAutocompleteClienteResults([]);
                                                                         // Setear documentoTributarioId si corresponde
                                                                         if (clienteData.cliente.documentoTributarioId) {
                                                                             setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == clienteData.cliente.documentoTributarioId)?._id);
                                                                         }
+                                                                        if(clienteData.cliente.direccionesDespacho?.length === 1) {                                                                            
+                                                                            setValue("direccionDespachoId", clienteData.cliente.direccionesDespacho[0].direccionId._id);                                                                            
+                                                                        }
                                                                         // Setear tipoRegistro si corresponde
                                                                         if (clienteData.cliente.ordenCompra === true) {
                                                                             setValue("tipoRegistro", 3);
                                                                             setRegistroSelected(3);
-                                                                        }
-                                                                        // Setear dirección de despacho si solo hay una
-                                                                        if (clienteData.cliente.direccionDespachoIds && clienteData.cliente.direccionDespachoIds.length === 1) {
-                                                                            setValue("direccionDespachoId", clienteData.cliente.direccionDespachoIds[0]._id);
                                                                         }
                                                                         // Ahora cargar los precios
                                                                         const preciosResp = await fetch(`/api/clientes/precios?clienteId=${cliente._id}`);
@@ -370,36 +419,134 @@ export default function Pedidos({ session }) {
                                                                     });
                                                                 }
                                                             }}
-                                                    >
-                                                        <p>{cliente.nombre}</p>
-                                                        <p className="text-xs text-gray-500">{cliente.rut}</p>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
+                                                        >
+                                                            <p>{cliente.nombre}</p>
+                                                            <p className="text-xs text-gray-500">{cliente.rut}</p>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
                                         </div>
                                     </div>
                                     {clienteSelected && <>
-                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
-                                            {clienteSelected.direccionDespachoIds && clienteSelected.direccionDespachoIds.length > 0 && (
-                                                <>
-                                                    <label htmlFor="direccionDespachoId" className="block text-sm font-medium text-gray-700">Dirección de despacho</label>
-                                                    <select
-                                                        id="direccionDespachoId"
-                                                        {...register('direccionDespachoId')}
-                                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                                    >
-                                                        <option value="">Seleccione dirección</option>
-                                                        {clienteSelected.direccionDespachoIds.map(dir => (
-                                                            <option key={dir._id} value={dir._id}>
-                                                                {dir.nombre}
+                                        {!editDireccionDespacho ? <div className="w-full md:w-5/12 pr-0 md:pr-4 flex items-end">
+                                            <div className="w-full">
+                                                <label htmlFor="direccionesDespacho" className="block text-sm font-medium text-gray-700">Dirección de despacho</label>
+                                                <select
+                                                    id="direccionDespachoId"
+                                                    {...register('direccionDespachoId')}
+                                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                                >
+                                                    <option value="">Seleccione dirección</option>
+                                                    {clienteSelected.direccionesDespacho
+                                                        && clienteSelected.direccionesDespacho.length > 0                                                        
+                                                        && clienteSelected.direccionesDespacho.map(dir => (
+                                                            <option key={dir.direccionId._id} value={dir.direccionId._id}>
+                                                                {dir.direccionId.nombre}
                                                             </option>
                                                         ))}
-                                                    </select>
-                                                </>
-                                            )}
-                                        </div>
-                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                                </select>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="ml-2 flex items-center px-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold"
+                                                onClick={() => {
+                                                    setEditDireccionDespacho(true);
+                                                }}
+                                            >
+                                                <MdAddLocationAlt size="1.6rem" />
+                                            </button>
+                                        </div> : <div className="w-full md:w-5/12 pr-0 md:pr-4 flex items-end">
+                                            <div className="relative w-full">
+                                                <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                                                <div className="flex">
+                                                    <Autocomplete
+                                                        apiKey={googleMapsApiKey}
+                                                        onPlaceSelected={(place) => {
+                                                            handlePlaceChanged(place);
+                                                        }}
+                                                        options={{
+                                                            types: ['address'],
+                                                            componentRestrictions: { country: 'cl' }
+                                                        }}
+                                                        ref={autocompleteRef}
+                                                        defaultValue={''}
+                                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className={`ml-2 flex items-center pl-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${savingPlace ? 'cursor-not-allowed opacity-50' : ''}`}
+                                                        disabled={savingPlace}
+                                                        onClick={async () => {
+                                                            setSavingPlace(true);
+                                                            if (!selectedPlace) {
+                                                                toast.error("Seleccione una dirección válida antes de guardar.");
+                                                                setSavingPlace(false);
+                                                                return;
+                                                            }
+                                                            try {
+                                                                const resp = await fetch('/api/ventas/direccionDespacho', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        direccion: {
+                                                                            nombre: selectedPlace.formatted_address,
+                                                                            latitud: selectedPlace.geometry.location.lat(),
+                                                                            longitud: selectedPlace.geometry.location.lng(),
+                                                                            apiId: selectedPlace.place_id
+                                                                        },
+                                                                        direccionId: false,
+                                                                    })
+                                                                });
+                                                                const result = await resp.json();
+                                                                if (resp.ok && result.ok) {
+                                                                    // Agregar la nueva dirección al cliente actual
+                                                                    const nuevaDireccion = result.direccion;
+                                                                    setClienteSelected(prev => ({
+                                                                        ...prev,
+                                                                        direccionesDespacho: [...(prev.direccionesDespacho || []), nuevaDireccion]
+                                                                    }));
+                                                                    setValue("direccionDespachoId", nuevaDireccion.direccionId._id);
+                                                                    toast.success("Dirección agregada exitosamente.");
+                                                                    setEditDireccionDespacho(false);
+                                                                } else {
+                                                                    toast.error(result.error || "No se pudo agregar la dirección.");
+                                                                }
+                                                            } catch {
+                                                                toast.error("Error al guardar la dirección.");
+                                                            } finally {
+                                                                setSavingPlace(false);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <FaCheck className="mr-2" size="1.6rem" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="ml-2 flex items-center px-2 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-semibold"
+                                                        onClick={() => {
+                                                            setEditDireccionDespacho(false);
+                                                        }}
+                                                    >
+                                                        <FaTimes size="1.6rem" />
+                                                    </button>
+                                                </div>
+                                                {autocompleteResults.length > 0 && (
+                                                    <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1">
+                                                        {autocompleteResults.map((result, index) => (
+                                                            <li
+                                                                key={index}
+                                                                className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                                                                onClick={() => handleSelectPlace(result)}
+                                                            >
+                                                                {result.formatted_address}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        </div>}
+                                        <div className="w-full md:w-2/12 pr-0 md:pr-4">
                                             <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
                                             <select id="documentoTributarioId" {...register('documentoTributarioId')}
                                                 onChange={(e) => {
@@ -421,7 +568,7 @@ export default function Pedidos({ session }) {
                                                 ))}
                                             </select>
                                         </div>}
-                                        <div className="w-full md:w-3/12 pr-0 md:pr-4">
+                                        <div className="w-full md:w-2/12 pr-0 md:pr-4">
                                             <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
                                             <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
                                                 onChange={(e) => {
@@ -435,6 +582,16 @@ export default function Pedidos({ session }) {
                                         </div>
                                     </>}
                                 </div>
+                                <div className="w-full md:w-1/2 mt-4">
+                                    <label htmlFor="comentario" className="block text-sm font-medium text-gray-700">Comentario</label>
+                                    <textarea
+                                        id="comentario"
+                                        {...register('comentario')}
+                                        rows={3}
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                        placeholder="Comentario para la venta"
+                                    ></textarea>
+                                </div>
                             </div>
 
                             <div className="w-full md:w-3/12 text-center">
@@ -444,7 +601,7 @@ export default function Pedidos({ session }) {
                                         {clienteSelected.tipoPrecio == TIPO_PRECIO.mayorista ? <span className="bg-green-600 text-white rounded-md py-1 px-2 text-xs mr-2">MAYORISTA</span>
                                             : <span className="bg-orange-600 text-white rounded-md py-1 px-2 text-xs mx-2">MINORISTA</span>}
                                         &nbsp;{formatRUT(clienteSelected.rut)}</p>
-                                    <p className="text-gray-400 text-xs mt-2">{clienteSelected.credito ? "CON" : "SIN"}&nbsp;CREDITO / {clienteSelected.arriendo ? "CON" : "SIN"}&nbsp;ARRIENDO</p>
+                                    <p className="text-gray-400 text-xs mt-2"><span className={`${clienteSelected.credito ? "text-green-600" : "text-red-600"}`}>{clienteSelected.credito ? "CON" : "SIN"}&nbsp;CRÉDITO</span> / {clienteSelected.arriendo ? "CON" : "SIN"}&nbsp;ARRIENDO</p>
                                 </div>)}
                             </div>
                         </div>
@@ -495,7 +652,7 @@ export default function Pedidos({ session }) {
                             </div>
                         </div>}
 
-                        <div className={`w-full ${clienteSelected != null ? '' : 'opacity-20'}`}>
+                        <div className={`w-full ${clienteSelected != null && clienteSelected.credito ? '' : 'opacity-20'}`}>
                             <div className="flex justify-between items-center">
                                 <p className="font-bold text-lg">PRECIOS CARGADOS</p>
                                 <button
@@ -503,7 +660,7 @@ export default function Pedidos({ session }) {
                                     className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                                     onClick={() => setModalSolicitudPrecio(true)}
                                 >
-                                    {session.user.role == USER_ROLE.manager ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                                    {(session.user.role == USER_ROLE.manager || session.user.role == USER_ROLE.seller) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                             </div>
                             <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
@@ -533,7 +690,6 @@ export default function Pedidos({ session }) {
                                                     updatedPrecios[index].seleccionado = e.target.checked;
                                                     updatedPrecios[index].cantidad = e.target.checked ? 1 : 0;
                                                     setValue(`precios[${index}].cantidad`, e.target.checked ? 1 : 0);
-                                                    console.log("PRECIOS", updatedPrecios);
                                                     setPrecios(updatedPrecios);
                                                 }}
                                                 {...register(`precios[${index}].seleccionado`)}
@@ -577,20 +733,20 @@ export default function Pedidos({ session }) {
                                     </div>
                                 </div>
                             ))}
-                            <div className="w-full flex mt-6 justify-end">
-                                <button className="flex w-full md:w-3/12 justify-center rounded-md bg-orange-500 px-3 h-10 pt-2 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
+                            <div className="fixed left-0 w-full flex mt-6 justify-end bottom-0 bg-white pt-1 pb-2 px-2 md:px-6">
+                                <button className="flex w-full md:w-3/12 justify-center rounded-md bg-gray-600 px-3 h-10 pt-2 text-white shadow-sm hover:bg-gray-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-300 mr-4"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         router.back()
-                                    }}>&lt;&lt;&nbsp;&nbsp;CANCELAR</button>
+                                    }}>CANCELAR</button>
                                 <button
-                                    className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${creandoVenta || isCreateVentaDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    type="submit"                                    
-                                    disabled={isCreateVentaDisabled || loadingForm}
+                                    className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isVentaDisabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    type="submit"
+                                    disabled={isVentaDisabled()}
                                 >
-                                    {creandoVenta ? <div className="relative mt-0"><Loader texto={redirecting ? "REDIRECCIONANDO" : "CREANDO VENTA"} /></div> : "CREAR VENTA"}
+                                    {creandoVenta ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> : "CREAR VENTA"}
                                 </button>
-                            </div>                            
+                            </div>
                         </div>
 
                     </form>
@@ -670,7 +826,7 @@ export default function Pedidos({ session }) {
                                             }
                                         </select>
                                     </div>
-                                    <div className="flex flex-col">
+                                    {(role == USER_ROLE.manager || role == USER_ROLE.seller) && <div className="flex flex-col">
                                         <label htmlFor="valor" className="text-sm text-gray-500">Precio</label>
                                         <div className="flex items-center">
                                             <span className="text-gray-500 mr-1">$</span>
@@ -685,7 +841,7 @@ export default function Pedidos({ session }) {
                                                 inputMode="numeric"
                                             />
                                         </div>
-                                    </div>
+                                    </div>}
                                 </div>
                             </div>
                             <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -694,7 +850,7 @@ export default function Pedidos({ session }) {
                                     disabled={loading}
                                     className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
                                     {saving && <div className="absolute -mt-1"><Loader texto="" /></div>}
-                                    {session.user.role == USER_ROLE.manager ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                                    {(session.user.role == USER_ROLE.manager || session.user.role == USER_ROLE.seller) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                                 <button
                                     onClick={handleCancel}

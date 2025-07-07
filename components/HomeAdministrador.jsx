@@ -21,25 +21,24 @@ export default function HomeAdministrador({ session }) {
     });
     const [routingIndex, setRoutingIndex] = useState(-2);
 
-    useEffect(() => {
-        async function fetchCounters() {
-            try {
-                const response = await fetch('/api/home/administrador');
-                const data = await response.json();                
-                console.log("Fetched counters:", data);
-                if(data.ok) {
-                    setCounters(data.resultado);
-                } else {
-                    toast.warn("No se pudieron cargar los contadores");
-                }
-                setRoutingIndex(-1);
-            } catch (error) {
-                console.error('Error fetching counters:', error);
+    async function fetchCounters() {
+        try {
+            const response = await fetch('/api/home/administrador');
+            const data = await response.json();                
+            console.log("Fetched counters:", data);
+            if(data.ok) {
+                setCounters(data.resultado);
+            } else {
+                toast.warn("No se pudieron cargar los contadores");
             }
+            setRoutingIndex(-1);
+        } catch (error) {
+            console.error('Error fetching counters:', error);
         }
+    }
 
+    useEffect(() => {
         console.log("SESSION", session);
-
         fetchCounters();
     }, [session]);
 

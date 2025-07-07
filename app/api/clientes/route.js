@@ -19,11 +19,13 @@ export async function GET(req) {
 
         // Busca el cliente y popula documentoTributarioId y direccionDespachoIds
         const cliente = await Cliente.findById(id)
-            .select("nombre rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionDespachoIds documentoTributarioId")
+            .select("nombre rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionesDespacho documentoTributarioId credito")
             .populate({
-                path: "direccionDespachoIds",
-                select: "_id nombre"
-            }).lean();
+                path: "direccionesDespacho.direccionId",
+                model: "Direccion",
+                select: "_id nombre latitud longitud"
+            })
+            .lean();
 
         if (!cliente) {
             return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
@@ -39,19 +41,35 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         await connectMongoDB();
+        console.log("[POST] Conectado a MongoDB");
         const entity = await req.json();
-        const exists = await Cliente.findOne({ id: entity.id });
+        console.log("[POST] Datos recibidos:", entity);
+
+        const exists = await Cliente.findOne({ _id: entity._id });
+        console.log("[POST] Cliente existente:", exists ? "Sí" : "No");
 
         if (exists) {
             exists.set(entity);
-            await exists.save();
+            try {
+                await exists.save();
+                console.log("[POST] Cliente actualizado correctamente");
+            } catch (saveError) {
+                console.error("[POST] Error al actualizar cliente:", saveError);
+                throw saveError;
+            }
             return NextResponse.json({ ok: true, cliente: exists });
         } else {
-            const newCliente = await Cliente.create(entity);
-            return NextResponse.json({ ok: true, cliente: newCliente });
+            try {
+                const newCliente = await Cliente.create(entity);
+                console.log("[POST] Nuevo cliente creado:", newCliente);
+                return NextResponse.json({ ok: true, cliente: newCliente });
+            } catch (createError) {
+                console.error("[POST] Error al crear cliente:", createError);
+                throw createError;
+            }
         }
     } catch (error) {
-        console.log("ERROR!", error);
+        console.log("[POST] ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

@@ -24,7 +24,8 @@ const ventaSchema = new Schema({
     medioDespacho: { type: String },
     numeroTraslado: { type: String, default: "" },
     cantidadConsultasSII: { type: Number },
-    cantidadReenviosSII: { type: Number }
+    cantidadReenviosSII: { type: Number },
+    comentario: { type: String, default: "" },
 }, {
     timestamps: true
 });

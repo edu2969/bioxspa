@@ -70,13 +70,13 @@ export async function POST() {
                 const cliente = await Cliente.findById(venta.clienteId);
                 if (
                     cliente &&
-                    cliente.direccionDespachoIds &&
-                    cliente.direccionDespachoIds.length === 1
+                    cliente.direccionesDespacho &&
+                    cliente.direccionesDespacho.length === 1
                 ) {
                     // Agregar la ruta si no existe ya esa dirección en la ruta
-                    const direccionId = cliente.direccionDespachoIds[0];
+                    const direccionId = cliente.direccionesDespacho[0].direccionId._id;
                     const yaExiste = rutaDespacho.ruta.some(
-                        r => r.direccionDestinoId?.toString() === direccionId.toString()
+                        r => r.direccionId?._id === direccionId
                     );
                     if (!yaExiste) {
                         rutaDespacho.ruta.push({
@@ -87,8 +87,8 @@ export async function POST() {
                     rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino;
                 }
             }
-        }
-
+        } 
+        
         await rutaDespacho.save();
         console.log(`[CONFIRMAR ORDEN] Estado de la ruta actualizado a 'orden_confirmada' y guardado en base de datos`);
 

@@ -70,7 +70,8 @@ export async function POST(req) {
             documentoTributarioId: body.documentoTributarioId,
             porCobrar: true,
             tieneArriendo,
-            direccionDespachoId: body.direccionDespachoId
+            direccionDespachoId: body.direccionDespachoId,
+            comentario: body.comentario || "",
         });
         const savedVenta = await nuevaVenta.save();
 

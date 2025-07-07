@@ -31,13 +31,13 @@ const MAP_OPTIONS = {
     mapTypeControl: false,
 };
 
-export default function MapaCilindros({ data }) {
+export default function MapaCilindros({ data, googleMapsApiKey }) {
     const [zoomedCluster, setZoomedCluster] = useState(null);
     const [selectedCilindro, setSelectedCilindro] = useState(null);
     const mapRef = useRef(null);
 
     const { isLoaded, loadError } = useJsApiLoader({
-        googleMapsApiKey: "AIzaSyCAc2Q7xNTfIejRrrfhpdMI2-8Vel7kjHU",
+        googleMapsApiKey,
         language: "es",
     });
 

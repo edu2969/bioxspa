@@ -1,5 +1,10 @@
 import mongoose, { Schema, models } from "mongoose";
 
+const direccionSchema = new Schema({
+    direccionId: { type: Schema.Types.ObjectId, ref: 'Direccion', required: true },
+    comentario: { type: String, default: null },
+}, { _id: false });
+
 const clienteSchema = new Schema({
     temporalId: { type: String },
     creadorId: { type: Schema.Types.ObjectId, ref: 'Usuario', default: null },
@@ -18,7 +23,7 @@ const clienteSchema = new Schema({
     arriendo: { type: Boolean, default: false },
     dias_de_pago: { type: Number, default: 1 },
     notificacion: { type: Boolean, default: false },
-    credito: { type: Boolean, default: false },
+    credito: { type: Number, default: 300000 },
     urlWeb: { type: String },
     comentario: { type: String },
     contacto: { type: String },
@@ -29,9 +34,9 @@ const clienteSchema = new Schema({
     cilindrosMax: { type: Number, default: 9999 },
     enQuiebra: { type: Boolean, default: false },
     mesesAumento: { type: [Number], default: null },
-    direccionDespachoIds: [{ type: Schema.Types.ObjectId, ref: 'Direccion', default: [] }],
-    createdAt: { type: Date, required: true },
-    updatedAt: { type: Date, required: true },
+    direccionesDespacho: [{ type: direccionSchema, default: [] }]
+}, {
+    timestamps: true
 });
 
 const Cliente = models.Cliente || mongoose.model("Cliente", clienteSchema);

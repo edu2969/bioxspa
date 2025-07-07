@@ -45,16 +45,6 @@ export async function POST(req) {
             }, { status: 404 });
         }
 
-        // Add new route without date
-        if (!rutaDespacho.ruta) {
-            rutaDespacho.ruta = [];
-        }
-        
-        rutaDespacho.ruta.push({
-            direccionDestinoId: direccionId,
-            fecha: null
-        });
-
         // Update estado to en_ruta
         rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.en_ruta;
         

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/constants";
+import { AiOutlineClose } from "react-icons/ai";
 
 const itemEmployeeLabels = {
     zapatos_seguridad: "¿Zapatos de seguridad presentes?",
@@ -162,43 +163,130 @@ export default function CheckList({ session, onFinish, vehiculos }) {
         const fecha = new Date().toLocaleString();
         const usuario = session?.user?.name || "";
         const km = kilometraje || "-";
+        let patente = "-";
+        let marcaModelo = "-";
+        if (selectedVehicleId && Array.isArray(vehiculos)) {
+            const vehiculo = vehiculos.find(v => v._id === selectedVehicleId);
+            if (vehiculo) {
+                patente = vehiculo.patente || "-";
+                marcaModelo = [vehiculo.marca, vehiculo.modelo].filter(Boolean).join(" ") || "-";
+            }
+        }
+
+        // Valida que todos los ítems requeridos (los de valor impar en TIPO_CHECKLIST_ITEM) tengan respuesta válida (>0 o true)
+        function resultadoChecklist(checklistItems, answers) {
+            // checklistItems: array de [key, value] (ej: [["tarjeta_combustible", 1], ...])
+            // answers: objeto con respuestas { key: valor }
+            // Devuelve true si todos los items requeridos (valor impar) tienen respuesta válida (>0 o true)
+
+            return checklistItems.every(([key, value]) => {
+            if (value % 2 === 1) {
+                const respuesta = answers[key];
+                // Considera 0 o false como no válido
+                return respuesta !== 0 && respuesta !== false && respuesta !== undefined && respuesta !== null;
+            }
+            return true;
+            });
+        }
+
+        const aprobado = resultadoChecklist(checklistItems, answers);
 
         const reportHtml = `
             <html>
             <head>
             <title>Reporte Checklist</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 2em; }
-                h2 { margin-bottom: 0.5em; }
-                table { border-collapse: collapse; width: 100%; margin-top: 1em; }
-                th, td { border: 1px solid #ccc; padding: 6px 12px; }
-                th { background: #f5f5f5; }
-                .firma { margin-top: 2em; }
+            body { font-family: Arial, sans-serif; margin: 2em; }
+            h2 { margin-bottom: 0.5em; }
+            table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+            th, td { border: 1px solid #ccc; padding: 6px 12px; }
+            th { background: #f5f5f5; }
+            .firma-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2em; }
+            .firma { }
+            .stamp-aprobado {
+            display: inline-block;
+            border: 3px solid #28a745;
+            color: #28a745;
+            font-weight: bold;
+            font-size: 1.3em;
+            padding: 0.5em 1.5em;
+            border-radius: 12px;
+            background: rgba(40,167,69,0.08);
+            box-shadow: 0 2px 8px rgba(40,167,69,0.10);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            transform: rotate(-8deg);
+            margin-left: 32px;
+            margin-bottom: 1rem;
+            }
+            .stamp-aprobado .icon {
+            font-size: 1.5em;
+            vertical-align: middle;
+            margin-right: 0.4em;
+            }
+            .stamp-rechazado {
+            display: inline-block;
+            border: 3px solid #dc3545;
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 1.3em;
+            padding: 0.5em 1.5em;
+            border-radius: 12px;
+            background: rgba(220,53,69,0.08);
+            box-shadow: 0 2px 8px rgba(220,53,69,0.10);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            transform: rotate(-8deg);
+            margin-left: 32px;
+            margin-bottom: 1rem;
+            }
+            .stamp-rechazado .icon {
+            font-size: 1.5em;
+            vertical-align: middle;
+            margin-right: 0.4em;
+            }
             </style>
             </head>
             <body>
             <h2>Reporte Checklist</h2>
-            <div>
-                <b>Fecha:</b> ${fecha}<br/>
-                <b>Usuario:</b> ${usuario}<br/>
-                <b>Kilometraje:</b> ${km}
+            <div class="info-row">
+            <div class="info-block">
+            <b>Fecha:</b> ${fecha}<br/>
+            <b>Usuario:</b> ${usuario}<br/>
+            <b>Kilometraje:</b> ${km}
+            </div>
+            <div class="info-block" style="text-align:right;">
+            <b>Patente:</b> ${patente}<br/>
+            <b>Marca/Modelo:</b> ${marcaModelo}
+            </div>
             </div>
             <table>
-                <thead>
-                <tr>
-                    <th>Ítem</th>
-                    <th>Respuesta</th>
-                    <th>Estado</th>
-                </tr>
-                </thead>
-                <tbody>
-                ${rows}
-                </tbody>
+            <thead>
+            <tr>
+            <th>Ítem</th>
+            <th>Respuesta</th>
+            <th>Estado</th>
+            </tr>
+            </thead>
+            <tbody>
+            ${rows}
+            </tbody>
             </table>
+            <div class="firma-row">
             <div class="firma">
-                <br/><br/>
-                ____________________________
-                <p style="margin-left: 48px;">Firma: <b>${usuario}</b></p>
+            <br/><br/>
+            ____________________________
+            <p style="margin-left: 48px;">Firma: <b>${usuario}</b></p>
+            </div>
+            <div>
+            ${
+            aprobado
+            ? `<div class="stamp-aprobado"><span class="icon">✅</span> APROBADO</div>`
+            : `<div class="stamp-rechazado"><span class="icon">❌</span> RECHAZADO</div>`
+            }
+            </div>
             </div>
             </body>
             </html>
@@ -215,6 +303,15 @@ export default function CheckList({ session, onFinish, vehiculos }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
             <div className="relative w-full max-w-xl mx-auto h-[340px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
+                {/* Botón de cerrar */}
+                <button
+                    aria-label="Cerrar"
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl z-10"
+                    onClick={() => window.history.back()}
+                    style={{ background: "none", border: "none", cursor: "pointer" }}
+                >
+                    <AiOutlineClose/>
+                </button>
                 {/* Slides */}
                 <div className="relative w-full h-full">
                     {/* Paso 0: Kilometraje */}
@@ -323,10 +420,31 @@ export default function CheckList({ session, onFinish, vehiculos }) {
                     })}
                     {/* Finalizar */}
                     <div style={getSlideStyle(totalSteps)} className="flex flex-col items-center justify-center h-full px-8">
-                        <h2 className="text-2xl font-bold mb-6">Checklist completado</h2>
-                        <p className="text-gray-600 mb-6">Presiona para imprimir el reporte y finalizar el checklist</p>
+                        <h2 className="text-2xl font-bold mb-8">Checklist completado</h2>                        
+                        {(() => {
+                            // Determina si el checklist está aprobado o rechazado
+                            function resultadoChecklist(checklistItems, answers) {
+                                return checklistItems.every(([key, value]) => {
+                                    if (value % 2 === 1) {
+                                        const respuesta = answers[key];
+                                        return respuesta !== 0 && respuesta !== false && respuesta !== undefined && respuesta !== null;
+                                    }
+                                    return true;
+                                });
+                            }
+                            const aprobado = resultadoChecklist(checklistItems, answers);
+                            return aprobado ? (
+                                <div className="inline-block border-4 border-green-600 text-green-600 font-bold text-xl px-8 py-2 rounded-xl bg-green-50 shadow-md uppercase tracking-wider mb-6" style={{transform: "rotate(-8deg)"}}>
+                                    <span className="mr-2 text-2xl align-middle">✅</span> APROBADO
+                                </div>
+                            ) : (
+                                <div className="inline-block border-4 border-red-600 text-red-600 font-bold text-xl px-8 py-2 rounded-xl bg-red-50 shadow-md uppercase tracking-wider mb-6" style={{transform: "rotate(-8deg)"}}>
+                                    <span className="mr-2 text-2xl align-middle">❌</span> RECHAZADO
+                                </div>
+                            );
+                        })()}
                         <button
-                            className={`w-full bg-green-500 text-white px-8 py-3 rounded-md font-bold text-lg`}
+                            className={`w-full bg-green-500 text-white px-8 py-3 rounded-md font-bold text-lg mt-4`}
                             onClick={() => {
                                 printChecklistReport(checklistItems);
                                 onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId});

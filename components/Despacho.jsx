@@ -15,6 +15,7 @@ import { LuFlagOff } from "react-icons/lu";
 import { getNUCode } from "@/lib/nuConverter";
 import { TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
+import { useRouter } from "next/navigation";
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -27,6 +28,7 @@ export default function Despacho({ session }) {
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
     const [loadingChecklist, setLoadingChecklist] = useState(false);
     const [checkListPassed, setCheckListPassed] = useState(true);
+    const router = useRouter();
 
     const fetchEstadoChecklist = async () => {
         try {
@@ -78,12 +80,15 @@ export default function Despacho({ session }) {
             body: JSON.stringify(checklist),
         })
         .then(async (res) => {
-            setCheckListPassed(res.ok);
+            setCheckListPassed(res.passed);
             setLoadingChecklist(false);
             if(res.ok) {
                 socket.emit("update-pedidos", {
                     userId: session.user.id
                 });
+            }
+            if(!res.passed) {
+                router.back();
             }
         })
         .catch((err) => {
@@ -164,19 +169,15 @@ export default function Despacho({ session }) {
         if (!rd || !Array.isArray(rd.cargaItemIds)) return [];
 
         // Find the current destination from the route
-        if (!rd.ruta || rd.ruta.length === 0) return [];
+        if (!rd.ruta || rd.ruta.length === 0 || rd.ventaIds.length === 0) return [];
 
         // Get current route that hasn't been delivered yet (no fechaArribo)
         const currentRoute = rd.ruta[rd.ruta.length - 1];
+        const currentRouteId = currentRoute.direccionDestinoId?._id;
 
         // Find which client corresponds to this destination
-        const currentClient = rd.ventaIds?.find(() => {
-            const clientDestId = rd.ruta[rd.ruta.length - 1].direccionDestinoId._id;
-            const routeDestId = typeof currentRoute.direccionDestinoId === 'object'
-                ? currentRoute.direccionDestinoId._id
-                : currentRoute.direccionDestinoId;
-
-            return clientDestId === routeDestId;
+        const currentClient = rd.ventaIds.find(venta => {
+            return venta.clienteId.direccionesDespacho?.some(dest => dest.direccionId?._id === currentRouteId);            
         });
 
         if (!currentClient) return [];
@@ -220,6 +221,8 @@ export default function Despacho({ session }) {
             }
         });
 
+        console.log(">>>>>>", Object.values(itemsBySubcategory));
+
         return Object.values(itemsBySubcategory);
     };
 
@@ -261,12 +264,12 @@ export default function Despacho({ session }) {
             const data = await response.json();
             if (data.ok) {
                 toast.success("Carga confirmada correctamente");
-                if (rutaDespacho.ventaIds.length === 1 && rutaDespacho.ventaIds[0].clienteId.direccionDespachoIds.length == 1) {
+                if (rutaDespacho.ventaIds.length === 1 && rutaDespacho.ventaIds[0].clienteId.direccionesDespacho.length == 1) {
                     setRutaDespacho({
                         ...rutaDespacho,
                         estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
                         ruta: [{
-                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionDespachoIds[0],
+                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionesDespacho[0]._id,
                             fechaArribo: null,
                         }]
                     });
@@ -384,7 +387,7 @@ export default function Despacho({ session }) {
         setRutaDespacho({
             ...rutaDespacho,
             estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
-            ruta: rutaDespacho.ruta.filter(r => r.fechaArribo)
+            ruta: rutaDespacho.ruta.map((r, idx) => idx === rutaDespacho.ruta.length ? { ...r, fechaArribo: null } : r)
         });
     }
 
@@ -653,12 +656,14 @@ export default function Despacho({ session }) {
                     height={275}
                     style={{ width: "355px", height: "275px" }}
                 />
+
                 {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-48 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.8)" }}>
                     <div className="ml-4 text-slate-800">
                         <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
                         <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
                     </div>
                 </div>}
+
                 {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute top-6 left-0 mt-2 w-full">
                     {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
                         const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
@@ -679,6 +684,7 @@ export default function Despacho({ session }) {
                         )
                     })}
                 </div>}
+
             </div>
             
 
@@ -689,13 +695,11 @@ export default function Despacho({ session }) {
                     || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && (
                         <div className="w-full py-2 px-2 border rounded-t-xl shadow-lg bg-white mx-2 -mb-1">
                             <MdOutlineKeyboardDoubleArrowUp className="text-gray-400 mx-auto -mt-1 mb-1" style={{ transform: "scaleX(6)" }} />
-                            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && <div className="py-4">
+                            {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && <div className="py-4 text-center">
                                 <div className="py-4">
                                     <Loader texto="EN PROCESO DE CARGA" />
-                                </div>
-                                <div>
-                                    <p className="mx-auto my-4 px-4">MARIO SOLAR esta cargando. Pronto podrás iniciar tu viaje.</p>
-                                </div>
+                                </div>                                
+                                <p className="mx-auto my-4 px-4">{rutaDespacho.encargado} esta cargando. Pronto podrás iniciar tu viaje.</p>                                
                             </div>}
 
                             {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
@@ -822,11 +826,11 @@ export default function Despacho({ session }) {
                                                 <option value="">Selecciona un destino</option>
                                                 {rutaDespacho.ventaIds
                                                         .flatMap(venta =>
-                                                            venta.clienteId.direccionDespachoIds
+                                                            venta.clienteId.direccionesDespacho
                                                                 .filter(dir =>
                                                                     !rutaDespacho.ruta
-                                                                        .map(r => typeof r.direccionDestinoId === 'object' ? r.direccionDestinoId._id : r.direccionDestinoId)
-                                                                        .includes(dir._id)
+                                                                        .map(r => r.direccionDestinoId)
+                                                                        .includes(dir.direccionId._id)
                                                                 )
                                                                 .map(dir => ({
                                                                     ventaId: venta._id,
@@ -851,7 +855,7 @@ export default function Despacho({ session }) {
                                     <span className="mt-2">INICIAR VIAJE</span>
                                 </div>}
                             </button>
-                        </div>}
+                        </div>}                        
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (
                             <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">                                
@@ -940,20 +944,21 @@ export default function Despacho({ session }) {
                     </button>
                 </div>}
 
+                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
+                    <button
+                        className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
+                        onClick={() => handleFinish()}>
+                        <FaHouseFlag className="mt-1 mr-2" /><span>HE REGRESADO</span>
+                        {loadingState == TIPO_ESTADO_RUTA_DESPACHO.terminado &&
+                            <div className="absolute -mt-1">
+                                <Loader texto="" />
+                            </div>
+                        }
+                    </button>
+                </div>}
+
             </div>}
 
-            {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && loadingState == -1 && <div className="absolute bottom-4 flex w-full px-4">
-                <button
-                    className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
-                    onClick={() => handleFinish()}>
-                    <FaHouseFlag className="mt-1 mr-2" /><span>HE REGRESADO</span>
-                    {loadingState == TIPO_ESTADO_RUTA_DESPACHO.terminado &&
-                        <div className="absolute -mt-1">
-                            <Loader texto="" />
-                        </div>
-                    }
-                </button>
-            </div>}
 
             {loadingState == -1 && !rutaDespacho && (
                 <div className="w-full py-6 px-12 mt-64 bg-white mx-auto">

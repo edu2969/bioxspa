@@ -9,6 +9,7 @@ import Loader from './Loader';
 export default function HomeConductor({ session }) {
     const [tienePedidos, setTienePedidos] = useState(false);
     const [routingIndex, setRoutingIndex] = useState(-2);
+    const [tieneChecklist, setTieneChecklist] = useState(false);
 
     const fetchTienePedidos = async () => {
         try {
@@ -19,7 +20,9 @@ export default function HomeConductor({ session }) {
                 },
             });
             const data = await response.json();
+            console.log("Datos recibidos de la API:", data);
             setTienePedidos(data.tienePedidos);
+            setTieneChecklist(data.tieneChecklist);
             setRoutingIndex(-1);
         } catch (error) {
             console.error("Error fetching pedidos:", error);
@@ -74,7 +77,7 @@ export default function HomeConductor({ session }) {
             <div className={`absolute w-full max-w-lg grid grid-cols-1 md:grid-cols-2 gap-4 px-12 ${routingIndex == -2 ? "opacity-20" : ""}`}>
                 <div className="relative">
                     <Link href="/modulos/homeConductor/pedidos" onClick={() => setRoutingIndex(0)}>
-                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""}`}>  
+                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${tieneChecklist ? "" : "border-red-500 bg-red-200"}`}>  
                             <div className="w-full inline-flex text-center text-slate-500 p-4 relative">
                                 <FaRoute className="mx-auto mb-1" size="6rem" />
                             </div>
@@ -87,6 +90,14 @@ export default function HomeConductor({ session }) {
                         ) : (
                             <div className="absolute top-8 right-24 bg-green-500 text-white text-xs font-bold rounded-full pl-2 pr-1.5 h-8 w-8 flex items-center justify-center">
                                 <span className="text-lg mr-1">0</span>
+                            </div>
+                        )}
+                        {!tieneChecklist && (
+                            <div className="absolute top-4 left-4">
+                                <div className="flex items-center">
+                                    <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+                                    <span className="text-xs text-red-500">Falta checklist</span>
+                                </div>
                             </div>
                         )}
                     </Link>
