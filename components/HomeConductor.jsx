@@ -17,13 +17,13 @@ export default function HomeConductor({ session }) {
     const [loadingChecklist, setLoadingChecklist] = useState(false);
 
     const faltaChecklistPersonal = () => {
-        const checklistPersonal = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal);
+        const checklistPersonal = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);
         console.log("Checklist personal:", checklistPersonal);
         return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
     }    
 
     const faltaChecklistVehiculo = () => {
-        const checklistVehiculo = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo);
+        const checklistVehiculo = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado);
         console.log("Checklist vehiculo:", checklistVehiculo);
         return !checklistVehiculo || !checklistVehiculo.aprobado || checklistVehiculo.fecha < new Date(new Date().setHours(0, 0, 0, 0));
     }    
@@ -101,7 +101,8 @@ export default function HomeConductor({ session }) {
                 body: JSON.stringify(checklist),
             })
             .then(async (res) => {
-                if(res.ok) {                    
+                const data = await res.json();                
+                if(data.passed) {                    
                     setChecklistsHechos([{
                         tipo: TIPO_CHECKLIST.personal,
                         aprobado: true,
@@ -111,6 +112,13 @@ export default function HomeConductor({ session }) {
                         userId: session.user.id
                     });
                     toast.success("Checklist guardado correctamente");        
+                } else {
+                    setChecklistsHechos([{
+                        tipo: TIPO_CHECKLIST.personal,
+                        aprobado: false,
+                        fecha: new Date()
+                    }]);
+                    toast.error("Avisa sobre tu rechazo. ¡Gracias!");
                 }
             })
             .catch((err) => {

@@ -322,7 +322,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
             <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
                 {/* Botón de cerrar */}
-                {tipo === TIPO_CHECKLIST.conductor && <button
+                {tipo === TIPO_CHECKLIST.vehiculo && <button
                     aria-label="Cerrar"
                     className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl z-10"
                     onClick={() => window.history.back()}

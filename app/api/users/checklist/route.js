@@ -23,6 +23,7 @@ export async function GET() {
         const checklists = await CheckList.find({
             userId,
             tipo: { $in: tiposChecklist },
+            passed: true, // Solo checklists aprobados
             fecha: {
                 $gte: new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()), // Desde el inicio del día de hoy
             }

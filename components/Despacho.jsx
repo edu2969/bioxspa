@@ -989,7 +989,7 @@ export default function Despacho({ session }) {
             />
 
 
-            {!loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} tipo={TIPO_CHECKLIST.vehiculo} loading={endingChecklist}/>}
+            {vehiculos?.length > 0 && !loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} tipo={TIPO_CHECKLIST.vehiculo} loading={endingChecklist}/>}
         </div>
     );
 }
