@@ -17,18 +17,28 @@ export async function GET() {
         }
         await connectMongoDB();
         const unaRuta = await RutaDespacho.findOne({ 
-            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
+            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
+                $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado },
             choferId: session.user.id 
         });
         const ahora = new Date();
-        const lastChecklist = await CheckList.findOne({ 
+        // Buscar ambos tipos de checklist del día actual
+        const tiposChecklist = [TIPO_CHECKLIST.vehiculo, TIPO_CHECKLIST.personal];
+        const checklists = await CheckList.find({
             userId: session.user.id,
-            tipo: TIPO_CHECKLIST.vehiculo,
+            tipo: { $in: tiposChecklist },
             fecha: {
                 $gte: new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()), // Desde el inicio del día de hoy
             }
-        });
-        return NextResponse.json({ ok: true, tienePedidos: unaRuta ? true : false, tieneChecklist: lastChecklist ? true : false });
+        }).select("tipo passed fecha").lean();
+
+        // Formatear la salida como arreglo de objetos con tipo, aprobado y fecha
+        const checklistResults = checklists.map(cl => ({
+            tipo: cl.tipo,
+            aprobado: !!cl.passed,
+            fecha: cl.fecha
+        }));
+        return NextResponse.json({ ok: true, tienePedidos: unaRuta ? true : false, checklists: checklistResults });
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }

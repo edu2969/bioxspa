@@ -11,10 +11,10 @@ export default async function Modulos() {
     return (
         <>
             {(session && session.user.role == USER_ROLE.neo) ? <div>yGa</div> : 
-                (session && session.user.role == USER_ROLE.manager) ? <HomeGerencia/> : 
+                (session && session.user.role == USER_ROLE.gerente) ? <HomeGerencia/> : 
                 (session && session.user.role == USER_ROLE.conductor) ? <HomeConductor session={session}/> : 
-                (session && session.user.role == USER_ROLE.supplier) ? <HomeDespacho session={session}/> 
-                : <HomeAdministrador session={session}/>}
+                (session && session.user.role == USER_ROLE.despacho) ? <HomeDespacho session={session}/> 
+                : <HomeAdministrador session={session}/>}                
         </>
     );
 }

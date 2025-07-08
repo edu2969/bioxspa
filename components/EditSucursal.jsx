@@ -142,7 +142,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setAutocompleteResults([]);
     };
 
-    const handleSelectPlace = (place) => {        
+    const handleSelectPlace = (place) => {
         const address = {
             nombre: place.formatted_address,
             apiId: place.place_id,
@@ -270,27 +270,37 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                     {sucursal?.cargos?.length > 0 ? (
                                         <div className="flex flex-wrap gap-4">
                                             {sucursal.cargos.map((cargo, idx) => (
-                                                <div key={`sucursal_cargo_${idx}`} className="w-14 h-14">
-                                                    <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
+                                                <div key={`sucursal_cargo_${idx}`}
+                                                    className={`w-48 h-24 rounded-md shadow-md p-2 hover:scale-105 duration-200 ${editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    <div className="relative flex justify-start h-20 rounded-full">
                                                         <Image
                                                             src={getUserAvatarFromUserId(cargo.userId)}
                                                             alt="avatar"
-                                                            className="w-14 h-14 rounded-full mr-2"
+                                                            className="w-20 h-20 rounded-full mr-2"
+                                                            onClick={() => {
+                                                                if (editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx) return;
+                                                                setEditingCargoSucursalIndex(idx);
+                                                                setValue(`newCargoSucursalUsuario`, cargo.user?.name || '');
+                                                                setValue(`newCargoSucursalTipo`, cargo.tipo);
+                                                                setValue(`newCargoSucursalDesde`, cargo.desde);
+                                                                setValue(`newCargoSucursalHasta`, cargo.hasta);
+                                                            }}
                                                             width={56} height={56}
                                                         />
-                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-600 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-blue-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
                                                         <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
                                                             const updatedCargos = sucursal.cargos.filter((_, i) => i !== idx);
                                                             setSucursal({ ...sucursal, cargos: updatedCargos });
                                                         }}>
-                                                            <MdDeleteForever className="text-lg border border-gray-400 rounded-full" />
+                                                            <MdDeleteForever className="text-lg border border-gray-400 rounded-full" size="1.5rem" />
                                                         </span>
+                                                        {cargo.user.name.split(" ").slice(0, 2).join(" ")}
                                                     </div>
                                                 </div>
                                             ))}
@@ -436,7 +446,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                 <div className="divide-y divide-gray-200">
                                     {dependencias.map((dependencia, index) => (
                                         <div className="flex" key={`dependencia_${index}`}>
-                                            <div className="px-6 py-4 whitespace-nowrap w-7/12">
+                                            <div className="px-6 py-4 whitespace-nowrap w-4/12">
                                                 {editingIndex === index ? (
                                                     <div className="w-full">
                                                         <div className="flex">
@@ -598,34 +608,44 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="px-6 py-4 whitespace-nowrap w-7/12">
+                                            <div className="px-6 py-4 w-7/12">
                                                 <div className="flex bg-blue-50 shadow-md p-4 rounded-md">
-                                                    <div className="w-9/12">
-                                                        {dependencia.cargos?.length > 0 ? <div className="grid grid-cols-6 gap-2">
+                                                    <div className="w-full">
+                                                        {dependencia.cargos?.length > 0 ? <div className="flex flex-wrap gap-4">
                                                             {dependencia.cargos?.map((cargo, idx) => (
-                                                                <div key={`avatar_${index}_${idx}`} className="w-14 h-14">
-                                                                    <div className="relative flex items-center justify-center w-14 h-14 rounded-full">
+                                                                <div key={`avatar_${index}_${idx}`}
+                                                                    className={`w-48 h-24 rounded-md shadow-md p-2 hover:scale-105 duration-200 ${editingCargoDependenciaIndex != null && editingCargoDependenciaIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                    onClick={() => {
+                                                                        if (editingCargoDependenciaIndex === null || editingCargoDependenciaParentIndex !== index) {
+                                                                            setEditingCargoDependenciaIndex(idx);
+                                                                            setEditingCargoDependenciaParentIndex(index);
+                                                                            setValue(`newCargoDependenciaUsuario`, cargo.user.name);
+                                                                            setValue(`newCargoDependenciaTipo`, cargo.tipo);                                                                            
+                                                                        }
+                                                                    }}>
+                                                                    <div className="relative flex justify-start h-20 rounded-full">
                                                                         <Image
-                                                                            src={`/profiles/${cargo.user?.email.split('@')[0].toLowerCase()}.jpg`}
+                                                                            src={getUserAvatarFromUserId(cargo.userId)}
                                                                             alt="avatar"
-                                                                            className="w-14 h-14 rounded-full mr-2"
+                                                                            className="w-20 h-20 rounded-full mr-2"
                                                                             width={56} height={56}
                                                                         />
-                                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
-                                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 text-xl border border-gray-400" />}
+                                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-400 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-gray-400 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-sky-600 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-orange-5000 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                         <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
                                                                             const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
                                                                             const updatedDependencias = [...dependencias];
                                                                             updatedDependencias[index].cargos = updatedCargos;
                                                                             setDependencias(updatedDependencias);
                                                                         }}>
-                                                                            <MdDeleteForever className="text-lg border border-gray-400 rounded-full" />
+                                                                            <MdDeleteForever className="border border-gray-400 rounded-full" size="1.5rem" />
                                                                         </span>
+                                                                        {cargo.user.name.split(" ").slice(0, 2).join(" ")}
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -634,7 +654,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                             NO HAY CARGOS DESIGNADOS AÚN
                                                         </div>}
                                                     </div>
-                                                    <div className="w-3/12 text-right">
+                                                    <div className="w-1/12 text-right">
                                                         {editingIndex === index && <button
                                                             type="button"
                                                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -752,7 +772,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
 
 
 
-                                            <div className="px-6 py-4 whitespace-nowrap text-sm font-medium w-1/6">
+                                            <div className="px-6 py-4 whitespace-nowrap text-sm font-medium w-1/12">
                                                 {editingIndex === index ? (
                                                     <>
                                                         <button

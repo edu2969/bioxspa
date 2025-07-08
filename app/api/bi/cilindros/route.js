@@ -8,6 +8,8 @@ import Cargo from "@/models/cargo";
 import Sucursal from "@/models/sucursal";
 import Dependencia from "@/models/dependencia";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import Cliente from "@/models/cliente";
+import Direccion from "@/models/direccion";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 
 // Helper para obtener direcciones propias
@@ -50,6 +52,15 @@ export async function GET(req) {
         await connectMongoDB();
         console.log("[GET /api/bi/cilindros] Conectado a MongoDB");
 
+        if (!mongoose.models.Cliente) {
+            mongoose.model("Cliente", Cliente.schema);
+        }
+        if (!mongoose.models.Direccion) {
+            mongoose.model("Direccion", Direccion.schema);
+        }
+        if (!mongoose.models.SubcategoriaCatalogo) {
+            mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
+        }
         // 1. Obtener usuario en sesión (ajusta según tu auth)
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
@@ -61,10 +72,6 @@ export async function GET(req) {
 
         const userId = session.user.id;
         console.log(`[GET /api/bi/cilindros] userId: ${userId}`);
-
-        if (!mongoose.models.SubcategoriaCatalogo) {
-            mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-        }
 
         // 2. Direcciones propias
         const direccionIdsPropias = await getDireccionesPropias(userId);

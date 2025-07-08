@@ -42,7 +42,7 @@ export default function LoginForm() {
         redirect: false,
       });
       if (res.error) {
-        setError("Invalid Credentials");
+        setError("email/password incorrectos");
         return;
       }
       const response = await fetch("/api/auth", {
@@ -65,6 +65,8 @@ export default function LoginForm() {
     } catch (error) {
       console.log(error);
       setError(error);
+      
+    } finally {
       setIsLogingIn(false);
     }
   }

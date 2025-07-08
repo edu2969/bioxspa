@@ -1,11 +1,11 @@
 export const USER_ROLE = {
     neo: 2969,
-    manager: 1,
-    cliente: 2,
-    seller: 3,
-    conductor: 4,
-    supervisor: 8,
-    supplier: 16,
+    gerente: 1,
+    cobranza: 2,
+    encargado: 8,
+    despacho: 16,
+    conductor: 32,
+    proveedor: 64 
 }
 
 export const TIPO_DEPENDENCIA = {

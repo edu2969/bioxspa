@@ -7,9 +7,9 @@ const itemCheckListSchema = new Schema({
 
 const checklistSchema = new Schema({
     tipo: { type: Number, required: true },
-    userId: { type: Schema.Types.ObjectId, ref: "Cliente", required: true },
-    vehiculoId: { type: Schema.Types.ObjectId, ref: "Vehiculo", required: true },
-    kilometraje: { type: Number, required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    vehiculoId: { type: Schema.Types.ObjectId, ref: "Vehiculo" },
+    kilometraje: { type: Number },
     fecha: { type: Date, required: true },
     passed: { type: Boolean, default: false },
     items: [itemCheckListSchema]

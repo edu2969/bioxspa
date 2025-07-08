@@ -28,28 +28,34 @@ export default function Despacho({ session }) {
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
     const [loadingChecklist, setLoadingChecklist] = useState(false);
     const [checkListPassed, setCheckListPassed] = useState(true);
+    const [endingChecklist, setEndingChecklist] = useState(false);
     const router = useRouter();
 
     const fetchEstadoChecklist = async () => {
         try {
+            setLoadingChecklist(true);
             const response = await fetch('/api/users/checklist', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },
             });
-
-            if (!response.ok) {
-                throw new Error('Error al obtener el estado del checklist');
+            if (response.ok) {
+                const data = await response.json();
+                // Busca si existe un checklist del tipo vehiculo aprobado hoy
+                setCheckListPassed(
+                    Array.isArray(data.checklists) &&
+                    data.checklists.find(
+                        checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado
+                    ) !== undefined
+                );
+            } else {
+                toast.error("Error al obtener el estado del checklist. Por favor, inténtelo más tarde.");
             }
-            
-            const data = await response.json();
-            console.log("Estado del checklist:", data);            
-            setLoadingChecklist(false);
-            setCheckListPassed(data.passed);
         } catch (error) {
             console.error('Error fetching checklist status:', error);
-            return false;
+        } finally {
+            setLoadingChecklist(false);
         }
     }
 
@@ -67,7 +73,7 @@ export default function Despacho({ session }) {
     }, [session]);
 
     const onFinish = (checklist) => {
-        console.log("Checklist completed", checklist);
+        setEndingChecklist(true);
         checklist.tipo = TIPO_CHECKLIST.vehiculo;
         if(vehiculos.length === 1) {
             checklist.vehiculoId = vehiculos[0]._id;
@@ -96,7 +102,10 @@ export default function Despacho({ session }) {
             toast.error("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
                 position: "top-center"
             });
-        });
+        })
+        .finally(() => {
+            setEndingChecklist(false);
+        })
     };
 
     function calculateTubePosition(index) {
@@ -980,7 +989,7 @@ export default function Despacho({ session }) {
             />
 
 
-            {!loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} />}
+            {!loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} tipo={TIPO_CHECKLIST.vehiculo} loading={endingChecklist}/>}
         </div>
     );
 }

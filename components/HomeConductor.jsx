@@ -5,13 +5,30 @@ import { TbReportMoney } from 'react-icons/tb';
 import { useEffect, useState } from 'react';
 import { socket } from '@/lib/socket-client';
 import Loader from './Loader';
+import CheckList from './CheckList';
+import { TIPO_CHECKLIST } from '@/app/utils/constants';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function HomeConductor({ session }) {
     const [tienePedidos, setTienePedidos] = useState(false);
     const [routingIndex, setRoutingIndex] = useState(-2);
-    const [tieneChecklist, setTieneChecklist] = useState(false);
+    const [checklistsHechos, setChecklistsHechos] = useState([]);
+    const [loadingChecklist, setLoadingChecklist] = useState(false);
 
-    const fetchTienePedidos = async () => {
+    const faltaChecklistPersonal = () => {
+        const checklistPersonal = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal);
+        console.log("Checklist personal:", checklistPersonal);
+        return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
+    }    
+
+    const faltaChecklistVehiculo = () => {
+        const checklistVehiculo = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo);
+        console.log("Checklist vehiculo:", checklistVehiculo);
+        return !checklistVehiculo || !checklistVehiculo.aprobado || checklistVehiculo.fecha < new Date(new Date().setHours(0, 0, 0, 0));
+    }    
+
+    const fetchPanel = async () => {
         try {
             const response = await fetch("/api/home/chofer", {
                 method: "GET",
@@ -22,7 +39,7 @@ export default function HomeConductor({ session }) {
             const data = await response.json();
             console.log("Datos recibidos de la API:", data);
             setTienePedidos(data.tienePedidos);
-            setTieneChecklist(data.tieneChecklist);
+            setChecklistsHechos(data.checklists);
             setRoutingIndex(-1);
         } catch (error) {
             console.error("Error fetching pedidos:", error);
@@ -60,7 +77,7 @@ export default function HomeConductor({ session }) {
 
     useEffect(() => {
         socket.on("update-pedidos", () => {
-            fetchTienePedidos();
+            fetchPanel();
         });
 
         return () => {
@@ -69,15 +86,50 @@ export default function HomeConductor({ session }) {
     }, []);
 
     useEffect(() => {
-        fetchTienePedidos();
+        fetchPanel();
     }, []);
+
+    const onFinish = (checklist) => {
+            console.log("Checklist completed", checklist);
+            checklist.tipo = TIPO_CHECKLIST.personal;
+            setLoadingChecklist(true);
+            fetch('/api/users/checklist', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(checklist),
+            })
+            .then(async (res) => {
+                if(res.ok) {                    
+                    setChecklistsHechos([{
+                        tipo: TIPO_CHECKLIST.personal,
+                        aprobado: true,
+                        fecha: new Date()
+                    }]);
+                    socket.emit("update-pedidos", {
+                        userId: session.user.id
+                    });
+                    toast.success("Checklist guardado correctamente");        
+                }
+            })
+            .catch((err) => {
+                console.error('Error al guardar el checklist:', err);
+                toast.error("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
+                    position: "top-center"
+                });
+            })
+            .finally(() => {
+                setLoadingChecklist(false);
+            });
+        };
 
     return (
         <main className="w-full h-screen flex items-center justify-center">
             <div className={`absolute w-full max-w-lg grid grid-cols-1 md:grid-cols-2 gap-4 px-12 ${routingIndex == -2 ? "opacity-20" : ""}`}>
                 <div className="relative">
                     <Link href="/modulos/homeConductor/pedidos" onClick={() => setRoutingIndex(0)}>
-                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${tieneChecklist ? "" : "border-red-500 bg-red-200"}`}>  
+                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${faltaChecklistVehiculo() ? "border-red-500 bg-red-200" : ""}`}>  
                             <div className="w-full inline-flex text-center text-slate-500 p-4 relative">
                                 <FaRoute className="mx-auto mb-1" size="6rem" />
                             </div>
@@ -92,7 +144,7 @@ export default function HomeConductor({ session }) {
                                 <span className="text-lg mr-1">0</span>
                             </div>
                         )}
-                        {!tieneChecklist && (
+                        {faltaChecklistVehiculo() && (
                             <div className="absolute top-4 left-4">
                                 <div className="flex items-center">
                                     <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
@@ -126,6 +178,8 @@ export default function HomeConductor({ session }) {
             {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center bg-white bg-opacity-60 z-10">
                 <Loader texto="Cargando panel" />
             </div>}
+            {routingIndex == -1 && faltaChecklistPersonal() && !loadingChecklist && <CheckList session={session} tipo={TIPO_CHECKLIST.personal} onFinish={onFinish}/>}
+            <ToastContainer/>
         </main>
     );
 }

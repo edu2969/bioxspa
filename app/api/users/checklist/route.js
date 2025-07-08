@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import { connectMongoDB } from "@/lib/mongodb";
 import Checklist from "@/models/checklist";
-import mongoose from "mongoose";
 import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM } from "@/app/utils/constants";
+import CheckList from "@/models/checklist";
 
 export async function GET() {
     try {
@@ -17,22 +17,26 @@ export async function GET() {
 
         const userId = session.user.id;
 
-        // Buscar el último checklist del usuario
         const ahora = new Date();
-        const lastChecklist = await Checklist.findOne({ 
-            userId, //: new mongoose.Types.ObjectId(userId),
-            tipo: TIPO_CHECKLIST.vehiculo,
+        // Buscar ambos tipos de checklist del día actual
+        const tiposChecklist = [TIPO_CHECKLIST.vehiculo, TIPO_CHECKLIST.personal];
+        const checklists = await CheckList.find({
+            userId,
+            tipo: { $in: tiposChecklist },
             fecha: {
                 $gte: new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()), // Desde el inicio del día de hoy
             }
-         });
+        }).select("tipo passed fecha").lean();
 
-        if (!lastChecklist) {
-            return NextResponse.json({ ok: false });
-        }
-        
-        return NextResponse.json({ ok: true, passed: lastChecklist.passed });
-    } catch {
+        // Formatear la salida como arreglo de objetos con tipo, aprobado y fecha
+        const checklistResults = checklists.map(cl => ({
+            tipo: cl.tipo,
+            aprobado: !!cl.passed,
+            fecha: cl.fecha
+        }));
+        return NextResponse.json({ ok: true, checklists: checklistResults });
+    } catch (error) {
+        console.error("Error fetching checklists:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -71,27 +75,17 @@ export async function POST(req) {
             }
         });
 
-        console.log("Checklist to save:", {
-            tipo,
-            userId: new mongoose.Types.ObjectId(userId),
-            vehiculoId: new mongoose.Types.ObjectId(vehiculoId),
-            kilometraje,
-            fecha: new Date(),
-            passed,
-            items,
-        });
-
         // Crear un nuevo checklist
-        const newChecklist = new Checklist({
+        const checklistPayload = {
+            userId,
             tipo,
-            userId: new mongoose.Types.ObjectId(userId),
-            vehiculoId: new mongoose.Types.ObjectId(vehiculoId),
-            kilometraje,
-            fecha: new Date(),
+            vehiculoId: tipo === TIPO_CHECKLIST.vehiculo ? vehiculoId : null,
+            kilometraje: tipo === TIPO_CHECKLIST.vehiculo ? kilometraje : null,
             passed,
             items,
-        });
-
+            fecha: new Date(),
+        };
+        const newChecklist = new Checklist(checklistPayload);
         await newChecklist.save();
         console.log("Checklist saved:", newChecklist);
 
