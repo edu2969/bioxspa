@@ -469,8 +469,8 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             className={`w-full bg-green-500 text-white px-8 h-12 rounded-md font-bold text-lg mt-4 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
                             disabled={loading}
                             onClick={() => {
-                                printChecklistReport(checklistItems);
                                 onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId});
+                                printChecklistReport(checklistItems);
                             }}>
                                 {loading ? <div className="relative"><Loader texto="FINALIZANDO"/></div> : "FINALIZAR CHECKLIST"}
                             </button>
