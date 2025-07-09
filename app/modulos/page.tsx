@@ -1,20 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
-import { USER_ROLE } from "../utils/constants";
-import HomeGerencia from "./homeGerencia/page";
-import HomeAdministrador from "@/components/HomeAdministrador";
-import HomeConductor from "@/components/HomeConductor";
-import HomeDespacho from "@/components/HomeDespacho";
+import Home from "@/components/Home";
 
-export default async function Modulos() {
+export default async function HomePage() {
     const session = await getServerSession(authOptions);
     return (
-        <>
-            {(session && session.user.role == USER_ROLE.neo) ? <div>yGa</div> : 
-                (session && session.user.role == USER_ROLE.gerente) ? <HomeGerencia/> : 
-                (session && session.user.role == USER_ROLE.conductor) ? <HomeConductor session={session}/> : 
-                (session && session.user.role == USER_ROLE.despacho) ? <HomeDespacho session={session}/> 
-                : <HomeAdministrador session={session}/>}                
-        </>
+        <Home session={session}/>
     );
 }

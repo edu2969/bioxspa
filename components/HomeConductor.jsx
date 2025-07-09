@@ -2,135 +2,18 @@
 import Link from 'next/link';
 import { FaRoute } from "react-icons/fa";
 import { TbReportMoney } from 'react-icons/tb';
-import { useEffect, useState } from 'react';
-import { socket } from '@/lib/socket-client';
+import { useState } from 'react';
 import Loader from './Loader';
-import CheckList from './CheckList';
 import { TIPO_CHECKLIST } from '@/app/utils/constants';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
-export default function HomeConductor({ session }) {
-    const [tienePedidos, setTienePedidos] = useState(false);
-    const [routingIndex, setRoutingIndex] = useState(-2);
-    const [checklistsHechos, setChecklistsHechos] = useState([]);
-    const [loadingChecklist, setLoadingChecklist] = useState(false);
-
-    const faltaChecklistPersonal = () => {
-        const checklistPersonal = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);
-        console.log("Checklist personal:", checklistPersonal);
-        return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
-    }    
+export default function HomeConductor({ contadores, checklists }) {
+    const [routingIndex, setRoutingIndex] = useState(-1);
 
     const faltaChecklistVehiculo = () => {
-        const checklistVehiculo = checklistsHechos.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado);
+        const checklistVehiculo = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado);
         console.log("Checklist vehiculo:", checklistVehiculo);
         return !checklistVehiculo || !checklistVehiculo.aprobado || checklistVehiculo.fecha < new Date(new Date().setHours(0, 0, 0, 0));
-    }    
-
-    const fetchPanel = async () => {
-        try {
-            const response = await fetch("/api/home/chofer", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            });
-            const data = await response.json();
-            console.log("Datos recibidos de la API:", data);
-            setTienePedidos(data.tienePedidos);
-            setChecklistsHechos(data.checklists);
-            setRoutingIndex(-1);
-        } catch (error) {
-            console.error("Error fetching pedidos:", error);
-        }
     }
-
-    useEffect(() => {
-        // Verifica si hay sesión y el socket está conectado
-        if (session?.user?.id && socket.connected) {
-            console.log("Re-uniendo a room-pedidos después de posible recarga");
-            socket.emit("join-room", {
-                room: "room-pedidos",
-                userId: session.user.id
-            });
-        }
-
-        // Evento para manejar reconexiones del socket
-        const handleReconnect = () => {
-            if (session?.user?.id) {
-                console.log("Socket reconectado, uniendo a sala nuevamente");
-                socket.emit("join-room", {
-                    room: "room-pedidos",
-                    userId: session.user.id
-                });
-            }
-        };
-
-        // Escucha el evento de reconexión
-        socket.on("connect", handleReconnect);
-
-        return () => {
-            socket.off("connect", handleReconnect);
-        };
-    }, [session]);
-
-    useEffect(() => {
-        socket.on("update-pedidos", () => {
-            fetchPanel();
-        });
-
-        return () => {
-            socket.off("update-pedidos");
-        };
-    }, []);
-
-    useEffect(() => {
-        fetchPanel();
-    }, []);
-
-    const onFinish = (checklist) => {
-            console.log("Checklist completed", checklist);
-            checklist.tipo = TIPO_CHECKLIST.personal;
-            setLoadingChecklist(true);
-            fetch('/api/users/checklist', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(checklist),
-            })
-            .then(async (res) => {
-                const data = await res.json();                
-                if(data.passed) {                    
-                    setChecklistsHechos([{
-                        tipo: TIPO_CHECKLIST.personal,
-                        aprobado: true,
-                        fecha: new Date()
-                    }]);
-                    socket.emit("update-pedidos", {
-                        userId: session.user.id
-                    });
-                    toast.success("Checklist guardado correctamente");        
-                } else {
-                    setChecklistsHechos([{
-                        tipo: TIPO_CHECKLIST.personal,
-                        aprobado: false,
-                        fecha: new Date()
-                    }]);
-                    toast.error("Avisa sobre tu rechazo. ¡Gracias!");
-                }
-            })
-            .catch((err) => {
-                console.error('Error al guardar el checklist:', err);
-                toast.error("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
-                    position: "top-center"
-                });
-            })
-            .finally(() => {
-                setLoadingChecklist(false);
-            });
-        };
 
     return (
         <main className="w-full h-screen flex items-center justify-center">
@@ -143,7 +26,7 @@ export default function HomeConductor({ session }) {
                             </div>
                             <span>PEDIDOS</span>
                         </div>
-                        {tienePedidos ? (
+                        {contadores && contadores.pedidos ? (
                             <div className="absolute top-8 right-24 bg-blue-500 text-white text-xs font-bold rounded-full pl-2 pr-1.5 h-8 w-8 flex items-center justify-center">
                                 <span className="text-lg mr-1">1</span>
                             </div>
@@ -185,9 +68,7 @@ export default function HomeConductor({ session }) {
             </div>
             {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center bg-white bg-opacity-60 z-10">
                 <Loader texto="Cargando panel" />
-            </div>}
-            {routingIndex == -1 && faltaChecklistPersonal() && !loadingChecklist && <CheckList session={session} tipo={TIPO_CHECKLIST.personal} onFinish={onFinish}/>}
-            <ToastContainer/>
+            </div>} 
         </main>
     );
 }

@@ -471,6 +471,8 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             onClick={() => {
                                 onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId});
                                 printChecklistReport(checklistItems);
+                                setStep(0);
+                                setAnswers({});
                             }}>
                                 {loading ? <div className="relative"><Loader texto="FINALIZANDO"/></div> : "FINALIZAR CHECKLIST"}
                             </button>

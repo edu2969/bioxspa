@@ -3,83 +3,11 @@ import Link from 'next/link';
 import { FaSignInAlt } from "react-icons/fa";
 import { FaFileContract } from "react-icons/fa";
 import { TbReportMoney } from 'react-icons/tb';
-import { useEffect, useState } from 'react';
-import { socket } from '@/lib/socket-client';
 import Loader from './Loader';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useState } from 'react';
 
-export default function HomeAdministrador({ session }) {
-    const [counters, setCounters] = useState({
-        pedidosCount: 0,
-        asignacionCounts: {
-            porAsignar: 0,
-            preparacion: 0,
-            enRuta: 0,
-        },
-        deudasCount: 0,
-    });
-    const [routingIndex, setRoutingIndex] = useState(-2);
-
-    async function fetchCounters() {
-        try {
-            const response = await fetch('/api/home/administrador');
-            const data = await response.json();                
-            console.log("Fetched counters:", data);
-            if(data.ok) {
-                setCounters(data.resultado);
-            } else {
-                toast.warn("No se pudieron cargar los contadores");
-            }
-            setRoutingIndex(-1);
-        } catch (error) {
-            console.error('Error fetching counters:', error);
-        }
-    }
-
-    useEffect(() => {
-        console.log("SESSION", session);
-        fetchCounters();
-    }, [session]);
-
-    useEffect(() => {
-        // Verifica si hay sesión y el socket está conectado
-        if (session?.user?.id && socket.connected) {
-            console.log("Re-uniendo a room-pedidos después de posible recarga");
-            socket.emit("join-room", {
-                room: "room-pedidos",
-                userId: session.user.id
-            });
-        }
-
-        // Evento para manejar reconexiones del socket
-        const handleReconnect = () => {
-            if (session?.user?.id) {
-                console.log("Socket reconectado, uniendo a sala nuevamente");
-                socket.emit("join-room", {
-                    room: "room-pedidos",
-                    userId: session.user.id
-                });
-            }
-        };
-
-        // Escucha el evento de reconexión
-        socket.on("connect", handleReconnect);
-
-        return () => {
-            socket.off("connect", handleReconnect);
-        };
-    }, [session]);
-
-    useEffect(() => {
-        socket.on("update-pedidos", () => {
-            fetchCounters();
-        });
-
-        return () => {
-            socket.off("update-pedidos");
-        };
-    }, []);
+export default function HomeAdministrador({ contadores }) {
+    const [routingIndex, setRoutingIndex] = useState(-1);
 
     return (
         <main className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 p-2 md:p-6 max-w-lg mx-auto mt-7">
@@ -92,9 +20,9 @@ export default function HomeAdministrador({ session }) {
                             </div>
                             <span>PEDIDOS</span>
                         </div>
-                        {counters.pedidosCount > 0 && (
+                        {contadores?.pedidos > 0 && (
                             <div className="absolute top-6 -left-10 bg-red-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
-                                <span className="text-sm mr-1">{counters.pedidosCount > 999999 ? '999999+' : counters.pedidosCount}</span>
+                                <span className="text-sm mr-1">{contadores.pedidos > 999999 ? '999999+' : contadores.pedidos}</span>
                                 <span className="text-xs mt-0.5">x APROBAR</span>
                             </div>
                         )}
@@ -113,22 +41,22 @@ export default function HomeAdministrador({ session }) {
                             </div>
                             <span>ASIGNACION</span>
                         </div>
-                        {counters.asignacionCounts.porAsignar > 0 && (
+                        {contadores?.porAsignar > 0 && (
                             <div className="absolute top-6 -right-10 bg-red-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
-                                <span className="text-sm mr-1">{counters.asignacionCounts.porAsignar > 999999 ? '999999+' : counters.asignacionCounts.porAsignar}</span>
+                                <span className="text-sm mr-1">{contadores.porAsignar > 999999 ? '999999+' : contadores.porAsignar}</span>
                                 <span className="text-xs mt-0.5">x POR ASIGNAR</span>
                             </div>
                         )}
-                        {counters.asignacionCounts.preparacion > 0 && (
+                        {contadores?.preparacion > 0 && (
                             <div className="absolute top-6 -right-10 bg-yellow-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
-                                <span className="text-sm mr-1">{counters.asignacionCounts.preparacion > 999999 ? '999999+' : counters.asignacionCounts.preparacion}</span>
+                                <span className="text-sm mr-1">{contadores.preparacion > 999999 ? '999999+' : contadores.preparacion}</span>
                                 <span className="text-xs mt-0.5">x EN PREPARACION</span>
                             </div>
                         )}
                         
-                        {counters.asignacionCounts.enRuta > 0 && (
+                        {contadores?.enRuta > 0 && (
                             <div className="absolute top-6 -right-10 bg-blue-500 text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center">
-                                <span className="text-sm mr-1">{counters.asignacionCounts.enRuta > 999999 ? '999999+' : counters.asignacionCounts.enRuta}</span>
+                                <span className="text-sm mr-1">{contadores.enRuta > 999999 ? '999999+' : contadores.enRuta}</span>
                                 <span className="text-xs mt-0.5">x EN RUTA</span>
                             </div>
                         )}
@@ -157,8 +85,7 @@ export default function HomeAdministrador({ session }) {
                 {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center bg-white bg-opacity-60 z-10">
                     <Loader texto="Cargando panel" />
                 </div>}
-            </div>
-            <ToastContainer />
+            </div> 
         </main>
     );
 }
