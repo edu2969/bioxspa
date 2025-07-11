@@ -73,6 +73,7 @@ export default function Despacho({ session }) {
     }, [session]);
 
     const onFinish = (checklist) => {
+        console.log("DESPACHO ---> onFinish called with checklist:", checklist);
         setEndingChecklist(true);
         checklist.tipo = TIPO_CHECKLIST.vehiculo;
         if(vehiculos.length === 1) {

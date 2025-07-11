@@ -12,19 +12,44 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CheckList from "@/components/CheckList";
 import { TIPO_CHECKLIST } from "@/app/utils/constants";
+import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 
 export default function Home({ session }) {
     const [checklists, setChecklists] = useState([]);
     const [counters, setCounters] = useState({});
     const [routingIndex, setRoutingIndex] = useState(-2);
     const [loadingChecklist, setLoadingChecklist] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState(new Date());
 
     const faltaChecklistPersonal = () => {
         if(!checklists || checklists.length === 0) return true;
         const checklistPersonal = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);
         console.log("Checklist personal:", checklistPersonal);
         return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
-    }   
+    }    
+    
+    useOnVisibilityChange(() => {
+        const fetch = async () => {
+            console.log('La app volvió al primer plano');
+            toast.info("Volviendo a cargar los datos");
+            setRoutingIndex(-2);
+            await fetchDataHome();
+        }
+        fetch('/api/ventas/lastUpdate')
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok && data.updatedAt) {
+                    const updatedAt = new Date(data.updatedAt);
+                    if (updatedAt > lastUpdate) {
+                        setLastUpdate(updatedAt);
+                        fetchDataHome();
+                    }
+                }
+            })
+            .catch(() => {});
+    });
+
+
 
     const onFinish = (checklist) => {
         console.log("Checklist completed", checklist);
@@ -130,7 +155,6 @@ export default function Home({ session }) {
             socket.off("update-pedidos");
         };
     }, []);
-
 
     return (
         <div>

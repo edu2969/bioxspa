@@ -12,7 +12,7 @@ export default function Nav({ session }) {
     const [role, setRole] = useState(0);
     const router = useRouter();
     const [menuActivo, setMenuActivo] = useState(false);  
-    const path = usePathname();    
+    const path = usePathname(); 
 
     useEffect(() => {
         if(session && session.user && session.user?.role) {

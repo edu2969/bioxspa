@@ -120,202 +120,36 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
         left: 0,
     });
 
-    const printChecklistReport = (checklistItems) => {
-        // Mapas para mostrar los labels y opciones legibles
-        const selectorValueToLabel = {};
-        selectorOptions.forEach(opt => { selectorValueToLabel[opt.value] = opt.label; });
-        limpiezaOptions.forEach(opt => { selectorValueToLabel[opt.value] = opt.label; });        
-
-        // Datos generales
-        const fecha = new Date().toLocaleString();
-        const usuario = session?.user?.name || "";
-        const km = kilometraje || "-";
-        let patente = "-";
-        let marcaModelo = "-";
-        if (selectedVehicleId && Array.isArray(vehiculos)) {
-            const vehiculo = vehiculos.find(v => v._id === selectedVehicleId);
-            if (vehiculo) {
-                patente = vehiculo.patente || "-";
-                marcaModelo = [vehiculo.marca, vehiculo.modelo].filter(Boolean).join(" ") || "-";
-            }
-        }
-
-        // Valida que todos los ítems requeridos (los de valor impar en TIPO_CHECKLIST_ITEM) tengan respuesta válida (>0 o true)
-        function resultadoChecklist(checklistItems, answers) {
-            // checklistItems: array de [key, value] (ej: [["tarjeta_combustible", 1], ...])
-            // answers: objeto con respuestas { key: valor }
-            // Devuelve true si todos los items requeridos (valor impar) tienen respuesta válida (>0 o true)
-
-            return checklistItems.every(([key, value]) => {
-            if (value % 2 === 1) {
-                const respuesta = answers[key];
-                // Considera 0 o false como no válido
-                return respuesta !== 0 && respuesta !== false && respuesta !== undefined && respuesta !== null;
-            }
-            return true;
+    // Imprime el checklist usando una ventana nueva (desktop) o descarga PDF/HTML (mobile)
+    // Genera y descarga el PDF del checklist usando la API del backend
+    // Permite descargar el PDF del checklist después de finalizarlo
+    const downloadChecklistPDF = async (checklist) => {
+        console.log(">>>>>>>>>> AER?", checklist);
+        try {
+            const res = await fetch("/api/reportes/checklist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(checklist),
             });
+            if (!res.ok) {
+                alert("No se pudo generar el PDF del checklist.");
+                return;
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "reporte_checklist.pdf";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        } catch (err) {
+            alert("Error al descargar el PDF del checklist.");
+            console.error("Error al descargar el PDF del checklist:", err);
         }
-
-        const aprobado = resultadoChecklist(checklistItems, answers);
-
-        // Calcula el criterio mínimo aceptado para cada ítem
-        function getCriterioMinimo(key, value) {
-            // Opcional (valor par): criterio mínimo es 0 (no aplica)
-            // Requerido (valor impar): criterio mínimo depende del tipo de ítem
-            if (value % 2 === 0) return "Opcional";
-            // Especiales
-            if (specialSelectorItems.includes(key)) {
-            // El mínimo aceptado es "Bien" (valor 3)
-            return selectorOptions.find(opt => opt.value === 3)?.label || "Bien";
-            }
-            if (limpiezaItems.includes(key)) {
-            // El mínimo aceptado es "Limpio" (valor 1)
-            return limpiezaOptions.find(opt => opt.value === 1)?.label || "Limpio";
-            }
-            // Por defecto, mínimo aceptado es "Sí"
-            return "Sí";
-        }
-
-        const reportHtml = `
-            <html>
-            <head>
-            <title>Reporte Checklist</title>
-            <style>
-            body { font-family: Arial, sans-serif; margin: 1em 0.5em; font-size: 75%; }
-            h2 { margin-bottom: 0.5em; font-size: 1.3em; }
-            table { border-collapse: collapse; width: 100%; margin-top: 0.7em; font-size: 1em; }
-            th, td { border: none; padding: 4px 6px; }
-            th { background: #f5f5f5; font-size: 1em; }
-            .firma-row { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 1.5em; }
-            .firma { }
-            .stamp-aprobado {
-            display: inline-block;
-            border: 2px solid #28a745;
-            color: #28a745;
-            font-weight: bold;
-            font-size: 1.1em;
-            padding: 0.4em 1em;
-            border-radius: 10px;
-            background: rgba(40,167,69,0.08);
-            box-shadow: 0 2px 8px rgba(40,167,69,0.10);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: relative;
-            transform: rotate(-8deg);
-            margin-left: 18px;
-            margin-bottom: 0.5rem;
-            }
-            .stamp-aprobado .icon {
-            font-size: 1.2em;
-            vertical-align: middle;
-            margin-right: 0.3em;
-            }
-            .stamp-rechazado {
-            display: inline-block;
-            border: 2px solid #dc3545;
-            color: #dc3545;
-            font-weight: bold;
-            font-size: 1.1em;
-            padding: 0.4em 1em;
-            border-radius: 10px;
-            background: rgba(220,53,69,0.08);
-            box-shadow: 0 2px 8px rgba(220,53,69,0.10);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: relative;
-            transform: rotate(-8deg);
-            margin-left: 18px;
-            margin-bottom: 0.5rem;
-            }
-            .stamp-rechazado .icon {
-            font-size: 1.2em;
-            vertical-align: middle;
-            margin-right: 0.3em;
-            }
-            .info-row { margin-bottom: 0.7em; }
-            .info-block { font-size: 1em; }
-            </style>
-            </head>
-            <body>
-            <h2>Reporte Checklist</h2>
-            <div class="info-row">
-            <div class="info-block">
-                <b>Fecha:</b> ${fecha}<br/>
-                <b>Usuario:</b> ${usuario}<br/>
-                ${tipo === TIPO_CHECKLIST.vehiculo ? `<b>Kilometraje:</b> ${km}<br/>
-                <b>Patente:</b> ${patente}<br/>
-                <b>Marca/Modelo:</b> ${marcaModelo}` : ""}
-            </div>
-            </div>
-            <table>
-            <thead>
-            <tr>
-            <th>Ítem</th>
-            <th>Criterio mínimo</th>
-            <th>Respuesta</th>
-            <th>Estado</th>
-            </tr>
-            </thead>
-            <tbody>
-            ${checklistItems.map(([key, value]) => {
-            let respuesta = "";
-            let icon = "";
-            if (specialSelectorItems.includes(key)) {
-                const val = answers[key];
-                respuesta = selectorOptions.find(opt => opt.value === val)?.label ?? "-";
-                icon = val === 3 ? "✔️" : val === 0 ? "❌" : "";
-            } else if (limpiezaItems.includes(key)) {
-                const val = answers[key];
-                respuesta = limpiezaOptions.find(opt => opt.value === val)?.label ?? "-";
-                icon = val === 1 ? "✔️" : val === 0 ? "❌" : "";
-            } else {
-                const val = answers[key];
-                if (val === true) {
-                respuesta = "Sí";
-                icon = "✔️";
-                } else if (val === false) {
-                respuesta = "No";
-                icon = "❌";
-                } else {
-                respuesta = "-";
-                }
-            }
-            const criterio = getCriterioMinimo(key, value);
-            return `
-                <tr>
-                <td style="padding: 4px 6px;">${(itemDriverLabels[key] || itemEmployeeLabels[key] || key).replace(/\?$/, "")}</td>
-                <td style="padding: 4px 6px; text-align:center;">${criterio}</td>
-                <td style="padding: 4px 6px; text-align:center;">${respuesta}</td>
-                <td style="padding: 4px 6px; text-align:center;">${icon}</td>
-                </tr>
-            `;
-            }).join("")}
-            </tbody>
-            </table>
-            <div class="firma-row">
-            <div class="firma">
-                <br/><br/>
-                ____________________________
-                <p style="margin-left: 32px;">Firma: <b>${usuario}</b></p>
-            </div>
-            <div>
-            ${
-            aprobado
-            ? `<div class="stamp-aprobado"><span class="icon">✅</span> APROBADO</div>`
-            : `<div class="stamp-rechazado"><span class="icon">❌</span> RECHAZADO</div>`
-            }
-            </div>
-            </div>
-            </body>
-            </html>
-        `;
-        // Abre una ventana nueva y manda a imprimir
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(reportHtml);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
     };
 
     return (
@@ -469,8 +303,9 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             className={`w-full bg-green-500 text-white px-8 h-12 rounded-md font-bold text-lg mt-4 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
                             disabled={loading}
                             onClick={() => {
-                                onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId});
-                                printChecklistReport(checklistItems);
+                                console.log("CHECKLIST ---> ", { kilometraje, ...answers, vehiculoId: selectedVehicleId});
+                                onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
+                                downloadChecklistPDF({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
                                 setStep(0);
                                 setAnswers({});
                             }}>
