@@ -124,7 +124,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
     // Genera y descarga el PDF del checklist usando la API del backend
     // Permite descargar el PDF del checklist después de finalizarlo
     const downloadChecklistPDF = async (checklist) => {
-        console.log(">>>>>>>>>> AER?", checklist);
+        checklist.tipo = tipo;
         try {
             const res = await fetch("/api/reportes/checklist", {
                 method: "POST",

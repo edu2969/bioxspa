@@ -61,7 +61,7 @@ export async function POST(req) {
             clienteId: body.clienteId,
             vendedorId: body.usuarioId,
             fecha: new Date(),
-            estado: (session.user.role == USER_ROLE.manager || session.user.role == USER_ROLE.seller) 
+            estado: (session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.cobranza || session.user.role == USER_ROLE.encargado) 
                 ? TIPO_ESTADO_VENTA.por_asignar : TIPO_ESTADO_VENTA.borrador,
             valorNeto,
             valorIva: valorNeto * 0.19,

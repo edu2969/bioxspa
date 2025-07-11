@@ -2,73 +2,12 @@
 
 import Link from 'next/link';
 import { TbReportMoney, TbTruckLoading } from 'react-icons/tb';
-import { useEffect, useState } from 'react';
-import { socket } from '@/lib/socket-client';
+import { useState } from 'react';
 import Loader from '@/components/Loader';
 
-export default function HomeDespacho({ session }) {
-    const [cantidadRutas, setCantidadRutas] = useState(0);
-    const [routingIndex, setRoutingIndex] = useState(-2);
-
-    const fetchRutas = async () => {
-        try {
-            const response = await fetch("/api/home/despacho", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            });
-            const data = await response.json();
-            setCantidadRutas(data.cantidadRutas);
-            setRoutingIndex(-1);
-        } catch (error) {
-            console.error("Error fetching pedidos:", error);
-        }
-    }
-
-    useEffect(() => {
-        socket.on("update-pedidos", () => {
-            fetchRutas();
-        });
-
-        return () => {
-            socket.off("update-pedidos");
-        };
-    }, []);
-
-    useEffect(() => {
-        // Verifica si hay sesión y el socket está conectado
-        if (session?.user?.id && socket.connected) {
-            console.log("Re-uniendo a room-pedidos después de posible recarga");
-            socket.emit("join-room", {
-                room: "room-pedidos",
-                userId: session.user.id
-            });
-        }
-
-        // Evento para manejar reconexiones del socket
-        const handleReconnect = () => {
-            if (session?.user?.id) {
-                console.log("Socket reconectado, uniendo a sala nuevamente");
-                socket.emit("join-room", {
-                    room: "room-pedidos",
-                    userId: session.user.id
-                });
-            }
-        };
-
-        // Escucha el evento de reconexión
-        socket.on("connect", handleReconnect);
-
-        return () => {
-            socket.off("connect", handleReconnect);
-        };
-    }, [session]);
-
-    useEffect(() => {
-        fetchRutas();
-    }, []);
-
+export default function HomeDespacho({ contadores }) {
+    const [routingIndex, setRoutingIndex] = useState(-1);
+    
     return (
         <main className="w-full h-screen flex items-center justify-center">
             <div className={`absolute w-full max-w-lg grid grid-cols-1 md:grid-cols-2 gap-4 px-12 ${routingIndex === -2 ? "opacity-20" : ""}`}>
@@ -84,7 +23,7 @@ export default function HomeDespacho({ session }) {
                             </div>
                             <span>PEDIDOS</span>
                             <div className="absolute top-12 right-24 bg-red-500 text-white text-md font-bold rounded-full pl-1 w-8 h-8 flex items-center justify-center">
-                                <span className="text-sm mr-1">{cantidadRutas}</span>
+                                <span className="text-sm mr-1">{contadores.preparacion}</span>
                             </div>
                             {routingIndex === 0 && (
                                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">

@@ -22,9 +22,10 @@ export default function Home({ session }) {
     const [lastUpdate, setLastUpdate] = useState(new Date());
 
     const faltaChecklistPersonal = () => {
+        const requiereChecklist = session?.user?.role === USER_ROLE.conductor || session?.user?.role === USER_ROLE.despacho || session?.user?.role === USER_ROLE.encargado;
+        if (!requiereChecklist) return false;
         if(!checklists || checklists.length === 0) return true;
-        const checklistPersonal = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);
-        console.log("Checklist personal:", checklistPersonal);
+        const checklistPersonal = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);        
         return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
     }    
     
@@ -161,16 +162,19 @@ export default function Home({ session }) {
             {(session && session.user.role == USER_ROLE.neo) ? <div>yGa</div> :
                 (session && session.user.role == USER_ROLE.gerente) ? <HomeGerencia session={session} contadores={counters} checklists={checklists} /> :
                 (session && session.user.role == USER_ROLE.conductor) ? <HomeConductor contadores={counters} checklists={checklists} /> :
-                (session && session.user.role == USER_ROLE.despacho) ? <HomeDespacho session={session} contadores={counters} checklists={checklists} /> :
+                (session && session.user.role == USER_ROLE.despacho) ? <HomeDespacho contadores={counters}/> :
                 <HomeAdministrador contadores={counters}/>}
 
             {routingIndex == -1 && faltaChecklistPersonal() 
                 && <CheckList session={session} tipo={TIPO_CHECKLIST.personal} 
                 onFinish={onFinish} loading={loadingChecklist}/>}
 
-            {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center bg-white bg-opacity-60 z-10">
-                <Loader texto="Cargando panel" />
-            </div>}            
+            {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center z-10">
+                <div className="absolute w-full h-screen bg-white/80"></div>
+                <div className="flex items-center justify-center bg-white roounded-lg shadow-lg p-4 z-20 text-xl">
+                    <Loader texto="CARGANDO PANEL" />
+                </div>
+            </div>}
             <ToastContainer />
         </div>
     )

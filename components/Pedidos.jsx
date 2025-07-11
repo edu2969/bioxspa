@@ -37,7 +37,6 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const { register, handleSubmit, setValue, getValues } = useForm();
     const [usuarios, setUsuarios] = useState([]);
     const [precios, setPrecios] = useState([]);
-    const [setLoadingForm] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
     const [itemsVenta] = useState([]);
@@ -159,7 +158,6 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                 })),
         }
         console.log("PAYLOAD2", payload);
-        setLoadingForm(true);
         try {
             const resp = await fetch('/api/ventas', {
                 method: 'POST',
@@ -188,7 +186,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                 position: "top-center"
             });
         } finally {
-            setLoadingForm(false);
+            setCreandoVenta(false);
         }
     };
 

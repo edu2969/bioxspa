@@ -978,7 +978,12 @@ export default function Despacho({ session }) {
                 </div>
             )}
 
-            {loadingState == -2 && <div className="fixed w-full top-72 mt-16"><Loader texto="CARGANDO TUS PEDIDOS..." /></div>}
+            {loadingState == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center z-10">
+                <div className="absolute w-full h-screen bg-white/80"></div>
+                <div className="flex items-center justify-center bg-white roounded-lg shadow-lg p-4 z-20 text-xl">
+                    <Loader texto="CARGANDO PEDIDOS" />
+                </div>
+            </div>}
 
             <ToastContainer />
 

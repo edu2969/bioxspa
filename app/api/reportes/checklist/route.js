@@ -112,7 +112,7 @@ export async function POST(req) {
         }
 
         // Solo los ítems que están en TIPO_CHECKLIST_ITEM
-        let checklistItems = Object.entries(TIPO_CHECKLIST_ITEM).filter(([, value]) => tipo === TIPO_CHECKLIST.personal ? value < 128 : value >= 128);
+        let checklistItems = Object.entries(TIPO_CHECKLIST_ITEM).filter(([, value]) => tipo === TIPO_CHECKLIST.vehiculo ? value < 128 : value >= 128);
         
         console.log("Checklist items:", checklistItems);
 
