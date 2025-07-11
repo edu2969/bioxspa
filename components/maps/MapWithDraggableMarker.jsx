@@ -2,10 +2,10 @@
 import { useEffect, useState } from "react";
 import {
     GoogleMap,
-    Marker,
-    useJsApiLoader,
+    Marker
 } from "@react-google-maps/api";
 import Loader from "../Loader";
+import { useGoogleMaps } from "./GoogleMapProvider";
 
 const containerStyle = {
     width: "100%",
@@ -16,26 +16,19 @@ export default function MapWithDraggableMarker({
     lat = -33.45,
     lng = -70.65,
     nombre = "",
-    onMarkerChange,
-    googleMapsApiKey
+    onMarkerChange
 }) {
-    const [setDireccion] = useState({ nombre, lat, lng });
     const [markerPosition, setMarkerPosition] = useState({ lat, lng });
-    const { isLoaded } = useJsApiLoader({
-        googleMapsApiKey,
-        language: "es",
-    });
+    const { isLoaded } = useGoogleMaps();
 
     useEffect(() => {
-        setDireccion({ nombre, lat, lng });
         setMarkerPosition({ lat, lng });
-    }, [nombre, lat, lng, setDireccion]);
+    }, [nombre, lat, lng]);
 
     const handleMarkerDragEnd = (e) => {
         const newLat = e.latLng.lat();
         const newLng = e.latLng.lng();
         setMarkerPosition({ lat: newLat, lng: newLng });
-        setDireccion((prev) => ({ ...prev, lat: newLat, lng: newLng }));
         if (onMarkerChange) onMarkerChange({ lat: newLat, lng: newLng });
     };
 
@@ -54,7 +47,6 @@ export default function MapWithDraggableMarker({
                     const newLat = e.latLng.lat();
                     const newLng = e.latLng.lng();
                     setMarkerPosition({ lat: newLat, lng: newLng });
-                    setDireccion((prev) => ({ ...prev, lat: newLat, lng: newLng }));
                     if (onMarkerChange) onMarkerChange({ lat: newLat, lng: newLng });
                 }}
             >

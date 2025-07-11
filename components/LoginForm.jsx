@@ -13,6 +13,7 @@ export default function LoginForm() {
   const onError = (errors, e) => console.log(errors, e)
   const [resolution, setResolution] = useState({ width: 0, height: 0 });
   const [isLogingIn, setIsLogingIn] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     const updateResolution = () => {
@@ -61,13 +62,25 @@ export default function LoginForm() {
       } else {
         console.error("Failed to fetch user role:", response.statusText);
       }
+
+      let retries = 0;
+      while (retries < 10) {
+        const sessionRes = await fetch("/api/auth/session"); // API interna de NextAuth
+        const sessionJson = await sessionRes.json();
+        console.log(`Intento ${retries + 1}: sessionJson=`, sessionJson);
+        if (sessionJson?.user) break;
+
+        await new Promise((res) => setTimeout(res, 200)); // esperar 200ms
+        retries++;
+      }
+
       router.replace("modulos");
     } catch (error) {
       console.log(error);
       setError(error);
       
     } finally {
-      setIsLogingIn(false);
+      setRedirecting(true);
     }
   }
 
@@ -115,7 +128,7 @@ export default function LoginForm() {
           <div>
             <button type="submit" onSubmit={handleSubmit(onSubmit)} disabled={isLogingIn}
               className="w-full rounded-md bg-black px-3 py-2 text-lg font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 h-12">
-                {isLogingIn ? <Loader texto="Entrando"/> : "Entrar"}                
+                {isLogingIn ? <Loader texto="Entrando"/> : redirecting ? <Loader texto="Redirigiendo..."/> : "Entrar"}
             </button>
           </div>
         </div>

@@ -16,6 +16,7 @@ export async function GET() {
         }
 
         const userId = session.user.id;
+        console.log("Fetching checklists for user:", userId);
 
         const ahora = new Date();
         // Buscar ambos tipos de checklist del día actual

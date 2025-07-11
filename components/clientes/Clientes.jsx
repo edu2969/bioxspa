@@ -14,8 +14,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Direcciones de despacho editor
-export default function Clientes({ googleMapsApiKey }) {
-    const [setSearch] = useState("");
+export default function Clientes() {
     const [loadingClients, setLoadingClients] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
@@ -195,7 +194,6 @@ export default function Clientes({ googleMapsApiKey }) {
                                                             console.log("Cliente seleccionado >>>>>>>>", clienteData.cliente);
                                                             setClienteSelected(clienteData.cliente);
                                                             setDireccionesDespacho(clienteData.cliente.direccionesDespacho || []);
-                                                            setSearch(cliente.nombre);
                                                             setAutocompleteClienteResults([]);
                                                         } else {
                                                             toast.error("Error al cargar cliente");
@@ -212,7 +210,7 @@ export default function Clientes({ googleMapsApiKey }) {
                                 <button
                                     type="button"
                                     className="ml-2 flex items-center px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold"
-                                    onClick={() => { setClienteSelected(null); setSearch(""); }}
+                                    onClick={() => { setClienteSelected(null) }}
                                 >
                                     <TiUserAddOutline className="mr-1" size="1.25rem" /> Nuevo
                                 </button>
@@ -361,7 +359,6 @@ export default function Clientes({ googleMapsApiKey }) {
                                         lat={direccionEdit.direccionId.latitud}
                                         lng={direccionEdit.direccionId.longitud}
                                         onMarkerChange={handleMapMarkerChange}
-                                        googleMapsApiKey={googleMapsApiKey}
                                     />
                                 </div>
                                 <div className="w-1/3 pl-4">

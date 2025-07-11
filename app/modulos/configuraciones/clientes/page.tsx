@@ -7,7 +7,7 @@ export default async function FlotaPage() {
     console.log("SESSION", session);
     return (
         <>
-            <Clientes googleMapsApiKey={process.env.GOOGLE_API_KEY} />
+            <Clientes/>
         </>
     );
 }

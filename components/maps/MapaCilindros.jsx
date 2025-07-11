@@ -3,10 +3,10 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import {
     GoogleMap,
     Marker,
-    InfoWindow,
-    useJsApiLoader,
+    InfoWindow
 } from "@react-google-maps/api";
 import { GrOverview } from "react-icons/gr";
+import { useGoogleMaps } from "./GoogleMapProvider";
 
 const REGION_BIOBIO_BOUNDS = {
     north: -36.0,
@@ -31,15 +31,11 @@ const MAP_OPTIONS = {
     mapTypeControl: false,
 };
 
-export default function MapaCilindros({ data, googleMapsApiKey }) {
+export default function MapaCilindros({ data }) {
     const [zoomedCluster, setZoomedCluster] = useState(null);
     const [selectedCilindro, setSelectedCilindro] = useState(null);
     const mapRef = useRef(null);
-
-    const { isLoaded, loadError } = useJsApiLoader({
-        googleMapsApiKey,
-        language: "es",
-    });
+    const { isLoaded } = useGoogleMaps();
 
     const handleClusterClick = (cluster) => {
         setZoomedCluster(cluster);
@@ -94,13 +90,6 @@ export default function MapaCilindros({ data, googleMapsApiKey }) {
         const bounds = getBounds();
         map.fitBounds(bounds, zoomedCluster ? 80 : 2);
     }, [getBounds, zoomedCluster, isLoaded, mapRef]);
-
-    if (loadError)
-        return (
-            <div className="w-full h-full flex items-center justify-center">
-                Error cargando el mapa
-            </div>
-        );
 
     return (
         <div className="w-full h-full relative" style={{ minHeight: 400 }}>

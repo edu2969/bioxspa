@@ -18,7 +18,7 @@ import { TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 import Image from 'next/image';
 
-export default function EditSucursal({ googleMapsApiKey }) {
+export default function EditSucursal() {
     const params = useSearchParams();
     const router = useRouter();
     const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm();

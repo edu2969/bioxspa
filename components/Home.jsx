@@ -13,15 +13,17 @@ import 'react-toastify/dist/ReactToastify.css';
 import CheckList from "@/components/CheckList";
 import { TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
+import { useSession } from "next-auth/react";
 
-export default function Home({ session }) {
+export default function Home() {
     const [checklists, setChecklists] = useState([]);
     const [counters, setCounters] = useState({});
     const [routingIndex, setRoutingIndex] = useState(-2);
     const [loadingChecklist, setLoadingChecklist] = useState(false);
     const [lastUpdate, setLastUpdate] = useState(new Date());
+    const { data: session, status } = useSession();
 
-    const faltaChecklistPersonal = () => {
+    const faltaChecklistPersonal = () => {        
         const requiereChecklist = session?.user?.role === USER_ROLE.conductor || session?.user?.role === USER_ROLE.despacho || session?.user?.role === USER_ROLE.encargado;
         if (!requiereChecklist) return false;
         if(!checklists || checklists.length === 0) return true;
@@ -95,7 +97,7 @@ export default function Home({ session }) {
             });
     };
     
-    async function fetchDataHome() {
+    async function fetchDataHome() {        
         try {
             const response = await fetch('/api/home');
             const data = await response.json();                
@@ -114,7 +116,7 @@ export default function Home({ session }) {
     }
 
     useEffect(() => {
-        console.log("SESSION", session);
+        if(!session || !session.user) return;
         fetchDataHome();
     }, [session]);
 
@@ -159,17 +161,17 @@ export default function Home({ session }) {
 
     return (
         <div>
-            {(session && session.user.role == USER_ROLE.neo) ? <div>yGa</div> :
-                (session && session.user.role == USER_ROLE.gerente) ? <HomeGerencia session={session} contadores={counters} checklists={checklists} /> :
-                (session && session.user.role == USER_ROLE.conductor) ? <HomeConductor contadores={counters} checklists={checklists} /> :
-                (session && session.user.role == USER_ROLE.despacho) ? <HomeDespacho contadores={counters}/> :
-                <HomeAdministrador contadores={counters}/>}
+            {(session && session.user.role == USER_ROLE.neo) && <div>yGa</div>}
+            {(session && session.user.role == USER_ROLE.gerente) && <HomeGerencia session={session} contadores={counters} checklists={checklists} />}
+            {(session && (session.user.role == USER_ROLE.cobranza || session.user.role == USER_ROLE.encargado) && <HomeAdministrador contadores={counters}/>)}
+            {(session && session.user.role == USER_ROLE.despacho) && <HomeDespacho contadores={counters}/>}
+            {(session && session.user.role == USER_ROLE.conductor) && <HomeConductor contadores={counters} checklists={checklists} />}
 
             {routingIndex == -1 && faltaChecklistPersonal() 
                 && <CheckList session={session} tipo={TIPO_CHECKLIST.personal} 
                 onFinish={onFinish} loading={loadingChecklist}/>}
 
-            {routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center z-10">
+            {status == 'loading' || routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center z-10">
                 <div className="absolute w-full h-screen bg-white/80"></div>
                 <div className="flex items-center justify-center bg-white roounded-lg shadow-lg p-4 z-20 text-xl">
                     <Loader texto="CARGANDO PANEL" />
