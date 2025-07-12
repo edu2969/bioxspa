@@ -52,8 +52,6 @@ export default function Home() {
             .catch(() => {});
     });
 
-
-
     const onFinish = (checklist) => {
         console.log("Checklist completed", checklist);
         checklist.tipo = TIPO_CHECKLIST.personal;
