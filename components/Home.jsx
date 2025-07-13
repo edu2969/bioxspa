@@ -33,8 +33,6 @@ export default function Home() {
     
     useOnVisibilityChange(() => {
         const fetch = async () => {
-            console.log('La app volvió al primer plano');
-            toast.info("Volviendo a cargar los datos");
             setRoutingIndex(-2);
             await fetchDataHome();
         }
@@ -45,7 +43,7 @@ export default function Home() {
                     const updatedAt = new Date(data.updatedAt);
                     if (updatedAt > lastUpdate) {
                         setLastUpdate(updatedAt);
-                        fetchDataHome();
+                        fetch();
                     }
                 }
             })

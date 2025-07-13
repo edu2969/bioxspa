@@ -7,7 +7,7 @@ import { IoAlertOutline } from "react-icons/io5";
 
 // filepath: d:/git/bioxspa/components/uix/LoginOut.jsx
 
-async function waitForSessionToBeUnauthenticated(timeoutMs = 3000) {
+async function waitForSessionToBeUnauthenticated(timeoutMs = 9000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const res = await fetch("/api/auth/session");

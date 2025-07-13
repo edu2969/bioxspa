@@ -6,6 +6,8 @@ import Cargo from "@/models/cargo";
 import Venta from "@/models/venta";
 import { authOptions } from "@/app/utils/authOptions";
 import { getServerSession } from "next-auth";
+import Cliente from "@/models/cliente";
+import BIDeuda from "@/models/biDeuda";
 import {
     USER_ROLE,
     TIPO_CARGO,
@@ -26,7 +28,6 @@ export async function GET() {
         const userRole = session.user.role;
 
         const tipos = [];
-        let contadores = {};
         if(userRole === USER_ROLE.despacho || userRole === USER_ROLE.conductor || userRole === USER_ROLE.encargado) {
             tipos.push(TIPO_CHECKLIST.personal);            
         }
@@ -49,6 +50,7 @@ export async function GET() {
 
         // ADMINISTRADOR
         if (userRole === USER_ROLE.cobranza || userRole === USER_ROLE.encargado) {
+            console.log("Fetching data for ADMINISTRADOR or ENCARGADO role");
             const ventas = await Venta.find({
                 estado: { $gte: TIPO_ESTADO_VENTA.borrador, $lte: TIPO_ESTADO_VENTA.reparto },
             });
@@ -56,14 +58,48 @@ export async function GET() {
             const porAsignar = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.por_asignar).length;
             const preparacion = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.preparacion).length;
             const enRuta = ventas.length - pedidosCount - porAsignar - preparacion;
-            contadores = {
-                pedidosCount,
-                asignacionCounts: {
+
+            // Clientes activos
+            const clientesActivos = await Cliente.countDocuments({ activo: true });
+
+            // Clientes en quiebra
+            const clientesEnQuiebra = await Cliente.countDocuments({ activo: true, enQuiebra: true });
+
+            // Obtener todas las deudas agrupadas por cliente
+            const deudasPorCliente = await BIDeuda.aggregate([
+                {
+                    $group: {
+                        _id: "$clienteId",
+                        totalDeuda: { $sum: "$monto" }
+                    }
+                }
+            ]);
+
+            // Obtener los créditos de los clientes
+            const clientes = await Cliente.find({ activo: true }).select("_id credito").lean();
+
+            // Calcular crédito restante por cliente
+            const creditoRestantePorCliente = clientes.map(cliente => {
+                const deuda = deudasPorCliente.find(d => String(d._id) === String(cliente._id));
+                const totalDeuda = deuda ? deuda.totalDeuda : 0;
+                return {
+                    clienteId: cliente._id,
+                    creditoRestante: cliente.credito - totalDeuda
+                };
+            });
+            const contadores = {
+                pedidos: pedidosCount,
+                asignaciones: {
                     porAsignar,
                     preparacion,
                     enRuta,
                 },
-                deudasCount: 0
+                clientes: {
+                    activos: clientesActivos,
+                    enQuiebra: clientesEnQuiebra,
+                    creditoRestante: creditoRestantePorCliente
+                },
+                deudas: 0
             }
             return NextResponse.json({ ok: true, contadores, checklists: checklistResults });
         }

@@ -8,15 +8,16 @@ import { socket } from "@/lib/socket-client";
 import Loader from "./Loader";
 import { IoMdAlert } from "react-icons/io";
 import { FaClipboardCheck } from "react-icons/fa";
+import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import 'react-circular-progressbar/dist/styles.css';
 
 function formatFecha(fecha) {
     return new Date(fecha).toLocaleDateString("es-CL", {
         day: "2-digit",
         month: "short",
-        year: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-    });
+    }).toUpperCase();
 }
 
 function amountFormat(num) {
@@ -31,6 +32,7 @@ export default function GestionPedidos({ session }) {
     const [saving, setSaving] = useState(false);
     const [pedidos, setPedidos] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [credito, setCredito] = useState(null);
 
     const fetchPedidos = useCallback(async () => {
         const res = await fetch("/api/pedidos/borradores");
@@ -44,6 +46,19 @@ export default function GestionPedidos({ session }) {
     }, []);
 
     const handleOpenPedido = (pedidoData) => {
+        console.log("Abriendo pedido:", pedidoData);
+        const fetchCreditoCliente = async () => {
+            if (!pedidoData.cliente?._id) return;
+            const res = await fetch(`/api/clientes/creditos?id=${pedidoData.cliente._id}`);
+            if (res.ok) {
+                const data = await res.json();
+                console.log("CREDITO", data);
+                setCredito({ ...data });
+            } else {
+                console.error("Error al obtener crédito del cliente");
+            }
+        }
+
         setPedidoEdit(pedidoData._id);
         setPedido(pedidoData);
         // Deep copy de items, asegurando que los precios vacíos sean string vacío
@@ -53,6 +68,7 @@ export default function GestionPedidos({ session }) {
                 precio: item.precio !== undefined && item.precio !== null ? Number(item.precio) : ""
             }))
         );
+        fetchCreditoCliente();
     };
 
     const handlePrecioChange = (idx, value) => {
@@ -166,6 +182,15 @@ export default function GestionPedidos({ session }) {
         };
     }, [session]);
 
+    const riesgo = (credito) => {
+        if (!credito) return { porcentaje: 0, color: "green" };
+        const valor = Math.min(100, Math.max(0, (credito.utilizado / credito.autorizado) * 100));
+        return {
+            texto: valor > 80 ? "RIESGOSO" : valor > 50 ? "ACEPTABLE" : "BUENO", 
+            porcentaje: Math.round(valor),
+        }        
+    }
+
     return (
         <main className="px-4 py-8 h-screen bg-gray-50">
             <h1 className="text-2xl font-bold mb-8 text-center">Gestión de Pedidos</h1>
@@ -180,13 +205,13 @@ export default function GestionPedidos({ session }) {
                             data-edit-pedido
                             data-id={pedido._id}
                             className="bg-white rounded-lg shadow p-4 border border-gray-200 hover:shadow-lg hover:scale-105 transition"
-                        >
+                        >                            
                             <div className="flex justify-between items-center mb-2">
                                 <div>
                                     <p className="font-semibold text-lg">{pedido.cliente.nombre}</p>
                                     <p className="text-xs text-gray-500">{pedido.cliente.rut}</p>
                                 </div>
-                                <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-0.5">
+                                <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-0.5 -mt-6">
                                     {formatFecha(pedido.fecha)}
                                 </span>
                             </div>
@@ -198,6 +223,7 @@ export default function GestionPedidos({ session }) {
                                     <span>{pedido.solicitante.telefono}</span>
                                 </div>
                             </div>
+
                             <div>
                                 <p className="text-sm font-medium text-gray-700 mb-1">Pedido:</p>
                                 <ul className="space-y-1">
@@ -242,21 +268,63 @@ export default function GestionPedidos({ session }) {
                         >
                             <LiaTimesSolid />
                         </button>
-                        <h2 className="text-xl font-bold mb-2 text-center">Editar Pedido</h2>
-                        <div className="mb-4">
-                            <div className="mb-1 text-sm text-gray-700 font-semibold">{pedido.cliente?.nombre}</div>
-                            <div className="text-xs text-gray-500">{pedido.cliente?.rut}</div>
-                        </div>
-                        <div className="mb-4">
-                            <div className="text-sm font-medium text-gray-700 mb-1">Solicitante:</div>
-                            <div className="flex items-center gap-2 text-xs text-gray-600">
-                                <span className="font-semibold">{pedido.solicitante?.nombre}</span>
-                                <span>|</span>
-                                <span>{pedido.solicitante?.telefono}</span>
+                        <h2 className="text-xl font-bold mb-2 text-center">Gestionar Pedido</h2>
+                        <div className="flex flex-start">
+                            <div className="w-1/3">
+                                <div className="mb-4">
+                                    <div className="mb-1 text-sm text-gray-700 font-semibold">{pedido.cliente?.nombre}</div>
+                                    <div className="text-xs text-gray-500">{pedido.cliente?.rut}</div>
+                                </div>
+                                <div className="mb-4">
+                                    <div className="text-sm font-medium text-gray-700 mb-1">Solicitante:</div>
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                        <span className="font-semibold">{pedido.solicitante?.nombre}</span>
+                                        <span>|</span>
+                                        <span>{pedido.solicitante?.telefono}</span>
+                                    </div>
+                                </div>
+                            </div>                            
+                            <div className="relative flex w-2/3 justify-end">
+                                <div className="ml-3 mt-4">                                    
+                                    <div className="bg-white rounded-md px-4 -pt-4 border border-gray-300">
+                                        <span className="relative -top-[14px] text-xs font-bold bg-white px-2 text-gray-400">Crédito</span>
+                                        <div className="grid grid-cols-2 gap-x-4 text-xs -mt-4 mb-1">
+                                            <div className="flex flex-col items-start space-y-1">
+                                                <span className="font-semibold text-green-600">Disponible</span>
+                                                <span className="font-semibold text-orange-700">Utilizado</span>
+                                                <span className="font-semibold">Saldo</span>
+                                            </div>
+                                            <div className="flex flex-col items-end space-y-1">
+                                                <span className="font-semibold text-green-600">
+                                                    {credito?.autorizado.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || '-.---.---'}
+                                                </span>
+                                                <span className="font-semibold text-orange-700">
+                                                    {credito?.utilizado.toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || '-.---.---'}
+                                                </span>
+                                                <span className="font-semibold">
+                                                    {credito && (credito?.autorizado - credito?.utilizado).toLocaleString("es-CL", { style: "currency", currency: "CLP" }) || '-.---.---'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="w-20 ml-3 mt-3 text-center">
+                                    <div className="w-14 h-14 relative mx-auto orbitron">
+                                        <CircularProgressbar className="w-14 h-14" strokeWidth={16} value={riesgo(credito).porcentaje} text={`${!credito ? '-' : riesgo(credito).porcentaje}%`} 
+                                            styles={buildStyles({
+                                                // Invertido: 0 (verde) -> 120, 100 (rojo) -> 0
+                                                pathColor: `hsl(${120 - Math.round((riesgo(credito).porcentaje / 100) * 120)}, 100%, 40%)`
+                                            })} />
+                                    </div>
+                                    <span className="text-xs font-bold bg-white px-2 text-gray-400">{riesgo(credito).texto}</span>
+                                </div>
+                                {!credito && <div className="absolute top-0 right-0 -mt-2 -mr-2 w-full h-24 justify-center items-center flex">
+                                    <div className="absolute top-0 right-0 bg-white w-full h-24 opacity-70"></div>
+                                    <Loader texto="Cargando información" />
+                                </div>}
                             </div>
                         </div>
                         <div>
-                            <div className="text-sm font-medium text-gray-700 mb-2">Productos:</div>
                             <div className="overflow-x-auto rounded border border-gray-200 bg-gray-50">
                                 <table className="min-w-full text-sm">
                                     <thead>
@@ -340,7 +408,7 @@ export default function GestionPedidos({ session }) {
             )}
 
             {loading && (
-                <div className="flex items-center justify-center h-full -mt-10">
+                <div className="flex items-center justify-center h-full -mt-20">
                     <Loader texto="Cargando borradores"/>
                 </div>
             )}

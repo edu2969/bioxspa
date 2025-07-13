@@ -16,6 +16,7 @@ import { getNUCode } from "@/lib/nuConverter";
 import { TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
 import { useRouter } from "next/navigation";
+import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -29,6 +30,7 @@ export default function Despacho({ session }) {
     const [loadingChecklist, setLoadingChecklist] = useState(false);
     const [checkListPassed, setCheckListPassed] = useState(true);
     const [endingChecklist, setEndingChecklist] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState(new Date());
     const router = useRouter();
 
     const fetchEstadoChecklist = async () => {
@@ -42,6 +44,7 @@ export default function Despacho({ session }) {
             });
             if (response.ok) {
                 const data = await response.json();
+                console.log("CHECKLISTS --->", data.checklists);
                 // Busca si existe un checklist del tipo vehiculo aprobado hoy
                 setCheckListPassed(
                     Array.isArray(data.checklists) &&
@@ -623,7 +626,26 @@ export default function Despacho({ session }) {
         return () => {
             socket.off("update-pedidos");
         };
-    }, [session, fetchRutaAsignada]);
+    }, [session, fetchRutaAsignada]);    
+
+    useOnVisibilityChange(() => {
+        const fetch = async () => {
+            setLoadingState(-2);
+            fetchRutaAsignada();
+        }
+        fetch('/api/ventas/lastUpdate')
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok && data.updatedAt) {
+                    const updatedAt = new Date(data.updatedAt);
+                    if (updatedAt > lastUpdate) {
+                        setLastUpdate(updatedAt);
+                        fetch();
+                    }
+                }
+            })
+            .catch(() => {});
+    });
 
     return (
         <div className="w-full h-screen overflow-hidden">

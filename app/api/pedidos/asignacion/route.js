@@ -7,7 +7,7 @@ import Cliente from "@/models/cliente";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import Cargo from "@/models/cargo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
 import DetalleVenta from "@/models/detalleVenta";
 import Direccion from "@/models/direccion";
 import ItemCatalogo from "@/models/itemCatalogo";
@@ -147,7 +147,6 @@ export async function GET() {
             }
 
             // Check if checklist exists for today
-            const Checklist = (await import('@/models/checklist')).default;
             const checklistExists = await Checklist.findOne({
                 userId: user._id,
                 fecha: {
@@ -292,15 +291,15 @@ export async function POST(request) {
             // Buscar el checklist de hoy para el chofer con passed=true
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
             const checklist = await Checklist.findOne({
                 userId: choferId,
-                fecha: { $gte: today, $lt: tomorrow },
-                passed: true
+                fecha: { $gte: today },
+                passed: true,
+                tipo: TIPO_CHECKLIST.vehiculo
             }).lean();
 
-            if (!checklist || !checklist.vehiculoId) {
+            if (!checklist) {
                 return NextResponse.json({ ok: false, error: "No existe checklist aprobado para el chofer hoy" }, { status: 500 });
             }
 

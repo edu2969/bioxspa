@@ -13,6 +13,7 @@ import { socket } from "@/lib/socket-client";
 import { MdAddLocationAlt } from 'react-icons/md';
 import Autocomplete from "react-google-autocomplete";
 import { FaCheck, FaTimes } from 'react-icons/fa';
+import { includes } from 'lodash';
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -62,7 +63,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [savingPlace, setSavingPlace] = useState(false);
 
     const isVentaDisabled = () => {
-        return !precios.length  
+        return  redirecting ||!precios.length  
             || !precios.some(precio => precio.seleccionado) 
             || precios.some(precio => precio.cantidad <= 0 && precio.seleccionado) 
             || !clienteSelected || !getValues("direccionDespachoId") 
@@ -110,7 +111,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
             const response = await fetch('/api/catalogo');
             const data = await response.json();
             console.log("CATEGORIAS", data);
-            setCategorias(data);
+            setCategorias(data.sort((a, b) => a.nombre < b.nombre ? -1 : 1));
             setLoading(false);
         } catch (error) {
             console.error('Error fetching categorias:', error);
@@ -128,16 +129,14 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         }
     }
 
-    function amountFormat(num) {
-        if (!num && num !== 0) return "";
-        return num.toLocaleString("es-CL");
-    }
-
     const handlePrecioInputChange = (e) => {
         const value = e.target.value;
         const clean = value.replace(/\D/g, "");
-        // Si el input está vacío, deja string vacío, si no, número
-        setValue("precio", amountFormat(clean) || "");
+        setValue('precio', clean === "" ? "" : Number(clean).toLocaleString("es-CL"));
+        setPrecioData(prev => ({
+            ...prev,
+            valor: clean === "" ? "" : parseInt(clean)
+        }));
     };
 
     const onSubmit = async (data) => {
@@ -292,6 +291,13 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         setTotal(newTotal);
     }, [itemsVenta, total]);
 
+    const formInvalid = () => {
+        if(!session) return true;
+        const role = session.user?.role || -1;
+        return !getValues('subcategoriaCatalogoId') || !getValues('categoriaId') 
+            || ([USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado].includes(role) && !getValues('precio'));
+    };
+
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
             <div className="w-full pb-2 mt-14 h-[calc(100vh-106px)] overflow-y-auto">
@@ -299,7 +305,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                     <form onSubmit={handleSubmit(onSubmit)} className="px-2 sm:px-4 md:px-8 space-y-4 md:space-y-6">
                         <div className="w-full flex flex-col md:flex-row">
                             <div className="w-full md:w-9/12">
-                                {session.role == USER_ROLE.manager && <div className="w-full flex">
+                                {session.role == USER_ROLE.gerente && <div className="w-full flex">
                                     <div className="w-full md:w-4/12 pr-0 md:pr-4">
                                         <label htmlFor="usuarioId" className="block text-sm font-medium text-gray-700">Usuario</label>
                                         <select id="usuarioId" {...register('usuarioId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
@@ -339,15 +345,16 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                 {loadingClients && <div className="absolute -right-2 top-1">
                                                     <Loader texto="" />
                                                 </div>}
-                                                <button
+                                                {(role === USER_ROLE.gerente || role === USER_ROLE.encargado || role === USER_ROLE.cobranza) 
+                                                && <button
                                                     type="button"
                                                     className={`ml-2 flex items-center px-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${loadingClients ? 'cursor-not-allowed opacity-50' : ''}`}
                                                     onClick={() => {
-                                                        router.push('/modulos/configuraciones/clientes');
+                                                        router.push(`/modulos/configuraciones/clientes${clienteSelected ? `?id=${clienteSelected._id}` : '' }`);
                                                     }}
                                                 >
                                                     <LiaPencilAltSolid size="1.6rem" />
-                                                </button>
+                                                </button>}
                                             </div>
                                             {autocompleteClienteResults.length > 0 && (
                                                 <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full">
@@ -357,6 +364,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                             className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                             onClick={async () => {
                                                                 try {
+                                                                    setValue('cliente', cliente.nombre);                                                                    
                                                                     // Primero, obtener el cliente completo desde la API
                                                                     const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
                                                                     const clienteData = await clienteResp.json();
@@ -656,9 +664,18 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                 <button
                                     type="button"
                                     className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                                    onClick={() => setModalSolicitudPrecio(true)}
+                                    onClick={() => {
+                                        setPrecioData({
+                                            categoriaId: "",
+                                            subcategoriaCatalogoId: "",
+                                            valor: getValues('precio'),
+                                        });
+                                        setModalSolicitudPrecio(true);
+                                    }}
                                 >
-                                    {(session.user.role == USER_ROLE.manager || session.user.role == USER_ROLE.seller) ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                                    {(session.user.role == USER_ROLE.gerente 
+                                        || session.user.role == USER_ROLE.cobranza
+                                        || session.user.role === USER_ROLE.encargado) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                             </div>
                             <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
@@ -731,7 +748,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                     </div>
                                 </div>
                             ))}
-                            <div className="fixed left-0 w-full flex mt-6 justify-end bottom-0 bg-white pt-1 pb-2 px-2 md:px-6">
+                            <div className="fixed left-0 w-full flex mt-6 justify-end bottom-2 bg-white pt-1 pb-2 px-2 md:px-6">
                                 <button className="flex w-full md:w-3/12 justify-center rounded-md bg-gray-600 px-3 h-10 pt-2 text-white shadow-sm hover:bg-gray-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-300 mr-4"
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -779,7 +796,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                 setPrecioData((prev) => ({
                                                     ...prev,
                                                     categoriaId,
-                                                    subcategoriaCatalogoId: ""
+                                                    subcategoriaCatalogoId: "",
+                                                    valor: getValues('precio'),
                                                 }));
                                                 setCategoriaIdSeleccionada(categoriaId);
                                                 setValue("categoriaId", categoriaId);
@@ -788,7 +806,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                     await fetchSubcategorias(categoriaId);
                                                 } else {
                                                     setSubcategorias([]);
-                                                }
+                                                }                                                
                                             }}
                                             className="border rounded-md px-3 py-2 text-base"
                                         >
@@ -824,18 +842,20 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                             }
                                         </select>
                                     </div>
-                                    {(role == USER_ROLE.manager || role == USER_ROLE.seller) && <div className="flex flex-col">
-                                        <label htmlFor="valor" className="text-sm text-gray-500">Precio</label>
+                                    {(role == USER_ROLE.gerente || role == USER_ROLE.encargado || role == USER_ROLE.cobranza)
+                                     && <div className="flex flex-col">
+                                        <label htmlFor="precio" className="text-sm text-gray-500">Precio</label>
                                         <div className="flex items-center">
                                             <span className="text-gray-500 mr-1">$</span>
                                             <input
+                                                {...register("precio", { required: true })}
+                                                value={precioData.valor}
                                                 type="text"
-                                                id="valor"
-                                                name="valor"
+                                                id="precio"
+                                                name="precio"
                                                 className="border rounded-md px-3 py-2 text-base w-full text-right"
                                                 placeholder="Precio"
-                                                value={precioData.valorFormateado}
-                                                onChange={handlePrecioInputChange}
+                                                onChange={handlePrecioInputChange}                                                
                                                 inputMode="numeric"
                                             />
                                         </div>
@@ -845,10 +865,12 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                             <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <button
                                     onClick={handleSave}
-                                    disabled={loading}
-                                    className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
+                                    disabled={saving || formInvalid()}
+                                    className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${(saving || formInvalid()) ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
                                     {saving && <div className="absolute -mt-1"><Loader texto="" /></div>}
-                                    {(session.user.role == USER_ROLE.manager || session.user.role == USER_ROLE.seller) ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                                    {(session.user.role == USER_ROLE.gerente 
+                                        || session.user.role == USER_ROLE.encargado
+                                        || session.user.role == USER_ROLE.cobranza) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                                 </button>
                                 <button
                                     onClick={handleCancel}

@@ -58,7 +58,7 @@ export async function GET() {
             return {
                 _id: venta._id.toString(),
                 cliente: cliente
-                    ? { nombre: cliente.nombre, rut: cliente.rut }
+                    ? { nombre: cliente.nombre, rut: cliente.rut, _id: cliente._id.toString() }
                     : { nombre: "Sin cliente", rut: "" },
                 solicitante: solicitante
                     ? {

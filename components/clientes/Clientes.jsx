@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { TiUserAddOutline } from "react-icons/ti";
 import { useForm } from "react-hook-form";
 import Loader from "@/components/Loader";
@@ -32,6 +33,9 @@ export default function Clientes() {
     const router = useRouter();
     const scrollRef = useRef(null);
     const [saving, setSaving] = useState(false);
+    const searchParams = useSearchParams();
+    const [loadingCliente, setLoadingCliente] = useState(false);
+    const clienteId = searchParams.get("id");
 
     // Abre el modal y carga los datos de la dirección seleccionada
     const handleAjustarDireccion = (idx) => {
@@ -55,6 +59,31 @@ export default function Clientes() {
             }
         }, 200);
     };
+
+    useEffect(() => {
+        if(clienteId) {
+            setLoadingCliente(true);
+            fetch(`/api/clientes?id=${clienteId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.ok) {
+                        setClienteSelected(data.cliente);
+                        setDireccionesDespacho(data.cliente.direccionesDespacho || []);
+                        Object.entries(data.cliente).forEach(([key, value]) => {
+                            setValue(key, value ?? "");
+                        });
+                    } else {
+                        toast.error("Error al cargar cliente");
+                    }
+                })
+                .catch(() => {
+                    toast.error("Error al cargar cliente");
+                })
+                .finally(() => {
+                    setLoadingCliente(false);
+                });
+        }
+    }, [clienteId]);
 
     // Actualiza la posición del marcador en el modal
     const handleMapMarkerChange = ({ lat, lng }) => {

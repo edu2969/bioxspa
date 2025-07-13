@@ -5,6 +5,7 @@ import { FaFileContract } from "react-icons/fa";
 import { TbReportMoney } from 'react-icons/tb';
 import Loader from './Loader';
 import { useState } from 'react';
+import { HiUserGroup } from 'react-icons/hi';
 
 export default function HomeAdministrador({ contadores }) {
     const [routingIndex, setRoutingIndex] = useState(-1);
@@ -27,20 +28,20 @@ export default function HomeAdministrador({ contadores }) {
             label: "ASIGNACION",
             index: 1,
             badges: [
-                contadores?.porAsignar > 0 && {
+                contadores?.asignaciones?.porAsignar > 0 && {
                     color: "bg-red-500",
-                    value: contadores.porAsignar > 999999 ? '999999+' : contadores.porAsignar,
-                    text: "x POR ASIGNAR"
+                    value: contadores.asignaciones.porAsignar > 999999 ? '999999+' : contadores.asignaciones.porAsignar,
+                    text: "x ASIGNAR"
                 },
-                contadores?.preparacion > 0 && {
-                    color: "bg-yellow-500",
-                    value: contadores.preparacion > 999999 ? '999999+' : contadores.preparacion,
-                    text: "x EN PREPARACION"
-                },
-                contadores?.enRuta > 0 && {
+                contadores?.asignaciones?.preparacion > 0 && {
                     color: "bg-blue-500",
-                    value: contadores.enRuta > 999999 ? '999999+' : contadores.enRuta,
-                    text: "x EN RUTA"
+                    value: contadores.asignaciones.preparacion > 999999 ? '999999+' : contadores.asignaciones.preparacion,
+                    text: "x PREPARAR"
+                },
+                contadores?.asignaciones?.enRuta > 0 && {
+                    color: "bg-blue-500",
+                    value: contadores.asignaciones.enRuta > 999999 ? '999999+' : contadores.asignaciones.enRuta,
+                    text: "en RUTA"
                 }
             ].filter(Boolean)
         },
@@ -49,11 +50,39 @@ export default function HomeAdministrador({ contadores }) {
             icon: TbReportMoney,
             label: "DEUDAS",
             index: 2
+        },
+        {
+            href: "/modulos/configuraciones/clientes",
+            icon: HiUserGroup,
+            label: "CLIENTES",
+            index: 3,
+            badges: [
+                contadores?.clientes?.activos > 0 && {
+                    color: "bg-green-500",
+                    value: contadores?.clientes?.activos > 999999 ? '999999+' : contadores?.clientes?.activos,
+                    text: "x ACTIVOS"
+                },
+                contadores?.clientes?.sinCredito > 0 && {
+                    color: "bg-red-500",
+                    value: contadores?.clientes?.sinCredito > 999999 ? '999999+' : contadores?.clientes?.sinCredito,
+                    text: "s/CREDITO"
+                },
+                contadores?.clientes?.enQuiebra > 0 && {
+                    color: "bg-gray-500",
+                    value: contadores?.clientes?.enQuiebra > 999999 ? '999999+' : contadores?.clientes?.enQuiebra,
+                    text: "en QUIEBRA"
+                },
+                contadores?.clientes?.pendientes > 0 && {
+                    color: "bg-orange-500",
+                    value: contadores?.clientes?.pendientes > 999999 ? '999999+' : contadores?.clientes?.pendientes,
+                    text: "x PENDIENTES"
+                }
+            ]
         }
     ];
 
     return (
-        <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0 md:mt-7">
+        <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                 {modules.map((mod, i) => (
                     <div key={`mod_${i}`} className="relative flex justify-center items-center">
@@ -64,19 +93,21 @@ export default function HomeAdministrador({ contadores }) {
                                     <mod.icon size="6rem" className="hidden md:block" />
                                 </div>
                                 <span className="text-base md:text-lg font-semibold">{mod.label}</span>
-                            </div>
-                            {mod.badge && (
-                                <div className={`absolute top-2 md:top-6 left-2 ${mod.badge.color} text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center`}>
-                                    <span className="text-sm mr-1">{mod.badge.value}</span>
-                                    <span className="text-xs mt-0.5">{mod.badge.text}</span>
-                                </div>
-                            )}
-                            {mod.badges && mod.badges.map((badge, idx) => (
-                                <div key={idx} className={`absolute top-2 md:top-6 right-2 ${badge.color} text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center mt-${idx * 7}`}>
-                                    <span className="text-sm mr-1">{badge.value}</span>
-                                    <span className="text-xs mt-0.5">{badge.text}</span>
-                                </div>
-                            ))}
+                            </div>                            
+                            <div className={`absolute top-2 md:top-6 flex flex-col gap-2 z-10 ${mod.index % 2 === 0 ? '-left-8' : '-right-8'}`}>
+                                {mod.badge && (
+                                    <div className={`${mod.badge.color} text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center`}>
+                                        <span className="text-sm mr-1">{mod.badge.value}</span>
+                                        <span className="text-xs mt-0.5">{mod.badge.text}</span>
+                                    </div>
+                                )}
+                                {mod.badges && mod.badges.filter(badge => badge.value > 0).map((badge, idx) => (
+                                    <div key={idx} className={`${badge.color} text-white text-xs font-bold rounded-full px-2 h-6 flex items-center justify-center`}>
+                                        <span className="text-sm mr-1">{badge.value}</span>
+                                        <span className="text-xs mt-0.5">{badge.text}</span>
+                                    </div>
+                                ))}
+                            </div>                            
                         </Link>
                         {routingIndex == mod.index && (
                             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
