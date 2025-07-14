@@ -49,9 +49,11 @@ export async function GET() {
             fecha: cl.fecha
         }));
 
-        // ADMINISTRADOR
+        console.log("User Role:", userRole);
+
+        // COBRANZA
         if (userRole === USER_ROLE.cobranza || userRole === USER_ROLE.encargado) {
-            console.log("Fetching data for ADMINISTRADOR or ENCARGADO role");
+            console.log("Fetching data for COBRANZA or ENCARGADO role");
             const ventas = await Venta.find({
                 estado: { $gte: TIPO_ESTADO_VENTA.borrador, $lte: TIPO_ESTADO_VENTA.reparto },
             });

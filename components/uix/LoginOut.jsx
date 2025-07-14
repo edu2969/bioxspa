@@ -12,7 +12,9 @@ async function waitForSessionToBeUnauthenticated(timeoutMs = 9000) {
     while (Date.now() - start < timeoutMs) {
         const res = await fetch("/api/auth/session");
         const session = await res.json();
-        if (!session?.user) {
+        console.log("Esperando que la sesión se cierre", session);
+        if (!session?.user) { 
+            console.log("Sesión cerrada, redirigiendo a la página principal");           
             return true;
         }
         await new Promise((res) => setTimeout(res, 150));
@@ -25,11 +27,13 @@ export default function LoginOut() {
     useEffect(() => {
         async function cerrarSesion() {
             try {
-                await waitForSessionToBeUnauthenticated();
+                const resp = await waitForSessionToBeUnauthenticated();
+                if(resp) {
+                    router.replace("/");
+                }
             } catch {
                 // Ignorar timeout, igual redirigir
             }
-            router.replace("/");
         }
         cerrarSesion();
     }, [router]);
