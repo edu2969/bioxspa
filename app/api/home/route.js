@@ -36,6 +36,7 @@ export async function GET() {
         }
         const ahora = new Date();
         const checklists = tipos.length > 0 ? await CheckList.find({
+            userId,
             tipo: { $in: tipos },
             fecha: {
                 $gte: new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),

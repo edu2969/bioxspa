@@ -10,10 +10,10 @@ export default function HomeConductor({ contadores, checklists }) {
     const [routingIndex, setRoutingIndex] = useState(-1);
 
     const faltaChecklistVehiculo = () => {
-        if(routingIndex == -1) return false;
+        if(!contadores || !checklists) return false;
         const checklistVehiculo = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado);
-        console.log("Checklist vehiculo:", checklistVehiculo);
-        return !checklistVehiculo || !checklistVehiculo.aprobado || checklistVehiculo.fecha < new Date(new Date().setHours(0, 0, 0, 0));
+        console.log("------------------> Checklist vehiculo:", checklistVehiculo);
+        return !checklistVehiculo;
     }
 
     return (

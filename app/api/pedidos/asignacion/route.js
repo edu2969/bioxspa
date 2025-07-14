@@ -149,6 +149,7 @@ export async function GET() {
             // Check if checklist exists for today
             const checklistExists = await Checklist.findOne({
                 userId: user._id,
+                tipo: TIPO_CHECKLIST.vehiculo,
                 fecha: {
                     $gte: today,
                     $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
