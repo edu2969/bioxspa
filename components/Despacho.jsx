@@ -282,7 +282,7 @@ export default function Despacho({ session }) {
                         ...rutaDespacho,
                         estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
                         ruta: [{
-                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionesDespacho[0]._id,
+                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionesDespacho[0],
                             fechaArribo: null,
                         }]
                     });
@@ -318,7 +318,7 @@ export default function Despacho({ session }) {
                 },
                 body: JSON.stringify({
                     rutaId: rutaDespacho._id,
-                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId._id
+                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
                 }),
             });
 
@@ -344,8 +344,39 @@ export default function Despacho({ session }) {
     }, [setRutaDespacho, setLoadingState, rutaDespacho, session]);
 
     const handleHeLlegado = () => {
+        const terminarRuta = async () => {
+            setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.terminado);
+            try {
+                const response = await fetch("/api/pedidos/terminarRuta", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        rutaId: rutaDespacho._id
+                    }),
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    toast.success("Ruta terminada correctamente");
+                    setRutaDespacho({
+                        ...rutaDespacho,
+                        estado: TIPO_ESTADO_RUTA_DESPACHO.terminado
+                    }); 
+                } else {
+                    toast.error(data.error || "Error al terminar la ruta");
+                }
+            } catch (error) {
+                console.error("Error al terminar la ruta:", error);
+            } finally {
+                setLoadingState(-1);
+            }
+        }
+
         console.log("He llegado");
-        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga);
+        if(rutaDespacho.items.length === 0) {
+            terminarRuta();
+        }
     };
 
     const handleConfirmarDestino = () => {

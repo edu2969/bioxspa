@@ -83,7 +83,7 @@ export default function Clientes() {
                     setLoadingCliente(false);
                 });
         }
-    }, [clienteId]);
+    }, [clienteId, setValue]);
 
     // Actualiza la posición del marcador en el modal
     const handleMapMarkerChange = ({ lat, lng }) => {
@@ -206,7 +206,7 @@ export default function Clientes() {
                                             }
                                         }}
                                     />
-                                    {loadingClients && <div className="absolute -right-2 top-1.5">
+                                    {(loadingClients || loadingCliente) && <div className="absolute -right-2 top-1.5">
                                         <Loader texto="" />
                                     </div>}
                                     {autocompleteClienteResults.length > 0 && (
@@ -224,6 +224,7 @@ export default function Clientes() {
                                                             setClienteSelected(clienteData.cliente);
                                                             setDireccionesDespacho(clienteData.cliente.direccionesDespacho || []);
                                                             setAutocompleteClienteResults([]);
+                                                            setValue("cliente", cliente.nombre);
                                                         } else {
                                                             toast.error("Error al cargar cliente");
                                                         }
@@ -447,7 +448,7 @@ export default function Clientes() {
                             
                         </div>
 
-                        <div className="fixed w-full bottom-2 max-w-5xl mt-2 bg-white">
+                        <div className="fixed w-full max-w-5xl bg-white pb-4 bottom-0">
                             <div className={`w-full flex justify-end gap-2 ${direccionEditIdx !== null ? 'opacity-20' : ''}`}>
                                 <button
                                     type="button"

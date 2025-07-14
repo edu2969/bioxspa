@@ -13,7 +13,6 @@ import { socket } from "@/lib/socket-client";
 import { MdAddLocationAlt } from 'react-icons/md';
 import Autocomplete from "react-google-autocomplete";
 import { FaCheck, FaTimes } from 'react-icons/fa';
-import { includes } from 'lodash';
 
 const TIPO_GUIA = [
     { value: 0, label: "Seleccione tipo de guia" },
@@ -384,6 +383,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                             setValue("tipoRegistro", 3);
                                                                             setRegistroSelected(3);
                                                                         }
+                                                                        setValue("cliente", clienteData.cliente.nombre);
                                                                         // Ahora cargar los precios
                                                                         const preciosResp = await fetch(`/api/clientes/precios?clienteId=${cliente._id}`);
                                                                         const preciosData = await preciosResp.json();
