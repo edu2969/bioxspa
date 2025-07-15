@@ -38,6 +38,7 @@ export default function GestionPedidos({ session }) {
         const res = await fetch("/api/pedidos/borradores");
         if (res.ok) {
             const data = await res.json();
+            console.log("Pedidos obtenidos:", data.pedidos);
             setPedidos(data.pedidos);
             setLoading(false);
         } else {
@@ -86,19 +87,13 @@ export default function GestionPedidos({ session }) {
     const handleSave = async () => {
         console.log("Guardando pedido con items:", items);
         setSaving(true);
-        try {
-            // MODIFICACIÓN: Asegura que cada item tenga el identificador correcto
+        try {            
             const precios = items
                 .map(item => {
                     // Busca el identificador de subcategoría en el item
-                    const subcategoriaId =
-                        item.subcategoriaId ||
-                        item.subcategoriaCatalogoId ||
-                        item.subcategoria_id ||
-                        item.subcatId ||
-                        null;
+                    const subcategoriaCatalogoId = item.subcategoriaCatalogoId;
                     return {
-                        subcategoriaId,
+                        subcategoriaCatalogoId,
                         precio: Number(item.precio)
                     };
                 });

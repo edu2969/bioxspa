@@ -140,6 +140,7 @@ export async function GET() {
                             _id: venta._id,
                             nombreCliente,
                             rutCliente,
+                            comentario: venta.comentario,
                             items,
                         };
                     })
@@ -209,7 +210,7 @@ export async function GET() {
     .populate({
         path: "ventaIds",
         model: "Venta",
-        select: "clienteId",
+        select: "clienteId comentario",
         populate: {
             path: "clienteId",
             model: "Cliente",

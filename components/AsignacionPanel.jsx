@@ -15,6 +15,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import { FaCartPlus } from 'react-icons/fa';
 import { TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
+import { BiSolidComment } from 'react-icons/bi';
+import Loader from './Loader';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
@@ -30,6 +32,7 @@ export default function AsignacionPanel({ session }) {
     const [selectedVenta, setSelectedVenta] = useState(null);
     const [loading, setLoading] = useState(false);
     const [loadingPanel, setLoadingPanel] = useState(true);
+    const [redirecting, setRedirecting] = useState(false);
 
     const nombreChofer = (choferId) => {
         const chofer = choferes.find((chofer) => chofer._id === choferId);
@@ -145,10 +148,15 @@ export default function AsignacionPanel({ session }) {
                             <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                                 PEDIDOS
                             </div>
-                            <Link href="/modulos/pedidos/nuevo" className="relative ml-auto -mt-2">
-                                <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3">
-                                    <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO
+                            <Link href="/modulos/pedidos/nuevo" className="relative ml-auto -mt-2" onClick={() => setRedirecting(true)}>
+                                <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3"
+                                    disabled={redirecting}>
+                                    <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO                                    
                                 </button>
+                                {redirecting && <div className="absolute -top-0 -right-0 w-full h-full pt-1 pl-4">
+                                    <div className="absolute -top-0 -right-0 w-full h-full bg-white opacity-70"></div>
+                                    <Loader texto=""/>
+                                </div>}
                             </Link>
                         </div>
                         {pedidos.length === 0 ? (
@@ -231,7 +239,15 @@ export default function AsignacionPanel({ session }) {
                                     <p className="font-md upper</div>case font-bold">{pedido.nombreCliente}</p>
                                     <ul className="list-disc ml-4">
                                         {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
-                                    </ul>
+                                    </ul>                                    
+                                    {pedido.comentario && <div className="absolute top-12 right-2 text-green-200 flex justify-end">
+                                        <div className="mr-2 cursor-pointer" onClick={(e) => {
+                                            e.stopPropagation();
+                                            toast.info(`Comentario: ${pedido.comentario}`);
+                                        }}>
+                                            <BiSolidComment size="2.5rem" />
+                                        </div>
+                                    </div>}
                                 </div>) : <div className="absolute w-32 -top-0 right-0">
                                     <div className="bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
                                         <RiZzzFill size="1rem" className="mr-1" />
@@ -342,7 +358,7 @@ export default function AsignacionPanel({ session }) {
                                     <div></div>
                                     <div className="flex flex-wrap">
                                         {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
-                                            <div key={venta._id || idxVenta} className="border border-blue-400 rounded-lg mb-2 px-2 py-1 bg-white/80 shadow">
+                                            <div key={venta._id || idxVenta} className="absolute border border-blue-400 rounded-lg mb-2 px-2 py-1 bg-white/80 shadow">
                                                 <div className="font-bold text-blue-800 text-xs mb-1 flex items-center">
                                                     <span className="uppercase">{venta.clienteId?.nombre || "Desconocido"}</span>
                                                 </div>
@@ -371,6 +387,14 @@ export default function AsignacionPanel({ session }) {
                                                         );
                                                     })}
                                                 </div>
+                                                {venta.comentario && <div className="absolute top-1 right-0 text-blue-500 flex justify-end">
+                                                    <div className="mr-2 cursor-pointer" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toast.info(`Comentario: ${venta.comentario}`);
+                                                    }}>
+                                                        <BiSolidComment size="2.5rem" />
+                                                    </div>
+                                                </div>}
                                             </div>
                                         ))}
                                     </div>

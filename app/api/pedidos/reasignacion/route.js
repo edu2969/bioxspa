@@ -35,7 +35,7 @@ export async function POST(request) {
         }
 
         // Verify user has the required role (manager or supervisor)
-        if (user.role && !(USER_ROLE.manager || USER_ROLE.supervisor)) {
+        if (user.role && ![USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado].includes(user.role)) {
             return NextResponse.json({ 
             ok: false, 
             error: "Insufficient permissions - requires manager or supervisor role" 

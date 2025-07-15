@@ -6,6 +6,7 @@ import DetalleVenta from "@/models/detalleVenta";
 import { TIPO_ESTADO_VENTA, USER_ROLE } from "@/app/utils/constants";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
+import Precio from "@/models/precio";
 
 export async function POST(req) {
     try {
@@ -32,9 +33,9 @@ export async function POST(req) {
 
         for (const item of body.items) {
             if (!item.cantidad || item.precio == undefined || !item.subcategoriaId) {
-            const errorMessage = "Each item must have 'cantidad', 'precio', and 'subcategoriaId'";
-            console.error("Validation Error:", errorMessage);
-            return NextResponse.json({ error: errorMessage }, { status: 400 });
+                const errorMessage = "Each item must have 'cantidad', 'precio', and 'subcategoriaId'";
+                console.error("Validation Error:", errorMessage);
+                return NextResponse.json({ error: errorMessage }, { status: 400 });
             }
         }
 
@@ -86,7 +87,42 @@ export async function POST(req) {
                 total: item.cantidad * item.precio * 1.19
             });
             await detalleVenta.save();
+
+            const precioExistente = await Precio.findOne({
+                subcategoriaCatalogoId: item.subcategoriaId,
+                clienteId: body.clienteId
+            });
+
+            if (precioExistente) {
+                if (precioExistente.valor !== item.precio) {
+                    const varianza = item.precio - precioExistente.valor;
+                    precioExistente.historial.push({
+                        valor: item.precio,
+                        fecha: new Date(),
+                        varianza
+                    });
+                    precioExistente.valor = item.precio;
+                    await precioExistente.save();
+                }
+            } else if (item.precio > 0) {
+                const nuevoPrecio = new Precio({
+                    subcategoriaCatalogoId: item.subcategoriaId,
+                    clienteId: body.clienteId,
+                    valorBruto: item.precio,
+                    impuesto: item.precio * 0.19,
+                    moneda: "CLP",
+                    valor: item.precio,
+                    historial: [{
+                        valor: item.precio,
+                        fecha: new Date(),
+                        varianza: 0
+                    }],
+                    fechaDesde: new Date()
+                });
+                await nuevoPrecio.save();
+            }
         }
+
 
         return NextResponse.json({ ok: true, venta: savedVenta });
     } catch (error) {

@@ -311,6 +311,16 @@ export default function PreparacionDePedidos({ session }) {
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="bg-gray-100 rounded-md px-4 -pt-4 border border-gray-300 mt-2">
+                                <span className="relative -top-[14px] text-xs font-bold bg-gray-100 px-2 text-gray-800">Comentario</span>
+                                <div className="grid grid-cols-2 gap-x-4 text-xs -mt-4 mb-1">
+                                    <div className="flex flex-col items-start space-y-1">
+                                        <span className="text-lg font-semibold text-gray-600">Un comentario</span>                                                
+                                    </div>                                            
+                                </div>
+                            </div>
+
                             <ul className="flex-1 flex flex-wrap items-center justify-center mt-2">
                                 {cargamento.items.map((item, idx) => (
                                     <li

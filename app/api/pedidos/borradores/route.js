@@ -51,6 +51,7 @@ export async function GET() {
                         capacidad: subcat?.cantidad ? `${subcat.cantidad} ${subcat.unidad || ""}`.trim() : "",
                         cantidad: item.cantidad,
                         precio: item.neto || undefined,
+                        subcategoriaCatalogoId: item.subcategoriaCatalogoId || null,
                     };
                 })
             );
@@ -110,15 +111,15 @@ export async function POST(request) {
     }
 
     // Guardar precios para el cliente
-    for (const { subcategoriaId, precio } of precios) {
-        if (!subcategoriaId || !precio) {
-            console.warn("Precio o subcategoriaId faltante en item:", { subcategoriaId, precio });
+    for (const { subcategoriaCatalogoId, precio } of precios) {
+        if (!subcategoriaCatalogoId || !precio) {
+            console.warn("Precio o subcategoriaCatalogoId faltante en item:", { subcategoriaCatalogoId, precio });
             continue;
         }
         // Buscar si ya existe un precio para este cliente y subcategoria
         let precioDoc = await Precio.findOne({
             clienteId: venta.clienteId,
-            subcategoriaCatalogoId: subcategoriaId,
+            subcategoriaCatalogoId: subcategoriaCatalogoId,
         });
         if (precioDoc) {
             // Actualizar historial y valor
@@ -131,12 +132,12 @@ export async function POST(request) {
             precioDoc.valorBruto = precio;
             precioDoc.fechaDesde = new Date();
             await precioDoc.save();
-            console.log(`Precio actualizado para cliente ${venta.clienteId}, subcategoria ${subcategoriaId}: ${precio}`);
+            console.log(`Precio actualizado para cliente ${venta.clienteId}, subcategoria ${subcategoriaCatalogoId}: ${precio}`);
         } else {
             // Crear nuevo precio
             await Precio.create({
                 clienteId: venta.clienteId,
-                subcategoriaCatalogoId: subcategoriaId,
+                subcategoriaCatalogoId: subcategoriaCatalogoId,
                 valor: precio,
                 valorBruto: precio,
                 impuesto: 0,
@@ -148,7 +149,7 @@ export async function POST(request) {
                 }],
                 fechaDesde: new Date(),
             });
-            console.log(`Precio creado para cliente ${venta.clienteId}, subcategoria ${subcategoriaId}: ${precio}`);
+            console.log(`Precio creado para cliente ${venta.clienteId}, subcategoria ${subcategoriaCatalogoId}: ${precio}`);
         }
     }
 
