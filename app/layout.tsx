@@ -7,7 +7,7 @@ import { Providers } from '@/components/Providers';
 export const metadata: Metadata = {
   title: 'BIOX',
   description: 'powered by yGa',
-  manifest: "/manifest.icon",
+  manifest: "/manifest.json",
   icons: {
     apple: '/icon-192x192.png'
   }  
