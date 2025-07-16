@@ -6,7 +6,7 @@ import User from "@/models/user";
 import Cargo from "@/models/cargo";
 import Venta from "@/models/venta";
 import RutaDespacho from "@/models/rutaDespacho";
-import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { USER_ROLE, TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function POST(request) {
     try {

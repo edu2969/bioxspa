@@ -5,7 +5,6 @@ import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/cons
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "./Loader";
 import { IoIosArrowBack } from "react-icons/io";
-import { set } from "lodash";
 
 const itemEmployeeLabels = {
     zapatos_seguridad: "¿Zapatos de seguridad presentes?",
