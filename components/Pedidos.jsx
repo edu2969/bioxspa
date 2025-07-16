@@ -60,6 +60,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const autocompleteRef = useRef(null);
     const [selectedPlace, setSelectedPlace] = useState(null);
     const [savingPlace, setSavingPlace] = useState(false);
+    const formScrollRef = useRef(null);
 
     const isVentaDisabled = () => {
         return  redirecting ||!precios.length  
@@ -224,6 +225,14 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         ]);
         setSaving(false);
         handleCancel();
+        setTimeout(() => {
+            if (formScrollRef.current) {
+                formScrollRef.current.scrollTo({
+                    top: formScrollRef.current.scrollHeight,
+                    behavior: "smooth"
+                });
+            }
+        }, 500);
     }
 
     useEffect(() => {
@@ -299,7 +308,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
 
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
-            <div className="w-full pb-2 mt-14 h-[calc(100vh-106px)] overflow-y-auto">
+            <div className="w-full pb-2 mt-14 h-[calc(100vh-106px)] overflow-y-auto" ref={formScrollRef}>
                 <div className="mx-auto">
                     <form onSubmit={handleSubmit(onSubmit)} className="px-2 sm:px-4 md:px-8 space-y-4 md:space-y-6">
                         <div className="w-full flex flex-col md:flex-row">

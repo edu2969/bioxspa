@@ -240,7 +240,7 @@ export default function AsignacionPanel({ session }) {
                                     <ul className="list-disc ml-4">
                                         {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
                                     </ul>                                    
-                                    {pedido.comentario && <div className="absolute top-12 right-2 text-green-200 flex justify-end">
+                                    {pedido.comentario && <div className="absolute top-12 right-2 text-green-500 flex justify-end">
                                         <div className="mr-2 cursor-pointer" onClick={(e) => {
                                             e.stopPropagation();
                                             toast.info(`Comentario: ${pedido.comentario}`);
@@ -360,7 +360,7 @@ export default function AsignacionPanel({ session }) {
                                         {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
                                             <div key={venta._id || idxVenta} className="absolute border border-blue-400 rounded-lg mb-2 px-2 py-1 bg-white/80 shadow">
                                                 <div className="font-bold text-blue-800 text-xs mb-1 flex items-center">
-                                                    <span className="uppercase">{venta.clienteId?.nombre || "Desconocido"}</span>
+                                                    <span className="uppercase pr-10">{venta.clienteId?.nombre || "Desconocido"}</span>
                                                 </div>
                                                 <div className="flex flex-wrap">
                                                     {/* Mostrar cada carga de la venta */}

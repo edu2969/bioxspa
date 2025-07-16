@@ -5,6 +5,7 @@ import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/cons
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "./Loader";
 import { IoIosArrowBack } from "react-icons/io";
+import { set } from "lodash";
 
 const itemEmployeeLabels = {
     zapatos_seguridad: "¿Zapatos de seguridad presentes?",
@@ -86,6 +87,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
     const [answers, setAnswers] = useState({});
     const [kilometraje, setKilometraje] = useState("");
     const [selectedVehicleId, setSelectedVehicleId] = useState("");
+    const [redirecting, setRedirecting] = useState(false);
     
     const totalSteps = checklistItems.length + 1;
 
@@ -139,7 +141,12 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "reporte_checklist.pdf";
+            const now = new Date();
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const yy = String(now.getFullYear()).slice(-2);
+            const tipoNombre = tipo === TIPO_CHECKLIST.vehiculo ? "VEHICULO" : "PERSONAL";
+            a.download = `checklist_${tipoNombre}_${dd}${mm}${yy}.pdf`;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {
@@ -154,7 +161,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
-            <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
+            {!redirecting && <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
                 {/* Botón de cerrar */}
                 {tipo === TIPO_CHECKLIST.vehiculo && <button
                     aria-label="Cerrar"
@@ -304,6 +311,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             disabled={loading}
                             onClick={() => {
                                 console.log("CHECKLIST ---> ", { kilometraje, ...answers, vehiculoId: selectedVehicleId});
+                                setRedirecting(true);
                                 onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
                                 downloadChecklistPDF({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
                                 setStep(0);
@@ -325,7 +333,8 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                         />
                     </div>
                 </div>
-            </div>
+            </div>}
+            {redirecting && <h1 className="text-white text-xl"><Loader texto="Informando..."/></h1>}
         </div>
     );
 }

@@ -37,45 +37,41 @@ export async function POST(request) {
         // Verify user has the required role (manager or supervisor)
         if (user.role && ![USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado].includes(user.role)) {
             return NextResponse.json({ 
-            ok: false, 
-            error: "Insufficient permissions - requires manager or supervisor role" 
+                ok: false, 
+                error: "Insufficient permissions - requires manager or supervisor role" 
             }, { status: 403 });
         }
         
         // Verify the user has a conductor cargo assigned
         const cargo = await Cargo.findOne({ 
             userId: userId,
-            tipo: TIPO_CARGO.cobranza,
-            hasta: null // Active cargo (not ended)
+            tipo: { $in: [USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado] },
+            hasta: null 
         });
         
         if (!cargo) {
-            return NextResponse.json({ ok: false, error: "User is not an cobranza" }, { status: 403 });
+            return NextResponse.json({ ok: false, error: "User is not authorized" }, { status: 403 });
         }
 
         // Find the rutaDespacho that contains this venta
         const rutaDespacho = await RutaDespacho.findOne({
-            ventaIds: ventaId,
-            estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
-                TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
-                TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada] }
+            ventaIds: ventaId,            
+            estado: { $lte: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino }
         });
 
-        if (!rutaDespacho) {
-            return NextResponse.json({ ok: false, error: "Venta not found in any RutaDespacho" }, { status: 404 });
+        if (rutaDespacho) {
+            // Remove the ventaId from the rutaDespacho
+            await RutaDespacho.findByIdAndUpdate(
+                rutaDespacho._id,
+                { $pull: { ventaIds: ventaId } }
+            );
+
+            if(rutaDespacho.ventaIds.length === 1) {
+                // Delete the route if it becomes empty
+                await RutaDespacho.findByIdAndDelete(rutaDespacho._id);
+            }
         }
-
-        // Remove the ventaId from the rutaDespacho
-        await RutaDespacho.findByIdAndUpdate(
-            rutaDespacho._id,
-            { $pull: { ventaIds: ventaId } }
-        );
-
-        if(rutaDespacho.ventaIds.length === 1) {
-            // Delete the route if it becomes empty
-            await RutaDespacho.findByIdAndDelete(rutaDespacho._id);
-        }
-
+        
         // Update the venta status back to borrador
         await Venta.findByIdAndUpdate(
             ventaId,

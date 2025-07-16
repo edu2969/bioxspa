@@ -282,7 +282,7 @@ export default function Despacho({ session }) {
                         ...rutaDespacho,
                         estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
                         ruta: [{
-                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionesDespacho[0],
+                            direccionDestinoId: rutaDespacho.ventaIds[0].clienteId.direccionesDespacho[0].direccionId,
                             fechaArribo: null,
                         }]
                     });
@@ -343,40 +343,8 @@ export default function Despacho({ session }) {
         }
     }, [setRutaDespacho, setLoadingState, rutaDespacho, session]);
 
-    const handleHeLlegado = () => {
-        const terminarRuta = async () => {
-            setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.terminado);
-            try {
-                const response = await fetch("/api/pedidos/terminarRuta", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        rutaId: rutaDespacho._id
-                    }),
-                });
-                const data = await response.json();
-                if (data.ok) {
-                    toast.success("Ruta terminada correctamente");
-                    setRutaDespacho({
-                        ...rutaDespacho,
-                        estado: TIPO_ESTADO_RUTA_DESPACHO.terminado
-                    }); 
-                } else {
-                    toast.error(data.error || "Error al terminar la ruta");
-                }
-            } catch (error) {
-                console.error("Error al terminar la ruta:", error);
-            } finally {
-                setLoadingState(-1);
-            }
-        }
-
-        console.log("He llegado");
-        if(rutaDespacho.items.length === 0) {
-            terminarRuta();
-        }
+    const handleHeLlegado = async () => {
+        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga);
     };
 
     const handleConfirmarDestino = () => {
@@ -720,8 +688,8 @@ export default function Despacho({ session }) {
                     style={{ width: "355px", height: "275px" }}
                 />
 
-                {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-48 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.8)" }}>
-                    <div className="ml-4 text-slate-800">
+                {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-44 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.6)" }}>
+                    <div className="ml-6 text-slate-800">
                         <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
                         <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
                     </div>

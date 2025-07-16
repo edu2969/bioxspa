@@ -10,11 +10,6 @@ const estadoHistorialSchema = new Schema({
     fecha: { type: Date, required: true }
 }, { _id: false });
 
-const checklistSchema = new Schema({
-    tarea: { type: Number, required: true },
-    fecha: { type: Date, required: true }
-}, { _id: false });
-
 const cargaHistorialSchema = new Schema({
     esCarga: { type: Boolean, required: true },
     fecha: { type: Date, required: true },
@@ -30,7 +25,6 @@ const rutaDespachoSchema = new Schema({
     ruta: [rutaSchema],
     estado: { type: Number, required: true },
     historialEstado: [estadoHistorialSchema],
-    checklist: [checklistSchema],
     ventaIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Venta" }],
     cargaItemIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "ItemCatalogo" }],
     hitorialCarga: [cargaHistorialSchema], 

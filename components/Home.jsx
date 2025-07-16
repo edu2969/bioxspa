@@ -23,7 +23,9 @@ export default function Home() {
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const { data: session, status } = useSession();
 
-    const faltaChecklistPersonal = () => {        
+    const faltaChecklistPersonal = () => {
+        if (!session || !session.user) return false;
+        if(routingIndex === -2) return true; // Si aún no se ha cargado el home, no mostrar checklist
         const requiereChecklist = session?.user?.role === USER_ROLE.conductor || session?.user?.role === USER_ROLE.despacho || session?.user?.role === USER_ROLE.encargado;
         if (!requiereChecklist) return false;
         if(!checklists || checklists.length === 0) return true;

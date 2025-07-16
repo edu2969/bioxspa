@@ -82,9 +82,9 @@ export async function POST(req) {
         }
 
         // Update estado to regreso_confirmado
-        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado;
+        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.terminado;
         
-        console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado}`);
+        console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.terminado}`);
         await rutaDespacho.save();
 
         console.log("RutaDespacho updated successfully.");
