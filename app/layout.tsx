@@ -6,7 +6,11 @@ import { Providers } from '@/components/Providers';
 
 export const metadata: Metadata = {
   title: 'BIOX',
-  description: 'by EDUARDO TRONCOSO',
+  description: 'powered by yGa',
+  manifest: "/manifest.icon",
+  icons: {
+    apple: '/icon-192x192.png'
+  }  
 };
 
 export default async function RootLayout({
