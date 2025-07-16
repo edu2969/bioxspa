@@ -5,5 +5,5 @@ const withPWA = require('next-pwa')({
 });
 
 module.exports = withPWA({
-    // Aquí van otras opciones de Next.js si las tienes
+    output: 'standalone',
 });
