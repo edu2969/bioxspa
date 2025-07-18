@@ -368,7 +368,7 @@ export default function AsignacionPanel({ session }) {
                                 onDrop={(e) => {
                                     alert(`SOLTADO en camión ${ruta.vehiculoId.patent}`);
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = "green";
+                                    e.currentTarget.style.backgroundColor = "#e5e7eb";
                                 }}>
                                 <div className="flex">
                                     <div className="w-1/2">

@@ -7,6 +7,7 @@ import Image from "next/image";
 import { socket } from "@/lib/socket-client";
 import { TIPO_CARGO } from "@/app/utils/constants";
 import Loader from "./Loader";
+import { IoAlertCircle } from "react-icons/io5";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function LoginForm() {
       });
       if (res.error) {
         setError("email/password incorrectos");
+        setIsLogingIn(false);
         return;
       }
       const response = await fetch("/api/auth", {
@@ -60,8 +62,8 @@ export default function LoginForm() {
           socket.emit("join-room", { room: "room-pedidos", userId: data.userId });
         }
       } else {
-        console.error("Failed to fetch user role:", response.statusText);
-      }
+        console.error("Failed to fetch user role:", response.statusText);        
+      }      
 
       let retries = 0;
       while (retries < 10) {
@@ -73,14 +75,13 @@ export default function LoginForm() {
         await new Promise((res) => setTimeout(res, 200)); // esperar 200ms
         retries++;
       }
-
+      setRedirecting(true);
       router.replace("modulos");
     } catch (error) {
       console.log(error);
-      setError(error);
-      
+      setError(error);      
     } finally {
-      setRedirecting(true);
+      setRedirecting(false);
     }
   }
 
@@ -123,12 +124,14 @@ export default function LoginForm() {
                 id="password" name="password" type="password" autoComplete="current-password"
                 required className="h-12 text-lg p-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-600 sm:text-sm sm:leading-6" />
             </div>
+            {error && <div className="flex text-red-500">
+              <IoAlertCircle className="mr-1 mt-2" /><span className="mt-0.5">{error}</span>
+            </div>}
           </div>
-          {error && <span className="text-red-500">{error}</span>}
           <div>
             <button type="submit" onSubmit={handleSubmit(onSubmit)} disabled={isLogingIn}
               className="w-full rounded-md bg-black px-3 py-2 text-lg font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 h-12">
-                {isLogingIn ? <Loader texto="Entrando"/> : redirecting ? <Loader texto="Redirigiendo..."/> : "Entrar"}
+                {isLogingIn ? <Loader texto="Validando"/> : redirecting ? <Loader texto="Redirigiendo..."/> : "Entrar"}
             </button>
           </div>
         </div>

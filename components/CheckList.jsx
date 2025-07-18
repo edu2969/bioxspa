@@ -182,7 +182,10 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             <select
                                 className="border rounded px-4 py-2 text-lg w-64 mb-4"
                                 defaultValue=""
-                                onClick={(e) => setSelectedVehicleId(e.target.value)}
+                                onClick={(e) => {
+                                    setSelectedVehicleId(e.target.value);
+                                    console.log("Vehículo seleccionado:", e.target.value);
+                                }}
                             >
                                 <option value="" disabled>Selecciona un vehículo</option>
                                 {vehiculos?.map((vehiculo) => (
@@ -309,7 +312,7 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             className={`w-full bg-green-500 text-white px-8 h-12 rounded-md font-bold text-lg mt-4 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
                             disabled={loading}
                             onClick={() => {
-                                console.log("CHECKLIST ---> ", { kilometraje, ...answers, vehiculoId: selectedVehicleId});
+                                console.log("CHECKLIST onFinish ---> ", { kilometraje, ...answers, vehiculoId: selectedVehicleId });
                                 setRedirecting(true);
                                 onFinish?.({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
                                 downloadChecklistPDF({ kilometraje, ...answers, vehiculoId: selectedVehicleId });
