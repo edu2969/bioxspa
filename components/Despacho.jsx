@@ -15,7 +15,6 @@ import { LuFlagOff } from "react-icons/lu";
 import { getNUCode } from "@/lib/nuConverter";
 import { TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
-import { useRouter } from "next/navigation";
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 
 export default function Despacho({ session }) {
@@ -31,8 +30,7 @@ export default function Despacho({ session }) {
     const [checkListPassed, setCheckListPassed] = useState(true);
     const [endingChecklist, setEndingChecklist] = useState(false);
     const [lastUpdate, setLastUpdate] = useState(new Date());
-    const router = useRouter();
-
+    
     const fetchEstadoChecklist = async () => {
         try {
             setLoadingChecklist(true);
@@ -98,7 +96,7 @@ export default function Despacho({ session }) {
                 });
             }
             if(!res.passed) {
-                router.back();
+                setCheckListPassed(true);
             }
         })
         .catch((err) => {
@@ -289,10 +287,11 @@ export default function Despacho({ session }) {
                 } else {
                     setRutaDespacho({
                         ...rutaDespacho,
-                        estado: rutaDespacho.ruta.length === rutaDespacho.ventaIds.length
+                        estado: rutaDespacho.ruta?.filter(r => !r.fechaArribo).length < rutaDespacho.ventaIds.length
                         ? TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
                         : TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                    });                  
+                    });
+                    setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino);
                 }
                 socket.emit("update-pedidos", {
                     userId: session.user.id
@@ -308,7 +307,7 @@ export default function Despacho({ session }) {
         }
     }, [rutaDespacho, setRutaDespacho, setLoadingState, session]);
 
-    const handleIniciarViaje = useCallback(async () => {
+    const handleIniciarViaje = useCallback(async () => {        
         setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.en_ruta);
         try {
             const response = await fetch("/api/pedidos/iniciarViaje", {
@@ -318,7 +317,7 @@ export default function Despacho({ session }) {
                 },
                 body: JSON.stringify({
                     rutaId: rutaDespacho._id,
-                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
+                    direccionId: rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId._id
                 }),
             });
 
@@ -646,6 +645,24 @@ export default function Despacho({ session }) {
             .catch(() => {});
     });
 
+    const getDireccionById = (direccionDespachoId) => {
+        if (!rutaDespacho || !rutaDespacho.ventaIds) return null;
+        for (const venta of rutaDespacho.ventaIds) {
+            const cliente = venta.clienteId;
+            if (!cliente?.direccionesDespacho) continue;
+            for (const dir of cliente.direccionesDespacho) {
+                if (dir.direccionId && dir.direccionId._id === direccionDespachoId) {
+                    return dir.direccionId;
+                }
+            }
+        }
+        return null;
+    }
+
+    useEffect(() => {
+        console.log("Ruta despacho actualizada:", rutaDespacho);
+    }, [rutaDespacho]);
+
     return (
         <div className="w-full h-screen overflow-hidden">
             
@@ -656,7 +673,7 @@ export default function Despacho({ session }) {
                     alt="camion_atras"
                     width={355}
                     height={275}
-                    style={{ width: "355px", height: "275px" }}
+                    style={{ width: "100%", height: "auto" }}
                     priority
                 />
                 <div className="absolute top-6 mt-2 w-full">
@@ -683,9 +700,9 @@ export default function Despacho({ session }) {
                     className="absolute top-6 pl-8"
                     src="/ui/camion_front.png"
                     alt="camion"
-                    width={355}
-                    height={275}
-                    style={{ width: "355px", height: "275px" }}
+                    width={328}
+                    height={254}
+                    style={{ width: "100%", height: "auto" }}
                 />
 
                 {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-44 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.6)" }}>
@@ -835,22 +852,41 @@ export default function Despacho({ session }) {
                                         </button>
                                     </div>))}
 
-                                    {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino 
+                                    {((rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino 
+                                        || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada)
                                         && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length) && (
                                         <div className="flex mt-2">
                                             <select
-                                                className="border rounded-lg shadow-sm w-full py-2 mt-3"
+                                                className="border rounded-md shadow-sm w-full py-2 px-1 mt-3"
                                                 onChange={(e) => {
-                                                    const selectedVentaId = e.target.value;
-                                                    const selectedVenta = rutaDespacho.ventaIds.find((venta) => venta._id === selectedVentaId);
-                                                    if (selectedVenta) {
+                                                    const direccionId = e.target.value;
+                                                    if (!direccionId) {
                                                         setRutaDespacho({
                                                             ...rutaDespacho,
-                                                            ruta: [
-                                                                ...rutaDespacho.ruta,
-                                                                { direccionDestinoId: selectedVenta.clienteId.direccionId }
-                                                            ]
+                                                            ruta: rutaDespacho.ruta.slice(0, -1)
                                                         });
+                                                    } else {
+                                                        const rutaSinArriboIdx = rutaDespacho.ruta.findIndex(r => r.fechaArribo === null);
+                                                        if (rutaSinArriboIdx !== -1) {
+                                                            // Si existe una ruta con fechaArribo null, actualiza su direccionDestinoId
+                                                            setRutaDespacho({
+                                                                ...rutaDespacho,
+                                                                ruta: rutaDespacho.ruta.map((r, idx) =>
+                                                                    idx === rutaSinArriboIdx
+                                                                        ? { ...r, direccionDestinoId: getDireccionById(direccionId) }
+                                                                        : r
+                                                                )
+                                                            });
+                                                        } else {
+                                                            // Si no existe, agrega una nueva
+                                                            setRutaDespacho({
+                                                                ...rutaDespacho,
+                                                                ruta: [
+                                                                    ...rutaDespacho.ruta,
+                                                                    { direccionDestinoId: getDireccionById(direccionId), fechaArribo: null }
+                                                                ]
+                                                            });
+                                                        }
                                                     }
                                                 }}
                                             >
@@ -870,8 +906,8 @@ export default function Despacho({ session }) {
                                                                 }))
                                                         )
                                                         .map(({ ventaId, clienteNombre, direccion }) => (
-                                                            <option key={`venta_${ventaId}_dir_${direccion._id}`} value={ventaId + '|' + direccion._id}>
-                                                                {clienteNombre} - {direccion.nombre}
+                                                            <option key={`venta_${ventaId}_dir_${direccion._id}`} value={direccion.direccionId._id}>
+                                                                {clienteNombre}|{direccion.direccionId.nombre}
                                                             </option>
                                                         ))}
                                             </select>
@@ -879,9 +915,11 @@ export default function Despacho({ session }) {
                                 </div>
                             </div>}
 
-                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && <div className="flex flex-row items-center justify-center">
-                            <button className="flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4"
-                                onClick={handleIniciarViaje}>
+                        {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                            || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada) && <div className="flex flex-row items-center justify-center">
+                            <button className={`flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4 ${loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={handleIniciarViaje}
+                                disabled={loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada}>
                                 {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <div className="mt-1"><Loader texto="INICIANDO" /></div> : <div className="flex"><FaFlagCheckered className="mt-3 mr-3" />
                                     <span className="mt-2">INICIAR VIAJE</span>
                                 </div>}

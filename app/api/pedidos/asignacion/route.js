@@ -68,6 +68,7 @@ export async function GET() {
 
             return {
                 _id: venta._id,
+                comentario: venta.comentario || "",
                 clienteId: venta.clienteId,
                 clienteNombre,
                 clienteRut,

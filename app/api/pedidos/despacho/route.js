@@ -15,6 +15,8 @@ import User from "@/models/user";
 import Vehiculo from "@/models/vehiculo";
 import Venta from "@/models/venta";
 import ItemCatalogo from "@/models/itemCatalogo";
+import Cliente from "@/models/cliente";
+import Direccion from "@/models/direccion";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {
@@ -43,6 +45,12 @@ export async function GET() {
         }        
         if (!mongoose.models.ItemCatalogo) {
             mongoose.model("ItemCatalogo", ItemCatalogo.schema);
+        }
+        if (!mongoose.models.Cliente) {
+            mongoose.model("Cliente", Cliente.schema);
+        }
+        if (!mongoose.models.Direccion) {
+            mongoose.model("Direccion", Direccion.schema);
         }
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
@@ -88,7 +96,37 @@ export async function GET() {
         };
         
         const rutasDespacho = await RutaDespacho.find(rutaQuery)
-            .populate("choferId vehiculoId ventaIds")
+            .select("ventaIds estado cargaItemIds choferId vehiculoId")      
+            .populate({
+                path: "cargaItemIds",
+                model: "ItemCatalogo",
+                select: "codigo"
+            })
+            .populate({
+                path: "choferId",
+                model: "User",
+                select: "name"
+            })
+            .populate({
+                path: "vehiculoId",
+                model: "Vehiculo",
+                select: "marca vehiculo patente"
+            })
+            .populate({
+                path: "ventaIds",
+                model: "Venta",
+                select: "_id clienteId comentario createdAt",
+                populate: {
+                    path: "clienteId",
+                    model: "Cliente",
+                    select: "_id nombre telefono direccionesDespacho",
+                    populate: {
+                        path: "direccionesDespacho.direccionId",
+                        model: "Direccion",
+                        select: "_id nombre latitud longitud",
+                    }
+                }
+            })           
             .lean();
 
         if (rutasDespacho.length === 0) {
@@ -97,7 +135,10 @@ export async function GET() {
         }
 
         console.log("Fetching detalleVentas...");
-        const detalleVentas = await DetalleVenta.find()
+        // Obtener todos los IDs de ventas de las rutas
+        const ventaIds = rutasDespacho.flatMap(r => r.ventaIds.map(v => v._id));
+        // Buscar los detalles de venta que correspondan a esas ventas
+        const detalleVentas = await DetalleVenta.find({ ventaId: { $in: ventaIds } })
             .populate({
                 path: "subcategoriaCatalogoId",
                 model: "SubcategoriaCatalogo",
@@ -108,66 +149,69 @@ export async function GET() {
                     select: "nombre tipo gas elemento esIndustrial"
                 }
             })
-            .populate({
-                path: "itemCatalogoIds",
-                model: "ItemCatalogo",
-                select: "codigo"
-            })
             .lean();
 
         console.log("Mapping cargamentos...");
         const cargamentos = rutasDespacho.map((ruta) => {
-            const items = [];
             let fechaVentaMasReciente = null;
-
-            ruta.ventaIds.forEach((venta) => {
-                const detalles = detalleVentas.filter(
-                    (detalle) => detalle.ventaId.toString() === venta._id.toString()
-                );
-
-                detalles.forEach((detalle) => {
-                    const subcategoria = detalle.subcategoriaCatalogoId;
-                    const itemCatalogoIds = detalle.itemCatalogoIds || [];
-                    const nuCode = subcategoria?.categoriaCatalogoId?.elemento
-                        ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
-                        : null;
-
-                    const existingItem = items.find((item) => item.subcategoriaId === subcategoria?._id);
-
-                    if (existingItem) {
-                        existingItem.multiplicador += detalle.cantidad;
-                        existingItem.restantes += detalle.cantidad - itemCatalogoIds.length;
-                    } else {
-                        items.push({
-                            nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
-                            multiplicador: detalle.cantidad,
-                            cantidad: subcategoria?.cantidad || "??",
-                            unidad: subcategoria?.unidad || null,
-                            restantes: detalle.cantidad - itemCatalogoIds.length,
-                            elemento: subcategoria?.categoriaCatalogoId?.elemento,
-                            sinSifon: subcategoria?.sinSifon || false,
-                            esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
-                            nuCode: nuCode,
-                            subcategoriaId: subcategoria?._id || null,
-                            items: itemCatalogoIds.map((item) => ({
-                                codigo: item.codigo,
-                                _id: item._id
-                            }))
-                        });
-                    }
-                });
-
-                if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
-                    fechaVentaMasReciente = venta.createdAt;
-                }
-            });
-
             return {
                 rutaId: ruta._id,
+                ventas: ruta.ventaIds.map((venta) => {
+                    const detallesFiltrados = detalleVentas.filter(
+                        (detalle) => detalle.ventaId.toString() === venta._id.toString()
+                    );     
+                    return {
+                        ventaId: venta._id,
+                        fecha: venta.createdAt,
+                        detalles: detallesFiltrados.map((detalle) => {
+                            let newDetalle = {};
+                            const subcategoria = detalle.subcategoriaCatalogoId;                            
+                            const nuCode = subcategoria?.categoriaCatalogoId?.elemento
+                                ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
+                                : null;
+
+                            newDetalle = {
+                                nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
+                                multiplicador: detalle.cantidad,
+                                cantidad: subcategoria?.cantidad || "??",
+                                unidad: subcategoria?.unidad || null,
+                                restantes: detalle.cantidad - ruta.cargaItemIds?.filter(ic => ic.subcategoriaCatalogoId === subcategoria._id).length || 0,
+                                elemento: subcategoria?.categoriaCatalogoId?.elemento,
+                                sinSifon: subcategoria?.sinSifon || false,
+                                esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
+                                nuCode: nuCode,
+                                subcategoriaId: subcategoria?._id || null, 
+                            };                    
+
+                            if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
+                                fechaVentaMasReciente = venta.createdAt;
+                            }
+                            return newDetalle;
+                        }),
+                        comentario: venta.comentario || null,
+                        cliente: {
+                            nombre: venta.clienteId?.nombre || null,
+                            rut: venta.clienteId?.rut || null,
+                            direccion: venta.clienteId?.direccionId || null,
+                            telefono: venta.clienteId?.telefono || null,
+                            direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
+                                _id: dir._id,
+                                nombre: dir.nombre,
+                                direccionId: dir.direccionId?._id || null,
+                                latitud: dir.direccionId?.latitud || null,
+                                longitud: dir.direccionId?.longitud || null
+                            })) || []
+                        }
+                    }
+                }),
                 nombreChofer: ruta.choferId.name,
                 patenteVehiculo: ruta.vehiculoId?.patente || null,
                 fechaVentaMasReciente,
-                items
+                items: ruta.cargaItemIds?.map((item) => ({
+                    codigo: item.codigo,
+                    _id: item._id
+                })) || [],
+                estado: ruta.estado,
             };
         });
 

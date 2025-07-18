@@ -5,7 +5,7 @@ import { BsQrCodeScan } from "react-icons/bs";
 import { FaRoadCircleCheck } from "react-icons/fa6";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
-import { FaClipboardCheck, FaTruck } from "react-icons/fa";
+import { FaClipboardCheck, FaPhoneAlt, FaTruck } from "react-icons/fa";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useRef } from "react";
@@ -16,6 +16,7 @@ import { getNUCode } from "@/lib/nuConverter";
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
+import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 
 export default function PreparacionDePedidos({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
@@ -25,18 +26,18 @@ export default function PreparacionDePedidos({ session }) {
     const [itemCatalogoEscaneado, setItemCatalogoEscaneado] = useState(null);
     const hiddenInputRef = useRef(null);
     const temporalRef = useRef(null);
-    const [inputTemporalVisible, setInputTemporalVisible] = useState(false);    
+    const [inputTemporalVisible, setInputTemporalVisible] = useState(false); 
+    const [posting, setPosting] = useState(false); 
 
     const postCargamento = async () => {
-        console.log("Cargamento a guardar:", cargamentos[0]);
         if (!isCompleted()) {
             console.log("Eeeeepa!");
             return;
         }
-        // Unir todos los ids de scanCodes de todos los items
-        const scanCodes = cargamentos[0].items
-            .flatMap(item => Array.isArray(item.scanCodes) ? item.scanCodes : [])
-            .map(scan => scan.id);
+        
+        const scanCodes = cargamentos[0].ventas
+            .flatMap(venta => venta.detalles)
+            .flatMap(detalle => Array.isArray(detalle.scanCodes) ? detalle.scanCodes : []);        
 
         const response = await fetch("/api/pedidos/despacho", {
             method: "POST",
@@ -97,7 +98,9 @@ export default function PreparacionDePedidos({ session }) {
 
     const isCompleted = () => {
         if (cargamentos.length === 0) return false;
-        return cargamentos[0].items.every((item) => item.restantes <= 0);
+        return cargamentos[0].ventas.every(venta =>
+            venta.detalles.every(detalle => detalle.restantes === 0)
+        );
     }
 
     const [loadingCargamentos, setLoadingCargamentos] = useState(true);
@@ -112,11 +115,22 @@ export default function PreparacionDePedidos({ session }) {
 
     const cargarItem = useCallback(async (item, codigo) => {
         const cargamentoActual = cargamentos[0];
-        console.log("CARGAMENTO ACTUAL", cargamentoActual);
         if (!cargamentoActual) return false;
 
-        const itemIndex = cargamentoActual.items.map(i => i.subcategoriaId).indexOf(item.subcategoriaCatalogoId);
-        if (itemIndex === -1) {
+        // Buscar la venta y el detalle que corresponde al subcategoriaCatalogoId
+        let ventaIndex = -1;
+        let detalleIndex = -1;
+
+        cargamentoActual.ventas.forEach((venta, vIdx) => {
+            venta.detalles.forEach((detalle, dIdx) => {
+                if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
+                    ventaIndex = vIdx;
+                    detalleIndex = dIdx;
+                }
+            });
+        });
+
+        if (ventaIndex === -1 || detalleIndex === -1) {
             setScanMode(false);
             setShowModalCilindroErroneo(true);
             toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`, {
@@ -125,7 +139,8 @@ export default function PreparacionDePedidos({ session }) {
             return;
         }
 
-        if (cargamentoActual.items[itemIndex].scanCodes && cargamentoActual.items[itemIndex].scanCodes.map(sc => sc.codigo).includes(codigo)) {
+        const detalle = cargamentoActual.ventas[ventaIndex].detalles[detalleIndex];
+        if (detalle.scanCodes && detalle.scanCodes.map(sc => sc.codigo).includes(codigo)) {
             toast.warn(`CODIGO ${codigo} ya escaneado`, {
                 position: "bottom-right",
             });
@@ -133,47 +148,52 @@ export default function PreparacionDePedidos({ session }) {
         }
 
         setCargamentos(prev => {
-            // Solo actualiza si hay cargamentos
             if (!prev.length) return prev;
             const newCargamentos = [...prev];
             const currentCargamento = { ...newCargamentos[0] };
-            const items = [...currentCargamento.items];
-            const itemToUpdate = { ...items[itemIndex] };
+            const ventas = [...currentCargamento.ventas];
+            const detalles = [...ventas[ventaIndex].detalles];
+            const detalleToUpdate = { ...detalles[detalleIndex] };
 
-            // Cambia el nombre del arreglo de items a scanCodes y agrega el nuevo código escaneado
-            const scanCodes = Array.isArray(itemToUpdate.scanCodes) ? [...itemToUpdate.scanCodes] : [];
-            scanCodes.push({ id: item._id, codigo: item.codigo });
+            const scanCodes = Array.isArray(detalleToUpdate.scanCodes) ? [...detalleToUpdate.scanCodes] : [];
+            scanCodes.push(item._id);
 
             // Actualiza restantes y multiplicador si corresponde
-            const updatedRestantes = itemToUpdate.multiplicador < itemToUpdate.restantes
-                ? itemToUpdate.restantes
-                : itemToUpdate.restantes - 1;
-            const updatedMultiplicador = itemToUpdate.multiplicador < itemToUpdate.restantes
-                ? itemToUpdate.multiplicador + 1
-                : itemToUpdate.multiplicador;
+            const updatedRestantes = detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                ? detalleToUpdate.restantes
+                : detalleToUpdate.restantes - 1;
+            const updatedMultiplicador = detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                ? detalleToUpdate.multiplicador + 1
+                : detalleToUpdate.multiplicador;
 
-            // Actualiza el item
-            const newItem = {
-                ...itemToUpdate,
+            const newDetalle = {
+                ...detalleToUpdate,
                 restantes: updatedRestantes,
                 multiplicador: updatedMultiplicador,
                 scanCodes,
             };
-            items[itemIndex] = newItem;
-            currentCargamento.items = items;
+            detalles[detalleIndex] = newDetalle;
+            ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
+            currentCargamento.ventas = ventas;
             newCargamentos[0] = currentCargamento;
             return newCargamentos;
         });
+
         toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`, {
             position: "bottom-right",
         });
     }, [setCargamentos, cargamentos]);
 
     useEffect(() => {
+        console.log("cargamentos updated:", cargamentos);
+    }, [cargamentos]);
+
+    useEffect(() => {
         fetchCargamentos();
     }, []);
     
     const scanItem = useCallback(async (codigo) => {
+        setPosting(true);
         try {
             const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
             console.log("RESPONSE", response);
@@ -195,6 +215,8 @@ export default function PreparacionDePedidos({ session }) {
                 position: "bottom-right",
             });
             return;
+        } finally {
+            setPosting(false);
         }
     }, [cargarItem, setItemCatalogoEscaneado]);
 
@@ -289,7 +311,7 @@ export default function PreparacionDePedidos({ session }) {
             <div className="w-full">
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
                     <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
-                        <div className={`absolute w-11/12 md:w-9/12 h-5/6 bg-gray-100 shadow-lg rounded-lg p-4 ${animating ? "transition-all duration-500" : ""}`}
+                        <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1 ${animating ? "transition-all duration-500" : ""}`}
                             style={{
                                 top: `${index * 10 + 52}px`,
                                 left: `${index * 10 + 16}px`,
@@ -299,7 +321,7 @@ export default function PreparacionDePedidos({ session }) {
                                 opacity: animating && index == 0 ? 0 : 1,
                             }}
                         >
-                            <div className="flex flex-row text-xl font-bold">
+                            <div className="flex flex-row text-xl font-bold px-3 py-1">
                                 <div>
                                     <p className="text-xs">CHOFER</p>
                                     <p className="font-bold text-lg uppercase -mt-2">{cargamento.nombreChofer}</p>
@@ -312,67 +334,88 @@ export default function PreparacionDePedidos({ session }) {
                                 </div>
                             </div>
 
-                            <div className="bg-gray-100 rounded-md px-4 -pt-4 border border-gray-300 mt-2">
-                                <span className="relative -top-[14px] text-xs font-bold bg-gray-100 px-2 text-gray-800">Comentario</span>
-                                <div className="grid grid-cols-2 gap-x-4 text-xs -mt-4 mb-1">
-                                    <div className="flex flex-col items-start space-y-1">
-                                        <span className="text-lg font-semibold text-gray-600">Un comentario</span>                                                
-                                    </div>                                            
-                                </div>
-                            </div>
-
-                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2">
-                                {cargamento.items.map((item, idx) => (
-                                    <li
-                                        key={`item_${idx}`}
-                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${idx === 0 ? 'rounded-t-lg' : idx === cargamento.items.length - 1 ? 'rounded-b-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
-                                    >
-                                        <div className="w-full flex items-left">
-                                            <div className="flex">
-                                                <div>
-                                                    <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{item.nuCode}</div>
-                                                    {item.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                                                    {item.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
-                                                </div>
-                                                <div className="font-bold text-xl ml-2">
-                                                    <span>
-                                                        {(() => {
-                                                            let match = item.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
-                                                            if (!match) {
-                                                                match = [null, (item.elemento ?? item.gas ?? item.nombre.split(" ")[0]), ''];
-                                                            }
-                                                            const [, p1, p2] = match;
-                                                            return (
-                                                                <>
-                                                                    {p1 ? p1.toUpperCase() : ''}
-                                                                    {p2 ? <small>{p2}</small> : ''}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <p className="text-2xl orbitron ml-2"><b>{item.cantidad}</b> <small>{item.unidad}</small></p>
+                            {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
+                                <div className="flex">
+                                    <div className="w-10/12">
+                                        <p className="text-xs font-bold text-gray-500 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
+                                        <p className="flex text-xs text-gray-500">
+                                            <FaPhoneAlt className="mr-1"/>{venta.cliente?.telefono || "Sin teléfono"}
+                                        </p>
+                                    </div>
+                                    <div key={`comentario_${ventaIndex}`} className={`w-2/12 flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                                        <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                            e.stopPropagation();
+                                            toast.info(`${venta.comentario || "Sin comentarios"}`);
+                                        }}>
+                                            {!venta.comentario ? <VscCommentDraft size="1.75rem" /> : <VscCommentUnresolved size="1.75rem" />}
                                         </div>
-                                        <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{item.multiplicador - item.restantes} <small>/</small> {item.multiplicador}</div>
-                                    </li>
-                                ))}
-                            </ul>
+                                    </div>
+                                </div>
+                                
+
+                                <ul key={`detalles_${ventaIndex}`} className="flex-1 flex flex-wrap items-center justify-center mt-1">
+                                    {venta.detalles.map((detalle, idx) => (
+                                        <li
+                                            key={`detalle_${ventaIndex}_${idx}`}
+                                            className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                        >
+                                            <div className="w-full flex items-left">
+                                                <div className="flex">
+                                                    <div>
+                                                        <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{detalle.nuCode}</div>
+                                                        {detalle.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                                        {detalle.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                                    </div>
+                                                    <div className="font-bold text-xl ml-2">
+                                                        <span>
+                                                            {(() => {
+                                                                let match = detalle.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
+                                                                if (!match) {
+                                                                    match = [null, (detalle.elemento ?? detalle.gas ?? detalle.nombre.split(" ")[0]), ''];
+                                                                }
+                                                                const [, p1, p2] = match;
+                                                                return (
+                                                                    <>
+                                                                        {p1 ? p1.toUpperCase() : ''}
+                                                                        {p2 ? <small>{p2}</small> : ''}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <p className="text-2xl orbitron ml-2"><b>{detalle.cantidad}</b> <small>{detalle.unidad}</small></p>
+                                            </div>
+                                            <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>)}
 
                             {!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8"
                                 onClick={index === 0 ? postCargamento : undefined}>
-                                <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
-                                    onClick={() => {
+                                <button className={`mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         handleScanMode();
                                     }}>
                                     <BsQrCodeScan className="text-4xl" />
-                                    {scanMode && !isCompleted() && <div className="absolute top-2 left-2">
-                                        <Loader texto="" />
+                                    {scanMode && !isCompleted() && <div className="absolute top-0 left-2">
+                                        <div className="w-12 h-12 bg-gray-100 opacity-80"></div>
+                                        <div className="absolute top-2 left-2"><Loader texto="" /></div>
                                     </div>}
                                 </button>
-                                <button className={`ml-14 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}>
+                                <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        postCargamento();
+                                    }} disabled={!isCompleted() || posting}>
                                     <FaRoadCircleCheck className="text-4xl pb-0" />
                                     <p className="ml-2 mt-2 text-md font-bold">CONFIRMAR CARGA</p>
+                                    {posting && <div className="absolute w-full top-0">
+                                        <div className="w-full h-12 bg-gray-100 opacity-80"></div>
+                                        <div className="absolute top-2 w-full"><Loader texto="" /></div>
+                                    </div>}
                                 </button>
                             </div> :
                             <div className="flex flex-col justify-center items-center h-4/5">
@@ -409,7 +452,7 @@ export default function PreparacionDePedidos({ session }) {
                 )}
             </div>
 
-            {cargamentos?.length > 1 && <div className="fixed bottom-4 right-4 z-40">
+            {cargamentos?.length > 1 && <div className="fixed bottom-2 right-4 z-40">
                 <button
                     className="flex items-center px-6 py-3 bg-white text-gray-500 border border-gray-300 rounded-xl shadow-lg font-bold text-lg hover:bg-gray-100 transition duration-200"
                     style={{ minWidth: 220 }}

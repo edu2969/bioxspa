@@ -47,6 +47,9 @@ export async function POST(req) {
 
         // Update estado to en_ruta
         rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.en_ruta;
+        rutaDespacho.ruta.push({
+            direccionDestinoId: direccionId
+        });
         
         console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.en_ruta}`);
         await rutaDespacho.save();

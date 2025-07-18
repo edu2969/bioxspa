@@ -216,15 +216,17 @@ export default function Clientes() {
                                                     key={cliente._id}
                                                     className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                     onClick={async () => {
+                                                        setLoadingCliente(true);
                                                         console.log("CLIENTE", cliente);
                                                         const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
                                                         const clienteData = await clienteResp.json();
+                                                        console.log("Cliente seleccionado >>>>>>>>", clienteResp, clienteData);
                                                         if (clienteResp.ok && clienteData.ok) {
-                                                            console.log("Cliente seleccionado >>>>>>>>", clienteData.cliente);
                                                             setClienteSelected(clienteData.cliente);
                                                             setDireccionesDespacho(clienteData.cliente.direccionesDespacho || []);
                                                             setAutocompleteClienteResults([]);
                                                             setValue("cliente", cliente.nombre);
+                                                            setLoadingCliente(false);
                                                         } else {
                                                             toast.error("Error al cargar cliente");
                                                         }

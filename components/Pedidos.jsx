@@ -54,6 +54,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [creandoVenta, setCreandoVenta] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
     const [loadingClients, setLoadingClients] = useState(false);
+    const [loadingCliente, setLoadingCliente] = useState(false);
     const [role, setRole] = useState(-1);
     const [editDireccionDespacho, setEditDireccionDespacho] = useState(false);
     const [autocompleteResults, setAutocompleteResults] = useState([]);
@@ -350,7 +351,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                         } else setLoadingClients(false);
                                                     }}
                                                 />
-                                                {loadingClients && <div className="absolute -right-2 top-1">
+                                                {(loadingClients || loadingCliente) && <div className="absolute -right-2 top-1">
+                                                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-white opacity-70"></div>
                                                     <Loader texto="" />
                                                 </div>}
                                                 {(role === USER_ROLE.gerente || role === USER_ROLE.encargado || role === USER_ROLE.cobranza) 
@@ -372,6 +374,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                             className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                             onClick={async () => {
                                                                 try {
+                                                                    setLoadingCliente(true);
                                                                     setValue('cliente', cliente.nombre);                                                                    
                                                                     // Primero, obtener el cliente completo desde la API
                                                                     const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
@@ -432,6 +435,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                         draggable: true,
                                                                         progress: undefined,
                                                                     });
+                                                                } finally {
+                                                                    setLoadingCliente(false);
                                                                 }
                                                             }}
                                                         >
