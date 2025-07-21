@@ -712,7 +712,7 @@ export default function Despacho({ session }) {
     }, [rutaDespacho]);
 
     return (
-        <div className="w-full h-screen overflow-hidden">
+        <div className="w-full h-dvh overflow-hidden">
             
             <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
                 <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
