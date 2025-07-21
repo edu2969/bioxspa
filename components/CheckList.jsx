@@ -181,13 +181,13 @@ export default function CheckList({ session, onFinish, vehiculos = [], tipo, loa
                             <span>Patente</span>
                             <select
                                 className="border rounded px-4 py-2 text-lg w-64 mb-4"
-                                defaultValue=""
-                                onClick={(e) => {
+                                value={selectedVehicleId}
+                                onChange={(e) => {
                                     setSelectedVehicleId(e.target.value);
                                     console.log("Vehículo seleccionado:", e.target.value);
                                 }}
                             >
-                                <option value="" disabled>Selecciona un vehículo</option>
+                                <option>Selecciona un vehículo</option>
                                 {vehiculos?.map((vehiculo) => (
                                     <option key={vehiculo._id} value={vehiculo._id}>
                                         {vehiculo.patente} - {vehiculo.marca}
