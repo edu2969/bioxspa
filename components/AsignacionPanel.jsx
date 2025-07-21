@@ -14,9 +14,10 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import { FaCartPlus } from 'react-icons/fa';
-import { TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
+import {  TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from './Loader';
+import { getColorEstanque } from '@/lib/uix';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
@@ -105,20 +106,20 @@ export default function AsignacionPanel({ session }) {
     }, [session]);
 
     function calculateTubePosition(index) {
-        const baseTop = 26;
-        const baseLeft = 22;
-        const verticalIncrement = 3;
-        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
-        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+        const baseTop = 22;
+        const baseLeft = 14;
+        const verticalIncrement = 3.2;
+        const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 2; // Ajuste horizontal con perspectiva
         return { top, left, width: '14px', height: '78px' };
     }
 
     function calculateUploadTubePosition(index) {
         const baseTop = 76;
-        const baseLeft = 156;
-        const verticalIncrement = 3;
-        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
-        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+        const baseLeft = 96;
+        const verticalIncrement = 3.2;
+        const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 2;
         return { top, left, width: '14px', height: '78px' };
     }
 
@@ -197,6 +198,36 @@ export default function AsignacionPanel({ session }) {
         setShowCommentModal(0);
         setSelectedVenta(null);
         setComentario(null);
+    }
+
+    const getCilindrosDescarga = (ruta) => {
+        if (!ruta || !Array.isArray(ruta.ventaIds) || !Array.isArray(ruta.ruta) || ruta.ruta.length === 0) return [];
+        const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
+        const venta = ruta.ventaIds.find(v => String(v.direccionDespachoId) === String(ultimaDireccionId));
+        if (!venta || !Array.isArray(venta.detalles)) return [];
+        const elementos = [];
+        venta.detalles.forEach(detalle => {
+            const cantidad = Number(detalle.cantidad) || 0;
+            // Buscar el elemento en la cargaItemIds si existe, si no, usar el subcategoriaCatalogoId directamente
+            let elemento = null;
+            const carga = Array.isArray(ruta.cargaItemIds)
+                ? ruta.cargaItemIds.find(
+                    item =>
+                        String(item.subcategoriaCatalogoId?._id || item.subcategoriaCatalogoId) === String(detalle.subcategoriaCatalogoId?._id || detalle.subcategoriaCatalogoId)
+                )
+                : null;
+            if (carga && carga.subcategoriaCatalogoId && carga.subcategoriaCatalogoId.categoriaCatalogoId) {
+                elemento = carga.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+            } else if (detalle.subcategoriaCatalogoId && detalle.subcategoriaCatalogoId.categoriaCatalogoId) {
+                elemento = detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+            } else {
+                elemento = detalle.elemento || "?";
+            }
+            for (let i = 0; i < cantidad; i++) {
+                elementos.push(elemento);
+            }
+        });
+        return elementos;
     }
 
     return (
@@ -345,7 +376,7 @@ export default function AsignacionPanel({ session }) {
                 {/* EN TRÁNSITO */}
                 <div className="relative col-span-5 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto overflow-x-hidden pt-12">
                     <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
-                        EN TRÁNSITO
+                        EN TRÁNSITO ({enTransito.length})
                     </div>
                     {enTransito.length === 0 ? (
                         <div
@@ -380,17 +411,14 @@ export default function AsignacionPanel({ session }) {
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
                                                 {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
                                                     const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                                                    const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
-                                                    const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
-                                                    const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
                                                     return (
                                                         <Image
                                                             key={index}
-                                                            src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                                            src={`/ui/tanque_biox${getColorEstanque(elem)}.png`}
                                                             alt={`tank_${index}`}
                                                             width={14 * 2}
                                                             height={78 * 2}
-                                                            className={`absolute ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga ? "" : "opacity-20"}`}
+                                                            className={`absolute ${ruta.cargaItemIds[index].entregado ? "opacity-20" : ""}`}
                                                             style={calculateTubePosition(index)}
                                                             priority={false}
                                                         />
@@ -415,15 +443,11 @@ export default function AsignacionPanel({ session }) {
                                             </div>
                                             {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
                                                 || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
-                                                    {Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
-                                                        const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                                                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
-                                                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
-                                                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
+                                                    {getCilindrosDescarga(ruta, index).map((elem, index) => {                                                        
                                                         return (
                                                             <Image
                                                                 key={index}
-                                                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
+                                                                src={`/ui/tanque_biox${getColorEstanque(elem)}.png`}
                                                                 alt={`tank_${index}`}
                                                                 width={14 * 3}
                                                                 height={78 * 3}

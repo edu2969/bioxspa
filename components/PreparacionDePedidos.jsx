@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BsQrCodeScan } from "react-icons/bs";
+import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { FaRoadCircleCheck } from "react-icons/fa6";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
@@ -17,6 +17,8 @@ dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
+import { getColorEstanque } from "@/lib/uix";
+import { TIPO_ESTADO_ITEM_CATALOGO } from "@/app/utils/constants";
 
 export default function PreparacionDePedidos({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
@@ -28,6 +30,21 @@ export default function PreparacionDePedidos({ session }) {
     const temporalRef = useRef(null);
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false); 
     const [posting, setPosting] = useState(false); 
+    const [editMode, setEditMode] = useState(false);
+    const [moverCilindro, setMoverCilindro] = useState(false);
+    const [corrigiendo, setCorrigiendo] = useState(false);
+
+    function getEstadoItemCatalogoLabel(value) {
+        return {
+            [TIPO_ESTADO_ITEM_CATALOGO.no_aplica]: "No aplica",
+            [TIPO_ESTADO_ITEM_CATALOGO.en_mantenimiento]: "En mantenimiento",
+            [TIPO_ESTADO_ITEM_CATALOGO.en_arriendo]: "En arriendo",
+            [TIPO_ESTADO_ITEM_CATALOGO.en_garantia]: "En garantía",
+            [TIPO_ESTADO_ITEM_CATALOGO.vacio]: "Vacío",
+            [TIPO_ESTADO_ITEM_CATALOGO.en_llenado]: "En llenado",
+            [TIPO_ESTADO_ITEM_CATALOGO.lleno]: "Lleno"
+        }[value] || "Desconocido";
+    }
 
     const postCargamento = async () => {
         if (!isCompleted()) {
@@ -123,7 +140,7 @@ export default function PreparacionDePedidos({ session }) {
 
         cargamentoActual.ventas.forEach((venta, vIdx) => {
             venta.detalles.forEach((detalle, dIdx) => {
-                if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
+                if (detalle.subcategoriaId === item.subcategoria._id) {
                     ventaIndex = vIdx;
                     detalleIndex = dIdx;
                 }
@@ -134,6 +151,15 @@ export default function PreparacionDePedidos({ session }) {
             setScanMode(false);
             setShowModalCilindroErroneo(true);
             toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`, {
+                position: "bottom-right",
+            });
+            return;
+        }
+
+        if(item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
+            setScanMode(false);
+            setShowModalCilindroErroneo(true);
+            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`, {
                 position: "bottom-right",
             });
             return;
@@ -156,7 +182,7 @@ export default function PreparacionDePedidos({ session }) {
             const detalleToUpdate = { ...detalles[detalleIndex] };
 
             const scanCodes = Array.isArray(detalleToUpdate.scanCodes) ? [...detalleToUpdate.scanCodes] : [];
-            scanCodes.push(item._id);
+            scanCodes.push(item.itemId);
 
             // Actualiza restantes y multiplicador si corresponde
             const updatedRestantes = detalleToUpdate.multiplicador < detalleToUpdate.restantes
@@ -195,21 +221,15 @@ export default function PreparacionDePedidos({ session }) {
     const scanItem = useCallback(async (codigo) => {
         setPosting(true);
         try {
-            const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
-            console.log("RESPONSE", response);
+            const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);            
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || "Error al escanear el código");
             }
             const data = await response.json();
-            console.log("Scan exitoso:", data);
-            const item = {
-                ...data.item,
-                categoria: data.categoria,
-                subcategoria: data.subcategoria,
-            }
-            setItemCatalogoEscaneado(item);
-            cargarItem(item, codigo);
+            setItemCatalogoEscaneado(data);
+            cargarItem(data, codigo);
+            console.log("Item cargado:", data);
         } catch {
             toast.error(`Cilindro ${codigo} no existe`, {
                 position: "bottom-right",
@@ -306,8 +326,39 @@ export default function PreparacionDePedidos({ session }) {
         };
     }, []);
 
+    const handleUpdateItem = async (item) => {
+        setCorrigiendo(true);
+        try {
+            const response = await fetch("/api/items/corregir", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    id: item.itemId,
+                    estado: item.estado,
+                    reubicar: moverCilindro,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                toast.error(`Error al corregir: ${data.error || "Error desconocido"}`, { position: "bottom-right" });
+            } else {
+                setShowModalCilindroErroneo(false);
+                setMoverCilindro(false);
+                setItemCatalogoEscaneado(null);
+                cargarItem(item, item.codigo);
+            }
+        } catch {
+            toast.error("Error de red al corregir cilindro", { position: "bottom-right" });
+        } finally {
+            setEditMode(true);
+            setCorrigiendo(false);
+        }
+    }
+
     return (
-        <div className="w-full h-screen overflow-hidden">
+        <div className="w-full" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
             <div className="w-full">
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
                     <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
@@ -418,7 +469,7 @@ export default function PreparacionDePedidos({ session }) {
                                     </div>}
                                 </button>
                             </div> :
-                            <div className="flex flex-col justify-center items-center h-4/5">
+                            <div className="absolute bottom-3 w-full pr-8 text-center">
                                 <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
                                 <input
                                     ref={temporalRef}
@@ -464,12 +515,12 @@ export default function PreparacionDePedidos({ session }) {
             </div>}
 
             {showModalCilindroErroneo && itemCatalogoEscaneado != null && <div className="fixed flex inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center">
-                <div className="relative mx-auto p-5 border w-10/12 shadow-lg rounded-md bg-white">
+                <div className="relative mx-auto p-5 pt-0 border w-10/12 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-center">
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Información de Cilindro</h3>
                         <div className="mt-2">
                             <div className="flex items-center justify-center">
-                                <Image width={20} height={64} src="/ui/tanque_biox.png" style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
+                                <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.categoria.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
                                 <div className="text-left ml-6">
                                     <div>
                                         <div className="flex">
@@ -477,7 +528,7 @@ export default function PreparacionDePedidos({ session }) {
                                             <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>
                                             {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
                                         </div>
-                                        <div className="font-bold text-4xl">
+                                        <div className="flex font-bold text-4xl">
                                             <span>
                                                 {(() => {
                                                     let match = itemCatalogoEscaneado.categoria.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
@@ -493,67 +544,101 @@ export default function PreparacionDePedidos({ session }) {
                                                     );
                                                 })()}
                                             </span>
+                                            <div className="ml-3">
+                                                
+                                                {editMode && <><p className="text-xs text-gray-600">Estado</p>
+                                                <select
+                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
+                                                    onChange={(e) => {
+                                                        const newEstado = parseInt(e.target.value, 10);
+                                                        setItemCatalogoEscaneado(prev => ({
+                                                            ...prev,
+                                                            estado: newEstado                                                            
+                                                        }));
+                                                    }}
+                                                    value={itemCatalogoEscaneado.estado || 0}
+                                                >
+                                                    <option value={0}>No aplica</option>
+                                                    <option value={1}>En mantenimiento</option>
+                                                    <option value={2}>En arriendo</option>
+                                                    <option value={4}>En garantía</option>
+                                                    <option value={8}>Vacío</option>
+                                                    <option value={9}>En llenado</option>
+                                                    <option value={16}>Lleno</option>
+                                                </select>
+                                                </>}
+                                                {!editMode && <p className="bg-gray-400 text-white text-xs ml-2 px-2 py-0.5 rounded uppercase mt-4">{getEstadoItemCatalogoLabel(itemCatalogoEscaneado.estado)}</p>}
+                                            </div>
                                         </div>
                                     </div>
                                     <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoria.cantidad} <small>{itemCatalogoEscaneado.subcategoria.unidad}</small> </p>
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
-                                    <p className="text-sm text-gray-600"><small>Mantención:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>
+                                    <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>
+                                    {!editMode && itemCatalogoEscaneado.direccionInvalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
+                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
+                                            <p className="flex text-red-600 -mt-6">
+                                                <BsFillGeoAltFill size="1.5rem"/><span className="text-xs ml-1">{itemCatalogoEscaneado.direccion.nombre}</span>
+                                            </p>
+                                        </div>}
+                                    {editMode && itemCatalogoEscaneado.direccionInvalida && (
+                                        <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
+                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Se ubica en</span>                                            
+                                            <div className="-mt-6">
+                                                <p className="text-xs font-bold">{itemCatalogoEscaneado.direccionActual?.cliente?.nombre}</p>                                                
+                                                <div className="flex">
+                                                    <div className="flex text-xs text-gray-700">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="ubicacion-dependencia"
+                                                            className="mr-2 h-8 w-8"
+                                                            checked={moverCilindro}
+                                                            onChange={(e) => {
+                                                                const mueve = e.target.checked;
+                                                                setMoverCilindro(mueve);
+                                                                setItemCatalogoEscaneado(prev => ({
+                                                                    ...prev,
+                                                                    direccionInvalida: mueve
+                                                                }));
+                                                            }}
+                                                        />                                                    
+                                                        <div className="flex items-start">
+                                                            <BsFillGeoAltFill size="2.75rem" /><p className="text-xs ml-2">{itemCatalogoEscaneado.direccionActual?.direccion?.nombre}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}                                    
                                 </div>
                             </div>
                         </div>
                         <div className="mt-4 mx-4">
                             <button
-                                onClick={() => {
-                                    setShowModalCilindroErroneo(false);
-                                    const newCargamentos = [...cargamentos];
-                                    const currentCargamento = newCargamentos[0];
-
-                                    // Verificar si el item ya existe en el cargamento
-                                    const existingItemIndex = currentCargamento.items.findIndex(
-                                        (item) => item.subcategoriaId === itemCatalogoEscaneado.subcategoria._id
-                                    );
-
-                                    if (existingItemIndex === -1) {
-                                        // Agregar el nuevo item si no existe                
-                                        const newItem = {
-                                            subcategoriaId: itemCatalogoEscaneado.subcategoria._id,
-                                            nombre: `${itemCatalogoEscaneado.categoria.nombre} ${itemCatalogoEscaneado.subcategoria.nombre}`,
-                                            restantes: -1,
-                                            cantidad: itemCatalogoEscaneado.subcategoria.cantidad,
-                                            elemento: itemCatalogoEscaneado.categoria.elemento,
-                                            nuCode: getNUCode(itemCatalogoEscaneado.categoria.elemento),
-                                            esIndustrial: itemCatalogoEscaneado.categoria.esIndustrial,
-                                            sinSifon: itemCatalogoEscaneado.subcategoria.sinSifon,
-                                            unidad: itemCatalogoEscaneado.subcategoria.unidad,
-                                            multiplicador: 0,
-                                            scanCodes: [
-                                                {
-                                                    id: itemCatalogoEscaneado._id,
-                                                    codigo: itemCatalogoEscaneado.codigo,
-                                                },
-                                            ],
-                                        };
-                                        currentCargamento.items.push(newItem);
-                                    }
-                                    newCargamentos[0] = currentCargamento;
-                                    setCargamentos(newCargamentos);
-                                    setScanMode(true);
-                                }}
-                                className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                onClick={() => handleUpdateItem(itemCatalogoEscaneado)}
+                                disabled={!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno)}
+                                className={`relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 ${!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno)  ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                CONTINUAR
+                                {editMode ? "ACTUALIZAR" : "AGREGAR A PEDIDO"}
+                                {corrigiendo && <div className="absolute top-0 left-0 w-full h-10">
+                                        <div className="absolute top-0 left-0 w-full h-full bg-gray-100 opacity-80"></div>
+                                        <div className="mt-1"><Loader texto="" /></div>
+                                    </div>}
                             </button>
-                            <button
+                            {!editMode && <button
                                 onClick={() => {
-                                    setShowModalCilindroErroneo(false);
-                                    setScanMode(true);
+                                    setEditMode(true);
                                 }}
-                                className="mt-2 px-4 py-2 bg-yellow-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >CORREGIR</button>
+                                className="mt-2 px-4 py-2 bg-orange-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >CORREGIR</button>}
                             <button
                                 onClick={() => {
-                                    setShowModalCilindroErroneo(false);
-                                    setScanMode(true);
+                                    if(editMode) {
+                                        setEditMode(false);
+                                    } else {
+                                        setShowModalCilindroErroneo(false);
+                                        setScanMode(true);
+                                    }
+                                    setMoverCilindro(false);                                    
                                 }}
                                 className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                             >CANCELAR</button>

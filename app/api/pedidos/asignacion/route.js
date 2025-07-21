@@ -211,7 +211,7 @@ export async function GET() {
     .populate({
         path: "ventaIds",
         model: "Venta",
-        select: "clienteId comentario",
+        select: "clienteId comentario direccionDespachoId",
         populate: {
             path: "clienteId",
             model: "Cliente",

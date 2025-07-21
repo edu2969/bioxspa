@@ -107,7 +107,7 @@ export const TIPO_ITEM_CATALOGO = {
     cilindro: 7,
 }
 
-export const ESTADO_ITEM_CATALOGO = {
+export const TIPO_ESTADO_ITEM_CATALOGO = {
     no_aplica: 0,
     en_mantenimiento: 1,
     en_arriendo: 2,

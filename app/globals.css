@@ -16,10 +16,19 @@
   }
 }
 
-body {
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
   color: #4B5563;
-  background: white;
-  overflow: hidden;  
+  overflow-x: hidden;
+  overflow-y: hidden;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  position: fixed;
 }
 
 .roboto {

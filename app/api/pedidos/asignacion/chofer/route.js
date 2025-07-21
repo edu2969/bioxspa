@@ -14,6 +14,7 @@ import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
 import CheckList from "@/models/checklist";
+import DetalleVenta from "@/models/detalleVenta";
 
 export async function GET() {
     try {
@@ -82,7 +83,7 @@ export async function GET() {
         }).populate({
             path: "ventaIds",
             model: "Venta",
-            select: "_id clienteId direccionesDespacho",
+            select: "_id clienteId direccionDespachoId",
             populate: {
                 path: "clienteId",
                 model: "Cliente",
@@ -99,6 +100,54 @@ export async function GET() {
             select: "_id nombre latitud longitud"
         })
         .lean();
+
+        if (rutaDespacho && rutaDespacho.ventaIds && rutaDespacho.ventaIds.length > 0) {
+            const ventaIds = rutaDespacho.ventaIds.map(v => v._id ? v._id : v);
+            // Importar aquí para evitar ciclos si es necesario
+            // Obtener los detalles de venta
+            const detallesPorVenta = await DetalleVenta.find({
+                ventaId: { $in: ventaIds }
+            })
+            .select("ventaId subcategoriaCatalogoId cantidad")
+            .populate({
+                path: "subcategoriaCatalogoId",
+                model: "SubcategoriaCatalogo",
+                select: "nombre unidad cantidad sinSifon categoriaCatalogoId",
+                populate: {
+                    path: "categoriaCatalogoId",
+                    model: "CategoriaCatalogo",
+                    select: "nombre elemento esIndustrial esMedicinal"
+                }
+            })
+            .lean();
+
+            // Agrupar detalles por ventaId
+            const detallesMap = {};
+            detallesPorVenta.forEach(det => {
+                const vId = det.ventaId.toString();
+                if (!detallesMap[vId]) detallesMap[vId] = [];
+                detallesMap[vId].push({
+                    subcategoriaCatalogoId: det.subcategoriaCatalogoId,
+                    cantidad: det.cantidad,
+                    elemento: det.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
+                    nombre: det.subcategoriaCatalogoId.nombre,
+                    sinSifon: det.subcategoriaCatalogoId.sinSifon,
+                    unidad: det.subcategoriaCatalogoId.unidad,
+                    capacidad: det.subcategoriaCatalogoId.cantidad,
+                    esIndustrial: det.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial,
+                    esMedicinal: det.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal
+                });
+            });
+
+            // Agregar el atributo detalles a cada venta en rutaDespacho.ventaIds
+            rutaDespacho.ventaIds = rutaDespacho.ventaIds.map(venta => {
+                const vId = (venta._id || venta).toString();
+                return {
+                    ...venta,
+                    detalles: detallesMap[vId] || []
+                };
+            });
+        }
 
         console.log(`Fetching vehiculos for choferId: ${choferId}`);
         const vehiculos = await Vehiculo.find({

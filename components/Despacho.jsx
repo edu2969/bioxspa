@@ -16,6 +16,7 @@ import { getNUCode } from "@/lib/nuConverter";
 import { TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
+import { getColorEstanque } from "@/lib/uix";
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -111,27 +112,27 @@ export default function Despacho({ session }) {
     };
 
     function calculateTubePosition(index) {
-        const baseTop = 36;
-        const baseLeft = 96;
+        const baseTop = 28;
+        const baseLeft = 76;
         const scaleFactor = 1.5;
 
-        const verticalIncrement = 3;
+        const verticalIncrement = 4;
 
-        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
-        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+        const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
 
         return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
     }
 
-    function calculateUploadTubePosition(index) {
-        const baseTop = 176;
+    function calculateUploadTubePosition(index) {        
+        const baseTop = 146;
         const baseLeft = 176;
         const scaleFactor = 1.5;
 
-        const verticalIncrement = 3;
+        const verticalIncrement = 4;
 
-        const top = baseTop + (index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
-        const left = baseLeft + (index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
+        const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
+        const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
 
         return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
     }
@@ -175,6 +176,36 @@ export default function Despacho({ session }) {
         setScanMode(!scanMode);
     };
 
+    const getCilindrosDescarga = (ruta) => {
+        if (!ruta || !Array.isArray(ruta.ventaIds) || !Array.isArray(ruta.ruta) || ruta.ruta.length === 0) return [];
+        const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
+        const venta = ruta.ventaIds.find(v => String(v.direccionDespachoId) === String(ultimaDireccionId));
+        if (!venta || !Array.isArray(venta.detalles)) return [];
+        const elementos = [];
+        venta.detalles.forEach(detalle => {
+            const cantidad = Number(detalle.cantidad) || 0;
+            // Buscar el elemento en la cargaItemIds si existe, si no, usar el subcategoriaCatalogoId directamente
+            let elemento = null;
+            const carga = Array.isArray(ruta.cargaItemIds)
+                ? ruta.cargaItemIds.find(
+                    item =>
+                        String(item.subcategoriaCatalogoId?._id || item.subcategoriaCatalogoId) === String(detalle.subcategoriaCatalogoId?._id || detalle.subcategoriaCatalogoId)
+                )
+                : null;
+            if (carga && carga.subcategoriaCatalogoId && carga.subcategoriaCatalogoId.categoriaCatalogoId) {
+                elemento = carga.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+            } else if (detalle.subcategoriaCatalogoId && detalle.subcategoriaCatalogoId.categoriaCatalogoId) {
+                elemento = detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+            } else {
+                elemento = detalle.elemento || "?";
+            }
+            for (let i = 0; i < cantidad; i++) {
+                elementos.push(elemento);
+            }
+        });
+        return elementos;
+    }
+
     const getResumenDescarga = (rd) => {
         // If no rutaDespacho or no items, return empty array
         if (!rd || !Array.isArray(rd.cargaItemIds)) return [];
@@ -184,11 +215,11 @@ export default function Despacho({ session }) {
 
         // Get current route that hasn't been delivered yet (no fechaArribo)
         const currentRoute = rd.ruta[rd.ruta.length - 1];
-        const currentRouteId = currentRoute.direccionDestinoId?._id;
+        const currentDireccionId = currentRoute.direccionDestinoId?._id;
 
         // Find which client corresponds to this destination
         const currentClient = rd.ventaIds.find(venta => {
-            return venta.clienteId.direccionesDespacho?.some(dest => dest.direccionId?._id === currentRouteId);            
+            return venta.clienteId.direccionesDespacho?.some(dest => dest.direccionId?._id === currentDireccionId);            
         });
 
         if (!currentClient) return [];
@@ -197,17 +228,25 @@ export default function Despacho({ session }) {
         const itemsBySubcategory = {};
 
         // First pass: count total items for each subcategory
-        rd.cargaItemIds.forEach((item) => {
-            const sub = item.subcategoriaCatalogoId;
-            if (!sub || !sub._id) return;
+        // Encuentra la última ruta (la actual) y su dirección destino
+        
+        // Itera sobre cada venta
+        rd.ventaIds.forEach((venta) => {
+            // Busca la dirección de despacho de la venta que coincide con la ruta actual
+            const matchingDireccion = venta.clienteId.direccionesDespacho?.find(
+            dir => dir.direccionId?._id === currentDireccionId
+            );
+            if (!matchingDireccion) return;
 
-            // Check if this item belongs to the current client's orders
-            const itemClientId = item.ventaId?.clienteId || currentClient.clienteId._id;
-            if (itemClientId !== currentClient.clienteId._id) return;
+            // Itera sobre los detalles de la venta (ya poblados en el backend)
+            if (Array.isArray(venta.detalles)) {
+            venta.detalles.forEach(detalle => {
+                const sub = detalle.subcategoriaCatalogoId;
+                if (!sub || !sub._id) return;
 
-            const key = sub._id;
+                const key = sub._id;
 
-            if (!itemsBySubcategory[key]) {
+                if (!itemsBySubcategory[key]) {
                 itemsBySubcategory[key] = {
                     subcategoriaCatalogoId: sub,
                     cantidad: sub.cantidad,
@@ -218,21 +257,30 @@ export default function Despacho({ session }) {
                     elemento: sub.categoriaCatalogoId?.elemento || "",
                     multiplicador: 0,
                     restantes: 0,
-                    clienteId: currentClient.clienteId._id,
-                    clienteNombre: currentClient.clienteId.nombre
+                    clienteId: venta.clienteId._id,
+                    clienteNombre: venta.clienteId.nombre
                 };
-            }
+                }
 
-            // Increment the total count (multiplicador)
-            itemsBySubcategory[key].multiplicador += 1;
+                // Suma la cantidad pedida (multiplicador)
+                itemsBySubcategory[key].multiplicador += detalle.cantidad;
 
-            // If not marked as downloaded, increment the remaining count
-            if (!item.descargado) {
-                itemsBySubcategory[key].restantes += 1;
+                // Calcula cuántos faltan por descargar (basado en cargaItemIds descargados)
+                // Busca todos los items físicos de esta subcategoría y venta, que no estén descargados
+                const restantes = rd.cargaItemIds.filter(
+                item =>
+                    item.subcategoriaCatalogoId?._id === sub._id &&
+                    !item.descargado &&
+                    // Si tienes ventaId en cargaItemIds, puedes filtrar por venta._id también
+                    (!item.ventaId || item.ventaId?.toString?.() === venta._id?.toString?.())
+                ).length;
+
+                itemsBySubcategory[key].restantes = restantes;
+            });
             }
         });
 
-        console.log(">>>>>>", Object.values(itemsBySubcategory));
+        console.log(">>>>>> RESUMEN DESCARGA", Object.values(itemsBySubcategory));
 
         return Object.values(itemsBySubcategory);
     };
@@ -666,73 +714,66 @@ export default function Despacho({ session }) {
     return (
         <div className="w-full h-screen overflow-hidden">
             
-            <div className={`${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
-                <Image
-                    className="absolute top-6 left-0 pl-8"
-                    src="/ui/camion.png"
-                    alt="camion_atras"
-                    width={355}
-                    height={275}
-                    style={{ width: "100%", height: "auto" }}
-                    priority
-                />
-                <div className="absolute top-6 mt-2 w-full">
-                    {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
-                        const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
-                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
-                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
-                        return (
-                            <Image
-                                key={index}
-                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
-                                alt={`tank_${index}`}
-                                width={14 * 4}
-                                height={78 * 4}
-                                className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "opacity-30" : ""}`}
-                                style={calculateTubePosition(index)}
-                                priority={false}
-                            />
-                        )
-                    })}
-                </div>
-                <Image
-                    className="absolute top-6 pl-8"
-                    src="/ui/camion_front.png"
-                    alt="camion"
-                    width={328}
-                    height={254}
-                    style={{ width: "100%", height: "auto" }}
-                />
-
-                {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-44 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.6)" }}>
-                    <div className="ml-6 text-slate-800">
-                        <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
-                        <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
+            <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
+                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+                    <Image
+                        className="absolute top-6 left-4"
+                        src="/ui/camion.png"
+                        alt="camion_atras"
+                        width={355}
+                        height={275}
+                        style={{ width: "90%", height: "auto" }}
+                        priority
+                    />
+                    <div className="absolute top-6 mt-2 w-full">
+                        {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
+                            const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                            return (
+                                <Image
+                                    key={index}
+                                    src={`/ui/tanque_biox${getColorEstanque(elem)}.png`}
+                                    alt={`tank_${index}`}
+                                    width={14 * 4}
+                                    height={78 * 4}
+                                    className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "opacity-30" : ""}`}
+                                    style={calculateTubePosition(index)}
+                                    priority={false}
+                                />
+                            )
+                        })}
                     </div>
-                </div>}
+                    <Image
+                        className="absolute top-6"
+                        src="/ui/camion_front.png"
+                        alt="camion"
+                        width={328}
+                        height={254}
+                        style={{ width: "90%", height: "auto" }}
+                    />
+                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-44 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.6)" }}>
+                        <div className="ml-6 text-slate-800">
+                            <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
+                            <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
+                        </div>
+                    </div>}
 
-                {rutaDespacho && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="absolute top-6 left-0 mt-2 w-full">
-                    {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
-                        const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                        const elementos = ["o2", "co2", "n2o", "ar", "he", "aligal", "aire alphagaz", "n2 (liquido)", "n2", "atal", "arcal", "c2h2",];
-                        const colores = ["verde", "azul", "rojo", "amarillo", "azul", "rojo", "amarillo", "verde", "rojo", "rojo", "azul", "azul", "rojo"];
-                        const color = colores[elementos.indexOf(elem.toLowerCase())] || "";
-                        return (
-                            <Image
-                                key={index}
-                                src={`/ui/tanque_biox${color.length > 1 ? "_" + color : ""}.png`}
-                                alt={`tank_${index}`}
-                                width={14 * 3}
-                                height={78 * 3}
-                                className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "" : "opacity-40"}`}
-                                style={calculateUploadTubePosition(index)}
-                                priority={false}
-                            />
-                        )
-                    })}
-                </div>}
-
+                    {rutaDespacho && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada) && <div className="absolute top-6 left-0 mt-2 w-full">
+                        {getCilindrosDescarga(rutaDespacho).reverse().map((elemento, index) => { 
+                            return (
+                                <Image
+                                    key={index}
+                                    src={`/ui/tanque_biox${getColorEstanque(elemento)}.png`}
+                                    alt={`tank_${index}`}
+                                    width={14 * 3}
+                                    height={78 * 3}
+                                    className={`absolute ${rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? "" : "opacity-40"}`}
+                                    style={calculateUploadTubePosition(getCilindrosDescarga(rutaDespacho).length - index - 1)}
+                                    priority={false}
+                                />
+                            )
+                        })}
+                    </div>}
+                </div>
             </div>
             
 
@@ -986,7 +1027,7 @@ export default function Despacho({ session }) {
                                     <div className="absolute mt-1"><Loader texto="" /></div>}
                             </button>
                         </div> :
-                            <div className="flex flex-col justify-center items-center h-4/5">
+                            <div className="w-full pb-4">
                                 <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
                                 <input
                                     ref={temporalRef}

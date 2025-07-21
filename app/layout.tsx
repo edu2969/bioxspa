@@ -20,7 +20,7 @@ export default async function RootLayout({
 }) {
   return (
     <html lang="es-CL">
-      <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`}>
+      <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`} style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }}>
         <Providers apiKey={process.env.GOOGLE_API_KEY || ''}>
           {children}
           <Nav />
