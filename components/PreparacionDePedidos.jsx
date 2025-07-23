@@ -385,6 +385,7 @@ export default function PreparacionDePedidos({ session }) {
                                 </div>
                             </div>
 
+                            <div className="w-full h-[calc(100dvh-234px)] overflow-y-scroll">
                             {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
                                 <div className="flex">
                                     <div className="w-10/12">
@@ -442,8 +443,9 @@ export default function PreparacionDePedidos({ session }) {
                                     ))}
                                 </ul>
                             </div>)}
+                            </div>    
 
-                            {!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8"
+                            {!inputTemporalVisible ? <div className="absolute bottom-0 flex w-full pr-8"
                                 onClick={index === 0 ? postCargamento : undefined}>
                                 <button className={`mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
                                     onClick={(e) => {
@@ -469,7 +471,7 @@ export default function PreparacionDePedidos({ session }) {
                                     </div>}
                                 </button>
                             </div> :
-                            <div className="absolute bottom-3 w-full pr-8 text-center">
+                            <div className="absolute bottom-3 w-full pr-8 text-center pt-2">
                                 <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
                                 <input
                                     ref={temporalRef}

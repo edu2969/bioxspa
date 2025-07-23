@@ -174,7 +174,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                 });
                 socket.emit("update-pedidos", { userId: session.user.id });
                 setRedirecting(true);
-                router.push('/modulos');
+                router.back();
             } else {
                 toast.error(result.error || "Error al crear la venta. Por favor, inténtelo más tarde.", {
                     position: "top-center"

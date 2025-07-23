@@ -411,6 +411,7 @@ export default function AsignacionPanel({ session }) {
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
                                                 {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
                                                     const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                                    const descargados = getCilindrosDescarga(ruta).length;
                                                     return (
                                                         <Image
                                                             key={index}
@@ -418,7 +419,7 @@ export default function AsignacionPanel({ session }) {
                                                             alt={`tank_${index}`}
                                                             width={14 * 2}
                                                             height={78 * 2}
-                                                            className={`absolute ${ruta.cargaItemIds[index].entregado ? "opacity-20" : ""}`}
+                                                            className={`absolute ${index < descargados ? "opacity-20" : ""}`}
                                                             style={calculateTubePosition(index)}
                                                             priority={false}
                                                         />
@@ -443,7 +444,7 @@ export default function AsignacionPanel({ session }) {
                                             </div>
                                             {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
                                                 || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
-                                                    {getCilindrosDescarga(ruta, index).map((elem, index) => {                                                        
+                                                    {getCilindrosDescarga(ruta).reverse().map((elem, index) => {                                                        
                                                         return (
                                                             <Image
                                                                 key={index}
@@ -452,7 +453,7 @@ export default function AsignacionPanel({ session }) {
                                                                 width={14 * 3}
                                                                 height={78 * 3}
                                                                 className={`absolute ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? "" : "opacity-40"}`}
-                                                                style={calculateUploadTubePosition(index)}
+                                                                style={calculateUploadTubePosition(getCilindrosDescarga(ruta).length - index - 1)}
                                                                 priority={false}
                                                             />
                                                         )
