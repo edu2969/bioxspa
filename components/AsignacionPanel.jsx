@@ -115,7 +115,7 @@ export default function AsignacionPanel({ session }) {
     }
 
     function calculateUploadTubePosition(index) {
-        const baseTop = 76;
+        const baseTop = 86;
         const baseLeft = 96;
         const verticalIncrement = 3.2;
         const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
@@ -427,7 +427,7 @@ export default function AsignacionPanel({ session }) {
                                                 })}
                                             </div>
                                             <Image className="absolute top-0 left-0 ml-2" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
-                                            <div className="absolute ml-16 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>
+                                            <div className="absolute ml-12 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>
                                                 <div className="ml-4 text-slate-800">
                                                     <p className="text-xl font-bold">{ruta.vehiculoId.patente}</p>
                                                     <p className="text-xs">{ruta.vehiculoId.marca}</p>

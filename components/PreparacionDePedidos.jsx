@@ -28,8 +28,8 @@ export default function PreparacionDePedidos({ session }) {
     const [itemCatalogoEscaneado, setItemCatalogoEscaneado] = useState(null);
     const hiddenInputRef = useRef(null);
     const temporalRef = useRef(null);
-    const [inputTemporalVisible, setInputTemporalVisible] = useState(false); 
-    const [posting, setPosting] = useState(false); 
+    const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
+    const [posting, setPosting] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [moverCilindro, setMoverCilindro] = useState(false);
     const [corrigiendo, setCorrigiendo] = useState(false);
@@ -51,10 +51,10 @@ export default function PreparacionDePedidos({ session }) {
             console.log("Eeeeepa!");
             return;
         }
-        
+
         const scanCodes = cargamentos[0].ventas
             .flatMap(venta => venta.detalles)
-            .flatMap(detalle => Array.isArray(detalle.scanCodes) ? detalle.scanCodes : []);        
+            .flatMap(detalle => Array.isArray(detalle.scanCodes) ? detalle.scanCodes : []);
 
         const response = await fetch("/api/pedidos/despacho", {
             method: "POST",
@@ -68,14 +68,10 @@ export default function PreparacionDePedidos({ session }) {
         });
         if (!response.ok) {
             const errorData = await response.json();
-            toast.error(`Error al guardar el cargamento: ${errorData.error}`, {
-                position: "bottom-right",
-            });
+            toast.error(`Error al guardar el cargamento: ${errorData.error}`);
         } else {
             handleRemoveFirst();
-            toast.success(`Cargamento confirmado con éxito`, {
-                position: "bottom-right",
-            });
+            toast.success(`Cargamento confirmado con éxito`);
             socket.emit("update-pedidos", {
                 userId: session.user.id
             });
@@ -107,9 +103,6 @@ export default function PreparacionDePedidos({ session }) {
     }
 
     const handleScanMode = () => {
-        toast.info(`Modo escaneo ${scanMode ? "desactivado" : "activado"}`, {
-            position: "bottom-right",
-        });
         setScanMode(!scanMode);
     };
 
@@ -140,7 +133,7 @@ export default function PreparacionDePedidos({ session }) {
 
         cargamentoActual.ventas.forEach((venta, vIdx) => {
             venta.detalles.forEach((detalle, dIdx) => {
-                if (detalle.subcategoriaId === item.subcategoria._id) {
+                if (detalle.subcategoriaId === item.subcategoria._id && detalle.restantes > 0) {
                     ventaIndex = vIdx;
                     detalleIndex = dIdx;
                 }
@@ -150,26 +143,20 @@ export default function PreparacionDePedidos({ session }) {
         if (ventaIndex === -1 || detalleIndex === -1) {
             setScanMode(false);
             setShowModalCilindroErroneo(true);
-            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`, {
-                position: "bottom-right",
-            });
+            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`);
             return;
         }
 
-        if(item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
+        if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
             setScanMode(false);
             setShowModalCilindroErroneo(true);
-            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`, {
-                position: "bottom-right",
-            });
+            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`);
             return;
         }
 
         const detalle = cargamentoActual.ventas[ventaIndex].detalles[detalleIndex];
         if (detalle.scanCodes && detalle.scanCodes.map(sc => sc.codigo).includes(codigo)) {
-            toast.warn(`CODIGO ${codigo} ya escaneado`, {
-                position: "bottom-right",
-            });
+            toast.warn(`CODIGO ${codigo} ya escaneado`);
             return;
         }
 
@@ -205,9 +192,7 @@ export default function PreparacionDePedidos({ session }) {
             return newCargamentos;
         });
 
-        toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`, {
-            position: "bottom-right",
-        });
+        toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`);
     }, [setCargamentos, cargamentos]);
 
     useEffect(() => {
@@ -217,11 +202,11 @@ export default function PreparacionDePedidos({ session }) {
     useEffect(() => {
         fetchCargamentos();
     }, []);
-    
+
     const scanItem = useCallback(async (codigo) => {
         setPosting(true);
         try {
-            const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);            
+            const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || "Error al escanear el código");
@@ -231,9 +216,7 @@ export default function PreparacionDePedidos({ session }) {
             cargarItem(data, codigo);
             console.log("Item cargado:", data);
         } catch {
-            toast.error(`Cilindro ${codigo} no existe`, {
-                position: "bottom-right",
-            });
+            toast.error(`Cilindro ${codigo} no existe`);
             return;
         } finally {
             setPosting(false);
@@ -241,7 +224,7 @@ export default function PreparacionDePedidos({ session }) {
     }, [cargarItem, setItemCatalogoEscaneado]);
 
     useEffect(() => {
-        const handleTextInput = (e) => {            
+        const handleTextInput = (e) => {
             if (scanMode) {
                 const codigo = e.data;
                 console.log("Código escaneado:", codigo);
@@ -249,7 +232,7 @@ export default function PreparacionDePedidos({ session }) {
                     setScanMode(false);
                     setInputTemporalVisible(true);
                     setTimeout(() => {
-                        if(temporalRef.current)
+                        if (temporalRef.current)
                             temporalRef.current.focus();
                     }, 0);
                     return;
@@ -290,9 +273,9 @@ export default function PreparacionDePedidos({ session }) {
         // Verifica si hay sesión y el socket está conectado
         if (session?.user?.id && socket.connected) {
             console.log("Re-uniendo a room-pedidos después de posible recarga");
-            socket.emit("join-room", { 
-                room: "room-pedidos", 
-                userId: session.user.id 
+            socket.emit("join-room", {
+                room: "room-pedidos",
+                userId: session.user.id
             });
         }
 
@@ -300,9 +283,9 @@ export default function PreparacionDePedidos({ session }) {
         const handleReconnect = () => {
             if (session?.user?.id) {
                 console.log("Socket reconectado, uniendo a sala nuevamente");
-                socket.emit("join-room", { 
-                    room: "room-pedidos", 
-                    userId: session.user.id 
+                socket.emit("join-room", {
+                    room: "room-pedidos",
+                    userId: session.user.id
                 });
             }
         };
@@ -342,7 +325,7 @@ export default function PreparacionDePedidos({ session }) {
             });
             const data = await response.json();
             if (!response.ok) {
-                toast.error(`Error al corregir: ${data.error || "Error desconocido"}`, { position: "bottom-right" });
+                toast.error(`Error al corregir: ${data.error || "Error desconocido"}`);
             } else {
                 setShowModalCilindroErroneo(false);
                 setMoverCilindro(false);
@@ -350,7 +333,7 @@ export default function PreparacionDePedidos({ session }) {
                 cargarItem(item, item.codigo);
             }
         } catch {
-            toast.error("Error de red al corregir cilindro", { position: "bottom-right" });
+            toast.error("Error de red al corregir cilindro");
         } finally {
             setEditMode(true);
             setCorrigiendo(false);
@@ -360,6 +343,7 @@ export default function PreparacionDePedidos({ session }) {
     return (
         <div className="w-full" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
             <div className="w-full">
+
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
                     <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
                         <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1 ${animating ? "transition-all duration-500" : ""}`}
@@ -386,107 +370,109 @@ export default function PreparacionDePedidos({ session }) {
                             </div>
 
                             <div className="w-full h-[calc(100dvh-234px)] overflow-y-scroll">
-                            {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
-                                <div className="flex">
-                                    <div className="w-10/12">
-                                        <p className="text-xs font-bold text-gray-500 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
-                                        <p className="flex text-xs text-gray-500">
-                                            <FaPhoneAlt className="mr-1"/>{venta.cliente?.telefono || "Sin teléfono"}
-                                        </p>
-                                    </div>
-                                    <div key={`comentario_${ventaIndex}`} className={`w-2/12 flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
-                                        <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
-                                            e.stopPropagation();
-                                            toast.info(`${venta.comentario || "Sin comentarios"}`);
-                                        }}>
-                                            {!venta.comentario ? <VscCommentDraft size="1.75rem" /> : <VscCommentUnresolved size="1.75rem" />}
+                                {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
+                                    <div className="flex">
+                                        <div className="w-10/12">
+                                            <p className="text-xs font-bold text-gray-500 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
+                                            <p className="flex text-xs text-gray-500">
+                                                <FaPhoneAlt className="mr-1" />{venta.cliente?.telefono || "Sin teléfono"}
+                                            </p>
+                                        </div>
+                                        <div key={`comentario_${ventaIndex}`} className={`w-2/12 flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                                            <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                                e.stopPropagation();
+                                                toast.info(`${venta.comentario || "Sin comentarios"}`);
+                                            }}>
+                                                {!venta.comentario ? <VscCommentDraft size="1.75rem" /> : <VscCommentUnresolved size="1.75rem" />}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                
 
-                                <ul key={`detalles_${ventaIndex}`} className="flex-1 flex flex-wrap items-center justify-center mt-1">
-                                    {venta.detalles.map((detalle, idx) => (
-                                        <li
-                                            key={`detalle_${ventaIndex}_${idx}`}
-                                            className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
-                                        >
-                                            <div className="w-full flex items-left">
-                                                <div className="flex">
-                                                    <div>
-                                                        <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{detalle.nuCode}</div>
-                                                        {detalle.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                                                        {detalle.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+
+                                    <ul key={`detalles_${ventaIndex}`} className="flex-1 flex flex-wrap items-center justify-center mt-1">
+                                        {venta.detalles.map((detalle, idx) => (
+                                            <li
+                                                key={`detalle_${ventaIndex}_${idx}`}
+                                                className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                            >
+                                                <div className="w-full flex items-left">
+                                                    <div className="flex">
+                                                        <div>
+                                                            <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{detalle.nuCode}</div>
+                                                            {detalle.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                                            {detalle.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                                        </div>
+                                                        <div className="font-bold text-xl ml-2">
+                                                            <span>
+                                                                {(() => {
+                                                                    let match = detalle.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
+                                                                    if (!match) {
+                                                                        match = [null, (detalle.elemento ?? detalle.gas ?? detalle.nombre.split(" ")[0]), ''];
+                                                                    }
+                                                                    const [, p1, p2] = match;
+                                                                    return (
+                                                                        <>
+                                                                            {p1 ? p1.toUpperCase() : ''}
+                                                                            {p2 ? <small>{p2}</small> : ''}
+                                                                        </>
+                                                                    );
+                                                                })()}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="font-bold text-xl ml-2">
-                                                        <span>
-                                                            {(() => {
-                                                                let match = detalle.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
-                                                                if (!match) {
-                                                                    match = [null, (detalle.elemento ?? detalle.gas ?? detalle.nombre.split(" ")[0]), ''];
-                                                                }
-                                                                const [, p1, p2] = match;
-                                                                return (
-                                                                    <>
-                                                                        {p1 ? p1.toUpperCase() : ''}
-                                                                        {p2 ? <small>{p2}</small> : ''}
-                                                                    </>
-                                                                );
-                                                            })()}
-                                                        </span>
-                                                    </div>
+                                                    <p className="text-2xl orbitron ml-2"><b>{detalle.cantidad}</b> <small>{detalle.unidad}</small></p>
                                                 </div>
-                                                <p className="text-2xl orbitron ml-2"><b>{detalle.cantidad}</b> <small>{detalle.unidad}</small></p>
-                                            </div>
-                                            <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>)}
-                            </div>    
+                                                <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>)}
 
-                            {!inputTemporalVisible ? <div className="absolute bottom-0 flex w-full pr-8"
-                                onClick={index === 0 ? postCargamento : undefined}>
-                                <button className={`mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleScanMode();
-                                    }}>
-                                    <BsQrCodeScan className="text-4xl" />
-                                    {scanMode && !isCompleted() && <div className="absolute top-0 left-2">
-                                        <div className="w-12 h-12 bg-gray-100 opacity-80"></div>
-                                        <div className="absolute top-2 left-2"><Loader texto="" /></div>
+                                {!inputTemporalVisible ? <div className="absolute -bottom-2 flex w-full pr-4"
+                                    onClick={index == 0 ? postCargamento : undefined}>
+                                    <button className={`mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
+                                        disabled={isCompleted() ? true : false}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleScanMode();
+                                        }}>
+                                        <BsQrCodeScan className="text-4xl" />
+                                        {scanMode && !isCompleted() && <div className="absolute top-0 left-2">
+                                            <div className="w-12 h-12 bg-gray-100 opacity-80"></div>
+                                            <div className="absolute top-2 left-2"><Loader texto="" /></div>
+                                        </div>}
+                                    </button>
+                                    <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            postCargamento();
+                                        }} disabled={!isCompleted() || posting}>
+                                        <FaRoadCircleCheck className="text-4xl pb-0" />
+                                        <p className="ml-2 mt-2 text-md font-bold">CONFIRMAR CARGA</p>
+                                        {posting && <div className="absolute w-full top-0">
+                                            <div className="w-full h-12 bg-gray-100 opacity-80"></div>
+                                            <div className="absolute top-2 w-full"><Loader texto="" /></div>
+                                        </div>}
+                                    </button>
+                                </div> :
+                                    <div className="absolute bottom-3 w-full pr-8 text-center pt-2">
+                                        <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
+                                        <input
+                                            ref={temporalRef}
+                                            type="text"
+                                            className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    console.log("Código temporal ingresado:", e.target.value);
+                                                    setInputTemporalVisible(false);
+                                                    scanItem(e.target.value);
+                                                    e.target.value = '';
+                                                }
+                                            }}
+                                        />
                                     </div>}
-                                </button>
-                                <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        postCargamento();
-                                    }} disabled={!isCompleted() || posting}>
-                                    <FaRoadCircleCheck className="text-4xl pb-0" />
-                                    <p className="ml-2 mt-2 text-md font-bold">CONFIRMAR CARGA</p>
-                                    {posting && <div className="absolute w-full top-0">
-                                        <div className="w-full h-12 bg-gray-100 opacity-80"></div>
-                                        <div className="absolute top-2 w-full"><Loader texto="" /></div>
-                                    </div>}
-                                </button>
-                            </div> :
-                            <div className="absolute bottom-3 w-full pr-8 text-center pt-2">
-                                <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
-                                <input
-                                    ref={temporalRef}
-                                    type="text"
-                                    className="border border-gray-300 rounded-lg px-3 py-2 w-64"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            console.log("Código temporal ingresado:", e.target.value);
-                                            setInputTemporalVisible(false);
-                                            scanItem(e.target.value);
-                                            e.target.value = '';
-                                        }
-                                    }}
-                                />
-                            </div>}
+
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -547,27 +533,27 @@ export default function PreparacionDePedidos({ session }) {
                                                 })()}
                                             </span>
                                             <div className="ml-3">
-                                                
+
                                                 {editMode && <><p className="text-xs text-gray-600">Estado</p>
-                                                <select
-                                                    className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
-                                                    onChange={(e) => {
-                                                        const newEstado = parseInt(e.target.value, 10);
-                                                        setItemCatalogoEscaneado(prev => ({
-                                                            ...prev,
-                                                            estado: newEstado                                                            
-                                                        }));
-                                                    }}
-                                                    value={itemCatalogoEscaneado.estado || 0}
-                                                >
-                                                    <option value={0}>No aplica</option>
-                                                    <option value={1}>En mantenimiento</option>
-                                                    <option value={2}>En arriendo</option>
-                                                    <option value={4}>En garantía</option>
-                                                    <option value={8}>Vacío</option>
-                                                    <option value={9}>En llenado</option>
-                                                    <option value={16}>Lleno</option>
-                                                </select>
+                                                    <select
+                                                        className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
+                                                        onChange={(e) => {
+                                                            const newEstado = parseInt(e.target.value, 10);
+                                                            setItemCatalogoEscaneado(prev => ({
+                                                                ...prev,
+                                                                estado: newEstado
+                                                            }));
+                                                        }}
+                                                        value={itemCatalogoEscaneado.estado || 0}
+                                                    >
+                                                        <option value={0}>No aplica</option>
+                                                        <option value={1}>En mantenimiento</option>
+                                                        <option value={2}>En arriendo</option>
+                                                        <option value={4}>En garantía</option>
+                                                        <option value={8}>Vacío</option>
+                                                        <option value={9}>En llenado</option>
+                                                        <option value={16}>Lleno</option>
+                                                    </select>
                                                 </>}
                                                 {!editMode && <p className="bg-gray-400 text-white text-xs ml-2 px-2 py-0.5 rounded uppercase mt-4">{getEstadoItemCatalogoLabel(itemCatalogoEscaneado.estado)}</p>}
                                             </div>
@@ -577,16 +563,16 @@ export default function PreparacionDePedidos({ session }) {
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
                                     <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>
                                     {!editMode && itemCatalogoEscaneado.direccionInvalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
-                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
-                                            <p className="flex text-red-600 -mt-6">
-                                                <BsFillGeoAltFill size="1.5rem"/><span className="text-xs ml-1">{itemCatalogoEscaneado.direccion.nombre}</span>
-                                            </p>
-                                        </div>}
+                                        <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
+                                        <p className="flex text-red-600 -mt-6">
+                                            <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{itemCatalogoEscaneado.direccion.nombre}</span>
+                                        </p>
+                                    </div>}
                                     {editMode && itemCatalogoEscaneado.direccionInvalida && (
                                         <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
-                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Se ubica en</span>                                            
+                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Se ubica en</span>
                                             <div className="-mt-6">
-                                                <p className="text-xs font-bold">{itemCatalogoEscaneado.direccionActual?.cliente?.nombre}</p>                                                
+                                                <p className="text-xs font-bold">{itemCatalogoEscaneado.direccionActual?.cliente?.nombre}</p>
                                                 <div className="flex">
                                                     <div className="flex text-xs text-gray-700">
                                                         <input
@@ -602,7 +588,7 @@ export default function PreparacionDePedidos({ session }) {
                                                                     direccionInvalida: mueve
                                                                 }));
                                                             }}
-                                                        />                                                    
+                                                        />
                                                         <div className="flex items-start">
                                                             <BsFillGeoAltFill size="2.75rem" /><p className="text-xs ml-2">{itemCatalogoEscaneado.direccionActual?.direccion?.nombre}</p>
                                                         </div>
@@ -610,7 +596,7 @@ export default function PreparacionDePedidos({ session }) {
                                                 </div>
                                             </div>
                                         </div>
-                                    )}                                    
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -618,13 +604,13 @@ export default function PreparacionDePedidos({ session }) {
                             <button
                                 onClick={() => handleUpdateItem(itemCatalogoEscaneado)}
                                 disabled={!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno)}
-                                className={`relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 ${!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno)  ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 ${!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {editMode ? "ACTUALIZAR" : "AGREGAR A PEDIDO"}
                                 {corrigiendo && <div className="absolute top-0 left-0 w-full h-10">
-                                        <div className="absolute top-0 left-0 w-full h-full bg-gray-100 opacity-80"></div>
-                                        <div className="mt-1"><Loader texto="" /></div>
-                                    </div>}
+                                    <div className="absolute top-0 left-0 w-full h-full bg-gray-100 opacity-80"></div>
+                                    <div className="mt-1"><Loader texto="" /></div>
+                                </div>}
                             </button>
                             {!editMode && <button
                                 onClick={() => {
@@ -634,20 +620,19 @@ export default function PreparacionDePedidos({ session }) {
                             >CORREGIR</button>}
                             <button
                                 onClick={() => {
-                                    if(editMode) {
+                                    if (editMode) {
                                         setEditMode(false);
                                     } else {
                                         setShowModalCilindroErroneo(false);
                                         setScanMode(true);
                                     }
-                                    setMoverCilindro(false);                                    
+                                    setMoverCilindro(false);
                                 }}
                                 className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                             >CANCELAR</button>
                         </div>
                     </div>
                 </div>
-
             </div>}
             <ToastContainer />
             <input

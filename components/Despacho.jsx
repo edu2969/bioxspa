@@ -17,6 +17,7 @@ import { TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 import { getColorEstanque } from "@/lib/uix";
+import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 
 export default function Despacho({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -207,47 +208,29 @@ export default function Despacho({ session }) {
     }
 
     const getResumenDescarga = (rd) => {
-        // If no rutaDespacho or no items, return empty array
-        if (!rd || !Array.isArray(rd.cargaItemIds)) return [];
+        // Validaciones básicas
+        if (!rd || !Array.isArray(rd.cargaItemIds) || !rd.ruta || rd.ruta.length === 0 || !rd.ventaIds || rd.ventaIds.length === 0) return [];
 
-        // Find the current destination from the route
-        if (!rd.ruta || rd.ruta.length === 0 || rd.ventaIds.length === 0) return [];
-
-        // Get current route that hasn't been delivered yet (no fechaArribo)
+        // Dirección destino actual
         const currentRoute = rd.ruta[rd.ruta.length - 1];
-        const currentDireccionId = currentRoute.direccionDestinoId?._id;
+        const currentDireccionId = currentRoute.direccionDestinoId?._id || currentRoute.direccionDestinoId;
 
-        // Find which client corresponds to this destination
-        const currentClient = rd.ventaIds.find(venta => {
-            return venta.clienteId.direccionesDespacho?.some(dest => dest.direccionId?._id === currentDireccionId);            
-        });
+        // Filtra la venta que corresponde a la dirección actual
+        const currentVenta = rd.ventaIds.find(venta =>
+            venta.direccionDespachoId?.toString() === currentDireccionId?.toString()
+        );
+        if (!currentVenta || !Array.isArray(currentVenta.detalles)) return [];
 
-        if (!currentClient) return [];
+        // Agrupa por subcategoria los detalles de la venta actual
+        const resumen = {};
 
-        // Group items by subcategory and client
-        const itemsBySubcategory = {};
+        currentVenta.detalles.forEach(detalle => {
+            const sub = detalle.subcategoriaCatalogoId;
+            if (!sub || !sub._id) return;
+            const key = sub._id;
 
-        // First pass: count total items for each subcategory
-        // Encuentra la última ruta (la actual) y su dirección destino
-        
-        // Itera sobre cada venta
-        rd.ventaIds.forEach((venta) => {
-            // Busca la dirección de despacho de la venta que coincide con la ruta actual
-            const matchingDireccion = venta.clienteId.direccionesDespacho?.find(
-            dir => dir.direccionId?._id === currentDireccionId
-            );
-            if (!matchingDireccion) return;
-
-            // Itera sobre los detalles de la venta (ya poblados en el backend)
-            if (Array.isArray(venta.detalles)) {
-            venta.detalles.forEach(detalle => {
-                const sub = detalle.subcategoriaCatalogoId;
-                if (!sub || !sub._id) return;
-
-                const key = sub._id;
-
-                if (!itemsBySubcategory[key]) {
-                itemsBySubcategory[key] = {
+            if (!resumen[key]) {
+                resumen[key] = {
                     subcategoriaCatalogoId: sub,
                     cantidad: sub.cantidad,
                     unidad: sub.unidad,
@@ -257,33 +240,42 @@ export default function Despacho({ session }) {
                     elemento: sub.categoriaCatalogoId?.elemento || "",
                     multiplicador: 0,
                     restantes: 0,
-                    clienteId: venta.clienteId._id,
-                    clienteNombre: venta.clienteId.nombre
+                    clienteId: currentVenta.clienteId._id,
+                    clienteNombre: currentVenta.clienteId.nombre
                 };
-                }
-
-                // Suma la cantidad pedida (multiplicador)
-                itemsBySubcategory[key].multiplicador += detalle.cantidad;
-
-                // Calcula cuántos faltan por descargar (basado en cargaItemIds descargados)
-                // Busca todos los items físicos de esta subcategoría y venta, que no estén descargados
-                const restantes = rd.cargaItemIds.filter(
-                item =>
-                    item.subcategoriaCatalogoId?._id === sub._id &&
-                    !item.descargado &&
-                    // Si tienes ventaId en cargaItemIds, puedes filtrar por venta._id también
-                    (!item.ventaId || item.ventaId?.toString?.() === venta._id?.toString?.())
-                ).length;
-
-                itemsBySubcategory[key].restantes = restantes;
-            });
             }
+            resumen[key].multiplicador += detalle.cantidad;
         });
 
-        console.log(">>>>>> RESUMEN DESCARGA", Object.values(itemsBySubcategory));
+        // Calcula los restantes por subcategoria, solo para los items físicos que coinciden con la dirección y subcategoria
+        Object.keys(resumen).forEach(key => {
+            // Filtra solo los items que corresponden a la venta actual (por dirección de despacho)
+            const itemsDeVentaActual = rd.cargaItemIds.filter(item => {
+            // El item debe ser de la subcategoria actual
+            return item.subcategoriaCatalogoId?._id === key;
+            });
 
-        return Object.values(itemsBySubcategory);
+            // Busca el multiplicador (cantidad) de la venta actual para esta subcategoria
+            const detalleVenta = currentVenta.detalles.find(det => det.subcategoriaCatalogoId?._id === key);
+            const multiplicadorVenta = detalleVenta ? detalleVenta.cantidad : 0;
+
+            // Restantes son los items de la venta actual que no han sido descargados, pero no puede exceder el multiplicador de la venta
+            const noDescargados = itemsDeVentaActual.filter(item => !item.descargado).length;
+            resumen[key].restantes = Math.max(0, multiplicadorVenta - (itemsDeVentaActual.length - noDescargados));
+        });
+
+        console.log("RESUMEN DESCARGA --->", Object.values(resumen));
+
+        return Object.values(resumen);
     };
+
+    const getClientedescarga = (rd) => {
+        if (!rd || !Array.isArray(rd.ruta) || rd.ruta.length === 0 || !Array.isArray(rd.ventaIds)) return null;
+        const lastDireccionId = rd.ruta[rd.ruta.length - 1].direccionDestinoId?._id || rd.ruta[rd.ruta.length - 1].direccionDestinoId;
+        const venta = rd.ventaIds.find(v => String(v.direccionDespachoId) === String(lastDireccionId));
+        if (!venta || !venta.clienteId) return null;
+        return venta.clienteId;
+    }
 
     const isCompleted = (rd) => {
         const descarga = getResumenDescarga(rd);
@@ -452,8 +444,39 @@ export default function Despacho({ session }) {
 
     const postDescarga = async () => {
         setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada);
+
+        // Encuentra la última dirección de la ruta
+        const lastRoute = rutaDespacho.ruta[rutaDespacho.ruta.length - 1];
+        const lastDireccionId = lastRoute.direccionDestinoId?._id || lastRoute.direccionDestinoId;
+
+        // Busca la venta correspondiente a esa dirección
+        const venta = rutaDespacho.ventaIds.find(
+            v => String(v.direccionDespachoId) === String(lastDireccionId)
+        );
+
+        if (!venta) {
+            toast.error("No se encontró la venta para la dirección actual.", {
+                position: "top-center",
+            });
+            setLoadingState(-1);
+            return;
+        }
+
+        // Filtra los items escaneados (descargados) para esa venta
+        const scanCodes = rutaDespacho.cargaItemIds
+            .filter(item => {
+                // El item debe estar marcado como descargado
+                if (!item.descargado) return false;
+                // El item debe pertenecer a la venta actual (por subcategoria)
+                return venta.detalles.some(
+                    det => String(det.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
+                );
+            })
+            .map(item => item._id);
+
         if (!isCompleted(rutaDespacho)) {
             console.log("Eeeeepa!");
+            setLoadingState(-1);
             return;
         }
 
@@ -463,7 +486,8 @@ export default function Despacho({ session }) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                rutaId: rutaDespacho._id
+                rutaId: rutaDespacho._id,
+                scanCodes
             }),
         });
         if (!response.ok) {
@@ -472,7 +496,7 @@ export default function Despacho({ session }) {
                 position: "top-center",
             });
         } else {
-            toast.success(`Descarga confirmado con éxito`, {
+            toast.success(`Descarga confirmada con éxito`, {
                 position: "top-center",
             });
             socket.emit("update-pedidos", {
@@ -750,7 +774,7 @@ export default function Despacho({ session }) {
                         height={254}
                         style={{ width: "90%", height: "auto" }}
                     />
-                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-44 mt-10" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.6)" }}>
+                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-40 mt-8" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.5)" }}>
                         <div className="ml-6 text-slate-800">
                             <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
                             <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
@@ -967,12 +991,40 @@ export default function Despacho({ session }) {
                             </button>
                         </div>}                        
 
-                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (
+                        {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (<>
+                            <div className="w-full flex justify-center mb-2">
+                                {(() => {
+                                    const cliente = getClientedescarga(rutaDespacho);
+                                    // Busca la venta actual por dirección
+                                    const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
+                                    const ventaActual = rutaDespacho.ventaIds.find(v => String(v.direccionDespachoId) === String(currentDireccionId));
+                                    return (
+                                        <div className="w-full flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
+                                            <div className="w-10/12">
+                                                <p className="text-xs font-bold text-gray-500 truncate">{cliente?.nombre || "Sin cliente"}</p>
+                                                <p className="flex text-xs text-gray-500">
+                                                    {/* Si tienes teléfono, agrégalo aquí */}
+                                                </p>
+                                            </div>
+                                            <div className={`w-2/12 flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                                                <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
+                                                }}>
+                                                    {!ventaActual?.comentario
+                                                        ? <VscCommentDraft size="1.75rem" />
+                                                        : <VscCommentUnresolved size="1.75rem" />}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
                             <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">                                
                                 {getResumenDescarga(rutaDespacho).map((item, idx) => (
                                     <li
                                         key={`item_${idx}`}
-                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${idx === 0 ? 'rounded-t-lg' : idx === getResumenDescarga(rutaDespacho).length - 1 ? 'rounded-b-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-t-lg' : (idx === getResumenDescarga(rutaDespacho).length - 1 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-b-lg' : getResumenDescarga(rutaDespacho).length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                     >
                                         <div className="w-full flex items-left">
                                             <div className="flex">
@@ -1006,7 +1058,7 @@ export default function Despacho({ session }) {
                                     </li>
                                 ))}
                             </ul>
-                        )}
+                        </>)}
 
                         {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga && (!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8">
                             <button className={`absolute h-12 w-12 mr-3 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted(rutaDespacho)) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
