@@ -4,6 +4,8 @@ import { authOptions } from "@/app/utils/authOptions";
 import { connectMongoDB } from "@/lib/mongodb";
 import RutaDespacho from "@/models/rutaDespacho";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import Venta from "@/models/venta";
+import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function POST(req) {
     try {
@@ -34,6 +36,7 @@ export async function POST(req) {
             _id: rutaId,
             choferId: choferId,
             estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
+                TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada,
                 TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino] }
         });
 
@@ -50,11 +53,26 @@ export async function POST(req) {
         rutaDespacho.ruta.push({
             direccionDestinoId: direccionId
         });
+
+        // Buscar las ventas asociadas a la ruta con la dirección de despacho indicada
+        const ventas = await Venta.find({
+            _id: { $in: rutaDespacho.ventaIds },
+            direccionDespachoId: direccionId
+        });
+
+        // Actualizar el estado de esas ventas a "reparto"
+        if (ventas.length > 0) {
+            await Venta.updateMany(
+                { _id: { $in: ventas.map(v => v._id) } },
+                { $set: { estado: TIPO_ESTADO_VENTA.reparto } }
+            );
+        }
         
         console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.en_ruta}`);
         await rutaDespacho.save();
 
         console.log("RutaDespacho updated successfully.");
+
         return NextResponse.json({ 
             ok: true, 
             message: "Viaje iniciado correctamente", 

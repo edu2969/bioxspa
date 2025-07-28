@@ -4,16 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
-import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
+import { FaClipboardCheck, FaFlagCheckered, FaPrint } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
-import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
-import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckArrowRight } from "react-icons/fa6";
+import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, USER_ROLE } from "@/app/utils/constants";
+import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { LuFlagOff } from "react-icons/lu";
 import { getNUCode } from "@/lib/nuConverter";
-import { TbHomeShare } from "react-icons/tb";
+import { TbFlagCheck, TbHomeShare } from "react-icons/tb";
 import CheckList from './CheckList';
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 import { getColorEstanque } from "@/lib/uix";
@@ -510,13 +510,19 @@ export default function Despacho({ session }) {
     }
 
     const descargarItem = useCallback(async (codigo) => {
+        const direccionActualId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId._id;
+        const ventaActual = rutaDespacho.ventaIds.find(
+            v => v.direccionDespachoId === direccionActualId
+        );
+        const subcategorias = ventaActual?.detalles.map(det => det.subcategoriaCatalogoId._id) || [];
+        
         // Encontrar el item que corresponde al código escaneado
         const itemIndex = rutaDespacho.cargaItemIds.findIndex(
-            cargaItem => cargaItem.codigo === codigo
+            cargaItem => cargaItem.codigo === codigo && subcategorias.includes(cargaItem.subcategoriaCatalogoId._id)
         );
 
         if (itemIndex === -1) {
-            toast.error(`El código ${codigo} no corresponde a ningún item de esta entrega`, {
+            toast.error(`Código ${codigo} no pertenece a ésta entrega`, {
                 position: "top-center",
             });
             return;
@@ -731,6 +737,54 @@ export default function Despacho({ session }) {
         return null;
     }
 
+    // Devuelve el estado visual de cada cilindro en el camión según historial de carga y estado actual
+    const cargaActual = (rutaDespacho) => {
+        if (!rutaDespacho || !Array.isArray(rutaDespacho.cargaItemIds)) return [];
+
+        // Determina la última dirección de la ruta
+        const ultimaDireccionId = rutaDespacho.ruta?.length
+            ? rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
+            : null;
+
+        // Busca la venta correspondiente a esa dirección
+        const ventaActual = rutaDespacho.ventaIds?.find(
+            v => String(v.direccionDespachoId) === String(ultimaDireccionId)
+        );
+
+        // Obtén los IDs de los items descargados según hitorialCarga
+        const descargadosSet = new Set();
+        if (Array.isArray(rutaDespacho.hitorialCarga)) {
+            rutaDespacho.hitorialCarga.forEach(hist => {
+                if (!hist.esCarga && Array.isArray(hist.itemMovidoIds)) {
+                    hist.itemMovidoIds.forEach(id => descargadosSet.add(id));
+                }
+            });
+        }
+
+        return rutaDespacho.cargaItemIds.map(item => {
+            let estado = "cargado"; // default
+
+            // Si el item está en el historial de descarga, está entregado
+            if (descargadosSet.has(item._id)) {
+                estado = "entregado";
+            } else if (
+                rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga &&
+                ventaActual &&
+                ventaActual.detalles.some(
+                    det => String(det.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
+                )
+            ) {
+                // Solo los items que pertenecen a la venta de la última dirección están "descargando"
+                estado = "descargando";
+            }
+
+            return {
+                elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
+                estado
+            };
+        });
+    }
+
     useEffect(() => {
         console.log("Ruta despacho actualizada:", rutaDespacho);
     }, [rutaDespacho]);
@@ -750,8 +804,10 @@ export default function Despacho({ session }) {
                         priority
                     />
                     <div className="absolute top-6 mt-2 w-full">
-                        {Array.from({ length: rutaDespacho?.cargaItemIds.length }, (_, i) => rutaDespacho.cargaItemIds.length - i - 1).map(index => {
-                            const elem = rutaDespacho?.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                        {cargaActual(rutaDespacho).reverse().map((item, index) => {
+                            console.log("Item cargado:", item);
+                            // Deducción de descargado usando hitorialCarga                                                        
+                            const elem = item.elemento;
                             return (
                                 <Image
                                     key={index}
@@ -759,11 +815,11 @@ export default function Despacho({ session }) {
                                     alt={`tank_${index}`}
                                     width={14 * 4}
                                     height={78 * 4}
-                                    className={`absolute ${rutaDespacho.cargaItemIds[index].descargado ? "opacity-30" : ""}`}
-                                    style={calculateTubePosition(index)}
+                                    className={`absolute ${item.estado === "descargando" ? "opacity-40" : item.estado === "entregado" ? "opacity-0" : "opacity-100"}`}
+                                    style={calculateTubePosition(rutaDespacho?.cargaItemIds.length - index - 1)}
                                     priority={false}
                                 />
-                            )
+                            );
                         })}
                     </div>
                     <Image
@@ -877,33 +933,36 @@ export default function Despacho({ session }) {
                         {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga
                             && (rutaDespacho.estado >= TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada &&
                                 rutaDespacho.estado <= TIPO_ESTADO_RUTA_DESPACHO.en_ruta) 
-                            && <div className="flex flex-row items-start justify-center gap-4 mb-6">
+                            && <div className="flex flex-row items-start justify-center gap-3 mb-6">
                                 <div className="flex flex-col items-center mt-1 ml-2">
-                                    <FaFlagCheckered className="text-xl mb-4" />
-                                    <div className="h-4" />
+                                    <TbFlagCheck className="text-xl mb-4 w-6" />
                                     {/* Línea y puntos */}
-                                    <FaTruckArrowRight className="text-xl mt-1" />
+                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div className="h-12" key={`ruta_${indexRuta}`}>
+                                        <div className="h-4" />
+                                        {ruta.fechaArribo ? <TbFlagCheck className="text-xl mt-1" /> : <FaTruckFast className="text-xl mt-1 w-6" />}
+                                        </div>))}
                                 </div>
                                 <div className="flex flex-col items-center justify-start h-full">
-                                    {/* Camino vertical */}
+                                    {/* Camino vertical */}                                    
                                     <div className="flex flex-col items-center mt-1">
                                         {/* Punto lleno */}
                                         <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
                                         {/* Línea vertical */}
-                                        <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2" />
+                                        {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div className="w-6" key={`ruta_${indexRuta}`}>
+                                        <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
                                         {/* Punto hueco */}
-                                        <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
+                                        <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" /></div>))}
                                     </div>
                                 </div>
-                                <div className="flex flex-col justify-start text-left mt-1">
-                                    <div className="flex mt-1">
-                                        <BsFillGeoAltFill size="1.1rem" /><span className="text-sm ml-2">Barros Arana</span>
+                                <div className="w-full text-left -mt-3">
+                                    <div className="w-full flex mt-1 h-12 items-center">
+                                        <BsFillGeoAltFill size="1.1rem" className="w-4"/><span className="text-sm ml-2">Barros Arana</span>
                                     </div>
-                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-2">
-                                        <BsFillGeoAltFill size="1.1rem" className="w-8 h-8 mt-4" /><span className="text-sm ml-2 mt-3">
-                                            {ruta.direccionDestinoId.nombre}</span>
-                                        <button
-                                            className="bg-blue-400 text-white font-bold rounded-lg shadow-md w-12 h-12"
+                                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
+                                        <BsFillGeoAltFill size="1.1rem" className="w-4"/>
+                                        <span className="text-xs ml-2 w-36">{ruta.direccionDestinoId.nombre.split(",").slice(0, 3).join(",")}</span>
+                                        {indexRuta == rutaDespacho.ruta.length - 1 && <button
+                                            className="bg-blue-400 text-white font-bold rounded-md shadow-md w-10 h-10 pl-2"
                                             onClick={() => {
                                                 const destino = `${ruta.direccionDestinoId.latitud},${ruta.direccionDestinoId.longitud}`;
                                                 // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
@@ -913,78 +972,85 @@ export default function Despacho({ session }) {
                                                 );
                                             }}
                                         >
-                                            <FaMapLocationDot className="mt-0.5 mr-2 w-12" size="1.5rem" />
-                                        </button>
+                                            <FaMapLocationDot className="w-7 -ml-0.5" size="1.5rem" />
+                                        </button>}
                                     </div>))}
-
-                                    {((rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino 
-                                        || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada)
-                                        && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length) && (
-                                        <div className="flex mt-2">
-                                            <select
-                                                className="border rounded-md shadow-sm w-full py-2 px-1 mt-3"
-                                                onChange={(e) => {
-                                                    const direccionId = e.target.value;
-                                                    if (!direccionId) {
-                                                        setRutaDespacho({
-                                                            ...rutaDespacho,
-                                                            ruta: rutaDespacho.ruta.slice(0, -1)
-                                                        });
-                                                    } else {
-                                                        const rutaSinArriboIdx = rutaDespacho.ruta.findIndex(r => r.fechaArribo === null);
-                                                        if (rutaSinArriboIdx !== -1) {
-                                                            // Si existe una ruta con fechaArribo null, actualiza su direccionDestinoId
-                                                            setRutaDespacho({
-                                                                ...rutaDespacho,
-                                                                ruta: rutaDespacho.ruta.map((r, idx) =>
-                                                                    idx === rutaSinArriboIdx
-                                                                        ? { ...r, direccionDestinoId: getDireccionById(direccionId) }
-                                                                        : r
-                                                                )
-                                                            });
-                                                        } else {
-                                                            // Si no existe, agrega una nueva
-                                                            setRutaDespacho({
-                                                                ...rutaDespacho,
-                                                                ruta: [
-                                                                    ...rutaDespacho.ruta,
-                                                                    { direccionDestinoId: getDireccionById(direccionId), fechaArribo: null }
-                                                                ]
-                                                            });
-                                                        }
-                                                    }
-                                                }}
-                                            >
-                                                <option value="">Selecciona un destino</option>
-                                                {rutaDespacho.ventaIds
-                                                        .flatMap(venta =>
-                                                            venta.clienteId.direccionesDespacho
-                                                                .filter(dir =>
-                                                                    !rutaDespacho.ruta
-                                                                        .map(r => r.direccionDestinoId)
-                                                                        .includes(dir.direccionId._id)
-                                                                )
-                                                                .map(dir => ({
-                                                                    ventaId: venta._id,
-                                                                    clienteNombre: venta.clienteId.nombre,
-                                                                    direccion: dir
-                                                                }))
-                                                        )
-                                                        .map(({ ventaId, clienteNombre, direccion }) => (
-                                                            <option key={`venta_${ventaId}_dir_${direccion._id}`} value={direccion.direccionId._id}>
-                                                                {clienteNombre}|{direccion.direccionId.nombre}
-                                                            </option>
-                                                        ))}
-                                            </select>
-                                        </div>)}
                                 </div>
                             </div>}
 
+                    {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                        || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada) 
+                        && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length && (
+                            <div className="flex mt-1">
+                                <select
+                                    className="border rounded-md shadow-sm w-full py-2 px-1 mb-2"
+                                    onChange={(e) => {
+                                        const direccionId = e.target.value;
+                                        if (!direccionId) {
+                                            setRutaDespacho({
+                                                ...rutaDespacho,
+                                                ruta: rutaDespacho.ruta.slice(0, -1)
+                                            });
+                                        } else {
+                                            const rutaSinArriboIdx = rutaDespacho.ruta.findIndex(r => r.fechaArribo === null);
+                                            if (rutaSinArriboIdx !== -1) {
+                                                // Si existe una ruta con fechaArribo null, actualiza su direccionDestinoId
+                                                setRutaDespacho({
+                                                    ...rutaDespacho,
+                                                    ruta: rutaDespacho.ruta.map((r, idx) =>
+                                                        idx === rutaSinArriboIdx
+                                                            ? { ...r, direccionDestinoId: getDireccionById(direccionId) }
+                                                            : r
+                                                    )
+                                                });
+                                            } else {
+                                                // Si no existe, agrega una nueva
+                                                setRutaDespacho({
+                                                    ...rutaDespacho,
+                                                    ruta: [
+                                                        ...rutaDespacho.ruta,
+                                                        { direccionDestinoId: getDireccionById(direccionId), fechaArribo: null }
+                                                    ]
+                                                });
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <option value="">{rutaDespacho.ruta.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}</option>
+                                    {rutaDespacho.ventaIds
+                                        .flatMap(venta =>
+                                            venta.clienteId.direccionesDespacho
+                                                .filter(dir => {
+                                                    // Excluir direcciones ya entregadas (fechaArribo != null en la ruta)
+                                                    const entregada = rutaDespacho.ruta.some(
+                                                        r => r.direccionDestinoId._id === dir.direccionId._id && r.fechaArribo != null
+                                                    );
+                                                    // Excluir si ya está en la ruta pendiente de entrega
+                                                    const yaEnRutaPendiente = rutaDespacho.ruta.some(
+                                                        r => r.direccionDestinoId._id === dir.direccionId._id && r.fechaArribo == null
+                                                    );
+                                                    return !entregada && !yaEnRutaPendiente;
+                                                })
+                                                .map(dir => ({
+                                                    ventaId: venta._id,
+                                                    clienteNombre: venta.clienteId.nombre,
+                                                    direccion: dir
+                                                }))
+                                        )
+                                        .map(({ ventaId, clienteNombre, direccion }) => (
+                                            <option key={`venta_${ventaId}_dir_${direccion._id}`} value={direccion.direccionId._id}>
+                                                {clienteNombre}|{direccion.direccionId.nombre}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>)}
+
                         {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                            || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada) && <div className="flex flex-row items-center justify-center">
-                            <button className={`flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4 ${loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                            || rutaDespacho.ventaIds.filter(v => v.estado === TIPO_ESTADO_VENTA.entregado).length === rutaDespacho.ruta?.length) && <div className="flex flex-row items-center justify-center">
+                            <button className={`flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4 ${loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || rutaDespacho.ruta.length == 0 || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].fechaArribo ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 onClick={handleIniciarViaje}
-                                disabled={loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada}>
+                                disabled={rutaDespacho.ruta.length == 0 || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].fechaArribo}>
                                 {loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? <div className="mt-1"><Loader texto="INICIANDO" /></div> : <div className="flex"><FaFlagCheckered className="mt-3 mr-3" />
                                     <span className="mt-2">INICIAR VIAJE</span>
                                 </div>}
@@ -1098,7 +1164,47 @@ export default function Despacho({ session }) {
                     </div>)}
 
 
-                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && rutaDespacho.ruta.filter(r => r.fechaArribo != null).length == rutaDespacho.ventaIds.length && <div className="w-full px-6 mb-4 bg-white mx-auto">
+                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada && <div className="w-full px-6 py-4 bg-white mx-auto">
+                    <h2 className="text-xl font-bold mb-4">Datos de facturación</h2>
+                    <div className="flex flex-col md:flex-row text-left">
+                        <label htmlFor="rut" className="text-xs">RUT:</label>
+                        <input
+                            type="text"
+                            className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
+                            placeholder="RUT (opcional)*"                                    
+                        />
+                        <label htmlFor="nombre" className="text-xs mt-4">Nombre quien recibe:</label>
+                        <input
+                            type="text"
+                            className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
+                            placeholder="Nombre quien recibe"                                    
+                        />
+                        <button
+                            className={`relative w-full flex items-center bg-gray-400 text-white font-bold rounded-lg px-6 py-2 shadow-md justify-center mt-4 transition-all duration-200 ${loadingState === TIPO_ESTADO_RUTA_DESPACHO.imprimiendo ? "opacity-50 cursor-not-allowed" : ""}`}
+                            disabled={loadingState === TIPO_ESTADO_RUTA_DESPACHO.imprimiendo}
+                            onClick={async () => {
+                                setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.imprimiendo);
+                                // Aquí va la lógica de impresión, por ejemplo:
+                                // await imprimirFactura();                                
+                                setRutaDespacho({
+                                    ...rutaDespacho,
+                                    estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                                })                                    
+                                setLoadingState(-1);
+                            }}
+                        >
+                            <FaPrint className="mr-2" /><span>Imprimir factura</span>
+                            {loadingState === TIPO_ESTADO_RUTA_DESPACHO.imprimiendo && (
+                                <div className="absolute inset-0 flex items-center justify-center z-10">
+                                    <div className="absolute inset-0 bg-white opacity-70 rounded-lg"></div>
+                                    <Loader texto="" />
+                                </div>
+                            )}
+                        </button>
+                    </div>
+                </div>}
+
+                {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino && rutaDespacho.ruta.filter(r => r.fechaArribo != null).length == rutaDespacho.ventaIds.length && <div className="w-full px-6 mb-4 bg-white mx-auto">
                     <button
                         className={`w-full flex justify-center mt-4 py-3 bg-green-400 text-white font-bold rounded-lg shadow-md h-12`}
                         onClick={handleGoingBackToBase}>

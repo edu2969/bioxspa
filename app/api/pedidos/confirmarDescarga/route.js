@@ -5,8 +5,9 @@ import { authOptions } from "@/app/utils/authOptions";
 import User from "@/models/user";
 import Cargo from "@/models/cargo";
 import RutaDespacho from "@/models/rutaDespacho";
-import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import ItemCatalogo from "@/models/itemCatalogo";
+import Venta from "@/models/venta"; // Import Venta model dynamically
 
 // filepath: d:\git\bioxspa\app\api\pedidos\confirmarDescarga\route.js
 
@@ -101,6 +102,35 @@ export async function POST(request) {
             { _id: { $in: scanCodes } },
             { $set: { direccionId: lastDireccionId } }
         );
+
+        // Busca las ventas asociadas a esa dirección de despacho en Cliente
+        // Primero, obtenemos todas las ventas de la ruta
+        const ventas = rutaDespacho.ventaIds || [];
+        let ventasEnDireccion = [];
+
+        if (ventas.length > 0 && lastDireccionId) {
+            // Importa el modelo Venta dinámicamente
+            // Busca las ventas de la ruta
+            const ventasDocs = await Venta.find({ _id: { $in: ventas } }).select('_id clienteId direccionDespachoId');
+
+            // Filtra las ventas cuya direccionDespachoId coincide con lastDireccionId
+            ventasEnDireccion = ventasDocs.filter(v => v.direccionDespachoId?.toString() === lastDireccionId?.toString());
+
+            const ventasEnDireccionIds = ventasEnDireccion.map(v => v._id);
+
+            // Actualiza las ventas correspondientes: cambia estado y flag porCobrar
+            if (ventasEnDireccionIds.length > 0) {
+                await Venta.updateMany(
+                    { _id: { $in: ventasEnDireccionIds } },
+                    {
+                        $set: {
+                            estado: TIPO_ESTADO_VENTA.entregado,
+                            porCobrar: true
+                        }
+                    }
+                );
+            }
+        }
 
         return NextResponse.json({
             ok: true,

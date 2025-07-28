@@ -69,7 +69,7 @@ export async function POST(req) {
             valorBruto: valorNeto * (1 - 0.19),
             valorTotal: valorNeto * 1.19,
             documentoTributarioId: body.documentoTributarioId,
-            porCobrar: true,
+            porCobrar: false,
             tieneArriendo,
             direccionDespachoId: body.direccionDespachoId,
             comentario: body.comentario || "",

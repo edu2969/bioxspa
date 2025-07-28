@@ -13,11 +13,12 @@ import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
-import { FaCartPlus } from 'react-icons/fa';
-import {  TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
+import { FaCartPlus, FaRegCheckCircle } from 'react-icons/fa';
+import {  TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from './Loader';
 import { getColorEstanque } from '@/lib/uix';
+import { FaTruckFast } from 'react-icons/fa6';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
@@ -409,8 +410,8 @@ export default function AsignacionPanel({ session }) {
                                         >
                                             <Image className="absolute top-0 left-0 ml-2" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
-                                                {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && Array.from({ length: ruta.cargaItemIds.length }, (_, i) => ruta.cargaItemIds.length - i - 1).map(index => {
-                                                    const elem = ruta.cargaItemIds[index].subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                                {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && ruta.cargaItemIds.reverse().map((item, index) => {
+                                                    const elem = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
                                                     const descargados = getCilindrosDescarga(ruta).length;
                                                     return (
                                                         <Image
@@ -419,8 +420,8 @@ export default function AsignacionPanel({ session }) {
                                                             alt={`tank_${index}`}
                                                             width={14 * 2}
                                                             height={78 * 2}
-                                                            className={`absolute ${index < descargados ? "opacity-20" : ""}`}
-                                                            style={calculateTubePosition(index)}
+                                                            className={`absolute ${ruta.cargaItemIds.length - index - 1 < descargados ? "opacity-20" : ""}`}
+                                                            style={calculateTubePosition(ruta.cargaItemIds.length - index - 1)}
                                                             priority={false}
                                                         />
                                                     )
@@ -471,9 +472,11 @@ export default function AsignacionPanel({ session }) {
                                             <p className="text-xs">Conductor</p>
                                             <p className="text-lg uppercase font-bold -mt-1 mb-2">{ruta.choferId.name}</p>
                                             {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
-                                                <div key={venta._id || idxVenta} className="border border-blue-400 rounded-lg mb-2 pl-2 pr-6 py-1 bg-white/80 shadow">
-                                                    <div className="flex font-bold text-blue-800 text-xs mb-1">
-                                                        <span className="uppercase pr-10 w-11/12">{venta.clienteId?.nombre || "Desconocido"}</span>
+                                                <div key={venta._id || idxVenta} className={`border rounded-lg mb-2 pl-2 pr-6 py-1 shadow ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'border-green-500 bg-green-50' : 'border-blue-400 bg-white/80'}`}>
+                                                    <div className={`flex font-bold text-xs mb-1 ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'text-green-600' : 'text-blue-700'}`}>
+                                                        {venta.estado === TIPO_ESTADO_VENTA.entregado && <FaRegCheckCircle size="1rem" />}
+                                                        {venta.estado === TIPO_ESTADO_VENTA.reparto && <FaTruckFast size="1rem" />}
+                                                        <span className="uppercase pr-10 w-11/12 pl-1">{venta.clienteId?.nombre || "Desconocido"}</span>
                                                         <div className={`${venta.comentario ? 'text-blue-500 ' : 'text-gray-500 '} w-1/12`}>
                                                             <div className="mr-2 cursor-pointer" onClick={(e) => {
                                                                 e.stopPropagation();
