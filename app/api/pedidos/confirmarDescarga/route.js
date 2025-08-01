@@ -16,18 +16,18 @@ export async function POST(request) {
     try {
         await connectMongoDB();
 
-        // Get rutaId and scanCodes from request
-        const { rutaId, scanCodes } = await request.json();
-        console.log("Request received with rutaId:", rutaId, "scanCodes:", scanCodes);
+        // Get rutaId and itemMovidoIds from request
+        const { rutaId, itemMovidoIds } = await request.json();
+        console.log("Request received with rutaId:", rutaId, "itemMovidoIds:", itemMovidoIds);
 
         // Validate rutaId
         if (!rutaId) {
             return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
         }
 
-        // Validate scanCodes
-        if (!Array.isArray(scanCodes)) {
-            return NextResponse.json({ ok: false, error: "scanCodes must be an array" }, { status: 400 });
+        // Validate itemMovidoIds
+        if (!Array.isArray(itemMovidoIds)) {
+            return NextResponse.json({ ok: false, error: "itemMovidoIds must be an array" }, { status: 400 });
         }
 
         // Get user from session
@@ -73,8 +73,9 @@ export async function POST(request) {
 
         // Get current date
         const now = new Date();
+        
 
-        // Update the route: set estado to descarga_confirmada, update historialEstado, and add to hitorialCarga
+        // Update the route: set estado to descarga_confirmada, update historialEstado, and add to historialCarga
         await RutaDespacho.findByIdAndUpdate(
             rutaId,
             {
@@ -84,10 +85,10 @@ export async function POST(request) {
                         estado: TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada,
                         fecha: now
                     },
-                    hitorialCarga: {
-                        esCarga: false,
+                    historialCarga: {
                         fecha: now,
-                        itemMovidoIds: scanCodes
+                        itemMovidoIds,
+                        esCarga: false
                     }
                 }
             }
@@ -99,7 +100,7 @@ export async function POST(request) {
 
         // Actualiza la direccionId de cada item movido
         await ItemCatalogo.updateMany(
-            { _id: { $in: scanCodes } },
+            { _id: { $in: itemMovidoIds } },
             { $set: { direccionId: lastDireccionId } }
         );
 
@@ -129,6 +130,21 @@ export async function POST(request) {
                         }
                     }
                 );
+                for (const venta of ventasEnDireccion) {
+                    // Encuentra el índice de la dirección destino en la ruta
+                    const direccionIndex = rutaDespacho.ruta.findIndex(
+                        r => (r.direccionDestinoId?._id || r.direccionDestinoId)?.toString() === venta.direccionDespachoId?.toString()
+                    );
+                    if (direccionIndex !== -1) {
+                        // Filtra los items movidos que pertenecen a esta venta
+                        // Si tienes una relación directa entre venta y items, puedes filtrar aquí
+                        // Si no, se asume que todos los itemMovidoIds son descargados en esa dirección
+                        await ItemCatalogo.updateMany(
+                            { _id: { $in: itemMovidoIds } },
+                            { $set: { direccionId: rutaDespacho.ruta[direccionIndex].direccionDestinoId } }
+                        );
+                    }
+                }
             }
         }
 

@@ -100,7 +100,7 @@ export async function GET() {
             .populate({
                 path: "cargaItemIds",
                 model: "ItemCatalogo",
-                select: "codigo"
+                select: "_id codigo"
             })
             .populate({
                 path: "choferId",
@@ -239,7 +239,7 @@ export async function POST(request) {
         }
 
         // Agregar historial de carga
-        ruta.hitorialCarga.push({
+        ruta.historialCarga.push({
             esCarga: true,
             fecha: new Date(),
             itemMovidoIds: scanCodes

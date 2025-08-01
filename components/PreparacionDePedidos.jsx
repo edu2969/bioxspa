@@ -123,77 +123,102 @@ export default function PreparacionDePedidos({ session }) {
         setLoadingCargamentos(false);
     }
 
-    const cargarItem = useCallback(async (item, codigo) => {
-        const cargamentoActual = cargamentos[0];
-        if (!cargamentoActual) return false;
+    const cargarItem = useCallback(
+        async (item, codigo) => {
+            const cargamentoActual = cargamentos[0];
+            if (!cargamentoActual) return false;
 
-        // Buscar la venta y el detalle que corresponde al subcategoriaCatalogoId
-        let ventaIndex = -1;
-        let detalleIndex = -1;
+            // Verifica si el código ya fue escaneado en cualquier detalle de cualquier venta del primer cargamento
+            const codigoYaEscaneado = cargamentoActual.ventas.some(venta =>
+                venta.detalles.some(detalle =>
+                    Array.isArray(detalle.scanCodes) && detalle.scanCodes.includes(item.itemId)
+                )
+            );
+            if (codigoYaEscaneado) {
+                toast.warn(`CODIGO ${codigo} ya escaneado`);
+                setScanMode(false);
+                return;
+            }
 
-        cargamentoActual.ventas.forEach((venta, vIdx) => {
-            venta.detalles.forEach((detalle, dIdx) => {
-                if (detalle.subcategoriaId === item.subcategoria._id && detalle.restantes > 0) {
-                    ventaIndex = vIdx;
-                    detalleIndex = dIdx;
-                }
+            // Buscar la venta y el detalle que corresponde al subcategoriaCatalogoId
+            let ventaIndex = -1;
+            let detalleIndex = -1;
+
+            cargamentoActual.ventas.forEach((venta, vIdx) => {
+                venta.detalles.forEach((detalle, dIdx) => {
+                    if (
+                        detalle.subcategoriaId === item.subcategoria._id &&
+                        detalle.restantes > 0
+                    ) {
+                        ventaIndex = vIdx;
+                        detalleIndex = dIdx;
+                    }
+                });
             });
-        });
 
-        if (ventaIndex === -1 || detalleIndex === -1) {
-            setScanMode(false);
-            setShowModalCilindroErroneo(true);
-            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`);
-            return;
-        }
+            if (ventaIndex === -1 || detalleIndex === -1) {
+                setScanMode(false);
+                setShowModalCilindroErroneo(true);
+                toast.warn(
+                    `CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`
+                );
+                return;
+            }
 
-        if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
-            setScanMode(false);
-            setShowModalCilindroErroneo(true);
-            toast.warn(`CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`);
-            return;
-        }
+            if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
+                setScanMode(false);
+                setShowModalCilindroErroneo(true);
+                toast.warn(
+                    `CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`
+                );
+                return;
+            }
 
-        const detalle = cargamentoActual.ventas[ventaIndex].detalles[detalleIndex];
-        if (detalle.scanCodes && detalle.scanCodes.map(sc => sc.codigo).includes(codigo)) {
-            toast.warn(`CODIGO ${codigo} ya escaneado`);
-            return;
-        }
+            setCargamentos((prev) => {
+                if (!prev.length) return prev;
+                const newCargamentos = [...prev];
+                const currentCargamento = { ...newCargamentos[0] };
+                const ventas = [...currentCargamento.ventas];
+                const detalles = [...ventas[ventaIndex].detalles];
+                const detalleToUpdate = { ...detalles[detalleIndex] };
 
-        setCargamentos(prev => {
-            if (!prev.length) return prev;
-            const newCargamentos = [...prev];
-            const currentCargamento = { ...newCargamentos[0] };
-            const ventas = [...currentCargamento.ventas];
-            const detalles = [...ventas[ventaIndex].detalles];
-            const detalleToUpdate = { ...detalles[detalleIndex] };
+                // Evitar duplicados en scanCodes
+                const scanCodes = Array.isArray(detalleToUpdate.scanCodes)
+                    ? [...detalleToUpdate.scanCodes]
+                    : [];
+                if (!scanCodes.includes(item.itemId)) {
+                    scanCodes.push(item.itemId);
+                }
 
-            const scanCodes = Array.isArray(detalleToUpdate.scanCodes) ? [...detalleToUpdate.scanCodes] : [];
-            scanCodes.push(item.itemId);
+                // Actualiza restantes y multiplicador si corresponde
+                const updatedRestantes =
+                    detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                        ? detalleToUpdate.restantes
+                        : detalleToUpdate.restantes - 1;
+                const updatedMultiplicador =
+                    detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                        ? detalleToUpdate.multiplicador + 1
+                        : detalleToUpdate.multiplicador;
 
-            // Actualiza restantes y multiplicador si corresponde
-            const updatedRestantes = detalleToUpdate.multiplicador < detalleToUpdate.restantes
-                ? detalleToUpdate.restantes
-                : detalleToUpdate.restantes - 1;
-            const updatedMultiplicador = detalleToUpdate.multiplicador < detalleToUpdate.restantes
-                ? detalleToUpdate.multiplicador + 1
-                : detalleToUpdate.multiplicador;
+                const newDetalle = {
+                    ...detalleToUpdate,
+                    restantes: updatedRestantes,
+                    multiplicador: updatedMultiplicador,
+                    scanCodes,
+                };
+                detalles[detalleIndex] = newDetalle;
+                ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
+                currentCargamento.ventas = ventas;
+                newCargamentos[0] = currentCargamento;
+                return newCargamentos;
+            });
 
-            const newDetalle = {
-                ...detalleToUpdate,
-                restantes: updatedRestantes,
-                multiplicador: updatedMultiplicador,
-                scanCodes,
-            };
-            detalles[detalleIndex] = newDetalle;
-            ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
-            currentCargamento.ventas = ventas;
-            newCargamentos[0] = currentCargamento;
-            return newCargamentos;
-        });
-
-        toast.success(`Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`);
-    }, [setCargamentos, cargamentos]);
+            toast.success(
+                `Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`
+            );
+        },
+        [setCargamentos, cargamentos]
+    );
 
     useEffect(() => {
         console.log("cargamentos updated:", cargamentos);

@@ -231,6 +231,53 @@ export default function AsignacionPanel({ session }) {
         return elementos;
     }
 
+    const cargaActual = (rutaDespacho) => {
+        if (!rutaDespacho || !Array.isArray(rutaDespacho.cargaItemIds)) return [];
+
+        // Determina la última dirección de la ruta
+        const ultimaDireccionId = rutaDespacho.ruta?.length
+            ? rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
+            : null;
+
+        // Busca la venta correspondiente a esa dirección
+        const ventaActual = rutaDespacho.ventaIds?.find(
+            v => String(v.direccionDespachoId) === String(ultimaDireccionId)
+        );
+
+        // Obtén los IDs de los items descargados según historialCarga
+        const descargadosSet = new Set();
+        if (Array.isArray(rutaDespacho.historialCarga)) {
+            rutaDespacho.historialCarga.forEach(hist => {
+                if (!hist.esCarga && Array.isArray(hist.itemMovidoIds)) {
+                    hist.itemMovidoIds.forEach(id => descargadosSet.add(id));
+                }
+            });
+        }
+
+        return rutaDespacho.cargaItemIds.map(item => {
+            let estado = "cargado"; // default
+
+            // Si el item está en el historial de descarga, está entregado
+            if (descargadosSet.has(item._id)) {
+                estado = "entregado";
+            } else if (
+                rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga &&
+                ventaActual &&
+                ventaActual.detalles.some(
+                    det => String(det.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
+                )
+            ) {
+                // Solo los items que pertenecen a la venta de la última dirección están "descargando"
+                estado = "descargando";
+            }
+
+            return {
+                elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
+                estado
+            };
+        });
+    }
+
     return (
         <main className="mt-10 h-screen overflow-hidden">
             <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 p-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>
@@ -410,9 +457,8 @@ export default function AsignacionPanel({ session }) {
                                         >
                                             <Image className="absolute top-0 left-0 ml-2" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
-                                                {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && ruta.cargaItemIds.reverse().map((item, index) => {
-                                                    const elem = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                                                    const descargados = getCilindrosDescarga(ruta).length;
+                                                {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && cargaActual(ruta).reverse().map((item, index) => {
+                                                    const elem = item.elemento;
                                                     return (
                                                         <Image
                                                             key={index}
@@ -420,8 +466,8 @@ export default function AsignacionPanel({ session }) {
                                                             alt={`tank_${index}`}
                                                             width={14 * 2}
                                                             height={78 * 2}
-                                                            className={`absolute ${ruta.cargaItemIds.length - index - 1 < descargados ? "opacity-20" : ""}`}
-                                                            style={calculateTubePosition(ruta.cargaItemIds.length - index - 1)}
+                                                            className={`absolute ${item.estado === "descargando" ? "opacity-40" : item.estado === "entregado" ? "opacity-0" : "opacity-100"}`}
+                                                            style={calculateTubePosition(cargaActual(ruta).length - index - 1)}
                                                             priority={false}
                                                         />
                                                     )

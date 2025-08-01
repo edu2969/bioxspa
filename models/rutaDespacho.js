@@ -27,7 +27,7 @@ const rutaDespachoSchema = new Schema({
     historialEstado: [estadoHistorialSchema],
     ventaIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Venta" }],
     cargaItemIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "ItemCatalogo" }],
-    hitorialCarga: [cargaHistorialSchema], 
+    historialCarga: [cargaHistorialSchema], 
 }, {
     timestamps: true
 });

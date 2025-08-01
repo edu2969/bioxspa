@@ -173,7 +173,7 @@ export async function GET() {
             $gte: TIPO_ESTADO_RUTA_DESPACHO.en_ruta, 
             $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
     })
-    .select("ruta vehiculoId choferId cargaItemIds estado ventaIds")
+    .select("ruta vehiculoId choferId cargaItemIds estado ventaIds historialCarga")
     // Poblar cada dirección de cada ruta
     .populate({
         path: "ruta.direccionDestinoId",
@@ -233,7 +233,7 @@ export async function GET() {
             }
         }
     }
-
+    
     return NextResponse.json({
         pedidos,
         choferes,

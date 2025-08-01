@@ -25,12 +25,16 @@ const resetVentas = async () => {
         const rutas = await RutaDespacho.find({ ventaIds: venta._id });
         for (const ruta of rutas) {
             // Eliminar del historialCarga los registros donde esCarga: false
-            ruta.hitorialCarga = ruta.hitorialCarga.filter(h => h.esCarga);
+            ruta.historialCarga = ruta.historialCarga.filter(h => h.esCarga);
             ruta.ruta = []; // Limpiar la ruta
 
             // Cambiar estado a orden_confirmada
             ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada;
 
+            if (Array.isArray(ruta.historialEstado) && ruta.historialEstado.length > 3) {
+                ruta.historialEstado = ruta.historialEstado.slice(0, 3);
+            }
+            ruta.historialEstado[0].fechaArribo = null;
             await ruta.save();
         }
 

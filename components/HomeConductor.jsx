@@ -21,7 +21,7 @@ export default function HomeConductor({ contadores, checklists }) {
             <div className={`absolute w-full max-w-lg grid grid-cols-1 md:grid-cols-2 gap-4 px-12 ${routingIndex == -2 ? "opacity-20" : ""}`}>
                 <div className="relative">
                     <Link href="/modulos/homeConductor/pedidos" onClick={() => setRoutingIndex(0)}>
-                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${faltaChecklistVehiculo() ? "border-red-500 bg-red-200" : ""}`}>  
+                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${routingIndex != -1 && faltaChecklistVehiculo() ? "border-red-500 bg-red-200" : ""}`}>  
                             <div className="w-full inline-flex text-center text-slate-500 p-4 relative">
                                 <FaRoute className="mx-auto mb-1" size="6rem" />
                             </div>
@@ -36,7 +36,7 @@ export default function HomeConductor({ contadores, checklists }) {
                                 <span className="text-lg mr-1">0</span>
                             </div>
                         )}
-                        {faltaChecklistVehiculo() && (
+                        {routingIndex != -1 && faltaChecklistVehiculo() && (
                             <div className="absolute top-4 left-4">
                                 <div className="flex items-center">
                                     <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
@@ -62,7 +62,7 @@ export default function HomeConductor({ contadores, checklists }) {
                     </Link>
                     {routingIndex == 1 && <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                         <div className="w-full h-full flex items-center justify-center">
-                            <Loader texto="Cargador 2..." />
+                            <Loader texto="" />
                         </div>
                     </div>}
                 </div>
