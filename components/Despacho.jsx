@@ -6,7 +6,7 @@ import { MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
 import { FaClipboardCheck, FaFlagCheckered, FaPrint } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
-import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
