@@ -1,22 +1,22 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Venta from "@/models/venta";
+/*import Venta from "@/models/venta";
 import RutaDespacho from "@/models/rutaDespacho";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";*/
 
 export async function GET() {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();
     console.log("Connected to MongoDB");
 
-    console.log("Starting migration...");
+    /*console.log("Starting migration...");
     await resetVentas();
-    console.log("Migration completed successfully");
+    console.log("Migration completed successfully");*/
 
     return NextResponse.json({ message: "Success migrate and improve" });
 }
 
-const resetVentas = async () => {
+/*const resetVentas = async () => {
     const ventas = await Venta.find({});
     for (const venta of ventas) {
         venta.estado = 14; // TIPO_ESTADO_VENTA.preparacion
@@ -40,5 +40,5 @@ const resetVentas = async () => {
 
         await venta.save();
     }
-}
+}*/
 
