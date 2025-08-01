@@ -174,6 +174,12 @@ export default function PreparacionDePedidos({ session }) {
                 return;
             }
 
+            if(item.direccionInvalida) {
+                setScanMode(false);
+                setShowModalCilindroErroneo(true);
+                return;
+            }
+
             setCargamentos((prev) => {
                 if (!prev.length) return prev;
                 const newCargamentos = [...prev];

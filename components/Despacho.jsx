@@ -622,7 +622,7 @@ export default function Despacho({ session }) {
                 userId: session.user.id
             });
             setRutaDespacho(null);
-            setLoadingState(-2);
+            setLoadingState(-1);
         }
     }
 
