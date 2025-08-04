@@ -9,9 +9,10 @@ export function LineChart({ data, width, height, indexColor = 0 }) {
     let xScale = d3.scaleTime()
       .domain([data[0].date, data.at(-1).date])
       .range([margin.l, width - margin.r]);
-  
+
+    let maxY = d3.max(data, d => d.value) ?? 0;
     let yScale = d3.scaleLinear()
-      .domain([0, 1500000])
+      .domain([0, maxY])
       .range([height - margin.b - 60, margin.t]);
   
     let line = d3.line()

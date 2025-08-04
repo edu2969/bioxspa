@@ -46,9 +46,9 @@ export default function HomeAdministrador({ contadores }) {
             ].filter(Boolean)
         },
         {
-            href: "/modulos/deudas",
+            href: "/modulos/cobros",
             icon: TbReportMoney,
-            label: "DEUDAS",
+            label: "COBROS",
             index: 2
         },
         {

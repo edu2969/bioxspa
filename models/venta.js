@@ -4,7 +4,7 @@ const ventaSchema = new Schema({
     temporalId: { type: String },
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Cliente", required: true },
     codigo: { type: String },
-    vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
+    vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     fecha: { type: Date, required: true },
     estado: { type: Number, required: true },
     porCobrar: { type: Boolean, default: false },
