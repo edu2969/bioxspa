@@ -110,7 +110,7 @@ export default function DetalleDeudas({ clienteId }) {
                     </button>
                 </div>
                 
-                <div className="bg-white dark:bg-gray-900 px-6 pt-6 flex flex-col md:flex-row gap-1">
+                <div className="bg-white dark:bg-gray-900 px-6 pt-4 flex flex-col md:flex-row gap-1">
 
 
                     <div className="flex-1">
@@ -181,7 +181,7 @@ export default function DetalleDeudas({ clienteId }) {
                     </div>
                 </div>
 
-                <div className="px-6">
+                <div className="px-6 -mt-8">
                     <h3 className="text-lg font-bold mb-4">Detalle de Ventas por Cobrar</h3>
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-xs border">

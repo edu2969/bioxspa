@@ -2,7 +2,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { IoIosArrowBack, IoIosArrowForward, IoIosInformationCircle } from 'react-icons/io';
+import { IoIosArrowBack, IoIosInformationCircle } from 'react-icons/io';
 import { MdAddBusiness, MdDeleteForever } from 'react-icons/md';
 import { FaCheck, FaCrown, FaHandsHelping, FaRegSave, FaStar, FaTimes } from 'react-icons/fa';
 import { LuPencil } from 'react-icons/lu';
@@ -11,14 +11,13 @@ import { SiHomeassistantcommunitystore } from 'react-icons/si';
 import { TIPO_CARGO, TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import { ConfirmModal } from './modals/ConfirmModal';
 import Loader from '@/components/Loader';
-import Link from 'next/link';
-import { AiFillHome } from 'react-icons/ai';
 import { RiMoneyDollarCircleFill } from 'react-icons/ri';
 import { TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 import Image from 'next/image';
+import { IoChevronBack } from 'react-icons/io5';
 
-export default function EditSucursal() {
+export default function EditSucursal({ googleMapsApiKey }) {
     const params = useSearchParams();
     const router = useRouter();
     const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm();
@@ -197,20 +196,19 @@ export default function EditSucursal() {
     }
 
     return (
-        <main className="w-full h-screen">
-            <div className="py-10 w-full h-screen overflow-y-scroll">
-                <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pb-4 pt-4 mx-10 bg-white dark:bg-gray-900">
-                    <div className="flex items-center space-x-4 text-ship-cove-800">
-                        <Link href="/modulos">
-                            <AiFillHome size="1.4rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                        </Link>
-                        <IoIosArrowForward size="1.5rem" className="text-gray-700 dark:text-gray-300" />
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => router.back()}>SUCURSAL</span>
-                        <IoIosArrowForward size="1.5rem" className="text-gray-700 dark:text-gray-300" />
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">EDICIÓN</span>
-                    </div>
+        <main className="w-full h-screen pt-3">
+            <div className="ml-24">
+                    <button
+                        type="button"
+                        className="flex items-center px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-semibold"
+                        onClick={() => router.back()}
+                    >
+                        <IoChevronBack size="1.25rem"/>Volver
+                    </button>
                 </div>
-                <h2 className="text-lg font-medium text-gray-700 flex items-center ml-4">
+            <div className="w-full h-[calc(100vh-80px)] overflow-y-scroll">
+                
+                <h2 className="text-lg font-medium text-gray-700 flex items-center ml-4 mt-4">
                     <IoIosInformationCircle className="text-2xl mr-2" />
                     INFORMACIÓN PRINCIPAL
                 </h2>
@@ -271,36 +269,38 @@ export default function EditSucursal() {
                                         <div className="flex flex-wrap gap-4">
                                             {sucursal.cargos.map((cargo, idx) => (
                                                 <div key={`sucursal_cargo_${idx}`}
-                                                    className={`w-48 h-24 rounded-md shadow-md p-2 hover:scale-105 duration-200 ${editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                                                    <div className="relative flex justify-start h-20 rounded-full">
-                                                        <Image
-                                                            src={getUserAvatarFromUserId(cargo.userId)}
-                                                            alt="avatar"
-                                                            className="w-20 h-20 rounded-full mr-2"
-                                                            onClick={() => {
-                                                                if (editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx) return;
-                                                                setEditingCargoSucursalIndex(idx);
-                                                                setValue(`newCargoSucursalUsuario`, cargo.user?.name || '');
-                                                                setValue(`newCargoSucursalTipo`, cargo.tipo);
-                                                                setValue(`newCargoSucursalDesde`, cargo.desde);
-                                                                setValue(`newCargoSucursalHasta`, cargo.hasta);
-                                                            }}
-                                                            width={56} height={56}
-                                                        />
-                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-600 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-blue-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
-                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
-                                                        <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
-                                                            const updatedCargos = sucursal.cargos.filter((_, i) => i !== idx);
-                                                            setSucursal({ ...sucursal, cargos: updatedCargos });
-                                                        }}>
-                                                            <MdDeleteForever className="text-lg border border-gray-400 rounded-full" size="1.5rem" />
-                                                        </span>
-                                                        {cargo.user.name.split(" ").slice(0, 2).join(" ")}
+                                                    className={`w-32 h-32 rounded-md flex justify-center items-center shadow-md p-2 hover:scale-105 duration-200 ${editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    <div className="w-full flex flex-col justify-center items-center m-auto h-24 rounded-full">
+                                                        <div className="relative w-full text-center flex flex-col items-center">
+                                                            <Image
+                                                                src={getUserAvatarFromUserId(cargo.userId)}
+                                                                alt="avatar"
+                                                                className="w-20 h-20 rounded-full"
+                                                                onClick={() => {
+                                                                    if (editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx) return;
+                                                                    setEditingCargoSucursalIndex(idx);
+                                                                    setValue(`newCargoSucursalUsuario`, cargo.user?.name || '');
+                                                                    setValue(`newCargoSucursalTipo`, cargo.tipo);
+                                                                    setValue(`newCargoSucursalDesde`, cargo.desde);
+                                                                    setValue(`newCargoSucursalHasta`, cargo.hasta);
+                                                                }}
+                                                                width={56} height={56}
+                                                            />
+                                                            {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-600 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-500 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-blue-500 absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            <span className="absolute -bottom-1 left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
+                                                                const updatedCargos = sucursal.cargos.filter((_, i) => i !== idx);
+                                                                setSucursal({ ...sucursal, cargos: updatedCargos });
+                                                            }}>
+                                                                <MdDeleteForever className="text-lg border border-gray-400 rounded-full" size="1.5rem" />
+                                                            </span>
+                                                        </div>
+                                                        <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.user.name.split(" ").slice(0, 2).join(" ")}</span>
                                                     </div>
                                                 </div>
                                             ))}
@@ -614,7 +614,7 @@ export default function EditSucursal() {
                                                         {dependencia.cargos?.length > 0 ? <div className="flex flex-wrap gap-4">
                                                             {dependencia.cargos?.map((cargo, idx) => (
                                                                 <div key={`avatar_${index}_${idx}`}
-                                                                    className={`w-48 h-24 rounded-md shadow-md p-2 hover:scale-105 duration-200 ${editingCargoDependenciaIndex != null && editingCargoDependenciaIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                    className={`w-32 h-32 rounded-md flex justify-center items-center shadow-md p-2 hover:scale-105 duration-200 ${editingCargoDependenciaIndex != null && editingCargoDependenciaIndex !== idx ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                                                     onClick={() => {
                                                                         if (editingCargoDependenciaIndex === null || editingCargoDependenciaParentIndex !== index) {
                                                                             setEditingCargoDependenciaIndex(idx);
@@ -623,29 +623,31 @@ export default function EditSucursal() {
                                                                             setValue(`newCargoDependenciaTipo`, cargo.tipo);                                                                            
                                                                         }
                                                                     }}>
-                                                                    <div className="relative flex justify-start h-20 rounded-full">
-                                                                        <Image
-                                                                            src={getUserAvatarFromUserId(cargo.userId)}
-                                                                            alt="avatar"
-                                                                            className="w-20 h-20 rounded-full mr-2"
-                                                                            width={56} height={56}
-                                                                        />
-                                                                        {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-500 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-400 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-gray-400 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-sky-600 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-orange-5000 absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 -left-3 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
-                                                                        <span className="absolute -bottom-1 -left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
-                                                                            const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
-                                                                            const updatedDependencias = [...dependencias];
-                                                                            updatedDependencias[index].cargos = updatedCargos;
-                                                                            setDependencias(updatedDependencias);
-                                                                        }}>
-                                                                            <MdDeleteForever className="border border-gray-400 rounded-full" size="1.5rem" />
-                                                                        </span>
-                                                                        {cargo.user.name.split(" ").slice(0, 2).join(" ")}
+                                                                    <div className="w-full flex flex-col justify-center items-center m-auto h-24 rounded-full">
+                                                                        <div className="relative w-full text-center flex flex-col items-center">
+                                                                            <Image
+                                                                                src={getUserAvatarFromUserId(cargo.userId)}
+                                                                                alt="avatar"
+                                                                                className="w-20 h-20 rounded-full"
+                                                                                width={56} height={56}
+                                                                            />
+                                                                            {cargo.tipo === TIPO_CARGO.gerente && <FaCrown className="text-yellow-500 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-400 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-gray-400 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-sky-600 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-orange-5000 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            <span className="absolute bottom-6 left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
+                                                                                const updatedCargos = dependencia.cargos.filter((_, i) => i !== idx);
+                                                                                const updatedDependencias = [...dependencias];
+                                                                                updatedDependencias[index].cargos = updatedCargos;
+                                                                                setDependencias(updatedDependencias);
+                                                                            }}>
+                                                                                <MdDeleteForever className="border border-gray-400 rounded-full" size="1.5rem" />
+                                                                            </span>
+                                                                            <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.user.name.split(" ").slice(0, 2).join(" ")}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -831,7 +833,10 @@ export default function EditSucursal() {
                             </div>
                         )}
                     </div>
-                    <div className="w-full flex justify-end">
+                    
+                </form> : <Loader />}
+            </div>
+            <div className="absolute bottom-0 right-0 w-full flex justify-end bg-white p-2">
                         <div className="w-96 flex">
                             <button className="flex w-1/2 justify-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
                                 onClick={(e) => {
@@ -842,8 +847,6 @@ export default function EditSucursal() {
                                 type="submit" disabled={editingIndex !== null}><FaRegSave size="1.15rem" className="mt-0.5 mr-3" />GUARDAR</button>
                         </div>
                     </div>
-                </form> : <Loader />}
-            </div>
             <ConfirmModal show={showModal} confirmationLabel={"Eliminar"} title={"Eliminar Dependencia"}
                 confirmationQuestion={`¿Estás seguro de eliminar la dependencia ${showModal && dependencias[selectedIndex]?.nombre}?`} onClose={() => setShowModal(false)} onConfirm={handleDelete} />
         </main>
