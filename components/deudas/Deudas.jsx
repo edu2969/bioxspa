@@ -172,7 +172,7 @@ export default function Deudas() {
                                         </a>
                                     )}
                                     <a href={`/modulos/cobros/${cliente._id}`} className="hover:text-blue-400 px-2 py-1 flex items-center gap-1 border rounded">
-                                        <MdOutlineVisibility size="1.2rem" /> <span className="text-xs">VER DEUDA</span>
+                                        <MdOutlineVisibility size="1.2rem" /> <span className="text-xs">Ver deuda</span>
                                     </a>
                                 </div>
                             </div>

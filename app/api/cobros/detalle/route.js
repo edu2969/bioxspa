@@ -7,6 +7,9 @@ import User from "@/models/user";
 import Cliente from "@/models/cliente"; // Asumiendo que existe el modelo Cliente
 import DocumentoTributario from "@/models/documentoTributario";
 import Direccion from "@/models/direccion";
+import CategoriaCatalogo from "@/models/categoriaCatalogo";
+import ItemCatalogo from "@/models/itemCatalogo";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 
 // filepath: d:/git/bioxspa/app/api/deudas/detalle/route.js
 
@@ -61,6 +64,12 @@ export async function GET(request) {
     if (!mongoose.models.Direccion) {
         mongoose.model("Direccion", Direccion.schema);
     }
+    if (!mongoose.models.CategoriaCatalogo) {
+        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
+    }
+    if (!mongoose.models.SubcategoriaCatalogo) {
+        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
+    }
 
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get("id");
@@ -84,7 +93,14 @@ export async function GET(request) {
 
     // Busca detalles de cada venta
     const ventaIds = ventas.map(v => v._id);
-    const detalles = await DetalleVenta.find({ ventaId: { $in: ventaIds } }).lean();
+    const detalles = await DetalleVenta.find({ ventaId: { $in: ventaIds } }).populate({
+        path: "subcategoriaCatalogoId",
+        select: "cantidad unidad sinSifon categoriaCatalogoId",
+        populate: {
+            path: "categoriaCatalogoId",
+            select: "esIndustrial codigo elemento"
+        }
+    }).lean();
 
     // Adorna ventas con detalles y vendedor
     const ventasDetalladas = ventas.map(v => {
@@ -97,11 +113,13 @@ export async function GET(request) {
             documento: v.documentoTributarioId?.nombre || "",
             direccion: v.direccionDespachoId?.direccion || "",
             detalles: detallesVenta.map(d => ({
-                glosa: d.glosa,
+                glosa: (d.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento || "") + " " + (d.subcategoriaCatalogoId?.cantidad || 0) + (d.subcategoriaCatalogoId?.unidad || ""),
                 cantidad: d.cantidad,
                 neto: d.neto,
                 iva: d.iva,
-                total: d.total
+                total: d.total,
+                sinSifon: d.subcategoriaCatalogoId?.sinSifon || false,
+                esIndustrial: d.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false,
             }))
         };
     });
@@ -114,6 +132,36 @@ export async function GET(request) {
 
     // Genera gráfico de deuda/pago últimos 6 meses
     const graficoDeuda = generateFakeDebtData(ventas, pagos);
+
+    // Obtiene los IDs de direcciones de despacho del cliente
+    const despachoIds = cliente.direccionesDespacho?.map(d => d.direccionId) || [];
+
+    // Busca items del catálogo cuya direccionId coincida con alguna dirección de despacho
+    const items = await (
+        despachoIds.length > 0
+            ? ItemCatalogo.find({ direccionId: { $in: despachoIds } })
+                .populate({
+                    path: "subcategoriaCatalogoId",
+                    select: "cantidad unidad sinSifon categoriaCatalogoId",
+                    populate: {
+                        path: "categoriaCatalogoId",
+                        select: "esIndustrial codigo elemento"
+                    }
+                })
+                .lean()
+            : []
+    );
+
+    // Adorna los items con los datos requeridos
+    const cilindros = items.map(item => ({
+        _id: item._id,
+        codigo: item.codigo,
+        elemento: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento || null,
+        cantidad: item.subcategoriaCatalogoId?.cantidad || null,
+        unidad: item.subcategoriaCatalogoId?.unidad || null,
+        sinSifon: item.subcategoriaCatalogoId?.sinSifon || false,
+        esIndustrial: item.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false        
+    }));
 
     // Respuesta
     return NextResponse.json({
@@ -128,7 +176,8 @@ export async function GET(request) {
             ultimaVenta: ventas[0]?.fecha || null,
             ultimoPago: pagos[pagos.length - 1]?.fecha || null,
             ventas: ventasDetalladas,
-            graficoDeuda
+            graficoDeuda,
+            cilindros
         }
     });
 }

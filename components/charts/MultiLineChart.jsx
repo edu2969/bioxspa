@@ -80,7 +80,7 @@ export default function MultiLineChart({ data, width, height, colorIndexes = [1,
 
                 {!simple && data.map((kv, index) =>
                     <g key={`label_${kv.category}`} transform={`translate(${width / 2 + 16}, ${10 + index * 18})`}>
-                        <text className="text-sm" fill={COLORS_PALETTE[colorIndexes[index]]}>{kv.category}</text>
+                        <text className="text-xs" fill={COLORS_PALETTE[colorIndexes[index]]}>{kv.category}</text>
                     </g>)}
             </svg>
         </>

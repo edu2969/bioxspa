@@ -15,12 +15,12 @@ export default function DetalleDeudas({ clienteId }) {
     const router = useRouter();
 
     useEffect(() => {
-        console.log("Cargando detalle de deudas para cliente:", clienteId);
         if (!clienteId) return;
         setLoading(true);
         fetch(`/api/cobros/detalle?id=${clienteId}`)
             .then(res => res.json())
             .then(data => {
+                console.log("Datos del cliente:", data);
                 setCliente(data.cliente);
                 setLoading(false);
             });
@@ -58,8 +58,8 @@ export default function DetalleDeudas({ clienteId }) {
     }
 
     // Prepara datos para MultiLineChart
-    const meses = Array.from({ length: 6 }, (_, i) => {
-        return new Date(new Date().getFullYear(), new Date().getMonth() - (5 - i), 1);
+    const meses = Array.from({ length: 12 }, (_, i) => {
+        return new Date(new Date().getFullYear(), new Date().getMonth() - (11 - i), 1);
     });
 
     // const chartData = [
@@ -132,6 +132,37 @@ export default function DetalleDeudas({ clienteId }) {
                         </div>
                     </div>
 
+                    <div className="w-[220px] mr-4 border rounded-lg px-2"
+                        style={{ height: "284px" }}>
+                        <span className="text-xs font-bold mb-2">Cilindros</span>                        
+                        <div className="overflow-y-auto w-full" style={{ maxHeight: "210px" }}>
+                            <table className="min-w-full text-xs">
+                                <thead>
+                                    <tr>
+                                        <th className="p-1 border-b font-semibold">Código</th>
+                                        <th className="p-1 border-b font-semibold">Gas / Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(cliente.cilindros ?? []).map((cil, idx) => (
+                                        <tr key={cil._id || idx} className="border-b">
+                                            <td className="p-1">{cil.codigo}</td>
+                                            <td className="p-1">
+                                                <span className="font-semibold">{cil.elemento ?? "Gas"}</span>
+                                                {" "}
+                                                <span className="text-gray-600">
+                                                    {cil.cantidad} {cil.unidad ?? ""}
+                                                </span>
+                                                {cil.sinSifon ? <span className="text-white bg-red-500 font-bold ml-1 rounded-md px-1">S/S</span> : null}
+                                                {cil.esIndustrial ? <span className="text-white bg-blue-500 font-bold ml-1 rounded-md px-1">IND</span> : null}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div className="flex flex-col items-center justify-center gap-2 min-w-[120px] mr-4 border rounded-lg px-2">
                         <div className="w-24 h-24">
                             <CircularProgressbar
@@ -168,13 +199,13 @@ export default function DetalleDeudas({ clienteId }) {
                         </div>
                     </div>
 
-                    <div className="flex-1 flex-col items-center justify-center gap-2 border p-6 rounded-lg">
+                    <div className="flex-col items-center justify-center gap-2 border pt-4 px-6 rounded-lg w-[512px] h-[284px]">
                         <h3 className="text-lg font-bold mb-4">Gráfico de Deuda y Pagos últimos 6 meses</h3>
                         <div className="w-full mx-auto">
                             <MultiLineChart
                                 data={chartData}
-                                width={420}
-                                height={160}
+                                width={492}
+                                height={224}
                                 colorIndexes={[3, 7]}
                             />
                         </div>
@@ -187,29 +218,26 @@ export default function DetalleDeudas({ clienteId }) {
                         <table className="min-w-full text-xs border">
                             <thead>
                                 <tr className="bg-gray-100">
-                                    <th className="p-2 border">Folio</th>
                                     <th className="p-2 border">Fecha</th>
                                     <th className="p-2 border">Total</th>
                                     <th className="p-2 border">Vendedor</th>
                                     <th className="p-2 border">Documento</th>
-                                    <th className="p-2 border">Dirección</th>
                                     <th className="p-2 border">Detalle</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {cliente.ventas.map((v, idx) => (
                                     <tr key={idx} className="border-b">
-                                        <td className="p-2 border">{v.folio}</td>
                                         <td className="p-2 border">{new Date(v.fecha).toLocaleDateString("es-CL")}</td>
                                         <td className="p-2 border">{v.total.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</td>
                                         <td className="p-2 border">{v.vendedor}</td>
                                         <td className="p-2 border">{v.documento}</td>
-                                        <td className="p-2 border">{v.direccion}</td>
                                         <td className="p-2 border">
                                             <ul className="list-disc pl-4">
                                                 {v.detalles.map((d, i) => (
-                                                    <li key={i}>
-                                                        {d.glosa} x{d.cantidad} - Neto: {d.neto.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}, IVA: {d.iva.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}, Total: {d.total.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}
+                                                    <li key={i} className="flex">
+                                                        <div className="w-2/3">{d.cantidad}x {d.glosa}</div>
+                                                        <div className="w-1/3">Total: {d.total.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</div>
                                                     </li>
                                                 ))}
                                             </ul>
