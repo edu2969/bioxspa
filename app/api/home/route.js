@@ -137,7 +137,8 @@ export async function GET() {
             // Count rutasDespacho where the ventas are present
             const contadores = await RutaDespacho.countDocuments({
                 ventaIds: { $in: ventaIds },
-                choferId: { $in: choferIds }
+                choferId: { $in: choferIds },
+                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
             });
             return NextResponse.json({ ok: true, contadores: { preparacion: contadores }, checklists: checklistResults });
         }

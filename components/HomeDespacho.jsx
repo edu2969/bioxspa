@@ -22,7 +22,7 @@ export default function HomeDespacho({ contadores }) {
                                 <TbTruckLoading className="mx-auto mb-1" size="6rem" />
                             </div>
                             <span>PEDIDOS</span>
-                            <div className="absolute top-12 right-24 bg-red-500 text-white text-md font-bold rounded-full pl-1 w-8 h-8 flex items-center justify-center">
+                            <div className={`absolute top-12 right-24 ${contadores.preparacion > 0 ? "bg-red-500" : "bg-green-500"} text-white text-md font-bold rounded-full pl-1 w-8 h-8 flex items-center justify-center`}>
                                 <span className="text-sm mr-1">{contadores.preparacion}</span>
                             </div>
                             {routingIndex === 0 && (

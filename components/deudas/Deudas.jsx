@@ -60,7 +60,7 @@ export default function Deudas() {
                     onChange={e => setSearch(e.target.value)}
                 />
             </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6">
+            <div className="flex-1 overflow-y-auto px-6 pb-6 h-[calc(100vh-166px)]">
                 {loading && (
                     <div
                         className="flex justify-center items-center"
