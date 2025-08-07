@@ -372,7 +372,7 @@ export default function PreparacionDePedidos({ session }) {
     }
 
     return (
-        <div className="w-full" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
+        <div className="w-full h-screen" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
             <div className="w-full">
 
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
