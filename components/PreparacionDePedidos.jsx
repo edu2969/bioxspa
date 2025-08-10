@@ -125,6 +125,7 @@ export default function PreparacionDePedidos({ session }) {
 
     const cargarItem = useCallback(
         async (item, codigo) => {
+            console.log("CARGANDO ITEM", item);
             const cargamentoActual = cargamentos[0];
             if (!cargamentoActual) return false;
 
@@ -176,6 +177,7 @@ export default function PreparacionDePedidos({ session }) {
 
             if(item.direccionInvalida) {
                 setScanMode(false);
+                setEditMode(false);
                 setShowModalCilindroErroneo(true);
                 return;
             }
@@ -245,7 +247,6 @@ export default function PreparacionDePedidos({ session }) {
             const data = await response.json();
             setItemCatalogoEscaneado(data);
             cargarItem(data, codigo);
-            console.log("Item cargado:", data);
         } catch {
             toast.error(`Cilindro ${codigo} no existe`);
             return;
@@ -360,8 +361,9 @@ export default function PreparacionDePedidos({ session }) {
             } else {
                 setShowModalCilindroErroneo(false);
                 setMoverCilindro(false);
-                setItemCatalogoEscaneado(null);
+                item.direccionInvalida = false;
                 cargarItem(item, item.codigo);
+                setItemCatalogoEscaneado(null);
             }
         } catch {
             toast.error("Error de red al corregir cilindro");
@@ -541,14 +543,14 @@ export default function PreparacionDePedidos({ session }) {
                             <div className="flex items-center justify-center">
                                 <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.categoria.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
                                 <div className="text-left ml-6">
-                                    <div>
+                                    <div className="-mb-2">
                                         <div className="flex">
                                             {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
                                             <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>
                                             {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
                                         </div>
-                                        <div className="flex font-bold text-4xl">
-                                            <span>
+                                        <div className="flex font-bold text-4xl mt-1">
+                                            <span className="pb-0 mt-4">
                                                 {(() => {
                                                     let match = itemCatalogoEscaneado.categoria.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
                                                     if (!match) {
@@ -563,8 +565,7 @@ export default function PreparacionDePedidos({ session }) {
                                                     );
                                                 })()}
                                             </span>
-                                            <div className="ml-3">
-
+                                            <div className="ml-3 mt-1">
                                                 {editMode && <><p className="text-xs text-gray-600">Estado</p>
                                                     <select
                                                         className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
@@ -599,12 +600,12 @@ export default function PreparacionDePedidos({ session }) {
                                             <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{itemCatalogoEscaneado.direccion.nombre}</span>
                                         </p>
                                     </div>}
-                                    {editMode && itemCatalogoEscaneado.direccionInvalida && (
+                                    {editMode &&  (
                                         <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
-                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Se ubica en</span>
+                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">{!itemCatalogoEscaneado.direccionInvalida ? 'Se ubica en' : 'Cambiar a'}</span>
                                             <div className="-mt-6">
-                                                <p className="text-xs font-bold">{itemCatalogoEscaneado.direccionActual?.cliente?.nombre}</p>
-                                                <div className="flex">
+                                                {!itemCatalogoEscaneado.direccionInvalida && <p className="text-xs font-bold">{itemCatalogoEscaneado.direccionActual?.cliente?.nombre}</p>}
+                                                {itemCatalogoEscaneado.direccionInvalida && <div className="flex">
                                                     <div className="flex text-xs text-gray-700">
                                                         <input
                                                             type="checkbox"
@@ -624,7 +625,7 @@ export default function PreparacionDePedidos({ session }) {
                                                             <BsFillGeoAltFill size="2.75rem" /><p className="text-xs ml-2">{itemCatalogoEscaneado.direccionActual?.direccion?.nombre}</p>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </div>}
                                             </div>
                                         </div>
                                     )}
@@ -635,7 +636,7 @@ export default function PreparacionDePedidos({ session }) {
                             <button
                                 onClick={() => handleUpdateItem(itemCatalogoEscaneado)}
                                 disabled={!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno)}
-                                className={`relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 ${!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 ${!editMode && (itemCatalogoEscaneado.direccionInvalida || itemCatalogoEscaneado.estado !== TIPO_ESTADO_ITEM_CATALOGO.lleno) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {editMode ? "ACTUALIZAR" : "AGREGAR A PEDIDO"}
                                 {corrigiendo && <div className="absolute top-0 left-0 w-full h-10">

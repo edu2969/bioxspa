@@ -90,26 +90,24 @@ export async function POST(request) {
         // Update the route: set estado to descarga and update fechaArribo for the first null element
         // Update estado and historialEstado
         console.log("[confirmarArribo] Updating estado and historialEstado for rutaDespacho:", rutaId);
-        await RutaDespacho.findByIdAndUpdate(
-            rutaId,
-            {
-                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
-                $push: { 
-                    historialEstado: { 
-                        estado: TIPO_ESTADO_RUTA_DESPACHO.descarga, 
-                        fecha: now 
-                    }
-                }
+        // Update estado, historialEstado, and fechaArribo of the last element in ruta array in one operation
+        const update = {
+            estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
+            $push: { 
+            historialEstado: { 
+                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga, 
+                fecha: now 
             }
-        );
+            },
+            // Use $set to update the fechaArribo of the last element in ruta array
+            $set: {}
+        };
 
-        // Update fechaArribo of the last element in ruta array        
-        const rutaDespachoDoc = await RutaDespacho.findById(rutaId);
-        console.log("[confirmarArribo] RutaDespacho.ruta before update:", rutaDespachoDoc.ruta);
-        const lastIndex = rutaDespachoDoc.ruta.length - 1;
-        rutaDespachoDoc.ruta[lastIndex].fechaArribo = now;
-        console.log("[confirmarArribo] RutaDespacho.ruta after update:", rutaDespachoDoc.ruta);
-        await RutaDespacho.findByIdAndUpdate(rutaId, { ruta: rutaDespachoDoc.ruta });
+        // Get the last index of ruta array
+        const lastIndex = rutaDespacho.ruta.length - 1;
+        update.$set[`ruta.${lastIndex}.fechaArribo`] = now;
+
+        await RutaDespacho.findByIdAndUpdate(rutaId, update);
 
         console.log("[confirmarArribo] Route arrival confirmed successfully for rutaId:", rutaId);
 

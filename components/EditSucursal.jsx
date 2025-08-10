@@ -104,6 +104,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         const sucursal = data.sucursal;
         console.log("SUCURSAL", sucursal);
         setSucursal(sucursal);
+        console.log("DEPENDENCIAS", data.dependencias);
         setDependencias(data.dependencias);
         setValue("nombre", sucursal.nombre);
         setValue("visible", sucursal.visible);
@@ -834,7 +835,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                         )}
                     </div>
                     
-                </form> : <Loader />}
+                </form> : <Loader texto="Cargando..." />}
             </div>
             <div className="absolute bottom-0 right-0 w-full flex justify-end bg-white p-2">
                         <div className="w-96 flex">

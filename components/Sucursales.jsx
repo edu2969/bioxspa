@@ -16,7 +16,6 @@ export default function Sucursales() {
             try {
                 const response = await fetch('/api/sucursales');
                 const data = await response.json();
-                console.log("DATA", data);
                 setBranches(data.sucursales);
             } catch (error) {
                 console.error("Error fetching branches:", error);
