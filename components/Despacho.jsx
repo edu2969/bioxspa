@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
-import { FaClipboardCheck, FaFlagCheckered, FaPrint } from "react-icons/fa";
+import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
 import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckFast } from "react-icons/fa6";
