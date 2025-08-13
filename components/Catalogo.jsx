@@ -1,9 +1,6 @@
 "use client"
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 import React, { useState } from 'react';
-import { AiFillHome } from 'react-icons/ai';
-import { IoIosArrowForward } from 'react-icons/io';
 import { IoCloseSharp } from 'react-icons/io5';
 import { useEffect } from 'react';
 import Loader from './Loader';
@@ -48,8 +45,6 @@ export default function Catalogo() {
         }
     };
 
-    const router = useRouter();
-
     const [categorias, setCategorias] = useState([]);
 
     useEffect(() => {
@@ -66,23 +61,12 @@ export default function Catalogo() {
 
     return (
         <main className="w-full h-screen">
-            <div className="py-10 w-full">
-                <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pb-4 pt-4 mx-10 bg-white dark:bg-gray-900">
-                    <div className="flex items-center space-x-4 text-ship-cove-800">
-                        <Link href="/modulos">
-                            <AiFillHome size="1.4rem" className="text-gray-700 dark:text-gray-300 ml-2" />
-                        </Link>
-                        <IoIosArrowForward size="1.5rem" className="text-gray-700 dark:text-gray-300" />
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => router.back()}>CONFIGURACIONES</span>
-                        <IoIosArrowForward size="1.5rem" className="text-gray-700 dark:text-gray-300" />
-                        <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">CATALOGO</span>
-                    </div>
-                </div>
+            <div className="py-10 w-full">                
                 <div className="w-full h-full pb-20">
                     {selectedCategoria === null ? (
                     <div className="text-center">
                         <h1 className="text-4xl font-bold uppercase mb-4">CATEGORÍAS</h1>
-                        <div className="h-[calc(100vh-160px)] flex flex-wrap justify-center overflow-y-auto px-6">
+                        <div className="h-[calc(100vh-94px)] flex flex-wrap justify-center overflow-y-auto px-6">
                             {!loadingCategoria ? categorias.map((categoria, index) => (
                                 <div
                                     key={index}

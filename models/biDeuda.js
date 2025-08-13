@@ -16,7 +16,8 @@ const biDeudasSchema = new Schema({
         type: mongoose.Types.ObjectId,
         ref: "Venta",
         required: true
-    }
+    },
+    ventasPorCobrar: { type: Number, default: 0 }
 }, { 
     timestamps: true
 });

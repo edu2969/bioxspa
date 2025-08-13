@@ -8,6 +8,11 @@ import Loader from "../Loader";
 import MultiLineChart from "@/components/charts/MultiLineChart";
 import { IoChevronBack } from "react-icons/io5";
 import { useRouter } from "next/navigation";
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
+dayjs.locale('es');
+var relative = require('dayjs/plugin/relativeTime');
+dayjs.extend(relative);
 
 export default function DetalleDeudas({ clienteId }) {
     const [cliente, setCliente] = useState(null);
@@ -117,7 +122,7 @@ export default function DetalleDeudas({ clienteId }) {
                         <h2 className="text-2xl font-bold mb-2 uppercase">{cliente.nombre}</h2>
                         <p className="text-md text-gray-500 mb-1">RUT: {cliente.rut}</p>
                         <p className="text-sm text-gray-500 mb-1">
-                            Última venta: {cliente.ultimaVenta ? new Date(cliente.ultimaVenta).toLocaleDateString("es-CL") : "Sin ventas"}
+                            Última venta: {cliente.ultimaVenta ? new Date(cliente.ultimaVenta).toLocaleDateString("es-CL") : "Sin ventas"} ({dayjs(cliente.ultimaVenta).fromNow()})
                         </p>
                         <p className="text-sm text-gray-500 mb-1">
                             Último pago: {cliente.ultimoPago ? new Date(cliente.ultimoPago).toLocaleDateString("es-CL") : "Sin pagos"}

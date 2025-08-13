@@ -1,13 +1,18 @@
 'use client'
 
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { CircularProgressbar } from "react-circular-progressbar";
-import 'react-circular-progressbar/dist/styles.css';
-import { MdOutlineVisibility } from "react-icons/md";
-import { FiPhone, FiMail } from "react-icons/fi";
-import Loader from "../Loader";
-import { LiaPencilAltSolid } from "react-icons/lia";
 import { useRouter } from "next/navigation";
+import { IoChevronBack } from "react-icons/io5";
+import { TiUserAddOutline } from "react-icons/ti";
+import 'react-circular-progressbar/dist/styles.css';
+import Loader from "../Loader";
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
+dayjs.locale('es');
+var relative = require('dayjs/plugin/relativeTime');
+dayjs.extend(relative);
 
 const PERIODS = [
     { label: "Actual", value: 0 },
@@ -20,27 +25,131 @@ export default function Deudas() {
     const [clientes, setClientes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState(0);
-    const [search, setSearch] = useState("");
+    const [search] = useState("");
+    const [loadingClients, setLoadingClients] = useState(false);
+    const [loadingCliente, setLoadingCliente] = useState(false);
+    const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
+    const [pagination, setPagination] = useState({});
     const router = useRouter();
+    const { register, setValue } = useForm();
 
     useEffect(() => {
         setClientes([]);
         setLoading(true);
-        fetch(`/api/cobros?q=${period}`)
+        fetch(`/api/cobros?q=${period}&page=${pagination.page || 1}&sortBy=nombre&sortOrder=asc`)
             .then(res => res.json())
             .then(data => {
+                console.log("Clientes data:", data);
                 setClientes(data.clientes || []);
+                setPagination(data.pagination || {});
                 setLoading(false);
             });
-    }, [period]);
+    }, [period, pagination.page]);
 
     const filtered = clientes.filter(cliente =>
         cliente.nombre?.toLowerCase().includes(search.toLowerCase())
-    );    
+    );
+    
+    // Cambia a una página específica
+    const goToPage = (page) => {
+        setLoading(true);
+        setPagination(prev => ({ ...prev, page }));
+    };
+
+    // Página anterior
+    const goToPrevPage = () => {
+        if (pagination.page > 1) {
+            goToPage(pagination.page - 1);
+        }
+    };
+
+    // Página siguiente
+    const goToNextPage = () => {
+        if (pagination.page < pagination.totalPages) {
+            goToPage(pagination.page + 1);
+        }
+    };
 
     return (
-        <main className="w-full h-dvh overflow-hidden mt-10">
-            <div className="bg-white dark:bg-gray-900 px-6 pt-6 sticky top-0 z-10">
+        <main className="w-full h-dvh overflow-hidden mt-2">
+            <div className="px-6 sticky top-0 z-10">
+                <div className="max-w-5xl mx-auto mb-2">
+                    <div className="flex items-end gap-2">
+                        <div>
+                            <button
+                                type="button"
+                                className="flex items-center px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-semibold"
+                                onClick={() => router.back()}
+                            >
+                                <IoChevronBack size="1.25rem" className="mr-2" />Volver
+                            </button>
+                        </div>
+                        <div className="w-full">
+                            <label className="block text-sm font-medium text-gray-700">Nombre cliente / RUT</label>
+                            <div className="relative">
+                                <div className="w-full pr-0 md:pr-4 flex items-end">
+                                    <div className="relative w-full">
+                                        <input
+                                            id="cliente"
+                                            {...register("cliente")}
+                                            type="text"
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setLoadingClients(true);
+                                                if (value.length > 2) {
+                                                    fetch(`/api/clientes/search?q=${encodeURIComponent(value)}`)
+                                                        .then(response => response.json())
+                                                        .then(data => {
+                                                            setAutocompleteClienteResults(data.clientes || []);
+                                                            setLoadingClients(false);
+                                                        })
+                                                        .catch(() => {
+                                                            setAutocompleteClienteResults([]);
+                                                            setLoadingClients(false);
+                                                        });
+                                                } else {
+                                                    setAutocompleteClienteResults([]);
+                                                    setLoadingClients(false);
+                                                }
+                                            }}
+                                        />
+                                        {(loadingClients || loadingCliente) && <div className="absolute -right-2 top-1.5">
+                                            <Loader texto="" />
+                                        </div>}
+                                        {autocompleteClienteResults.length > 0 && (
+                                            <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full">
+                                                {autocompleteClienteResults.map(cliente => (
+                                                    <li
+                                                        key={cliente._id}
+                                                        className="px-3 py-2 cursor-pointer hover:bg-gray-200"
+                                                        onClick={async () => {
+                                                            console.log("CLIENTE", cliente);
+                                                            setLoadingCliente(true);
+                                                            setValue("cliente", cliente.nombre);                                                                
+                                                            setAutocompleteClienteResults([]);
+                                                            setLoadingCliente(false);                                                            
+                                                        }}
+                                                    >
+                                                        <p>{cliente.nombre}</p>
+                                                        <p className="text-xs text-gray-500">{cliente.rut}</p>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="ml-2 flex items-center px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold"
+                                        onClick={() => { setClienteSelected(null) }}
+                                    >
+                                        <TiUserAddOutline className="mr-1" size="1.25rem" /> Nuevo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div className="flex gap-2 mb-4">
                     {PERIODS.map(p => (
                         <button
@@ -52,15 +161,8 @@ export default function Deudas() {
                         </button>
                     ))}
                 </div>
-                <input
-                    type="text"
-                    placeholder="Buscar cliente..."
-                    className="w-full p-2 mb-2 border rounded"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
             </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6 h-[calc(100vh-166px)]">
+            <div className="flex-1 overflow-y-auto px-6 h-[calc(100vh-176px)]">
                 {loading && (
                     <div
                         className="flex justify-center items-center"
@@ -101,21 +203,33 @@ export default function Deudas() {
                         return (
                             <div
                                 key={cliente._id}
-                                className="w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] bg-white rounded-lg shadow p-4 border border-gray-200 flex flex-col"
-                            >
+                                onClick={() => router.push(`/modulos/cobros/${cliente._id}`)}
+                                className="relative w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] rounded-lg shadow p-4 border border-gray-200 flex flex-col hover:scale-105 hover:bg-blue-50 hover:top-2 transition-all cursor-pointer"
+                            >                               
+
                                 <div className="flex justify-between items-center mb-2">
-                                    <div>
-                                        <p className="flex font-semibold text-lg uppercase" onClick={() => router.push(`/modulos/configuraciones/clientes?id=${cliente._id}`)}>
+                                    <div className="overflow-hidden">
+                                        <p
+                                            className="font-semibold text-md uppercase"
+                                            style={{
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                maxWidth: "380px",
+                                                display: "block"
+                                            }}
+                                            onClick={() => router.push(`/modulos/configuraciones/clientes?id=${cliente._id}`)}
+                                            title={cliente.nombre}
+                                        >
                                             {cliente.nombre}
-                                            <LiaPencilAltSolid size="1.5rem" className="mt-1 ml-2 text-blue-600 hover:text-blue-500 cursor-pointer"/>
                                         </p>
                                         <p className="text-sm text-gray-500">
-                                            {cliente.ventas.length} venta{cliente.ventas.length !== 1 ? "s" : ""} por cobrar
+                                            {cliente.ventasPorCobrar} venta{cliente.ventasPorCobrar !== 1 ? "s" : ""} por cobrar
                                         </p>
                                         <p className="text-xs text-gray-500">
-                                            última venta: {new Date(cliente.ultimaVenta || 0).toLocaleDateString("es-CL", { year: "numeric", month: "2-digit", day: "2-digit" })}
+                                            última venta: {new Date(cliente.ultimaVenta || 0).toLocaleDateString("es-CL", { year: "numeric", month: "2-digit", day: "2-digit" })} ({dayjs(cliente.ultimaVenta).fromNow()})
                                         </p>
-                                    </div>
+                                    </div>                                    
                                 </div>
                                 <div className="flex gap-4 items-center mb-4">
                                     <div className="w-20 text-center">
@@ -151,7 +265,7 @@ export default function Deudas() {
                                                     </span>
                                                     <span className="font-semibold text-green-600">
                                                         {disponible.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}
-                                                    </span>                                        
+                                                    </span>
                                                 </div>
                                                 <p className="text-xs text-gray-500 text-right col-span-2 italic mt-2">
                                                     Ultimo pago: {new Date(cliente.ultimoPago || 0).toLocaleDateString("es-CL", { year: "numeric", month: "2-digit", day: "2-digit" })}
@@ -159,27 +273,46 @@ export default function Deudas() {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="flex gap-2 justify-center items-center mt-2">
-                                    {cliente.telefono && (
-                                        <a href={`tel:${cliente.telefono}`} className="hover:text-blue-500 flex items-center gap-1 px-2 py-1 border rounded">
-                                            <FiPhone /> <span className="text-xs">Llamar</span>
-                                        </a>
-                                    )}
-                                    {cliente.email && (
-                                        <a href={`mailto:${cliente.email}`} className="hover:text-blue-500 flex items-center gap-1 px-2 py-1 border rounded">
-                                            <FiMail /> <span className="text-xs">Mail</span>
-                                        </a>
-                                    )}
-                                    <a href={`/modulos/cobros/${cliente._id}`} className="hover:text-blue-400 px-2 py-1 flex items-center gap-1 border rounded">
-                                        <MdOutlineVisibility size="1.2rem" /> <span className="text-xs">Ver deuda</span>
-                                    </a>
-                                </div>
+                                </div>                                
                             </div>
                         );
                     })}
                 </div>
             </div>
+            {!loading && clientes.length > 0 && (
+                <div className="w-full flex justify-center items-center">
+                    <nav className="flex gap-2">
+                        {/* Botón anterior */}
+                        {pagination?.page > 1 && (
+                            <button
+                                className="px-3 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                                onClick={goToPrevPage}
+                            >
+                                &laquo; Anterior
+                            </button>
+                        )}
+                        {/* Números de página */}
+                        {Array.from({ length: pagination?.totalPages || 1 }, (_, i) => i + 1).map(num => (
+                            <button
+                                key={num}
+                                className={`px-3 py-2 rounded-md font-semibold text-xs ${pagination?.page === num ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                                onClick={() => goToPage(num)}
+                            >
+                                {num}
+                            </button>
+                        ))}
+                        {/* Botón siguiente */}
+                        {pagination?.page < (pagination?.totalPages || 1) && (
+                            <button
+                                className="px-3 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                                onClick={goToNextPage}
+                            >
+                                Próximo &raquo;
+                            </button>
+                        )}
+                    </nav>
+                </div>
+            )}
         </main>
     );
 }

@@ -10,6 +10,7 @@ import Direccion from "@/models/direccion";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import ItemCatalogo from "@/models/itemCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 // filepath: d:/git/bioxspa/app/api/deudas/detalle/route.js
 
@@ -83,8 +84,17 @@ export async function GET(request) {
         return NextResponse.json({ ok: false, error: "Cliente not found" }, { status: 404 });
     }
 
+    const documentoIds = await DocumentoTributario.find({
+        venta: true
+    }).select("_id");
+
     // Busca ventas por cobrar del cliente
-    const ventas = await Venta.find({ clienteId, porCobrar: true })
+    const ventas = await Venta.find({ 
+        clienteId, 
+        porCobrar: true, 
+        estado: TIPO_ESTADO_VENTA.entregado,
+        documentoTributarioId: { $in: documentoIds }
+    })
         .populate("vendedorId", "name email telefono")
         .populate("documentoTributarioId", "nombre")
         .populate("direccionDespachoId", "direccion")
