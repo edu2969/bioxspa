@@ -17,28 +17,31 @@ export async function GET(request) {
     console.log("Connected to MongoDB");
 
     const { searchParams } = new URL(request.url);
-    const rv = searchParams.get("rv");
-    const mv = searchParams.get("mv");
-    const bi = searchParams.get("bi");
+    const q = searchParams.get("q");
 
-    if (rv === "true") {
+    if (q === "rv") {
         console.log("Starting migration...");
         await resetVentas();
         console.log("Migration completed successfully");
     }
 
-    if (mv === "true") {
+    if (q === "mv") {
         console.log("Starting migration ventas...");
         await migrateVentas();
         console.log("Migration ventas completed successfully");
     }
 
-    if(bi === "true") {
+    if(q === "bi") {
         console.log("Starting migration generateBIDeudas...");
         await generateBIDeudas();
         console.log("Migration generateBIDeudas completed successfully");
     }
 
+    if(q === "fv") {
+        console.log("Starting fixing Ventas...");
+        await fixingVentas();
+        console.log("Fixing Ventas completed successfully");
+    }
 
     return NextResponse.json({ message: "Success migrate and improve" });
 }
@@ -149,7 +152,7 @@ const generateBIDeudas = async () => {
         estado: TIPO_ESTADO_VENTA.entregado,
         porCobrar: true,
         documentoTributarioId: { $in: documentoVentaIds },
-        fecha: { $gte: new Date('2025-01-01') }
+        fecha: { $gte: new Date('2024-01-01') }
     });
 
     const sucursales = await Sucursal.find({});
@@ -283,3 +286,42 @@ const generateBIDeudas = async () => {
     }
 }
 
+const fixingVentas = async () => {
+    // Solo buscar ventas que tengan numeroVale o cumplan las condiciones de saldo
+    const ventas = await Venta.find({
+        $or: [
+            { numeroVale: { $exists: true, $ne: null } },
+            {
+                estado: TIPO_ESTADO_VENTA.entregado,
+                porCobrar: true,
+                valorTotal: { $gt: 0 }
+            }
+        ]
+    });
+
+    for (const venta of ventas) {
+        let update = {};
+
+        // Si tiene numeroVale, copiar a numeroDocumento
+        if (venta.numeroVale) {
+            update.numeroDocumento = venta.numeroVale;
+        }
+
+        // Si está entregado, porCobrar true y valorTotal > 0, copiar valorTotal a saldo
+        if (
+            venta.estado === TIPO_ESTADO_VENTA.entregado &&
+            venta.porCobrar === true &&
+            venta.valorTotal > 0
+        ) {
+            update.saldo = venta.valorTotal;
+        }
+
+        // Eliminar numeroVale
+        update.$unset = { numeroVale: "" };
+
+        // Solo actualizar si hay cambios
+        if (Object.keys(update).length > 0) {
+            await Venta.updateOne({ _id: venta._id }, update);
+        }
+    }
+}

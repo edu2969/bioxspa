@@ -93,6 +93,7 @@ export async function GET(request) {
         clienteId, 
         porCobrar: true, 
         estado: TIPO_ESTADO_VENTA.entregado,
+        valorTotal: { $gt: 0 },
         documentoTributarioId: { $in: documentoIds }
     })
         .populate("vendedorId", "name email telefono")
@@ -119,6 +120,7 @@ export async function GET(request) {
             folio: v.codigo,
             fecha: v.fecha,
             total: v.valorTotal,
+            saldo: v.saldo ?? 0,
             vendedor: v.vendedorId?.name || "",
             documento: v.documentoTributarioId?.nombre || "",
             direccion: v.direccionDespachoId?.direccion || "",

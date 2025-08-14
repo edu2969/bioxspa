@@ -15,6 +15,7 @@ const ventaSchema = new Schema({
     valorTotal: { type: Number, required: true },
     numeroDocumento: { type: String },
     numeroVale: { type: String },
+    saldo: { type: Number, default: 0 },
     documentoTributarioId: { type: mongoose.Schema.Types.ObjectId, ref: "DocumentoTributario", required: true },
     direccionDespachoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion", required: true },
     tasaImpuesto: { type: Number },

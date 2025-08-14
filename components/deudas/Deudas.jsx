@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
 import { CircularProgressbar } from "react-circular-progressbar";
 import { useRouter } from "next/navigation";
 import { IoChevronBack } from "react-icons/io5";
@@ -13,6 +12,7 @@ import 'dayjs/locale/es';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
+import { useForm } from "react-hook-form";
 
 const PERIODS = [
     { label: "Actual", value: 0 },
@@ -31,7 +31,7 @@ export default function Deudas() {
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [pagination, setPagination] = useState({});
     const router = useRouter();
-    const { register, setValue } = useForm();
+    const { setValue } = useForm();
 
     useEffect(() => {
         setClientes([]);
@@ -72,8 +72,8 @@ export default function Deudas() {
 
     return (
         <main className="w-full h-dvh overflow-hidden mt-2">
-            <div className="px-6 sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto mb-2">
+            <div className="px-6 sticky top-0">
+                <div className="mx-32 mb-2">
                     <div className="flex items-end gap-2">
                         <div>
                             <button
@@ -91,7 +91,6 @@ export default function Deudas() {
                                     <div className="relative w-full">
                                         <input
                                             id="cliente"
-                                            {...register("cliente")}
                                             type="text"
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             onChange={(e) => {
@@ -126,9 +125,8 @@ export default function Deudas() {
                                                         onClick={async () => {
                                                             console.log("CLIENTE", cliente);
                                                             setLoadingCliente(true);
-                                                            setValue("cliente", cliente.nombre);                                                                
-                                                            setAutocompleteClienteResults([]);
-                                                            setLoadingCliente(false);                                                            
+                                                            setValue("cliente", cliente.nombre);
+                                                            router.push(`/modulos/cobros/${cliente._id}`);
                                                         }}
                                                     >
                                                         <p>{cliente.nombre}</p>
@@ -194,10 +192,10 @@ export default function Deudas() {
                         let riesgoTexto = "BIEN";
                         let riesgoColor = "#22c55e";
                         if (riesgoPorc > 80) {
-                            riesgoTexto = "QUIEBRA";
+                            riesgoTexto = "RIESGOSO";
                             riesgoColor = "#dc2626";
                         } else if (riesgoPorc > 50) {
-                            riesgoTexto = "RIESGOSO";
+                            riesgoTexto = "MODERADO";
                             riesgoColor = "#f59e42";
                         }
                         return (
@@ -291,17 +289,63 @@ export default function Deudas() {
                                 &laquo; Anterior
                             </button>
                         )}
-                        {/* Números de página */}
-                        {Array.from({ length: pagination?.totalPages || 1 }, (_, i) => i + 1).map(num => (
-                            <button
-                                key={num}
-                                className={`px-3 py-2 rounded-md font-semibold text-xs ${pagination?.page === num ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
-                                onClick={() => goToPage(num)}
-                            >
-                                {num}
-                            </button>
-                        ))}
-                        {/* Botón siguiente */}
+                        {/* Números de página con ellipsis */}
+                        {(() => {
+                            const totalPages = pagination?.totalPages || 1;
+                            const currentPage = pagination?.page || 1;
+                            const maxPagesToShow = 11;
+                            let pages = [];
+
+                            if (totalPages <= maxPagesToShow) {
+                                // Mostrar todas las páginas
+                                for (let i = 1; i <= totalPages; i++) {
+                                    pages.push(i);
+                                }
+                            } else {
+                                // Siempre mostrar la primera y última página
+                                let start = Math.max(2, currentPage - 4);
+                                let end = Math.min(totalPages - 1, currentPage + 4);
+
+                                // Ajustar si estamos cerca del inicio o fin
+                                if (currentPage <= 6) {
+                                    start = 2;
+                                    end = maxPagesToShow - 2;
+                                } else if (currentPage >= totalPages - 5) {
+                                    start = totalPages - (maxPagesToShow - 3);
+                                    end = totalPages - 1;
+                                }
+
+                                pages.push(1);
+                                if (start > 2) {
+                                    pages.push('left-ellipsis');
+                                }
+                                for (let i = start; i <= end; i++) {
+                                    pages.push(i);
+                                }
+                                if (end < totalPages - 1) {
+                                    pages.push('right-ellipsis');
+                                }
+                                pages.push(totalPages);
+                            }
+
+                            return pages.map((num, idx) => {
+                                if (num === 'left-ellipsis' || num === 'right-ellipsis') {
+                                    return (
+                                        <span key={num + idx} className="px-2 py-2 text-gray-400 select-none">...</span>
+                                    );
+                                }
+                                return (
+                                    <button
+                                        key={num}
+                                        className={`px-3 py-2 rounded-md font-semibold text-xs ${pagination?.page === num ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                                        onClick={() => goToPage(num)}
+                                        disabled={pagination?.page === num}
+                                    >
+                                        {num}
+                                    </button>
+                                );
+                            });
+                        })()}
                         {pagination?.page < (pagination?.totalPages || 1) && (
                             <button
                                 className="px-3 py-2 rounded-md bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
