@@ -117,6 +117,7 @@ export async function GET(request) {
     const ventasDetalladas = ventas.map(v => {
         const detallesVenta = detalles.filter(d => d.ventaId.toString() === v._id.toString());
         return {
+            ventaId: v._id,
             folio: v.codigo,
             fecha: v.fecha,
             total: v.valorTotal,

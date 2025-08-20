@@ -10,6 +10,10 @@ import User from "@/models/user";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import BIDeuda from "@/models/biDeuda";
 import Sucursal from "@/models/sucursal";
+import XetalleVenta from "@/models/xetalleVenta";
+import Xroducto from "@/models/xroducto";
+import ItemCatalogo from "@/models/itemCatalogo";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 
 export async function GET(request) {
     console.log("Connecting to MongoDB...");
@@ -41,6 +45,30 @@ export async function GET(request) {
         console.log("Starting fixing Ventas...");
         await fixingVentas();
         console.log("Fixing Ventas completed successfully");
+    }
+
+    if(q === "mdv") {
+        console.log("Starting migrateDetalleVentas...");
+        await migrateDetalleVentas();
+        console.log("Migration migrateDetalleVentas completed successfully");
+    }
+
+    if(q === "cdv") {
+        console.log("Starting cleanDetalleVentas...");
+        await cleanDetalleVentas();
+        console.log("CleanDetalleVentas completed successfully");
+    }
+
+    if(q === "cdv2") {
+        console.log("Starting completeDetalleVentas...");
+        await completeDetalleVentas();
+        console.log("CompleteDetalleVentas completed successfully");
+    }
+
+    if (q === "lv") {
+        console.log("Starting limpiarVentas...");
+        await limpiarVentas();
+        console.log("LimpiarVentas completed successfully");
     }
 
     return NextResponse.json({ message: "Success migrate and improve" });
@@ -152,6 +180,7 @@ const generateBIDeudas = async () => {
         estado: TIPO_ESTADO_VENTA.entregado,
         porCobrar: true,
         documentoTributarioId: { $in: documentoVentaIds },
+        valorTotal: { $gt: 0 },
         fecha: { $gte: new Date('2024-01-01') }
     });
 
@@ -323,5 +352,153 @@ const fixingVentas = async () => {
         if (Object.keys(update).length > 0) {
             await Venta.updateOne({ _id: venta._id }, update);
         }
+    }
+}
+
+const migrateDetalleVentas = async () => {
+    const ventas = await Venta.find({
+        fecha: { 
+            $gte: new Date('2024-01-01'),
+            $lt: new Date('2025-01-01')
+        }
+    });
+    const totalVentas = ventas.length;
+    let processedVentas = 0;
+
+    for (const venta of ventas) {
+        const xdetalles = await XetalleVenta.find({ codigo: venta.codigo });
+
+        for (const xdetalle of xdetalles) {
+            // Buscar el itemCatalogo por cod_cilindro
+            let itemCatalogoId = null;
+            if (xdetalle.cod_cilindro) {
+                const itemCatalogo = await ItemCatalogo.findOne({ codigo: xdetalle.cod_cilindro });
+                if (itemCatalogo) {
+                    itemCatalogoId = itemCatalogo._id;
+                }
+            }
+            // Crear el detalleVenta correspondiente, ajustando conversión de tipo numérico/texto
+            const detalleVentaData = {
+                temporalId: xdetalle.id,                
+                ventaId: venta._id,
+                itemCatalogoId,
+                codigo: xdetalle.codigo || "",
+                codigoProducto: xdetalle.codigoproducto || "",
+                codigoCilindro: xdetalle.cod_cilindro || null,
+                tipo: xdetalle.tipo === "retiro" ? 2 : 1,
+                cantidad: typeof xdetalle.cantidad === "string" ? Number(xdetalle.cantidad) : (xdetalle.cantidad || 0),
+                especifico: typeof xdetalle.especifico === "string" ? Number(xdetalle.especifico) : (xdetalle.especifico || 0),
+                neto: typeof xdetalle.neto === "string" ? Number(xdetalle.neto) : (xdetalle.neto || 0),
+                iva: typeof xdetalle.iva === "string" ? Number(xdetalle.iva) : (xdetalle.iva || 0),
+                total: typeof xdetalle.total === "string" ? Number(xdetalle.total) : (xdetalle.total || 0)
+            };
+
+            console.log("LEÍDO", xdetalle);
+
+            await DetalleVenta.findOneAndUpdate(
+                { temporalId: xdetalle.id, ventaId: venta._id },
+                detalleVentaData,
+                { upsert: true, new: true }
+            );
+        }
+
+        processedVentas++;
+        if (processedVentas % 100 === 0 || processedVentas === totalVentas) {
+            const percent = ((processedVentas / totalVentas) * 100).toFixed(2);
+            console.log(`Avance DetalleVenta: ${processedVentas}/${totalVentas} (${percent}%)`);
+        }
+    }
+}
+
+const cleanDetalleVentas = async () => {
+    const xdetalles = await XetalleVenta.find({ deleted_at: { $ne: null } });
+    const total = xdetalles.length;
+    let processed = 0;
+
+    for (let i = 0; i < total; i += 1000) {
+        const batch = xdetalles.slice(i, i + 1000);
+        const ids = batch.map(xdetalle => xdetalle.id);
+        await DetalleVenta.deleteMany({ temporalId: { $in: ids } });
+        processed += batch.length;
+        const percent = ((processed / total) * 100).toFixed(2);
+        console.log(`Avance cleanDetalleVentas: ${processed}/${total} (${percent}%)`);
+    }
+}
+
+const completeDetalleVentas = async () => {
+    const ventas = await Venta.find({
+        fecha: { 
+            $gte: new Date('2024-06-01'),
+            $lt: new Date('2025-01-01')
+         }
+    });
+    const totalVentas = ventas.length;
+    let processed = 0;
+
+    console.log("A procesar", totalVentas, "ventas");
+
+    for (const venta of ventas) {
+        const detalles = await DetalleVenta.find({ ventaId: venta._id });
+        let updates = [];
+
+        for (const detalle of detalles) {
+            let subcategoriaCatalogoId = null;
+
+            // Buscar el producto por codigoProducto
+            const xproducto = await Xroducto.findOne({ id: detalle.codigoProducto });
+            if (xproducto && xproducto.subcategoria_id) {
+                // Buscar la subcategoriaCatalogo por temporalId igual al subcategoria_id del producto
+                const subcatCatalogo = await SubcategoriaCatalogo.findOne({ temporalId: xproducto.subcategoria_id });
+                if (subcatCatalogo) {
+                    subcategoriaCatalogoId = subcatCatalogo._id;
+                } else {
+                    console.log(`SubcategoriaCatalogo no encontrada para temporalId: ${xproducto.subcategoria_id}`);
+                }
+            }
+
+            if (subcategoriaCatalogoId) {
+                updates.push({
+                    updateOne: {
+                        filter: { _id: detalle._id },
+                        update: { subcategoriaCatalogoId: subcategoriaCatalogoId }
+                    }
+                });
+            }
+        }
+
+        if (updates.length > 0) {
+            await DetalleVenta.bulkWrite(updates);
+        }
+
+        processed++;
+        if (processed % 1000 === 0 || processed === totalVentas) {
+            const percent = ((processed / totalVentas) * 100).toFixed(2);
+            console.log(`Avance completeDetalleVentas: ${processed}/${totalVentas} (${percent}%)`);
+        }
+    }
+}
+
+const limpiarVentas = async () => {
+    const xentasEliminadas = await Xenta.find({ deleted_at: { $ne: null } });
+    const total = xentasEliminadas.length;
+    let processed = 0;
+
+    for (let i = 0; i < total; i += 1000) {
+        const batch = xentasEliminadas.slice(i, i + 1000);
+        const temporalIds = batch.map(xenta => xenta.id);
+
+        // Buscar ventas por temporalId
+        const ventas = await Venta.find({ temporalId: { $in: temporalIds } });
+        const ventaIds = ventas.map(venta => venta._id);
+
+        // Eliminar ventas
+        await Venta.deleteMany({ _id: { $in: ventaIds } });
+
+        // Eliminar detalleVentas en cascada
+        await DetalleVenta.deleteMany({ ventaId: { $in: ventaIds } });
+
+        processed += batch.length;
+        const percent = ((processed / total) * 100).toFixed(2);
+        console.log(`Avance limpiarVentas: ${processed}/${total} (${percent}%)`);
     }
 }

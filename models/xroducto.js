@@ -11,8 +11,8 @@ const productoSchema = new mongoose.Schema({
     rut: { type: String, default: null },
     fecha_mantencion: { type: Date, default: null },
     afecta_stock: { type: Boolean, default: null },
-    categoria_id: { type: mongoose.Types.ObjectId, ref: 'Categoria' },
-    subcategoria_id: { type: mongoose.Types.ObjectId, ref: 'Subcategoria' },
+    categoria_id: { type: String },
+    subcategoria_id: { type: String },
     nombre: { type: String, default: null },
     descripcion: { type: String, default: null },
     breve: { type: String, default: null },
@@ -36,5 +36,5 @@ const productoSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now }
 });
 
-const Producto = models.Producto || mongoose.model('Producto', productoSchema);
-export default Producto;
+const Xroducto = models.Xroducto || mongoose.model('Xroducto', productoSchema);
+export default Xroducto;
