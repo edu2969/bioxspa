@@ -32,6 +32,7 @@ export default function Deudas() {
     const [pagination, setPagination] = useState({});
     const router = useRouter();
     const { setValue } = useForm();
+    const [redirecting, setRedirecting] = useState(false);
 
     useEffect(() => {
         setClientes([]);
@@ -201,7 +202,10 @@ export default function Deudas() {
                         return (
                             <div
                                 key={cliente._id}
-                                onClick={() => router.push(`/modulos/cobros/${cliente._id}`)}
+                                onClick={() => {
+                                    setRedirecting(true);
+                                    router.push(`/modulos/cobros/${cliente._id}`);
+                                }}
                                 className="relative w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] rounded-lg shadow p-4 border border-gray-200 flex flex-col hover:scale-105 hover:bg-blue-50 hover:top-2 transition-all cursor-pointer"
                             >                               
 
@@ -355,6 +359,11 @@ export default function Deudas() {
                             </button>
                         )}
                     </nav>
+                </div>
+            )}
+            {redirecting && (
+                <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+                    <Loader texto="Cargando..." />
                 </div>
             )}
         </main>

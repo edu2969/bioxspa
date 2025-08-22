@@ -26,7 +26,7 @@ export default function DetalleDeudas({ clienteId }) {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const [editandoCreditoDisponible, setEditandoCreditoDisponible] = useState(false);
-    const { register, getValues } = useForm();
+    const { register, getValues, setValue, resetField, watch } = useForm();
     const [creditoAutorizado, setCreditoAutorizado] = useState(0);
     const [porCobrar, setPorCobrar] = useState(true);
     const [pagarModal, setPagarModal] = useState(false);
@@ -35,7 +35,7 @@ export default function DetalleDeudas({ clienteId }) {
     const [montoAPagar, setMontoAPagar] = useState(0);
     const [archivoCargado, setArchivoCargado] = useState(null);
     const [pagosSeleccionados, setPagosSeleccionados] = useState(new Set());
-    const [detalleExpandido, setDetalleExpandido] = useState(null);
+    const [detalleExpandido, setDetalleExpandido] = useState(null);  
 
     const uploadFileRef = useRef(null);
 
@@ -158,6 +158,57 @@ export default function DetalleDeudas({ clienteId }) {
         const nuevoMonto = clean === "" ? 0 : Number(clean);
         setMontoAPagar(nuevoMonto);
         setFaltaMonto(nuevoMonto === 0);
+    };
+
+    const formaPago = watch("formaPago");
+    const numeroDocumento = watch("numeroDocumento");
+
+    const pagoInvalido = () => {
+        // Validaciones adicionales
+        const montoValido = montoAPagar > 0;
+        const montoCubierto = Array.from(pagosSeleccionados).reduce((acc, venta) => acc + (venta.pago ?? venta.saldo), 0) === montoAPagar;
+
+        console.log("PAGO INVALIDO >>", !(
+            montoValido &&
+            formaPago > 0 &&
+            (numeroDocumento?.trim() ?? "") != "" &&
+            montoCubierto
+        ))
+
+        // Retorna true si alguna validación falla
+        return !(
+            montoValido &&
+            formaPago > 0 &&
+            (numeroDocumento?.trim() ?? "") != "" &&
+            montoCubierto
+        );
+    }
+
+    const handlePagar = () => {
+        setPagarModal(true);
+
+        // Distribuir montoAPagar entre las ventas seleccionadas
+        let montoRestante = montoAPagar;
+        const nuevasVentas = Array.from(pagosSeleccionados).map((venta) => {
+            const maxPago = Math.min(venta.total, montoRestante);
+            montoRestante -= maxPago;
+            return { ...venta, pago: maxPago };
+        });
+
+        setPagosSeleccionados(new Set(nuevasVentas));
+        nuevasVentas.forEach((venta, idx) => {
+            setValue(`pagos.${idx}.monto`, venta.pago);
+        });
+    };
+
+    const reset = () => {
+        setMontoAPagar(0);
+        setFaltaMonto(true);
+        setPagosSeleccionados(prev => {
+            return new Set(Array.from(prev).map(v => ({ ...v, pago: 0 })));
+        });
+        resetField("formaPago");
+        resetField("numeroDocumento");
     };
 
     return (
@@ -309,7 +360,7 @@ export default function DetalleDeudas({ clienteId }) {
                         <span className={`border border-b-0 border-gray-200 rounded-tr-xl text-md px-4 py-1 z-10 -ml-2 ${!porCobrar ? 'bg-gray-100 font-bold' : 'bg-white text-gray-400 cursor-pointer hover:font-bold hover:text-gray-600'}`}
                             onClick={() => setPorCobrar(false)}>PAGOS</span>
                         <button className={`flex h-10 rounded-md px-3 text-white -mt-3 ml-12 justify-center items-center ${pagosSeleccionados.size ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
-                            onClick={() => setPagarModal(true)}
+                            onClick={handlePagar}
                             disabled={!pagosSeleccionados.size}
                         >
                             <TbMoneybag className="mr-2" size={22} />{pagosSeleccionados.size ? `Pagar ${pagosSeleccionados.size} seleccionados` : `Seleccione ventas`}
@@ -333,7 +384,7 @@ export default function DetalleDeudas({ clienteId }) {
                                                 <input type="checkbox"
                                                     {...register(`ventas.${idx}.selected`)}
                                                     className="mr-2 w-5 h-5"
-                                                    onClick={(e)=>{
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
                                                         setPagosSeleccionados(prev => {
                                                             const newSelected = new Set(prev);
@@ -414,7 +465,7 @@ export default function DetalleDeudas({ clienteId }) {
                             <LiaTimesSolid />
                         </button>
                         <h2 className="text-xl font-bold mb-2 text-center">Efectuar pago</h2>
-                        
+
                         <div className="flex flex-wrap gap-4">
                             <div className="space-y-4">
                                 <div className="flex space-x-3">
@@ -439,11 +490,13 @@ export default function DetalleDeudas({ clienteId }) {
                                     </div>
                                     <div className="w-48">
                                         <span className="ml-2">Forma de pago</span>
-                                        <select className="w-full rounded border p-2 mt-1">
-                                            <option>Seleccione</option>
-                                            <option>Transferencia</option>
-                                            <option>Cheque</option>
-                                            <option>Vale vista</option>
+                                        <select
+                                            {...register("formaPago", { required: true, defaultValue: 0 })}
+                                            className="w-full rounded border p-2 mt-1">
+                                            <option value={0}>Seleccione</option>
+                                            <option value={1}>Transferencia</option>
+                                            <option value={2}>Cheque</option>
+                                            <option value={3}>Vale vista</option>
                                         </select>
                                     </div>
                                 </div>
@@ -451,7 +504,7 @@ export default function DetalleDeudas({ clienteId }) {
                                 <div className="flex space-x-3">
                                     <div className="w-48">
                                         <span className="ml-2">N° documento</span>
-                                        <input
+                                        <input {...register("numeroDocumento", { required: true, defaultValue: "" })}
                                             type="text"
                                             className="block border rounded px-2 py-2 mt-1"
                                             placeholder="Número"
@@ -459,8 +512,20 @@ export default function DetalleDeudas({ clienteId }) {
                                         />
                                     </div>
                                     <div className="w-full text-center mt-1">
-                                        <p className="text-4xl">38<small>%</small></p>
-                                        <span className="text-gray-500">Cubierto</span>
+                                        {(() => {
+                                            const totalMontos = Array.from(pagosSeleccionados).reduce((acc, curr) => {
+                                                return acc + Number(curr.pago);
+                                            }, 0);
+                                            console.log("NUEVO TOTAL", totalMontos, montoAPagar);
+                                            // Suma el monto a cubrir (input de cada venta)
+                                            const porcentaje = montoAPagar > 0 ? Math.round((totalMontos / montoAPagar) * 100) : 0;
+                                            return (
+                                                <>
+                                                    <p className="text-4xl font-bold orbitron">{porcentaje}<small>%</small></p>
+                                                    <span className="text-gray-500">Cubierto</span>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -502,79 +567,85 @@ export default function DetalleDeudas({ clienteId }) {
                                         <th className="p-2 border">n°</th>
                                         <th className="p-2 border">Total</th>
                                         <th className="p-2 border">Saldo</th>
-                                        <th className="p-2 border">Monto a pagar / Estado</th>                                        
+                                        <th className="p-2 border">Monto a pagar / Estado</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Array.from(pagosSeleccionados).map((venta, idx) => (
-                                        <tr key={idx}>
-                                            <td className="p-2 border">{idx + 1}.</td>
-                                            <td className="p-2 border">{venta.total.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</td>
-                                            <td className="p-2 border">{venta.saldo.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</td>
-                                            <td className="p-2 border">
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={venta.saldo}
-                                                    className="border rounded px-2 py-1 w-24 text-right"
-                                                    value={venta.pago ?? venta.saldo}
-                                                    onChange={e => {
-                                                        const nuevoPago = Number(e.target.value);
-                                                        setPagosSeleccionados(prev => {
-                                                            const newSet = new Set(prev);
-                                                            newSet.delete(venta);
-                                                            newSet.add({ ...venta, pago: nuevoPago });
-                                                            return newSet;
-                                                        });
-                                                    }}
-                                                />
-                                                <span className="text-green-600 ml-2">Cubierto</span>
-                                                <span className="text-red-600 ml-2">Excede en $4.500</span>
-                                                <span className="text-gray-500">Faltan $4.5000</span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {Array.from(pagosSeleccionados).map((venta, idx) => {
+                                        const pago = venta.pago ?? venta.saldo;
+                                        const saldoRestante = (venta.total - pago);
+                                        return (
+                                            <tr key={idx}>
+                                                <td className="p-2 border">{idx + 1}.</td>
+                                                <td className="p-2 border">{venta.total.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</td>
+                                                <td className="p-2 border">{saldoRestante.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</td>
+                                                <td className="p-2 border">
+                                                    $ <input
+                                                        type="number"
+                                                        {...register(`pagos.${idx}.monto`)}
+                                                        min={0}
+                                                        max={venta.total}
+                                                        className="border rounded px-2 py-1 w-24 text-right"
+                                                        onChange={e => {
+                                                            const nuevoPago = Number(e.target.value);
+                                                            setPagosSeleccionados(prev => {
+                                                                // Mantener el orden, actualizando solo el objeto correspondiente
+                                                                return new Set(Array.from(prev).map((v, i) =>
+                                                                    i === idx ? { ...v, pago: nuevoPago } : v
+                                                                ));
+                                                            });
+                                                        }}
+                                                    />
+                                                    <span
+                                                        className={`text-xs text-white rounded px-1 ml-2 cursor-pointer ${
+                                                            Number(venta.pago ?? venta.saldo) < venta.total
+                                                                ? "bg-blue-400 hover:bg-blue-300 cursor-pointer"
+                                                                : "bg-gray-400 cursor-not-allowed"
+                                                        }`}
+                                                        onClick={() => {
+                                                            if (Number(venta.pago ?? venta.saldo) < venta.total) {
+                                                                // Calcular el monto restante a cubrir
+                                                                const cubiertos = Array.from(pagosSeleccionados)
+                                                                    .reduce((acc, v, i) => i === idx ? acc : acc + (v.pago ?? v.saldo), 0);
+                                                                const restante = Math.max(0, montoAPagar - cubiertos);
+                                                                const maxPago = Math.min(restante, venta.total);
+                                                                setPagosSeleccionados(prev => {
+                                                                    return new Set(Array.from(prev).map((v, i) =>
+                                                                        i === idx ? { ...v, pago: maxPago } : v
+                                                                    ));
+                                                                });
+                                                                setValue(`pagos.${idx}.monto`, maxPago);
+                                                            }
+                                                        }}
+                                                    >
+                                                        Cubrir max
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
-                            {(() => {
-                                const pagosArray = Array.from(pagosSeleccionados);
-                                const sumaPagos = pagosArray.reduce((acc, v) => acc + (v.pago ?? v.saldo), 0);
-                                if (!montoAPagar) return null;
-                                let glosa = "";
-                                let color = "text-gray-700";
-                                if (sumaPagos < montoAPagar) {
-                                    glosa = `Faltan ${(montoAPagar - sumaPagos).toLocaleString("es-CL", { style: "currency", currency: "CLP" })} para cubrir el monto`;
-                                    color = "text-orange-600";
-                                } else if (sumaPagos > montoAPagar) {
-                                    glosa = `Excede ${(sumaPagos - montoAPagar).toLocaleString("es-CL", { style: "currency", currency: "CLP" })} el monto a cubrir`;
-                                    color = "text-red-600";
-                                } else {
-                                    glosa = "Monto cubierto exactamente";
-                                    color = "text-green-600";
-                                }
-                                return (
-                                    <div className={`font-bold mt-2 ${color}`}>
-                                        Total pagos: {sumaPagos.toLocaleString("es-CL", { style: "currency", currency: "CLP" })} <br />
-                                        {glosa}
-                                    </div>
-                                );
-                            })()}
                         </div>
 
                         <div className="mt-6 flex gap-3">
                             <button
                                 className="w-full h-12 rounded font-semibold bg-gray-600 text-white hover:bg-gray-700"
-                                onClick={() => setPagarModal(false)}
+                                onClick={() => {                                    
+                                    setPagarModal(false);
+                                    reset();
+                                }}
                                 disabled={guardando}
                             >
                                 Cancelar
                             </button>
                             <button
-                                className={`w-full h-12 rounded font-semibold text-white ${!guardando ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}
+                                className={`w-full h-12 rounded font-semibold text-white ${!guardando && !pagoInvalido() ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}
                                 onClick={() => setGuardando(true)}
+                                disabled={pagoInvalido()}
                             >
                                 {guardando ? <div className="relative"><Loader texto="Guardando pago" /></div> : "Guardar pago"}
-                            </button>                            
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -187,70 +187,72 @@ export default function GestionPedidos({ session }) {
     }
 
     return (
-        <main className="px-4 py-8 h-screen bg-gray-50">
+        <main className="py-8 h-screen bg-gray-50">
             <h1 className="text-2xl font-bold mb-8 text-center">Gestión de Pedidos</h1>
-            {!loading && <div className="flex flex-wrap gap-6">
-                {pedidos.map((pedido) => (
-                    <div
-                        key={pedido._id}
-                        className="w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] space-y-6 cursor-pointer"
-                        onClick={() => handleOpenPedido(pedido)}
-                    >
+            <div className="w-full pb-4 px-4 h-[calc(100vh-98px)] overflow-y-scroll">
+                {!loading && <div className="flex flex-wrap gap-6">
+                    {pedidos.map((pedido) => (
                         <div
-                            data-edit-pedido
-                            data-id={pedido._id}
-                            className="bg-white rounded-lg shadow p-4 border border-gray-200 hover:shadow-lg hover:scale-105 transition"
-                        >                            
-                            <div className="flex justify-between items-center mb-2">
-                                <div>
-                                    <p className="font-semibold text-lg">{pedido.cliente.nombre}</p>
-                                    <p className="text-xs text-gray-500">{pedido.cliente.rut}</p>
+                            key={pedido._id}
+                            className="w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] space-y-6 cursor-pointer"
+                            onClick={() => handleOpenPedido(pedido)}
+                        >
+                            <div
+                                data-edit-pedido
+                                data-id={pedido._id}
+                                className="bg-white rounded-lg shadow p-4 border border-gray-200 hover:shadow-lg hover:scale-105 transition"
+                            >                            
+                                <div className="flex justify-between items-center mb-2">
+                                    <div>
+                                        <p className="font-semibold text-lg">{pedido.cliente.nombre}</p>
+                                        <p className="text-xs text-gray-500">{pedido.cliente.rut}</p>
+                                    </div>
+                                    <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-0.5 -mt-6">
+                                        {formatFecha(pedido.fecha)}
+                                    </span>
                                 </div>
-                                <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-0.5 -mt-6">
-                                    {formatFecha(pedido.fecha)}
-                                </span>
-                            </div>
-                            <div className="mb-2">
-                                <p className="text-sm font-medium text-gray-700 mb-1">Solicitante:</p>
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <span className="font-semibold">{pedido.solicitante.nombre}</span>
-                                    <span>|</span>
-                                    <span>{pedido.solicitante.telefono}</span>
+                                <div className="mb-2">
+                                    <p className="text-sm font-medium text-gray-700 mb-1">Solicitante:</p>
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                        <span className="font-semibold">{pedido.solicitante.nombre}</span>
+                                        <span>|</span>
+                                        <span>{pedido.solicitante.telefono}</span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div>
-                                <p className="text-sm font-medium text-gray-700 mb-1">Pedido:</p>
-                                <ul className="space-y-1">
-                                    {pedido.items.map((item, idx2) => (
-                                        <li key={idx2} className="flex justify-between items-center text-sm">
-                                            <span>
-                                                {item.cantidad} x {item.producto} {item.capacidad}
-                                            </span>
-                                            <span className="ml-2 flex items-center">
-                                                {idx2 === 1 && item.precio !== undefined && (
-                                                    <span className="mr-1 text-red-600 text-lg">
-                                                        <IoMdAlert />
-                                                    </span>
-                                                )}
-                                                {item.precio !== undefined ? (
-                                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                                        ${amountFormat(item.precio)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded">
-                                                        Sin precio
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-700 mb-1">Pedido:</p>
+                                    <ul className="space-y-1">
+                                        {pedido.items.map((item, idx2) => (
+                                            <li key={idx2} className="flex justify-between items-center text-sm">
+                                                <span>
+                                                    {item.cantidad} x {item.producto} {item.capacidad}
+                                                </span>
+                                                <span className="ml-2 flex items-center">
+                                                    {idx2 === 1 && item.precio !== undefined && (
+                                                        <span className="mr-1 text-red-600 text-lg">
+                                                            <IoMdAlert />
+                                                        </span>
+                                                    )}
+                                                    {item.precio !== undefined ? (
+                                                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                            ${amountFormat(item.precio)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded">
+                                                            Sin precio
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>}
+                    ))}
+                </div>}
+            </div>
 
             {pedidoEdit && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
