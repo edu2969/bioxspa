@@ -18,6 +18,6 @@ const HistorialGasSchema = new mongoose.Schema({
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-const HistorialGas = mongoose.models.HistorialGas || mongoose.model('HistorialGas', HistorialGasSchema);
+const XistorialGas = mongoose.models.XistorialGas || mongoose.model('XistorialGas', HistorialGasSchema);
 
-export default HistorialGas;
+export default XistorialGas;

@@ -35,21 +35,36 @@ export default function DetalleDeudas({ clienteId }) {
     const [montoAPagar, setMontoAPagar] = useState(0);
     const [archivoCargado, setArchivoCargado] = useState(null);
     const [pagosSeleccionados, setPagosSeleccionados] = useState(new Set());
-    const [detalleExpandido, setDetalleExpandido] = useState(null);  
+    const [detalleExpandido, setDetalleExpandido] = useState(null);
+    const [formasPago, setFormasPago] = useState([]);
 
     const uploadFileRef = useRef(null);
 
+    const fetchFormasPago = async () => {
+        const res = await fetch("/api/formaPago");
+        const data = await res.json();
+        setFormasPago(data);
+    };
+
+    const fetchCobros = async () => {
+        fetch(`/api/cobros/detalle?id=${clienteId}`)
+        .then(res => res.json())
+        .then(data => {
+            console.log("Datos del cliente:", data);
+            setCliente(data.cliente);
+            setCreditoAutorizado(data.cliente.credito || 0);
+            setLoading(false);
+        });
+    }
+
     useEffect(() => {
+        const actualizarCobros = async() => {
+            await fetchCobros();
+        }
+        fetchFormasPago();
         if (!clienteId) return;
         setLoading(true);
-        fetch(`/api/cobros/detalle?id=${clienteId}`)
-            .then(res => res.json())
-            .then(data => {
-                console.log("Datos del cliente:", data);
-                setCliente(data.cliente);
-                setCreditoAutorizado(data.cliente.credito || 0);
-                setLoading(false);
-            });
+        actualizarCobros();
     }, [clienteId]);
 
     useEffect(() => {
@@ -170,7 +185,7 @@ export default function DetalleDeudas({ clienteId }) {
 
         console.log("PAGO INVALIDO >>", !(
             montoValido &&
-            formaPago > 0 &&
+            formaPago != "" &&
             (numeroDocumento?.trim() ?? "") != "" &&
             montoCubierto
         ))
@@ -178,7 +193,7 @@ export default function DetalleDeudas({ clienteId }) {
         // Retorna true si alguna validación falla
         return !(
             montoValido &&
-            formaPago > 0 &&
+            formaPago != "" &&
             (numeroDocumento?.trim() ?? "") != "" &&
             montoCubierto
         );
@@ -210,6 +225,47 @@ export default function DetalleDeudas({ clienteId }) {
         resetField("formaPago");
         resetField("numeroDocumento");
     };
+
+    const handleEnviarPago = async() => {
+        setGuardando(true);
+        const ventas = Array.from(pagosSeleccionados).map(v => ({
+            _id: v.ventaId,
+            monto: v.pago ?? v.saldo
+        }));
+
+        const body = {
+            ventas,
+            formaPagoId: formaPago,
+            fecha: new Date().toISOString(),
+            adjuntoUrls: [] // puedes agregar URLs si tienes archivos
+        };
+
+        try {
+            const res = await fetch("/api/cobros/pagar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Pago registrado correctamente");
+                setPagarModal(false);
+                reset();
+            } else {
+                toast.error(data.error || "Error al registrar pago");
+            }
+        } catch (err) {
+            toast.error("Error de red al registrar pago");
+        } finally {
+            setGuardando(false);
+            for(var i=0; i<pagosSeleccionados.size; i++) {
+                setValue(`ventas.${i}.selected`, false);
+            }
+            setPagosSeleccionados(new Set());
+            setLoading(true);
+            await fetchCobros();
+        }
+    }
 
     return (
         <main className="w-full mt-3">
@@ -363,7 +419,7 @@ export default function DetalleDeudas({ clienteId }) {
                             onClick={handlePagar}
                             disabled={!pagosSeleccionados.size}
                         >
-                            <TbMoneybag className="mr-2" size={22} />{pagosSeleccionados.size ? `Pagar ${pagosSeleccionados.size} seleccionados` : `Seleccione ventas`}
+                            <TbMoneybag className="mr-2" size={22} />{pagosSeleccionados.size ? `Pagar ${Array.from(pagosSeleccionados).reduce((acc, curr) => acc + curr.total, 0).toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : `Seleccione ventas`}
                         </button>
                     </div>
                     <div className="overflow-x-auto">
@@ -493,10 +549,10 @@ export default function DetalleDeudas({ clienteId }) {
                                         <select
                                             {...register("formaPago", { required: true, defaultValue: 0 })}
                                             className="w-full rounded border p-2 mt-1">
-                                            <option value={0}>Seleccione</option>
-                                            <option value={1}>Transferencia</option>
-                                            <option value={2}>Cheque</option>
-                                            <option value={3}>Vale vista</option>
+                                            <option value="">Seleccione</option>
+                                            {formasPago.map((fp) => (
+                                                <option key={fp._id} value={fp._id}>{fp.nombre}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -641,7 +697,7 @@ export default function DetalleDeudas({ clienteId }) {
                             </button>
                             <button
                                 className={`w-full h-12 rounded font-semibold text-white ${!guardando && !pagoInvalido() ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}
-                                onClick={() => setGuardando(true)}
+                                onClick={handleEnviarPago}
                                 disabled={pagoInvalido()}
                             >
                                 {guardando ? <div className="relative"><Loader texto="Guardando pago" /></div> : "Guardar pago"}
