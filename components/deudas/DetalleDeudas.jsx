@@ -47,11 +47,11 @@ export default function DetalleDeudas({ clienteId }) {
 
     const uploadFileRef = useRef(null);
 
-    const fetchFormasPago = async () => {
+    const fetchFormasPago = useCallback(async () => {
         const res = await fetch("/api/formaPago");
         const data = await res.json();
         setFormasPago(data);
-    };
+    }, [setFormasPago]);
 
     const fetchVentas = useCallback(async () => {
         setLoadingVentas(true);
@@ -232,8 +232,7 @@ export default function DetalleDeudas({ clienteId }) {
     }
 
     const handlePagar = () => {
-        setPagarModal(true);
-
+        
         // Distribuir montoAPagar entre las ventas seleccionadas
         let montoRestante = montoAPagar;
         const nuevasVentas = Array.from(pagosSeleccionados).map((venta) => {
@@ -241,11 +240,14 @@ export default function DetalleDeudas({ clienteId }) {
             montoRestante -= maxPago;
             return { ...venta, pago: maxPago };
         });
-
+        
         setPagosSeleccionados(new Set(nuevasVentas));
         nuevasVentas.forEach((venta, idx) => {
             setValue(`pagos.${idx}.monto`, venta.pago);
         });
+
+        setMontoAPagar(Array.from(pagosSeleccionados).reduce((acc, curr) => acc + curr.total, 0));
+        setPagarModal(true);
     };
 
     const reset = () => {
