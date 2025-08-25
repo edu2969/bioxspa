@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Cliente from "@/models/cliente";
 import BIDeuda from "@/models/biDeuda";
+import Venta from "@/models/venta";
 
 export async function GET(request) {
     try {
@@ -21,6 +23,11 @@ export async function GET(request) {
         if (![0, 30, 60, 90].includes(q)) {
             console.warn("Parámetro 'q' inválido:", q);
             return NextResponse.json({ ok: false, error: "Invalid 'q' parameter" }, { status: 400 });
+        }
+
+        
+        if (!mongoose.models.Venta) {
+            mongoose.model("Venta", Venta.schema);
         }
 
         // Calcular periodoFecha

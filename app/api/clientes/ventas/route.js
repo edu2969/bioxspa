@@ -2,53 +2,14 @@ import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Venta from "@/models/venta";
+import DetalleVenta from "@/models/detalleVenta";
 import User from "@/models/user";
 import Cliente from "@/models/cliente"; // Asumiendo que existe el modelo Cliente
 import DocumentoTributario from "@/models/documentoTributario";
 import Direccion from "@/models/direccion";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import Pago from "@/models/pago";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-
-function getLast6Months() {
-    const months = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push({
-            label: d.toLocaleString("es-CL", { month: "short", year: "2-digit" }),
-            year: d.getFullYear(),
-            month: d.getMonth()
-        });
-    }
-    return months;
-}
-
-function generateFakeDebtData(ventas, pagos) {
-    // Genera datos ficticios para los últimos 6 meses
-    const months = getLast6Months();
-    let deudaAcumulada = 0;
-    let pagoAcumulado = 0;
-    return months.map((m) => {
-        // Suma ventas y pagos de ese mes
-        const ventasMes = ventas.filter(v => {
-            const d = new Date(v.fecha);
-            return d.getFullYear() === m.year && d.getMonth() === m.month;
-        });
-        const pagosMes = pagos.filter(p => {
-            const d = new Date(p.fecha);
-            return d.getFullYear() === m.year && d.getMonth() === m.month;
-        });
-        deudaAcumulada += ventasMes.reduce((sum, v) => sum + v.valorTotal, 0);
-        pagoAcumulado += pagosMes.reduce((sum, p) => sum + p.monto, 0);
-        return {
-            mes: m.label,
-            deuda: deudaAcumulada,
-            pago: pagoAcumulado
-        };
-    });
-}
 
 export async function GET(request) {
     await connectMongoDB();
@@ -93,30 +54,49 @@ export async function GET(request) {
         valorTotal: { $gt: 0 },
         documentoTributarioId: { $in: documentoIds }
     })
-        .populate("vendedorId", "name email telefono")
+        .populate("vendedorId", "name email")
         .populate("documentoTributarioId", "nombre")
-        .populate("direccionDespachoId", "direccion")
         .sort({ fecha: -1 })
         .lean();
 
-    const pagos = await Pago.find({ clienteId }).sort({ fecha: -1 }).limit(1).lean();
+    // Busca detalles de cada venta
+    const ventaIds = ventas.map(v => v._id);
+    const detalles = await DetalleVenta.find({ ventaId: { $in: ventaIds } }).populate({
+        path: "subcategoriaCatalogoId",
+        select: "cantidad unidad sinSifon categoriaCatalogoId",
+        populate: {
+            path: "categoriaCatalogoId",
+            select: "esIndustrial codigo elemento"
+        }
+    }).lean();
 
-    // Genera gráfico de deuda/pago últimos 6 meses
-    const graficoDeuda = generateFakeDebtData(ventas, pagos);
+    // Adorna ventas con detalles y vendedor
+    const ventasDetalladas = ventas.map(v => {
+        const detallesVenta = detalles.filter(d => d.ventaId.toString() === v._id.toString());
+        return {
+            ventaId: v._id,
+            folio: v.codigo,
+            fecha: v.fecha,
+            total: v.valorTotal,
+            saldo: v.saldo ?? 0,
+            vendedor: v.vendedorId?.name || "",
+            documento: v.documentoTributarioId?.nombre || "",
+            direccion: v.direccionDespachoId?.direccion || "",
+            detalles: detallesVenta.map(d => ({
+                glosa: (d.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento || "") + " " + (d.subcategoriaCatalogoId?.cantidad || 0) + (d.subcategoriaCatalogoId?.unidad || ""),
+                cantidad: d.cantidad,
+                neto: d.neto,
+                iva: d.iva,
+                total: d.total,
+                sinSifon: d.subcategoriaCatalogoId?.sinSifon || false,
+                esIndustrial: d.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false,
+            }))
+        };
+    });    
 
     // Respuesta
     return NextResponse.json({
         ok: true,
-        cliente: {
-            _id: cliente._id,
-            nombre: cliente.nombre,
-            rut: cliente.rut,
-            credito: cliente.credito ?? 0,
-            totalDeuda: ventas.reduce((sum, v) => sum + v.valorTotal, 0),
-            disponible: (cliente.credito ?? 0) - ventas.reduce((sum, v) => sum + v.valorTotal, 0),
-            ultimaVenta: ventas[0]?.fecha || null,
-            ultimoPago: pagos[0]?.fecha || null,
-            graficoDeuda,
-        }
+        ventas: ventasDetalladas
     });
 }

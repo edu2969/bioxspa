@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { CircularProgressbar } from "react-circular-progressbar";
 import 'react-circular-progressbar/dist/styles.css';
 import { FiPhone, FiMail } from "react-icons/fi";
@@ -28,7 +28,6 @@ export default function DetalleDeudas({ clienteId }) {
     const [editandoCreditoDisponible, setEditandoCreditoDisponible] = useState(false);
     const { register, getValues, setValue, resetField, watch } = useForm();
     const [creditoAutorizado, setCreditoAutorizado] = useState(0);
-    const [porCobrar, setPorCobrar] = useState(true);
     const [pagarModal, setPagarModal] = useState(false);
     const [guardando, setGuardando] = useState(false);
     const [faltaMonto, setFaltaMonto] = useState(true);
@@ -37,6 +36,14 @@ export default function DetalleDeudas({ clienteId }) {
     const [pagosSeleccionados, setPagosSeleccionados] = useState(new Set());
     const [detalleExpandido, setDetalleExpandido] = useState(null);
     const [formasPago, setFormasPago] = useState([]);
+    const [ventas, setVentas] = useState([]);
+    const [pagos, setPagos] = useState([]);
+    const [cilindros, setCilindros] = useState([]);
+    const [loadingVentas, setLoadingVentas] = useState(false);
+    const [loadingPagos, setLoadingPagos] = useState(false);
+    const [loadingCilindros, setLoadingCilindros] = useState(false);
+    const [updatingCredito, setUpdatingCredito] = useState(false);
+    const [tabSelected, setTabSelected] = useState(0);
 
     const uploadFileRef = useRef(null);
 
@@ -46,7 +53,46 @@ export default function DetalleDeudas({ clienteId }) {
         setFormasPago(data);
     };
 
-    const fetchCobros = async () => {
+    const fetchVentas = useCallback(async () => {
+        setLoadingVentas(true);
+        fetch(`/api/clientes/ventas?id=${clienteId}`)
+            .then(res => res.json())
+            .then(data => {
+                console.log("Datos de ventas:", data);
+                setVentas(data.ventas);
+            })
+            .finally(() => {
+                setLoadingVentas(false);
+            });
+    }, [clienteId, setVentas, setLoadingVentas]);
+
+    const fetchPagos = useCallback(async () => {
+        setLoadingPagos(true);
+        fetch(`/api/clientes/pagos?id=${clienteId}`)
+            .then(res => res.json())
+            .then(data => {
+                console.log("Datos de pagos:", data);
+                setPagos(data.pagos);
+            })
+            .finally(() => {
+                setLoadingPagos(false);
+            });
+    }, [clienteId, setPagos, setLoadingPagos]);
+
+    const fetchCilindros = useCallback(async () => {
+        setLoadingCilindros(true);
+        fetch(`/api/clientes/cilindros?id=${clienteId}`)
+            .then(res => res.json())
+            .then(data => {
+                console.log("Datos de cilindros:", data);
+                setCilindros(data.cilindros);
+            })
+            .finally(() => {
+                setLoadingCilindros(false); 
+            });
+    }, [clienteId, setCilindros, setLoadingCilindros]);    
+
+    const fetchCobros = useCallback(async () => {
         fetch(`/api/cobros/detalle?id=${clienteId}`)
         .then(res => res.json())
         .then(data => {
@@ -55,17 +101,19 @@ export default function DetalleDeudas({ clienteId }) {
             setCreditoAutorizado(data.cliente.credito || 0);
             setLoading(false);
         });
-    }
+    }, [clienteId, setCliente, setCreditoAutorizado, setLoading]);
 
     useEffect(() => {
         const actualizarCobros = async() => {
             await fetchCobros();
+            await fetchVentas();
+            await fetchCilindros();
         }
         fetchFormasPago();
         if (!clienteId) return;
         setLoading(true);
         actualizarCobros();
-    }, [clienteId]);
+    }, [clienteId, fetchCobros]);
 
     useEffect(() => {
         console.log("PAGOS SELECCIONADOS", pagosSeleccionados);
@@ -108,23 +156,6 @@ export default function DetalleDeudas({ clienteId }) {
         return new Date(new Date().getFullYear(), new Date().getMonth() - (11 - i), 1);
     });
 
-    // const chartData = [
-    //     {
-    //         category: "Deuda",
-    //         points: meses.map((date, i) => ({
-    //             date,
-    //             value: deudasData[i]?.deuda ?? 0
-    //         }))
-    //     },
-    //     {
-    //         category: "Pagos",
-    //         points: meses.map((date, i) => ({
-    //             date,
-    //             value: pagosData[i]?.pago ?? 0
-    //         }))
-    //     }
-    // ];
-
     // Valores aleatorios para los últimos 6 meses
     const chartData = [
         {
@@ -144,7 +175,7 @@ export default function DetalleDeudas({ clienteId }) {
     ];
 
     const guardarCambios = () => {
-        console.log(">>>", JSON.stringify({ clienteId, credito: creditoAutorizado }));
+        setUpdatingCredito(true);
         fetch("/api/clientes/creditos/nuevoDisponible", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -164,6 +195,7 @@ export default function DetalleDeudas({ clienteId }) {
                 toast.error("Error de red al actualizar crédito");
             })
             .finally(() => {
+                setUpdatingCredito(false);
                 setEditandoCreditoDisponible(false);
             });
     };
@@ -236,6 +268,7 @@ export default function DetalleDeudas({ clienteId }) {
         const body = {
             ventas,
             formaPagoId: formaPago,
+            numeroDocumento: numeroDocumento.trim(),
             fecha: new Date().toISOString(),
             adjuntoUrls: [] // puedes agregar URLs si tienes archivos
         };
@@ -254,16 +287,15 @@ export default function DetalleDeudas({ clienteId }) {
             } else {
                 toast.error(data.error || "Error al registrar pago");
             }
-        } catch (err) {
+        } catch {
             toast.error("Error de red al registrar pago");
         } finally {
             setGuardando(false);
             for(var i=0; i<pagosSeleccionados.size; i++) {
                 setValue(`ventas.${i}.selected`, false);
             }
-            setPagosSeleccionados(new Set());
-            setLoading(true);
-            await fetchCobros();
+            setPagosSeleccionados(new Set());            
+            await fetchVentas();
         }
     }
 
@@ -302,7 +334,7 @@ export default function DetalleDeudas({ clienteId }) {
                         </div>
                     </div>
 
-                    <div className="w-[220px] mr-4 border rounded-lg px-2"
+                    <div className="w-[220px] mr-4 border rounded-lg px-2 relative "
                         style={{ height: "284px" }}>
                         <span className="text-xs font-bold mb-2">Cilindros</span>
                         <div className="overflow-y-auto w-full" style={{ maxHeight: "210px" }}>
@@ -314,7 +346,7 @@ export default function DetalleDeudas({ clienteId }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(cliente.cilindros ?? []).map((cil, idx) => (
+                                    {(cilindros ?? []).map((cil, idx) => (
                                         <tr key={cil._id || idx} className="border-b">
                                             <td className="p-1">{cil.codigo}</td>
                                             <td className="p-1">
@@ -330,7 +362,10 @@ export default function DetalleDeudas({ clienteId }) {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </div>                        
+                        {loadingCilindros && <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-76">
+                            <Loader texto="Cargando..."/>
+                        </div>}
                     </div>
 
                     <div className="flex flex-col items-center justify-center gap-2 w-[220px] mr-4 border rounded-lg px-2">
@@ -392,6 +427,10 @@ export default function DetalleDeudas({ clienteId }) {
                                             {disponible.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}
                                         </span>
                                     </div>}
+
+                                {updatingCredito && <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-76">
+                                    <Loader texto="Actualizando..."/>
+                                </div>}
                             </div>
                         </div>
                     </div>
@@ -411,10 +450,18 @@ export default function DetalleDeudas({ clienteId }) {
 
                 <div className="px-6 -mt-8">
                     <div className="flex mt-2">
-                        <span className={`border border-b-0 border-gray-200 rounded-tr-xl text-md px-4 py-1 z-20 ${porCobrar ? 'bg-gray-100 font-bold' : 'bg-white text-gray-400 cursor-pointer hover:font-bold hover:text-gray-600'}`}
-                            onClick={() => setPorCobrar(true)}>POR COBRAR</span>
-                        <span className={`border border-b-0 border-gray-200 rounded-tr-xl text-md px-4 py-1 z-10 -ml-2 ${!porCobrar ? 'bg-gray-100 font-bold' : 'bg-white text-gray-400 cursor-pointer hover:font-bold hover:text-gray-600'}`}
-                            onClick={() => setPorCobrar(false)}>PAGOS</span>
+                        <span className={`border border-b-0 border-gray-200 rounded-tr-xl text-md px-4 py-1 z-20 ${tabSelected == 0 ? 'bg-gray-100 font-bold' : 'bg-white text-gray-400 cursor-pointer hover:font-bold hover:text-gray-600'}`}
+                            onClick={() => {
+                                if(tabSelected == 0) return;
+                                fetchVentas();
+                                setTabSelected(0);                                
+                            }}>POR COBRAR</span>
+                        <span className={`border border-b-0 border-gray-200 rounded-tr-xl text-md px-4 py-1 z-10 -ml-2 ${tabSelected == 1 ? 'bg-gray-100 font-bold' : 'bg-white text-gray-400 cursor-pointer hover:font-bold hover:text-gray-600'}`}
+                            onClick={() => {
+                                if(tabSelected == 1) return;
+                                fetchPagos();
+                                setTabSelected(1);
+                            }}>PAGOS</span>
                         <button className={`flex h-10 rounded-md px-3 text-white -mt-3 ml-12 justify-center items-center ${pagosSeleccionados.size ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
                             onClick={handlePagar}
                             disabled={!pagosSeleccionados.size}
@@ -422,7 +469,7 @@ export default function DetalleDeudas({ clienteId }) {
                             <TbMoneybag className="mr-2" size={22} />{pagosSeleccionados.size ? `Pagar ${Array.from(pagosSeleccionados).reduce((acc, curr) => acc + curr.total, 0).toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : `Seleccione ventas`}
                         </button>
                     </div>
-                    <div className="overflow-x-auto">
+                    {tabSelected == 0 &&<div className="overflow-x-auto">
                         <div className="min-w-full text-md border">
                             <div className="flex bg-gray-100 pr-4 font-bold">
                                 <div className="w-2/12 p-2 border">Sel / Fecha</div>
@@ -432,9 +479,9 @@ export default function DetalleDeudas({ clienteId }) {
                                 <div className="w-2/12 p-2 border">Documento</div>
                                 <div className="w-3/12 p-2 border">Detalle</div>
                             </div>
-                            <div className="w-full overflow-y-scroll h-80">
-                                <div>
-                                    {cliente.ventas.map((v, idx) => (
+                            <div className="w-full overflow-y-scroll h-80">                                
+                                <div className="relative">                                    
+                                    {ventas.map((v, idx) => (
                                         <div key={idx} className="w-full border-b flex">
                                             <div className="w-2/12 p-2 border">
                                                 <input type="checkbox"
@@ -501,10 +548,48 @@ export default function DetalleDeudas({ clienteId }) {
                                             </div>
                                         </div>
                                     ))}
+                                    {ventas.length == 0 && !loadingVentas && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-80">
+                                            <span>No hay ventas disponibles</span>
+                                        </div>
+                                    )}
+                                    {loadingVentas && <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-80">
+                                        <Loader texto="Cargando..."/>
+                                    </div>}
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div>}
+                    {tabSelected == 1 &&<div className="overflow-x-auto">
+                        <div className="min-w-full text-md border">
+                            <div className="flex bg-gray-100 pr-4 font-bold">
+                                <div className="w-3/12 p-2 border">Tipo de pago</div>
+                                <div className="w-3/12 p-2 border">Número documento</div>
+                                <div className="w-3/12 p-2 border">Monto</div>
+                                <div className="w-3/12 p-2 border">Fecha</div>                                
+                            </div>
+                            <div className="w-full overflow-y-scroll h-80">                                
+                                <div className="relative">                                    
+                                    {pagos.map((pago, idx) => (
+                                        <div key={idx} className="w-full border-b flex">
+                                            <div className="w-3/12 p-2 border">{pago.formaPagoId.nombre}</div>
+                                            <div className="w-3/12 p-2 border">{pago.numeroDocumento}</div>
+                                            <div className="w-3/12 p-2 border">{pago.monto.toLocaleString("es-CL", { style: "currency", currency: "CLP" })}</div>
+                                            <div className="w-3/12 p-2 border">{pago.fecha}</div>
+                                        </div>
+                                    ))}
+                                    {loadingPagos && <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-80">
+                                        <Loader texto="Cargando..."/>
+                                    </div>}
+                                    {pagos.length == 0 && !loadingPagos && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-white opacity-90 h-80">
+                                            <span>No hay pagos disponibles</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>}
                 </div>
             </div>
             <ToastContainer />

@@ -13,10 +13,10 @@ export async function POST(request) {
     const body = await request.json();
     console.log("Body recibido:", body);
 
-    const { ventas, formaPagoId, fecha, adjuntoUrls = [] } = body;
+    const { ventas, formaPagoId, numeroDocumento, fecha, adjuntoUrls = [] } = body;
 
-    if (!Array.isArray(ventas) || !formaPagoId || !fecha) {
-        console.error("Datos inválidos:", { ventas, formaPagoId, fecha });
+    if (!Array.isArray(ventas) || !formaPagoId || !fecha || !numeroDocumento) {
+        console.error("Datos inválidos:", { ventas, formaPagoId, fecha, numeroDocumento });
         return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
@@ -65,6 +65,7 @@ export async function POST(request) {
             ventaId,
             monto: pagoMonto,
             formaPagoId,
+            numeroDocumento,
             adjuntoUrls,
             fecha: new Date(fecha)
         });
