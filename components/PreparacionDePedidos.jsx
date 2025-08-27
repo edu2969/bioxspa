@@ -182,48 +182,63 @@ export default function PreparacionDePedidos({ session }) {
                 return;
             }
 
-            setCargamentos((prev) => {
-                if (!prev.length) return prev;
-                const newCargamentos = [...prev];
-                const currentCargamento = { ...newCargamentos[0] };
-                const ventas = [...currentCargamento.ventas];
-                const detalles = [...ventas[ventaIndex].detalles];
-                const detalleToUpdate = { ...detalles[detalleIndex] };
-
-                // Evitar duplicados en scanCodes
-                const scanCodes = Array.isArray(detalleToUpdate.scanCodes)
-                    ? [...detalleToUpdate.scanCodes]
-                    : [];
-                if (!scanCodes.includes(item.itemId)) {
-                    scanCodes.push(item.itemId);
-                }
-
-                // Actualiza restantes y multiplicador si corresponde
-                const updatedRestantes =
-                    detalleToUpdate.multiplicador < detalleToUpdate.restantes
-                        ? detalleToUpdate.restantes
-                        : detalleToUpdate.restantes - 1;
-                const updatedMultiplicador =
-                    detalleToUpdate.multiplicador < detalleToUpdate.restantes
-                        ? detalleToUpdate.multiplicador + 1
-                        : detalleToUpdate.multiplicador;
-
-                const newDetalle = {
-                    ...detalleToUpdate,
-                    restantes: updatedRestantes,
-                    multiplicador: updatedMultiplicador,
-                    scanCodes,
-                };
-                detalles[detalleIndex] = newDetalle;
-                ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
-                currentCargamento.ventas = ventas;
-                newCargamentos[0] = currentCargamento;
-                return newCargamentos;
+            const response = await fetch('/api/cilindros/cargar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rutaDespachoId: cargamentoActual._id,
+                    itemId: item._id,
+                }),
             });
 
-            toast.success(
-                `Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`
-            );
+            if (response.ok) {
+                setCargamentos((prev) => {
+                    if (!prev.length) return prev;
+                    const newCargamentos = [...prev];
+                    const currentCargamento = { ...newCargamentos[0] };
+                    const ventas = [...currentCargamento.ventas];
+                    const detalles = [...ventas[ventaIndex].detalles];
+                    const detalleToUpdate = { ...detalles[detalleIndex] };
+
+                    // Evitar duplicados en scanCodes
+                    const scanCodes = Array.isArray(detalleToUpdate.scanCodes)
+                        ? [...detalleToUpdate.scanCodes]
+                        : [];
+                    if (!scanCodes.includes(item.itemId)) {
+                        scanCodes.push(item.itemId);
+                    }
+
+                    // Actualiza restantes y multiplicador si corresponde
+                    const updatedRestantes =
+                        detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                            ? detalleToUpdate.restantes
+                            : detalleToUpdate.restantes - 1;
+                    const updatedMultiplicador =
+                        detalleToUpdate.multiplicador < detalleToUpdate.restantes
+                            ? detalleToUpdate.multiplicador + 1
+                            : detalleToUpdate.multiplicador;
+
+                    const newDetalle = {
+                        ...detalleToUpdate,
+                        restantes: updatedRestantes,
+                        multiplicador: updatedMultiplicador,
+                        scanCodes,
+                    };
+                    detalles[detalleIndex] = newDetalle;
+                    ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
+                    currentCargamento.ventas = ventas;
+                    newCargamentos[0] = currentCargamento;
+                    return newCargamentos;
+                });
+
+                toast.success(
+                    `Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`
+                );
+            } else {
+                toast.error(`Error al cargar cilindro ${item.codigo}`);
+            }
         },
         [setCargamentos, cargamentos]
     );

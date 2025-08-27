@@ -552,19 +552,34 @@ export default function Despacho({ session }) {
                 return;
             }
 
-            // Agrega el item._id al itemMovidoIds del último historial de descarga
-            setRutaDespacho(prev => {
-                const updatedHistorial = [...prev.historialCarga];
-                updatedHistorial[lastDescargaIdx] = {
-                    ...updatedHistorial[lastDescargaIdx],
-                    itemMovidoIds: [...updatedHistorial[lastDescargaIdx].itemMovidoIds, item._id]
-                };
-                return {
-                    ...prev,
-                    historialCarga: updatedHistorial
-                };
+            const response = await fetch("/api/cilindros/descargar", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    rutaDespachoId: rutaDespacho._id,
+                    codigo
+                }),
             });
-            toast.success(`${codigo} descargado correctamente`);
+
+            if (response.ok) {
+                // Agrega el item._id al itemMovidoIds del último historial de descarga
+                setRutaDespacho(prev => {
+                    const updatedHistorial = [...prev.historialCarga];
+                    updatedHistorial[lastDescargaIdx] = {
+                        ...updatedHistorial[lastDescargaIdx],
+                        itemMovidoIds: [...updatedHistorial[lastDescargaIdx].itemMovidoIds, item._id]
+                    };
+                    return {
+                        ...prev,
+                        historialCarga: updatedHistorial
+                    };
+                });
+                toast.success(`${codigo} descargado correctamente`);
+            } else {
+                toast.error(`Error al descargar ${codigo}`);
+            }
         },
         [rutaDespacho, setRutaDespacho]
     );

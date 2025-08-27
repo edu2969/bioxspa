@@ -509,6 +509,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
                                                                     body: JSON.stringify({
+                                                                        clienteId: clienteSelected._id,
                                                                         direccion: {
                                                                             nombre: selectedPlace.formatted_address,
                                                                             latitud: selectedPlace.geometry.location.lat(),
@@ -518,15 +519,20 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                         direccionId: false,
                                                                     })
                                                                 });
+                                                                console.log("RESP", resp);
                                                                 const result = await resp.json();
-                                                                if (resp.ok && result.ok) {
+                                                                console.log("RESULT", result);
+                                                                if (resp.ok) {
                                                                     // Agregar la nueva dirección al cliente actual
-                                                                    const nuevaDireccion = result.direccion;
+                                                                    const nuevaDireccion = {
+                                                                        direccionId: result.direccion,
+                                                                        comentario: null
+                                                                    };
                                                                     setClienteSelected(prev => ({
                                                                         ...prev,
                                                                         direccionesDespacho: [...(prev.direccionesDespacho || []), nuevaDireccion]
                                                                     }));
-                                                                    setValue("direccionDespachoId", nuevaDireccion.direccionId._id);
+                                                                    setValue("direccionDespachoId", result.direccion._id);
                                                                     toast.success("Dirección agregada exitosamente.");
                                                                     setEditDireccionDespacho(false);
                                                                 } else {

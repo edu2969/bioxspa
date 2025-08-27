@@ -1,5 +1,14 @@
 import mongoose, { Schema, models } from "mongoose";
 
+const comentarioCobroSchema = new Schema({
+    fecha: { type: Date, required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    comentario: { type: String, required: true },
+}, {
+    _id: false,
+    timestamps: true
+});
+
 const ventaSchema = new Schema({
     temporalId: { type: String },
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Cliente", required: true },
@@ -27,6 +36,7 @@ const ventaSchema = new Schema({
     cantidadConsultasSII: { type: Number },
     cantidadReenviosSII: { type: Number },
     comentario: { type: String, default: "" },
+    comentariosCobro: { type: [comentarioCobroSchema], default: [] },
 }, {
     timestamps: true
 });
