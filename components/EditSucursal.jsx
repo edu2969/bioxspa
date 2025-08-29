@@ -12,7 +12,7 @@ import { TIPO_CARGO, TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import { ConfirmModal } from './modals/ConfirmModal';
 import Loader from '@/components/Loader';
 import { RiMoneyDollarCircleFill } from 'react-icons/ri';
-import { TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
+import { TbBadges, TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 import Image from 'next/image';
 import { IoChevronBack } from 'react-icons/io5';
@@ -65,9 +65,23 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setShowModal(false);
     }
 
-    const onSubmit = async (data) => {
+    const onSubmit = async () => {
         try {
-            const body = { ...data, ...sucursal, dependencias };
+            // Limpia el atributo 'user' de cada cargo en sucursal y dependencias
+            function omit(obj, ...keys) {
+                const result = { ...obj };
+                keys.forEach(key => delete result[key]);
+                return result;
+            }
+            const cleanSucursal = {
+                ...sucursal,
+                cargos: (sucursal.cargos || []).map(cargo => omit(cargo, "user"))
+            };
+            const cleanDependencias = dependencias.map(dep => ({
+                ...dep,
+                cargos: (dep.cargos || []).map(cargo => omit(cargo, "user"))
+            }));
+            const body = { ...cleanSucursal, dependencias: cleanDependencias };
             console.log("POST Sucursales->", body);
             await fetch(`/api/sucursales/${params.get("id") ?? ''}`, {
                 method: "POST",
@@ -380,7 +394,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                             <label htmlFor="newCargoSucursalHasta" className="block text-sm font-medium text-gray-700">Hasta</label>
                                             <input
                                                 type="date"
-                                                {...register(`newCargoSucursalHasta`, { required: true })}
+                                                {...register(`newCargoSucursalHasta`)}
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                             />
                                             {errors.newCargoSucursalHasta && <p className="text-red-500 text-xs mt-1">{String(errors.newCargoSucursalHasta.message)}</p>}
@@ -636,6 +650,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                             {cargo.tipo === TIPO_CARGO.cobranza && <RiMoneyDollarCircleFill className="text-gray-400 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                             {cargo.tipo === TIPO_CARGO.vendedor && <TbMoneybag className="text-gray-400 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                             {cargo.tipo === TIPO_CARGO.encargado && <FaStar className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
+                                                                            {cargo.tipo === TIPO_CARGO.responsable && <TbBadges className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                             {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-sky-600 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                             {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-orange-5000 absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
                                                                             {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border border-gray-400" size="2rem" />}
@@ -761,7 +776,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                 <label htmlFor="newCargoDependenciaHasta" className="block text-sm font-medium text-gray-700">Hasta</label>
                                                                 <input
                                                                     type="date"
-                                                                    {...register(`newCargoDependenciaHasta`, { required: true })}
+                                                                    {...register(`newCargoDependenciaHasta`)}
                                                                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                                 />
                                                                 {errors.newCargoDependenciaHasta && <p className="text-red-500 text-xs mt-1">{String(errors.newCargoDependenciaHasta.message)}</p>}
@@ -834,10 +849,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                             </div>
                         )}
                     </div>
-                    
-                </form> : <Loader texto="Cargando..." />}
-            </div>
-            <div className="absolute bottom-0 right-0 w-full flex justify-end bg-white p-2">
+                    <div className="absolute bottom-0 right-0 w-full flex justify-end bg-white p-2">
                         <div className="w-96 flex">
                             <button className="flex w-1/2 justify-center rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-300 mr-1"
                                 onClick={(e) => {
@@ -845,9 +857,12 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                     router.back()
                                 }}><IoIosArrowBack size="1.15rem" className="mt-0.5 mr-3" />VOLVER</button>
                             <button className="flex w-1/2 justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ship-cove-600 ml-1"
-                                type="submit" disabled={editingIndex !== null}><FaRegSave size="1.15rem" className="mt-0.5 mr-3" />GUARDAR</button>
+                                type="submit"><FaRegSave size="1.15rem" className="mt-0.5 mr-3" />GUARDAR</button>
                         </div>
-                    </div>
+                    </div>                    
+                </form> : <Loader texto="Cargando..." />}
+            </div>
+            
             <ConfirmModal show={showModal} confirmationLabel={"Eliminar"} title={"Eliminar Dependencia"}
                 confirmationQuestion={`¿Estás seguro de eliminar la dependencia ${showModal && dependencias[selectedIndex]?.nombre}?`} onClose={() => setShowModal(false)} onConfirm={handleDelete} />
         </main>

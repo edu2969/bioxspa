@@ -113,7 +113,7 @@ export default function DetalleDeudas({ clienteId }) {
         if (!clienteId) return;
         setLoading(true);
         actualizarCobros();
-    }, [clienteId, fetchCobros]);
+    }, [clienteId, fetchCobros, fetchVentas, fetchCilindros, fetchFormasPago]);
 
     useEffect(() => {
         console.log("PAGOS SELECCIONADOS", pagosSeleccionados);

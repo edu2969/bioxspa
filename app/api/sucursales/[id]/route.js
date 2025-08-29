@@ -7,9 +7,10 @@ import Cliente from "@/models/cliente";
 import Cargo from "@/models/cargo";
 import User from "@/models/user";
 
-export async function GET(req, props) {
+export async function GET(props) {
     const params = await props.params;
     await connectMongoDB();
+
     const sucursal = await Sucursal.findById(params.id).lean();
     if (!sucursal) {
         return NextResponse.json({ error: "Sucursal not found" }, { status: 400 });
@@ -53,23 +54,51 @@ export async function GET(req, props) {
 export async function POST(req, props) {
     const params = await props.params;
     const body = await req.json();
-    console.log("SUCURSAL Update v2...", body, params);
+    await connectMongoDB();
 
+    // 1. FOTO INICIAL DE CARGOS Y DEPENDENCIAS
+    const cargosActualesSucursal = await Cargo.find({ sucursalId: params.id }).lean();
+    const dependenciasActuales = await Dependencia.find({ sucursalId: params.id }).lean();
+
+    // 2. ELIMINAR DEPENDENCIAS Y SUS CARGOS QUE YA NO ESTÁN EN EL BODY
+    const dependenciaIdsInput = body.dependencias.map(dep => dep._id).filter(Boolean);
+    const dependenciasAEliminar = dependenciasActuales.filter(dep => !dependenciaIdsInput.includes(dep._id.toString()));
+    for (const dep of dependenciasAEliminar) {
+        await Cargo.deleteMany({ dependenciaId: dep._id });
+        await Dependencia.findByIdAndDelete(dep._id);
+    }
+
+    // 3. ELIMINAR CARGOS DE SUCURSAL QUE YA NO ESTÁN EN EL BODY
+    const cargoIdsInput = body.cargos.map(cargo => cargo._id).filter(Boolean);
+    const cargosSucursalAEliminar = cargosActualesSucursal.filter(cargo => !cargoIdsInput.includes(cargo._id.toString()));
+    for (const cargo of cargosSucursalAEliminar) {
+        await Cargo.findByIdAndDelete(cargo._id);
+    }
+
+    // 4. ELIMINAR CARGOS DE DEPENDENCIAS QUE YA NO ESTÁN EN EL BODY
+    for (const dependencia of body.dependencias) {
+        if (!dependencia._id) continue;
+        const cargosActualesDep = await Cargo.find({ dependenciaId: dependencia._id }).lean();
+        const cargoIdsInputDep = (dependencia.cargos || []).map(cargo => cargo._id).filter(Boolean);
+        const cargosDepAEliminar = cargosActualesDep.filter(cargo => !cargoIdsInputDep.includes(cargo._id.toString()));
+        for (const cargo of cargosDepAEliminar) {
+            await Cargo.findByIdAndDelete(cargo._id);
+        }
+    }
+
+    // 5. ACTUALIZAR O CREAR DIRECCIONES, DEPENDENCIAS Y CARGOS (como ya lo tienes)
     // Update or create Direccion for Sucursal
     let direccionId = body.direccionId;
     if (body.direccion) {
         const direccion = await Direccion.findOne({ apiId: body.direccion.apiId });
-        if (direccion) {
-            if (direccion._id) {
-                direccionId = direccion._id;
-            }
-        } 
+        if (direccion && direccion._id) {
+            direccionId = direccion._id;
+        }
     }
     if (!direccionId) {
-        console.log("NUEVA DIRECCION...", body.direccion);
         const newDireccion = new Direccion(body.direccion);
         const savedDireccion = await newDireccion.save();
-        direccionId = savedDireccion._id;
+        direccionId = savedDireccion._id;        
     }
 
     // Update or create Cargos for Sucursal
@@ -82,21 +111,25 @@ export async function POST(req, props) {
             createdAt: cargo.createdAt ? new Date(cargo.createdAt) : new Date(),
             updatedAt: new Date()
         };
-        if(cargo.hasta != '') {
-            cargo.hasta = new Date(cargo.hasta);
+        if (cargo.hasta) {
+            cargoData.hasta = new Date(cargo.hasta);
         }
         if (cargo._id) {
             await Cargo.findByIdAndUpdate(cargo._id, cargoData, { new: true, upsert: true });
         } else {
             const newCargo = new Cargo(cargoData);
-            await newCargo.save();
+            const savedCargo = await newCargo.save();
+            if (!savedCargo || !savedCargo._id) {
+                console.error("Error al insertar el cargo sucursal:", cargoData);
+                throw new Error("No se pudo insertar el cargo de sucursal");
+            }
         }
     }
 
     // Update Dependencias and their Direcciones
     for (const dependencia of body.dependencias) {
         let direccionId = dependencia.direccionId;
-
+        
         // Check if direccion exists
         if (dependencia.direccion && !direccionId) {
             const direccion = await Direccion.findOne({ apiId: dependencia.direccion.apiId });
@@ -121,9 +154,7 @@ export async function POST(req, props) {
         if (dependencia.clienteId) {
             dependenciaData.clienteId = dependencia.clienteId;
         }
-
-        console.log("DEPENDENCIA DATA...", dependenciaData);
-
+        
         if (dependencia._id) {
             await Dependencia.findByIdAndUpdate(dependencia._id, dependenciaData, { new: true, upsert: true });
         } else {
@@ -141,11 +172,9 @@ export async function POST(req, props) {
                 createdAt: cargo.createdAt ? new Date(cargo.createdAt) : new Date(),
                 updatedAt: new Date()
             };
-            if(cargo.hasta) {
+            if (cargo.hasta) {
                 cargoData.hasta = new Date(cargo.hasta);
             }
-
-            console.log("CARGO DATA...", cargoData);
 
             if (cargo._id) {
                 await Cargo.findByIdAndUpdate(cargo._id, cargoData, { new: true, upsert: true });
@@ -156,7 +185,7 @@ export async function POST(req, props) {
         }
     }
 
-    // Update Sucursal
+    // 6. ACTUALIZAR SUCURSAL
     const sucursalData = {
         id: body.id,
         nombre: body.nombre,
@@ -168,35 +197,7 @@ export async function POST(req, props) {
     };
     const sucursalUpdated = await Sucursal.findByIdAndUpdate(params.id, sucursalData, { new: true, upsert: true });
 
-    // Eliminar dependencias que ya no están en el body
-    const dependenciaIdsInput = body.dependencias.map(dep => dep._id).filter(Boolean);
-    const dependenciasActuales = await Dependencia.find({ sucursalId: params.id }).lean();
-    const dependenciasAEliminar = dependenciasActuales.filter(dep => !dependenciaIdsInput.includes(dep._id.toString()));
-    for (const dep of dependenciasAEliminar) {
-        // Eliminar cargos asociados a la dependencia eliminada
-        await Cargo.deleteMany({ dependenciaId: dep._id });
-        await Dependencia.findByIdAndDelete(dep._id);
-    }
-
-    // Eliminar cargos de sucursal que ya no están en el body
-    const cargoIdsInput = body.cargos.map(cargo => cargo._id).filter(Boolean);
-    const cargosActualesSucursal = await Cargo.find({ sucursalId: params.id }).lean();
-    const cargosSucursalAEliminar = cargosActualesSucursal.filter(cargo => !cargoIdsInput.includes(cargo._id.toString()));
-    for (const cargo of cargosSucursalAEliminar) {
-        await Cargo.findByIdAndDelete(cargo._id);
-    }
-
-    // Eliminar cargos de dependencias que ya no están en el body
-    for (const dependencia of body.dependencias) {
-        if (!dependencia._id) continue;
-        const cargoIdsInputDep = (dependencia.cargos || []).map(cargo => cargo._id).filter(Boolean);
-        const cargosActualesDep = await Cargo.find({ dependenciaId: dependencia._id }).lean();
-        const cargosDepAEliminar = cargosActualesDep.filter(cargo => !cargoIdsInputDep.includes(cargo._id.toString()));
-        for (const cargo of cargosDepAEliminar) {
-            await Cargo.findByIdAndDelete(cargo._id);
-        }
-    }
-
+    // 7. RESPUESTA
     if (!sucursalUpdated) {
         return NextResponse.json({ error: "Error updating sucursal" }, { status: 404 });
     }

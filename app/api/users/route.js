@@ -31,7 +31,7 @@ export async function POST(req) {
       });
     }    
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(params.password, 10);
     params.password = hashedPassword;
     return NextResponse.json({
       ok: true,
