@@ -7,7 +7,8 @@ import Cliente from "@/models/cliente";
 import Cargo from "@/models/cargo";
 import User from "@/models/user";
 
-export async function GET(props) {
+export async function GET(req, props) {
+    console.log(req.url);
     const params = await props.params;
     await connectMongoDB();
 
