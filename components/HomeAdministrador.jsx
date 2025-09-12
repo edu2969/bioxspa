@@ -119,11 +119,10 @@ export default function HomeAdministrador({ contadores }) {
                     </div>
                 ))}
             </div>
-            {routingIndex == -2 && (
-                <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center bg-white bg-opacity-60 z-10">
-                    <Loader texto="Cargando panel" />
-                </div>
-            )}
+            {routingIndex == -2 && <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
+                <p className="text-xl font-bold">Cargando panel</p>
+            </div>}
         </main>
     );
 }

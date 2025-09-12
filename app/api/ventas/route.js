@@ -7,6 +7,8 @@ import { TIPO_ESTADO_VENTA, USER_ROLE } from "@/app/utils/constants";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import Precio from "@/models/precio";
+import Cargo from "@/models/cargo";
+import Dependencia from "@/models/dependencia";
 
 export async function POST(req) {
     try {
@@ -16,28 +18,10 @@ export async function POST(req) {
         console.log("BODY 2", body);
 
         const requiredFields = [
-            "clienteId",
+            "tipo",
             "usuarioId",
-            "documentoTributarioId",
-            "direccionDespachoId",
             "items"
         ];
-
-        for (const field of requiredFields) {
-            if (!body[field] || (Array.isArray(body[field]) && body[field].length === 0)) {
-            const errorMessage = `Field '${field}' is required and cannot be empty`;
-            console.error("Validation Error:", errorMessage);
-            return NextResponse.json({ error: errorMessage }, { status: 400 });
-            }
-        }
-
-        for (const item of body.items) {
-            if (!item.cantidad || item.precio == undefined || !item.subcategoriaId) {
-                const errorMessage = "Each item must have 'cantidad', 'precio', and 'subcategoriaId'";
-                console.error("Validation Error:", errorMessage);
-                return NextResponse.json({ error: errorMessage }, { status: 400 });
-            }
-        }
 
         const session = await getServerSession(authOptions);
         if (!session || !session.user || !session.user.id) {
@@ -45,6 +29,44 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
         
+        const esAdmin = session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.encargado || session.user.role === USER_ROLE.cobranza;
+
+        if(body.tipo == 1 || body.tipo == 4) { 
+            requiredFields.push("clienteId");
+            if(esAdmin && body.tipo == 1) {
+                requiredFields.push("documentoTributarioId");                
+            }
+            if(!esAdmin) {
+                const cliente = await Cliente.findById(body.clienteId);
+                body.documentoTributarioId = cliente ? cliente.documentoTributarioId : null;            
+            }
+        } else if (body.tipo == 2) {
+            // TODO OT: ID de Empresa de servicio, tipo de servicio, listado de items            
+        } else if (body.tipo == 3) {
+            // TODO Orden de traslado - empresaOrigenId, direccionOrigenId, empresaDestinoId, direccionDespacho, razón traslado, items
+        }
+        
+
+        for (const field of requiredFields) {
+            if (!body[field] || (Array.isArray(body[field]) && body[field].length === 0)) {
+                const errorMessage = `Field '${field}' is required and cannot be empty`;
+                console.error("Validation Error:", errorMessage);
+                return NextResponse.json({ error: errorMessage }, { status: 400 });
+            }
+        }
+
+        if(body.tipo == 1 || body.tipo == 4) {
+            for (const item of body.items) {
+                if (!item.cantidad || !item.subcategoriaId) {
+                    const errorMessage = "Each item must have 'cantidad' and 'subcategoriaId'";
+                    console.error("Validation Error:", errorMessage);
+                    return NextResponse.json({ error: errorMessage }, { status: 400 });
+                }
+            }
+        } else {
+            // TODO Los items no llevan precio, solo cantidad y subcategoriaId
+        }        
+
         const valorNeto = body.items.reduce((total, item) => {
             return total + (item.cantidad * item.precio);
         }, 0);
@@ -56,14 +78,37 @@ export async function POST(req) {
             return NextResponse.json({ error: errorMessage }, { status: 404 });
         }
 
-        const tieneArriendo = cliente.arriendo;
+        if(!body.sucursalId) {
+            const cargo = await Cargo.findOne({ userId: session.user.id });
+            if(!cargo) {
+                const errorMessage = "Usuario no tiene cargo activo";
+                console.error("Validation Error:", errorMessage);
+                return NextResponse.json({ error: errorMessage }, { status: 400 });
+            }
+            if(!cargo.sucursalId) {
+                const dependencia = await Dependencia.findById(cargo.dependenciaId);
+                if(!dependencia) {
+                    const errorMessage = "Usuario no tiene dependencia asignada";
+                    console.error("Validation Error:", errorMessage);
+                    return NextResponse.json({ error: errorMessage }, { status: 400 });
+                }
+                body.sucursalId = dependencia.sucursalId;
+            } else body.sucursalId = cargo.sucursalId;
+        }
 
+        const tieneArriendo = cliente.arriendo;
+        const estadoInicial = (body.tipo == 1 && (session.user.role == USER_ROLE.gerente 
+                || session.user.role == USER_ROLE.cobranza 
+                || session.user.role == USER_ROLE.encargado)) 
+                ? TIPO_ESTADO_VENTA.por_asignar : TIPO_ESTADO_VENTA.borrador;
         const nuevaVenta = new Venta({
+            tipo: body.tipo,
             clienteId: body.clienteId,
             vendedorId: body.usuarioId,
+            sucursalId: body.sucursalId,
+            dependenciaId: body.dependenciaId || null,
             fecha: new Date(),
-            estado: (session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.cobranza || session.user.role == USER_ROLE.encargado) 
-                ? TIPO_ESTADO_VENTA.por_asignar : TIPO_ESTADO_VENTA.borrador,
+            estado: estadoInicial,
             valorNeto,
             valorIva: valorNeto * 0.19,
             valorBruto: valorNeto * (1 - 0.19),
@@ -71,9 +116,14 @@ export async function POST(req) {
             documentoTributarioId: body.documentoTributarioId,
             porCobrar: false,
             tieneArriendo,
-            direccionDespachoId: body.direccionDespachoId,
+            direccionDespachoId: body.direccionDespachoId == "" ? null : body.direccionDespachoId || null,
             comentario: body.comentario || "",
+            historialEstados: [{
+                estado: estadoInicial,
+                fecha: new Date(),
+            }]
         });
+        
         const savedVenta = await nuevaVenta.save();
 
         for (const item of body.items) {
@@ -122,7 +172,6 @@ export async function POST(req) {
                 await nuevoPrecio.save();
             }
         }
-
 
         return NextResponse.json({ ok: true, venta: savedVenta });
     } catch (error) {

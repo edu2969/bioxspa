@@ -28,7 +28,7 @@ export async function GET() {
         const userRole = session.user.role;
 
         const tipos = [];
-        if(userRole === USER_ROLE.despacho || userRole === USER_ROLE.conductor || userRole === USER_ROLE.encargado) {
+        if(userRole === USER_ROLE.despacho || userRole === USER_ROLE.conductor || userRole === USER_ROLE.encargado || userRole === USER_ROLE.responsable) {
             tipos.push(TIPO_CHECKLIST.personal);            
         }
         if (userRole === USER_ROLE.conductor) {
@@ -107,12 +107,12 @@ export async function GET() {
             return NextResponse.json({ ok: true, contadores, checklists: checklistResults });
         }
 
-        // DESPACHO
-        if (userRole === USER_ROLE.despacho) {
+        // DESPACHO ó RESPONSABLE
+        if (userRole === USER_ROLE.despacho || userRole === USER_ROLE.responsable) {
             // Find the user's cargo
             const userCargo = await Cargo.findOne({
                 userId,
-                tipo: TIPO_CARGO.despacho
+                tipo: { $in: [TIPO_CARGO.despacho, TIPO_CARGO.responsable] }
             });
 
             if (!userCargo) {
@@ -125,14 +125,20 @@ export async function GET() {
                 tipo: TIPO_CARGO.conductor
             });
 
-            const choferIds = choferCargos.map(cargo => cargo.userId);
+            const choferIds = choferCargos?.map(cargo => cargo.userId) || [];
 
             // Find ventas in estado 'preparacion' for choferes in the dependencia
             const ventas = await Venta.find({
-                estado: TIPO_ESTADO_VENTA.preparacion
+                $or: [{
+                    estado: TIPO_ESTADO_VENTA.preparacion
+                }, {
+                    estado: TIPO_ESTADO_VENTA.por_asignar,
+                    direccionDespachoId: null
+                }]
             });
 
-            const ventaIds = ventas.map(venta => venta._id);
+            const ventaIds = ventas.filter(venta => venta.estado === TIPO_ESTADO_VENTA.preparacion).map(venta => venta._id);
+            const ventasDespachoEnLocal = ventas.filter(venta => !venta.direccionDespachoId).length;
 
             // Count rutasDespacho where the ventas are present
             const contadores = await RutaDespacho.countDocuments({
@@ -140,7 +146,7 @@ export async function GET() {
                 choferId: { $in: choferIds },
                 estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
             });
-            return NextResponse.json({ ok: true, contadores: { preparacion: contadores }, checklists: checklistResults });
+            return NextResponse.json({ ok: true, contadores: { preparacion: (contadores + ventasDespachoEnLocal) }, checklists: checklistResults });
         }
 
         // CHOFER

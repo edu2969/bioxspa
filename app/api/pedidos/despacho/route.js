@@ -17,7 +17,7 @@ import Venta from "@/models/venta";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {
     try {
@@ -62,23 +62,22 @@ export async function GET() {
 
         const userId = session.user.id;
         console.log(`Fetching cargo for userId: ${userId}`);
-        const cargo = await Cargo.findOne({ userId, tipo: TIPO_CARGO.despacho }).populate("dependenciaId").lean();
+        const cargo = await Cargo.findOne({ 
+            userId, 
+            tipo: { 
+                $in: [
+                    TIPO_CARGO.despacho,
+                    TIPO_CARGO.responsable
+                ]
+            }
+        }).populate("dependenciaId").lean();
 
-        if (!cargo || !cargo.dependenciaId) {
-            console.warn(`No cargo or dependencia found for userId: ${userId}`);
-            return NextResponse.json({ ok: false, error: "No cargo or dependencia found" }, { status: 404 });
-        }
-
+        const sucursalId = cargo.sucursalId ?? cargo.dependenciaId.sucursalId;
         const dependenciaId = cargo.dependenciaId._id;
         console.log(`Fetching choferes for dependenciaId: ${dependenciaId}`);
         const choferes = await Cargo.find({ dependenciaId, tipo: TIPO_CARGO.conductor }).populate("userId").lean();
 
-        if (choferes.length === 0) {
-            console.warn(`No choferes found for dependenciaId: ${dependenciaId}`);
-            return NextResponse.json({ ok: true, cargamentos: [] });
-        }
-
-        const choferIds = choferes.map((chofer) => chofer.userId._id);
+        const choferIds = choferes?.map((chofer) => chofer.userId._id) || [];
         console.log("Fetching rutasDespacho for choferes...");
         
         // Create a query that handles both cases
@@ -100,7 +99,7 @@ export async function GET() {
             .populate({
                 path: "cargaItemIds",
                 model: "ItemCatalogo",
-                select: "_id codigo"
+                select: "_id codigo subcategoriaCatalogoId",
             })
             .populate({
                 path: "choferId",
@@ -129,15 +128,25 @@ export async function GET() {
             })           
             .lean();
 
-        if (rutasDespacho.length === 0) {
-            console.warn("No rutasDespacho found for choferes.");
-            return NextResponse.json({ ok: true, cargamentos: [] });
+        console.log("Fetching detalleVentas...");
+        const dependencia = await Dependencia.findOne({ _id: dependenciaId }).lean();
+
+        console.log("DEPENDENCIA", dependencia);
+        if (!dependencia) {
+            console.warn(`No dependencia found for dependenciaId: ${dependenciaId}`);
+            return NextResponse.json({ ok: false, error: "No dependencia found for this dependencia" }, { status: 404 });
         }
 
-        console.log("Fetching detalleVentas...");
-        // Obtener todos los IDs de ventas de las rutas
-        const ventaIds = rutasDespacho.flatMap(r => r.ventaIds.map(v => v._id));
+        console.log("Mapping cargamentos...");
+        const ventasDespachoEnLocal = await Venta.find({
+            estado: { $in: [TIPO_ESTADO_VENTA.por_asignar, TIPO_ESTADO_VENTA.preparacion] },
+            direccionDespachoId: null,
+            sucursalId
+        }).populate("clienteId").lean();
+        console.log("Ventas en local", ventasDespachoEnLocal);
+
         // Buscar los detalles de venta que correspondan a esas ventas
+        const ventaIds = rutasDespacho.flatMap(ruta => ruta.ventaIds.map(venta => venta._id)).concat(ventasDespachoEnLocal.map(venta => venta._id));
         const detalleVentas = await DetalleVenta.find({ ventaId: { $in: ventaIds } })
             .populate({
                 path: "subcategoriaCatalogoId",
@@ -214,6 +223,80 @@ export async function GET() {
                 estado: ruta.estado,
             };
         });
+
+        console.log("Adding ventas for despacho en local...");
+        cargamentos.push(...ventasDespachoEnLocal.map((venta) => ({
+            rutaId: null,
+            ventas: [{
+                ...venta,                
+                detalles: detalleVentas.filter(dv => dv.ventaId === venta._id).map((venta) => {
+                    const detallesFiltrados = detalleVentas.filter(
+                        (detalle) => detalle.ventaId.toString() === venta._id.toString()
+                    );     
+                    return {
+                        ventaId: venta._id,
+                        fecha: venta.createdAt,
+                        detalles: detallesFiltrados.map((detalle) => {
+                            let newDetalle = {};
+                            const subcategoria = detalle.subcategoriaCatalogoId;                            
+                            const nuCode = subcategoria?.categoriaCatalogoId?.elemento
+                                ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
+                                : null;
+
+                            newDetalle = {
+                                nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
+                                multiplicador: detalle.cantidad,
+                                cantidad: subcategoria?.cantidad || "??",
+                                unidad: subcategoria?.unidad || null,
+                                restantes: detalle.cantidad - ruta.cargaItemIds?.filter(ic => ic.subcategoriaCatalogoId === subcategoria._id).length || 0,
+                                elemento: subcategoria?.categoriaCatalogoId?.elemento,
+                                sinSifon: subcategoria?.sinSifon || false,
+                                esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
+                                nuCode: nuCode,
+                                subcategoriaId: subcategoria?._id || null, 
+                            };                    
+
+                            if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
+                                fechaVentaMasReciente = venta.createdAt;
+                            }
+                            return newDetalle;
+                        }),
+                        comentario: venta.comentario || null,
+                        cliente: {
+                            nombre: venta.clienteId?.nombre || null,
+                            rut: venta.clienteId?.rut || null,
+                            direccion: venta.clienteId?.direccionId || null,
+                            telefono: venta.clienteId?.telefono || null,
+                            direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
+                                _id: dir._id,
+                                nombre: dir.nombre,
+                                direccionId: dir.direccionId?._id || null,
+                                latitud: dir.direccionId?.latitud || null,
+                                longitud: dir.direccionId?.longitud || null
+                            })) || []
+                        }
+                    }
+                })
+            }],
+            nombreChofer: null,
+            patenteVehiculo: null,
+            fechaVentaMasReciente: venta.createdAt,
+            cliente: {
+                nombre: venta.clienteId?.nombre || null,
+                rut: venta.clienteId?.rut || null,
+                direccion: venta.clienteId?.direccionId || null,
+                telefono: venta.clienteId?.telefono || null,
+                direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
+                    _id: dir._id,
+                    nombre: dir.nombre,
+                    direccionId: dir.direccionId?._id || null,
+                    latitud: dir.direccionId?.latitud || null,
+                    longitud: dir.direccionId?.longitud || null
+                })) || []
+            },
+            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+            retiroEnLocal: true,
+        })));
 
         console.log("Returning response with cargamentos.");
         return NextResponse.json({ ok: true, cargamentos });

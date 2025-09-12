@@ -71,7 +71,35 @@ export async function GET(request) {
         console.log("LimpiarVentas completed successfully");
     }
 
+    if(q == "ffm") {
+        console.log("Starting fixAddFechasMantencion...");
+        await fixAddFechasMantencion();
+        console.log("FixMantencion completed successfully");
+    }
+
+    if(q == "ahe") {
+        console.log("Starting addHistorialEstados...");
+        await addHistorialEstados();
+        console.log("addHistorialEstados completed successfully");
+    }
+
     return NextResponse.json({ message: "Success migrate and improve" });
+}
+
+const fixAddFechasMantencion = async () => {
+    const productosConMantencion = await Xroducto.find({ fecha_mantencion: { $ne: null } });
+
+    let updated = 0;
+    for (const producto of productosConMantencion) {
+        if (!producto.codigo) continue;
+        const result = await ItemCatalogo.findOneAndUpdate(
+            { codigo: producto.codigo },
+            { fechaMantencion: producto.fecha_mantencion }
+        );
+        if (result) updated++;
+    }
+
+    console.log(`Actualizados ${updated} ItemCatalogo con fechaMantencion desde Xroducto`);
 }
 
 const resetVentas = async () => {
@@ -500,5 +528,35 @@ const limpiarVentas = async () => {
         processed += batch.length;
         const percent = ((processed / total) * 100).toFixed(2);
         console.log(`Avance limpiarVentas: ${processed}/${total} (${percent}%)`);
+    }
+}
+
+const addHistorialEstados = async () => {
+    const ventas = await Venta.find({});
+    for (const venta of ventas) {
+        if (!venta.historialEstados || venta.historialEstados.length === 0) {
+            const estadoInicial = venta.estado  === TIPO_ESTADO_VENTA.por_asignar && venta.direccionDespachoId ? {
+                estado: TIPO_ESTADO_VENTA.por_asignar,
+                fecha: venta.createdAt
+            } : {
+                estado: TIPO_ESTADO_VENTA.borrador,
+                fecha: venta.createdAt
+            };
+
+            if(venta.updatedAt !== venta.createdAt && venta.updatedAt !== null) {
+                venta.historialEstados = [estadoInicial, {
+                    estado: venta.estado,
+                    fecha: venta.updatedAt
+                }];
+            } else {
+                venta.historialEstados = [estadoInicial];
+            }
+
+            if(!venta.vendedorId) {
+                venta.vendedorId = "67d71c43d925eb23dc3b5b32";
+            }
+
+            await venta.save();
+        }
     }
 }

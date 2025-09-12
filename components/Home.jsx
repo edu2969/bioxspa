@@ -7,7 +7,6 @@ import HomeDespacho from "./HomeDespacho";
 import HomeGerencia from "./branch/BranchBussinessView";
 import { USER_ROLE } from "@/app/utils/constants";
 import { socket } from '@/lib/socket-client';
-import Loader from './Loader';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CheckList from "@/components/CheckList";
@@ -162,18 +161,16 @@ export default function Home() {
             {(session && session.user.role == USER_ROLE.neo) && <div>yGa</div>}
             {(session && session.user.role == USER_ROLE.gerente) && <HomeGerencia session={session} contadores={counters} checklists={checklists} />}
             {(session && (session.user.role == USER_ROLE.cobranza || session.user.role == USER_ROLE.encargado) && <HomeAdministrador contadores={counters}/>)}
-            {(session && session.user.role == USER_ROLE.despacho) && <HomeDespacho contadores={counters}/>}
+            {(session && (session.user.role == USER_ROLE.despacho || session.user.role === USER_ROLE.responsable)) && <HomeDespacho contadores={counters}/>}
             {(session && session.user.role == USER_ROLE.conductor) && <HomeConductor contadores={counters} checklists={checklists} />}
 
             {routingIndex == -1 && faltaChecklistPersonal() 
                 && <CheckList session={session} tipo={TIPO_CHECKLIST.personal} 
                 onFinish={onFinish} loading={loadingChecklist}/>}
 
-            {status == 'loading' || routingIndex == -2 && <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center z-10">
-                <div className="absolute w-full h-screen bg-white/80"></div>
-                <div className="flex items-center justify-center bg-white roounded-lg shadow-lg p-4 z-20 text-xl">
-                    <Loader texto="CARGANDO PANEL" />
-                </div>
+            {status == 'loading' || routingIndex == -2 && <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
+                <p className="text-xl font-bold">Cargando panel</p>
             </div>}
             <ToastContainer />
         </div>

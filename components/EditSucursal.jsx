@@ -308,6 +308,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                             {cargo.tipo === TIPO_CARGO.conductor && <GoCopilot className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
                                                             {cargo.tipo === TIPO_CARGO.proveedor && <FaHandsHelping className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
                                                             {cargo.tipo === TIPO_CARGO.despacho && <TbTruckLoading className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
+                                                            {cargo.tipo === TIPO_CARGO.responsable && <TbBadges className="text-black absolute -top-1 left-0 bg-white rounded-full p-0.5 border-gray-400" size="2rem" />}
                                                             <span className="absolute -bottom-1 left-2 text-sm text-white cursor-pointer bg-red-500 rounded-full hover:text-red-400 hover:bg-white" onClick={() => {
                                                                 const updatedCargos = sucursal.cargos.filter((_, i) => i !== idx);
                                                                 setSucursal({ ...sucursal, cargos: updatedCargos });

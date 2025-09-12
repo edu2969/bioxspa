@@ -5,7 +5,7 @@ import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { FaRoadCircleCheck } from "react-icons/fa6";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
-import { FaClipboardCheck, FaPhoneAlt, FaTruck } from "react-icons/fa";
+import { FaClipboardCheck, FaPhoneAlt } from "react-icons/fa";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useRef } from "react";
@@ -20,7 +20,7 @@ import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import { getColorEstanque } from "@/lib/uix";
 import { TIPO_ESTADO_ITEM_CATALOGO } from "@/app/utils/constants";
 
-export default function PreparacionDePedidos({ session }) {
+export default function JefaturaDespacho({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
     const [animating, setAnimating] = useState(false);
     const [scanMode, setScanMode] = useState(false);
@@ -118,8 +118,28 @@ export default function PreparacionDePedidos({ session }) {
     const fetchCargamentos = async () => {
         const response = await fetch("/api/pedidos/despacho");
         const data = await response.json();
-        console.log("DATA", data);
-        setCargamentos(data.cargamentos);
+        const carga = data.cargamentos;
+        console.log("CARGAMENTOS", carga);
+        // Actualiza scanCodes en los detalles correspondientes según subcategoriaCatalogoId de cada item en carga.items
+        if (Array.isArray(carga) && carga.length > 0 && Array.isArray(carga[0].items)) {
+            const items = carga[0].items;
+            const ventas = carga[0].ventas;
+            items.forEach(item => {
+            ventas.forEach(venta => {
+                venta.detalles?.forEach(detalle => {
+                if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
+                    if (!Array.isArray(detalle.scanCodes)) {
+                    detalle.scanCodes = [];
+                    }
+                    if (!detalle.scanCodes.includes(item.itemId)) {
+                    detalle.scanCodes.push(item.itemId);
+                    }
+                }
+                });
+            });
+            });
+        }        
+        setCargamentos(carga);
         setLoadingCargamentos(false);
     }
 
@@ -188,8 +208,8 @@ export default function PreparacionDePedidos({ session }) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaDespachoId: cargamentoActual._id,
-                    itemId: item._id,
+                    rutaDespachoId: cargamentoActual.rutaId,
+                    itemId: item.itemId,
                 }),
             });
 
@@ -404,18 +424,26 @@ export default function PreparacionDePedidos({ session }) {
                                 opacity: animating && index == 0 ? 0 : 1,
                             }}
                         >
-                            <div className="flex flex-row text-xl font-bold px-3 py-1">
+                            {cargamento.retiroEnLocal ? <div className="w-full flex text-xl font-bold px-3 py-1">
+                                <div>
+                                    <p className="text-xs">RETIRA EN LOCAL</p>
+                                    <p className="font-bold -mt-2 text-nowrap">Desconocido</p>
+                                </div>
+                            </div>: <div className="w-full flex text-xl font-bold px-3 py-1">
                                 <div>
                                     <p className="text-xs">CHOFER</p>
-                                    <p className="font-bold text-lg uppercase -mt-2">{cargamento.nombreChofer}</p>
+                                    <p className="font-bold -mt-2 text-nowrap">{cargamento.nombreChofer.split(" ").splice(0, 2).join(" ")}</p>
                                 </div>
-                                <div className="ml-2 mt-3 text-gray-500">
-                                    <div className="flex justify-start md:justify-start">
-                                        <FaTruck className="text-xl mr-2" />
-                                        <p className="font-bold text-sm">{cargamento.patenteVehiculo}</p>
+                                <div className="w-full text-gray-500 mr-0 items-end flex justify-end">
+                                    <div className="w-[76px] text-center bg-white rounded-md p-0.5">
+                                        <div className="flex justify-start md:justify-start bg-white rounded-sm border-gray-400 border px-0.5 pb-0.5 space-x-0.5">
+                                            <p className="font-bold text-sm">{cargamento.patenteVehiculo.substring(0, 2)}</p>
+                                            <Image width={82} height={78} src="/ui/escudo.png" alt="separador" className="w-[9px] h-[9px]" style={{ "marginTop": "7px"}}/>
+                                            <p className="font-bold text-sm">{cargamento.patenteVehiculo.substring(2, cargamento.patenteVehiculo.length)}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </div>}
 
                             <div className="w-full h-[calc(100dvh-234px)] overflow-y-scroll">
                                 {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
@@ -526,7 +554,7 @@ export default function PreparacionDePedidos({ session }) {
                 ))}
                 {loadingCargamentos && (
                     <div className="absolute w-full h-screen flex items-center justify-center">
-                        <Loader texto="CARGANDO PEDIDOS" />
+                        <Loader texto="Cargando pedidos" />
                     </div>
                 )}
                 {cargamentos?.length === 0 && !loadingCargamentos && (

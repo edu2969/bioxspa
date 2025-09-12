@@ -33,7 +33,7 @@ const clienteSchema = new Schema({
     cilindrosMin: { type: String, default: 0 },
     cilindrosMax: { type: Number, default: 9999 },
     enQuiebra: { type: Boolean, default: false },
-    mesesAumento: { type: [Number], default: null },
+    mesesAumento: [Number],
     direccionesDespacho: [{ type: direccionSchema, default: [] }]
 }, {
     timestamps: true

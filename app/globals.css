@@ -163,3 +163,14 @@ html, body {
       border-radius: 50%;
   }
 }
+
+::-webkit-scrollbar {
+  width: 8px;
+  background-color: #9ca3af77;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: darken(teal, 10%);
+  border-radius: 4px;
+}

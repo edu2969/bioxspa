@@ -9,11 +9,22 @@ const comentarioCobroSchema = new Schema({
     timestamps: true
 });
 
+const historialEstadoSchema = new Schema({
+    fecha: { type: Date, required: true },
+    estado: { type: Number, required: true },
+}, {
+    _id: false,
+    timestamps: false
+});
+
 const ventaSchema = new Schema({
     temporalId: { type: String },
+    tipo: { type: Number, required: true }, // 1: Venta, 2: OT, 3: Translado, 4: Cotizacion
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Cliente", required: true },
     codigo: { type: String },
     vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    sucursalId: { type: mongoose.Schema.Types.ObjectId, ref: "Sucursal", required: true },
+    dependenciaId: { type: mongoose.Schema.Types.ObjectId, ref: "Dependencia" },
     fecha: { type: Date, required: true },
     estado: { type: Number, required: true },
     porCobrar: { type: Boolean, default: false },
@@ -26,7 +37,7 @@ const ventaSchema = new Schema({
     numeroVale: { type: String },
     saldo: { type: Number, default: 0 },
     documentoTributarioId: { type: mongoose.Schema.Types.ObjectId, ref: "DocumentoTributario", required: true },
-    direccionDespachoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion", required: true },
+    direccionDespachoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     tasaImpuesto: { type: Number },
     tieneOT: { type: Boolean, default: false },
     tieneArriendo: { type: Boolean, default: false },
@@ -37,6 +48,7 @@ const ventaSchema = new Schema({
     cantidadReenviosSII: { type: Number },
     comentario: { type: String, default: "" },
     comentariosCobro: { type: [comentarioCobroSchema], default: [] },
+    historialEstados: { type: [historialEstadoSchema], default: [] }
 }, {
     timestamps: true
 });

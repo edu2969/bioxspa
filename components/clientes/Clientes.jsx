@@ -22,14 +22,7 @@ export default function Clientes() {
     const [direccionesDespacho, setDireccionesDespacho] = useState([]);
     const { register, handleSubmit, setValue, reset } = useForm();
     const [direccionEditIdx, setDireccionEditIdx] = useState(null);
-    const [direccionEdit, setDireccionEdit] = useState({
-        direccionId: {
-            nombre: "",
-            latitud: null,
-            longitud: null
-        },
-        comentario: null
-    });
+    const [direccionEdit, setDireccionEdit] = useState(null);
     const router = useRouter();
     const scrollRef = useRef(null);
     const [saving, setSaving] = useState(false);
@@ -40,7 +33,6 @@ export default function Clientes() {
     // Abre el modal y carga los datos de la dirección seleccionada
     const handleAjustarDireccion = (idx) => {
         const dir = direccionesDespacho[idx] || {};
-        console.log("Direccion de despacho seleccionada:", dir);
         setDireccionEdit({
             direccionId: {
                 nombre: dir.direccionId.nombre || "",
@@ -70,7 +62,11 @@ export default function Clientes() {
                         setClienteSelected(data.cliente);
                         setDireccionesDespacho(data.cliente.direccionesDespacho || []);
                         Object.entries(data.cliente).forEach(([key, value]) => {
-                            setValue(key, value ?? "");
+                            if(key == "mesesAumento") {
+                                setValue("mesesAumento", Array.isArray(value) ? value.join(",") : "");
+                            } else {
+                                setValue(key, value ?? "");
+                            }
                         });
                     } else {
                         toast.error("Error al cargar cliente");
@@ -217,11 +213,10 @@ export default function Clientes() {
                                                     className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                     onClick={async () => {
                                                         setLoadingCliente(true);
-                                                        console.log("CLIENTE", cliente);
                                                         const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
                                                         const clienteData = await clienteResp.json();
-                                                        console.log("Cliente seleccionado >>>>>>>>", clienteResp, clienteData);
                                                         if (clienteResp.ok && clienteData.ok) {
+                                                            console.log("DATA CLIENTE", clienteData.cliente);
                                                             setClienteSelected(clienteData.cliente);
                                                             setDireccionesDespacho(clienteData.cliente.direccionesDespacho || []);
                                                             setAutocompleteClienteResults([]);
@@ -242,7 +237,9 @@ export default function Clientes() {
                                 <button
                                     type="button"
                                     className="ml-2 flex items-center px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold"
-                                    onClick={() => { setClienteSelected(null) }}
+                                    onClick={() => { setClienteSelected({
+                                        direccionesDespacho: [],
+                                    }) }}
                                 >
                                     <TiUserAddOutline className="mr-1" size="1.25rem" /> Nuevo
                                 </button>
@@ -356,7 +353,6 @@ export default function Clientes() {
                             </div>
                             
                             {clienteSelected.direccionesDespacho.map((dir, idx) => {
-                                console.log("Dirección de despacho:", dir, dir.direccionId?.nombre);
                                 return <div key={`direccion_despacho_${idx}`} className="flex items-center gap-2 mb-2">
                                     <input type="text"
                                         value={dir.direccionId?.nombre || ""}
@@ -388,8 +384,8 @@ export default function Clientes() {
                             <div className={`w-full flex transition-all ease-linear ${direccionEditIdx !== null ? 'h-96' : 'h-0'} overflow-hidden`}>
                                 <div className="w-2/3 h-80">
                                     <MapWithDraggableMarker
-                                        lat={direccionEdit.direccionId.latitud}
-                                        lng={direccionEdit.direccionId.longitud}
+                                        lat={direccionEdit?.direccionId?.latitud ?? 0}
+                                        lng={direccionEdit?.direccionId?.longitud ?? 0}
                                         onMarkerChange={handleMapMarkerChange}
                                     />
                                 </div>
@@ -400,7 +396,7 @@ export default function Clientes() {
                                                 <label className="block text-xs text-gray-500">Latitud</label>
                                                 <input
                                                     type="number"
-                                                    value={direccionEdit.direccionId.latitud ?? ""}
+                                                    value={direccionEdit?.direccionId?.latitud ?? ""}
                                                     readOnly
                                                     className="block w-32 px-2 py-1 border border-gray-200 rounded bg-gray-50 text-xs"
                                                 />
@@ -409,7 +405,7 @@ export default function Clientes() {
                                                 <label className="block text-xs text-gray-500">Longitud</label>
                                                 <input
                                                     type="number"
-                                                    value={direccionEdit.direccionId.longitud ?? ""}
+                                                    value={direccionEdit?.direccionId?.longitud ?? ""}
                                                     readOnly
                                                     className="block w-32 px-2 py-1 border border-gray-200 rounded bg-gray-50 text-xs"
                                                 />
@@ -418,7 +414,7 @@ export default function Clientes() {
                                         <div className="mt-4">
                                             <label className="block text-xs text-gray-500 mb-1">Comentario</label>
                                             <textarea
-                                                value={direccionEdit.comentario || ""}
+                                                value={direccionEdit?.comentario || ""}
                                                 onChange={e => setDireccionEdit(prev => ({ ...prev, comentario: e.target.value }))}
                                                 className="block w-full px-2 py-1 border border-gray-200 rounded bg-gray-50 text-xs resize-none"
                                                 rows={3}

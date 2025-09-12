@@ -97,7 +97,7 @@ export default function LoginForm() {
       <div className="z-10 flex min-h-full flex-col justify-center py-6">
         <div className="flex sm:mx-auto sm:w-full sm:max-w-sm px-12">
           <Image width={80} height={80} src="/brand.png" alt="BIOXSPA-Brand" className="mx-auto w-80 mt-6" priority={true} />
-          <span className="text-xs text-gray-400 mt-28">v0.91</span>
+          <span className="text-xs text-gray-400 mt-28">v0.95</span>
         </div>
       </div>
       <form className="z-10 mt-2 w-72" onSubmit={handleSubmit(onSubmit, onError)}>

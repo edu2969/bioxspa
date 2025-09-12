@@ -6,10 +6,11 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import Loader from "./Loader";
-import { IoMdAlert } from "react-icons/io";
 import { FaClipboardCheck } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import 'react-circular-progressbar/dist/styles.css';
+import Link from "next/link";
+import { MdAddTask } from "react-icons/md";
 
 function formatFecha(fecha) {
     return new Date(fecha).toLocaleDateString("es-CL", {
@@ -33,6 +34,7 @@ export default function GestionPedidos({ session }) {
     const [pedidos, setPedidos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [credito, setCredito] = useState(null);
+    const [redirecting, setRedirecting] = useState(false);
 
     const fetchPedidos = useCallback(async () => {
         const res = await fetch("/api/pedidos/borradores");
@@ -187,10 +189,24 @@ export default function GestionPedidos({ session }) {
     }
 
     return (
-        <main className="py-8 h-screen bg-gray-50">
-            <h1 className="text-2xl font-bold mb-8 text-center">Gestión de Pedidos</h1>
+        <main className="w-full py-4 h-screen bg-gray-50">
+            <div className="flex text-center items-center justify-center">
+                <h1 className="text-2xl font-bold mb-8 text-center">Gestión de Pedidos</h1>
+                <div className="ml-6 -mt-7">
+                    <Link href="/modulos/pedidos/nuevo" className="relative -mt-2" onClick={() => setRedirecting(true)}>
+                        <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3"
+                            disabled={redirecting}>
+                            <MdAddTask size={32} className="pl-0.5 mr-2" /> NUEVO
+                        </button>
+                        {redirecting && <div className="absolute -top-0 -left-16 w-32 h-full pt-1 pl-4">
+                            <div className="absolute -top-0 -left-0 w-full h-full bg-white opacity-70"></div>
+                            <Loader texto="" />
+                        </div>}
+                    </Link>
+                </div>
+            </div>
             <div className="w-full pb-4 px-4 h-[calc(100vh-98px)] overflow-y-scroll">
-                {!loading && <div className="flex flex-wrap gap-6">
+                {!loading && pedidos.length > 0 ? <div className="flex flex-wrap gap-6">
                     {pedidos.map((pedido) => (
                         <div
                             key={pedido._id}
@@ -200,18 +216,26 @@ export default function GestionPedidos({ session }) {
                             <div
                                 data-edit-pedido
                                 data-id={pedido._id}
-                                className="bg-white rounded-lg shadow p-4 border border-gray-200 hover:shadow-lg hover:scale-105 transition"
+                                className={`${'bg-yellow-50'} rounded-lg shadow px-4 pt-4 pb-2 border border-gray-200 hover:shadow-lg hover:scale-105 transition`}
                             >                            
                                 <div className="flex justify-between items-center mb-2">
-                                    <div>
+                                    <div className="-mt-8">
                                         <p className="font-semibold text-lg">{pedido.cliente.nombre}</p>
                                         <p className="text-xs text-gray-500">{pedido.cliente.rut}</p>
                                     </div>
-                                    <span className="text-xs bg-blue-100 text-blue-700 rounded px-2 py-0.5 -mt-6">
-                                        {formatFecha(pedido.fecha)}
-                                    </span>
+                                    <div className="flex flex-col space-y-1 mt-4">
+                                        <p className="text-center text-xs bg-yellow-100 text-yellow-700 rounded px-2 py-0.5 -mt-6">
+                                            COTIZACION
+                                        </p>
+                                        <p className="text-xs bg-blue-100 text-yellow-700 rounded px-2 py-0.5 -mt-6">
+                                            {formatFecha(pedido.fecha)}
+                                        </p>
+                                        <p className="text-xs text-right">
+                                            4 días atrás
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="mb-2">
+                                <div className="mb-2 -mt-6">
                                     <p className="text-sm font-medium text-gray-700 mb-1">Solicitante:</p>
                                     <div className="flex items-center gap-2 text-xs text-gray-600">
                                         <span className="font-semibold">{pedido.solicitante.nombre}</span>
@@ -219,21 +243,24 @@ export default function GestionPedidos({ session }) {
                                         <span>{pedido.solicitante.telefono}</span>
                                     </div>
                                 </div>
-
-                                <div>
-                                    <p className="text-sm font-medium text-gray-700 mb-1">Pedido:</p>
-                                    <ul className="space-y-1">
+                                <p className="text-sm font-medium text-gray-700 mb-1">Pedido:</p>                                    
+                                <div className="border-2 border-gray-100 rounded max-h-48 overflow-y-auto">
+                                    <ul>
                                         {pedido.items.map((item, idx2) => (
-                                            <li key={idx2} className="flex justify-between items-center text-sm">
+                                            <li
+                                                key={idx2}
+                                                className={`flex justify-between items-center text-sm ${idx2 % 2 === 0 ? "bg-gray-100" : "bg-gray-50"
+                                                    } px-2 py-1 rounded`}
+                                            >
                                                 <span>
-                                                    {item.cantidad} x {item.producto} {item.capacidad}
+                                                    <b>{item.cantidad}</b> x {item.producto} {item.capacidad}
                                                 </span>
                                                 <span className="ml-2 flex items-center">
-                                                    {idx2 === 1 && item.precio !== undefined && (
+                                                    {/*idx2 === 1 && item.precio !== undefined && (
                                                         <span className="mr-1 text-red-600 text-lg">
                                                             <IoMdAlert />
                                                         </span>
-                                                    )}
+                                                    ). Esta es una alerta que iría en caso del que precio haya vencido. */}
                                                     {item.precio !== undefined ? (
                                                         <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded">
                                                             ${amountFormat(item.precio)}
@@ -246,11 +273,20 @@ export default function GestionPedidos({ session }) {
                                                 </span>
                                             </li>
                                         ))}
+                                        {/* Totalizador */}
+                                        <li className="flex justify-between items-center text-sm bg-gray-200 px-2 py-1 rounded font-bold rounded-t-none border-yellow-200">
+                                            <span>Total</span>
+                                            <span className="text-yellow-700">
+                                                ${pedido.items.reduce((acc, item) => acc + ((parseInt(item.cantidad) || 0) * (parseInt(item.precio) || 0)), 0).toLocaleString("es-CL")}
+                                            </span>
+                                        </li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
                     ))}
+                </div> : <div className="flex justify-center items-center h-full">
+                    <p className="text-gray-500">No hay pedidos disponibles</p>
                 </div>}
             </div>
 
@@ -404,11 +440,10 @@ export default function GestionPedidos({ session }) {
                 </div>
             )}
 
-            {loading && (
-                <div className="flex items-center justify-center h-full -mt-20">
-                    <Loader texto="Cargando borradores"/>
-                </div>
-            )}
+            {loading && <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
+                <p className="text-xl font-bold">Cargando borradores</p>
+            </div>}
 
             {!loading && pedidos.length == 0 && (
                 <div className="flex items-center justify-center h-full -mt-16">

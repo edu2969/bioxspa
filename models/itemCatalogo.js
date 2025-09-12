@@ -21,6 +21,7 @@ const ItemCatalogoSchema = new mongoose.Schema({
     tipo: { type: Number, required: false },
     direccionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Direccion', required: false },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: false },
+    fechaMantencion: { type: Date, default: null }
 }, { timestamps: true });
 
 const ItemCatalogo = mongoose.models.ItemCatalogo || mongoose.model('ItemCatalogo', ItemCatalogoSchema);

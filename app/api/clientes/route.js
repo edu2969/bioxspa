@@ -19,14 +19,14 @@ export async function GET(req) {
 
         // Busca el cliente y popula documentoTributarioId y direccionDespachoIds
         const cliente = await Cliente.findById(id)
-            .select("nombre rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionesDespacho documentoTributarioId credito")
+            .select("nombre rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionesDespacho documentoTributarioId credito mesesAumento")
             .populate({
                 path: "direccionesDespacho.direccionId",
                 model: "Direccion",
                 select: "_id nombre latitud longitud"
             })
             .lean();
-
+        
         if (!cliente) {
             return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
         }

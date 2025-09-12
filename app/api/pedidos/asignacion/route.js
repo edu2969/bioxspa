@@ -14,8 +14,10 @@ import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
 import RutaDespacho from "@/models/rutaDespacho";
 import Checklist from "@/models/checklist";
+import Sucursal from "@/models/sucursal";
+import Dependencia from "@/models/dependencia";
 
-export async function GET() {
+export async function GET(request) {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();
     console.log("Connected to MongoDB");
@@ -36,8 +38,29 @@ export async function GET() {
         mongoose.model("Vehiculo", Vehiculo.schema);
     }
 
+    const { searchParams } = new URL(request.url);
+    const sucursalId = searchParams.get("sucursalId");
+    if (!sucursalId) {
+        return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
+    }
+
     console.log("Fetching ventas in 'borrador' state...");
-    const ventas = await Venta.find({ estado: TIPO_ESTADO_VENTA.por_asignar }).lean();
+    const ventas = await Venta.find({
+        sucursalId,
+        $or: [{
+            estado: TIPO_ESTADO_VENTA.por_asignar,            
+        }, {
+            estado: {
+                $in: [
+                    TIPO_ESTADO_VENTA.pagado,
+                    TIPO_ESTADO_VENTA.entregado
+                ]
+            }
+        }]
+    })
+    .sort({ fecha: -1 }) // Ordenar por fecha descendente (más reciente primero)
+    .limit(25)
+    .lean();
     console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
 
     const pedidos = await Promise.all(
@@ -72,9 +95,10 @@ export async function GET() {
                 clienteId: venta.clienteId,
                 clienteNombre,
                 clienteRut,
-                fechaCreacion: venta.createdAt,
-                items: itemsWithNames,
-                createdAt: venta.createdAt,
+                estado: venta.estado,
+                despachoEnLocal: !venta.direccionDespachoId,
+                fecha: venta.fecha,
+                items: itemsWithNames
             };
         })
     );
@@ -92,6 +116,15 @@ export async function GET() {
     if(choferesIds.length > 0) {
         qry.userId = { $nin: choferesIds };
     }
+    const sucursal = await Sucursal.findById(sucursalId).lean();
+    const dependencias = sucursal ? await Dependencia.find({ sucursalId: sucursal._id }).lean() : [];
+    if(dependencias.length == 0) {
+        return NextResponse.json({ ok: false, error: "No se encontraron dependencias para la sucursal" }, { status: 400 });
+    }
+    qry.$or = [
+        { sucursalId: sucursalId },
+        { dependenciaId: { $in: dependencias.map(d => d._id) } }
+    ];
     const cargosChoferes = await Cargo.find(qry).lean();
     const today = new Date();
     today.setHours(0, 0, 0, 0);

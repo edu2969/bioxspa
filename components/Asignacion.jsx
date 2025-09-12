@@ -1,7 +1,7 @@
 "use client";
 import Image from 'next/image';
 import Link from 'next/link';
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { BsGeoAltFill } from 'react-icons/bs';
 import { MdDragIndicator } from 'react-icons/md';
 import { GoCopilot } from 'react-icons/go';
@@ -12,18 +12,21 @@ import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
-import { FaCartPlus, FaRegCheckCircle } from 'react-icons/fa';
+import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle } from 'react-icons/fa';
 import {  TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from './Loader';
 import { getColorEstanque } from '@/lib/uix';
 import { FaTruckFast } from 'react-icons/fa6';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/es';
+import { BiTask } from 'react-icons/bi';
+import { useForm } from 'react-hook-form';
 dayjs.locale('es');
-var relative = require('dayjs/plugin/relativeTime');
-dayjs.extend(relative);
+dayjs.extend(relativeTime);
 
-export default function AsignacionPanel({ session }) {
+export default function Asignacion({ session }) {
     const [pedidos, setPedidos] = useState([]);
     const [choferes, setChoferes] = useState([]);
     const [enTransito, setEnTransito] = useState([]);
@@ -37,15 +40,21 @@ export default function AsignacionPanel({ session }) {
     const [redirecting, setRedirecting] = useState(false);
     const [showCommentModal, setShowCommentModal] = useState(0);
     const [comentario, setComentario] = useState(null);
+    const [detalleExpandido, setDetalleExpandido] = useState(null);
+    const pedidosScrollRef = useRef(null);
+    const [cargandoMas, setCargandoMas] = useState(false);
+    const [showDetalleOrdenModal, setShowDetalleOrdenModal] = useState(false);
+    const [sucursales, setSucursales] = useState([]);
+    const { setValue, getValues } = useForm();    
 
     const nombreChofer = (choferId) => {
         const chofer = choferes.find((chofer) => chofer._id === choferId);
         return chofer ? chofer.nombre : "Desconocido";
     }
 
-    const fetchPedidos = useCallback(async () => {
+    const fetchPedidos = useCallback(async (sucursalId) => {
         try {
-            const response = await fetch("/api/pedidos/asignacion");
+            const response = await fetch(`/api/pedidos/asignacion${sucursalId ? `?sucursalId=${sucursalId}` : ''}`);
             if (!response.ok) {
                 throw new Error("Failed to fetch pedidos");
             }
@@ -60,17 +69,37 @@ export default function AsignacionPanel({ session }) {
         }
     }, [setPedidos, setChoferes, setEnTransito, setLoadingPanel]);
 
+    const fetchSucursales = useCallback(async () => {
+        try {
+            const response = await fetch(`/api/pedidos/asignacion/sucursales`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch sucursales");
+            }
+            const data = await response.json();
+            console.log("Fetched sucursales:", data);
+            setSucursales(data.sucursales);
+        } catch (error) {
+            console.error("Error fetching sucursales:", error);
+        }
+    }, [setSucursales]);
+
     useEffect(() => {
-        fetchPedidos();
+        fetchSucursales();        
+        const sucursalId = localStorage.getItem("sucursalId") || null;
+        if(sucursalId) {
+            setValue("sucursalId", sucursalId);
+        }
+        fetchPedidos(sucursalId);
 
         socket.on("update-pedidos", () => {
-            fetchPedidos();
+            fetchSucursales();
+            fetchPedidos(sucursalId);
         });
 
         return () => {
             socket.off("update-pedidos");
         };
-    }, [fetchPedidos]);
+    }, [fetchPedidos, fetchSucursales, setValue]);
 
     useEffect(() => {
         console.log("Pedidos:", pedidos);
@@ -201,6 +230,10 @@ export default function AsignacionPanel({ session }) {
         setComentario(null);
     }
 
+    const onCloseDetalleVenta = () => {
+        setShowDetalleOrdenModal(false);
+    }
+
     const getCilindrosDescarga = (ruta) => {
         if (!ruta || !Array.isArray(ruta.ventaIds) || !Array.isArray(ruta.ruta) || ruta.ruta.length === 0) return [];
         const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
@@ -278,11 +311,79 @@ export default function AsignacionPanel({ session }) {
         });
     }
 
+    const handlePedidosScroll = (e) => {
+        if(cargandoMas) return; // Evita múltiples cargas simultáneas
+        const { scrollTop, scrollHeight, clientHeight } = e.target; 
+        // Detecta si el scroll llegó al fondo (con un margen de 10px)
+        if (scrollTop + clientHeight >= scrollHeight - 10) {
+            cargarMasPedidos();
+        }
+    };
+
+    const cargarMasPedidos = async () => {
+        setCargandoMas(true);
+        const ultimaFecha = pedidos.length ? pedidos[pedidos.length - 1].fecha : new Date();
+        await fetch(`/api/ventas/cargarMas?fecha=${new Date(ultimaFecha).toISOString()}`).then(async (response) => {
+            if (response.ok) {
+                const data = await response.json();
+                console.log("DATA", data);
+                // Actualiza la lista de pedidos con los nuevos datos
+                if (Array.isArray(data.pedidos)) {
+                    setPedidos((prev) => [...prev, ...data.pedidos]);
+                }
+            }
+            setCargandoMas(false);
+        });
+    }
+
     return (
-        <main className="mt-10 h-screen overflow-hidden">
-            <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 p-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>
+        <main className="w-full mt-2 h-screen overflow-hidden">
+            {sucursales.length > 1 && (
+                <div className="flex justify-center mb-2">                    
+                    <div className="flex">
+                        {sucursales.map((sucursal, idx) => {
+                            const isActive = getValues("sucursalId") === sucursal._id;
+                            const isFirst = idx === 0;
+                            const isLast = idx === sucursales.length - 1;
+                            return (
+                                <button
+                                    key={sucursal._id}
+                                    className={`
+                                        flex items-center px-5 py-2 font-semibold rounded-md
+                                        ${isFirst ? "rounded-r-none" : ""}
+                                        ${isLast ? "rounded-l-none" : ""}
+                                        ${!isFirst && !isLast ? "" : ""}
+                                        ${isActive
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-gray-100 text-gray-700 hover:bg-blue-100"}
+                                        border-0
+                                        ${!isFirst ? "-ml-px" : ""}
+                                        transition-colors
+                                        relative
+                                    `}
+                                    onClick={() => {
+                                        setValue("sucursalId", sucursal._id);
+                                        localStorage.setItem("sucursalId", sucursal._id);
+                                        setLoadingPanel(true);
+                                        fetchPedidos(sucursal._id);
+                                    }}
+                                    type="button"
+                                >
+                                    <span>{sucursal.nombre}</span>
+                                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-white text-blue-600 rounded-full border border-blue-200">
+                                        {sucursal.ventasActivas || 0}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+            <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 px-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>
+                {/* ORDENES / EN ESPERA */}
                 <div className="col-span-7 flex flex-col md:flex-row gap-4">
-                    <div className="relative w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto"
+                    {/* ORDENES*/}
+                    <div className="relative w-1/2 border rounded-lg pl-2 pt-4 pr-1 bg-teal-100 shadow-md h-[calc(100vh-64px)]"
                         onDragOver={(e) => {
                             e.preventDefault();
                             e.currentTarget.style.backgroundColor = "rgb(209 213 219)";
@@ -303,11 +404,11 @@ export default function AsignacionPanel({ session }) {
                         }}
                     >
                         <div className="flex items-center mb-4">
-                            <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
-                                PEDIDOS
+                            <div className="absolute -top-0 -left-0 bg-neutral-200 text-black text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                                ÓRDENES
                             </div>
                             <Link href="/modulos/pedidos/nuevo" className="relative ml-auto -mt-2" onClick={() => setRedirecting(true)}>
-                                <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3"
+                                <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3 mr-3"
                                     disabled={redirecting}>
                                     <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO
                                 </button>
@@ -317,56 +418,107 @@ export default function AsignacionPanel({ session }) {
                                 </div>}
                             </Link>
                         </div>
-                        {pedidos.length === 0 ? (
-                            <div
-                                className="flex items-center justify-center"
-                                style={{ height: "calc(100vh - 200px)" }}>
-                                <p className="text-gray-500 text-lg font-semibold">SIN PEDIDOS</p>
-                            </div>
-                        ) : (
-                            pedidos.map((pedido, index) => (
-                                <div key={`pedido_${index}`}
-                                    className="p-2 border rounded-lg mb-2 bg-gray-100 cursor-pointer flex items-start relative"
-                                    draggable
-                                    onDragStart={() => setSelectedPedido(pedido._id)}
-                                >
-                                    <div>
-                                        <p className="text-md font-bold uppercase w-full">{pedido.clienteNombre}</p>
-                                        <p className="text-xs text-gray-500 ml-2">{dayjs(pedido.createdAt).fromNow()}</p>
-                                        <ul className="list-disc ml-4 mt-2">
-                                            {pedido.items.map((item) => (<li key={`pedido_${index}_item_${item._id}`}>{item.cantidad}x {item.nombre}</li>))}
-                                        </ul>
-                                    </div>
-                                    <div className="absolute top-2 right-2 text-gray-500">
-                                        <MdDragIndicator size="1.5rem" />
-                                    </div>
+                        <div className="h-[calc(100vh-150px)] overflow-y-scroll"
+                            ref={pedidosScrollRef}
+                            onScroll={handlePedidosScroll}
+                        >
+                            
+                            {pedidos.length === 0 ? (
+                                <div
+                                    className="flex flex-col items-center justify-center"
+                                    style={{ height: "calc(100vh - 200px)" }}>
+                                        <BiTask size="6rem" className="mr-1" />
+                                    <p className="text-gray-500 text-lg font-semibold">SIN ÓRDENES</p>
                                 </div>
-                            ))
-                        )}
-                    </div>
+                            ) : (
+                                pedidos.map((pedido, index) => (
+                                    <div key={`pedido_${index}`}
+                                        className={`pl-2 mr-1 border rounded-lg mb-2 ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} cursor-pointer flex items-start relative`}
+                                        draggable={pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal}
+                                        onDragStart={() => setSelectedPedido(pedido._id)}
+                                        onClick={() => {setShowDetalleOrdenModal(true)}}
+                                    >
+                                        <div className="w-full">
+                                            <p className="text-md font-bold uppercase w-full">{pedido.clienteNombre}{pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2">Retiro en local</span>}</p>
+                                            <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>                                            
+                                            <ul className="w-full list-disc pl-4 mt-2">
+                                                {(() => {
+                                                    const items = pedido.items || [];
+                                                    const expandido = detalleExpandido === `${index}`;
+                                                    const mostrarItems = expandido ? items : items.slice(0, 1);
+                                                    const itemsCount = items.length;
 
-                    <div className="relative w-1/2 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto pt-14">
-                        <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
-                            EN ESPERA
+                                                    return (
+                                                        <div
+                                                            className="w-full relative right-2"
+                                                            style={{
+                                                                maxHeight: expandido ? `${itemsCount * 2.2}em` : "2.2em",
+                                                                transition: "max-height 0.4s cubic-bezier(.4,0,.2,1)",
+                                                                overflow: "hidden"
+                                                            }}
+                                                        >
+                                                            {mostrarItems.map((item, i) => {
+                                                                const detalleTexto = `${item.cantidad}x ${item.nombre}`;
+                                                                return (
+                                                                    <li key={i} className="w-full flex items-center">
+                                                                        <div className={`${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-gray-100' : 'bg-gray-800'} rounded-full h-2 w-2 mr-2`}></div>{detalleTexto}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                            {itemsCount > 1 && (
+                                                                <button
+                                                                    className="absolute top-0 right-0 text-blue-500 ml-1 text-xs z-10 bg-white px-1"
+                                                                    type="button"
+                                                                    style={{ borderRadius: 4 }}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDetalleExpandido(expandido ? null : `${index}`);
+                                                                    }}
+                                                                >
+                                                                    {expandido ? <FaChevronUp /> : <FaChevronDown />}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}                                                
+                                            </ul>
+                                        </div>                                        
+                                        {(pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal) && (
+                                            <div className="absolute top-2 right-2 text-gray-500">
+                                                <MdDragIndicator size="1.5rem" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                            {pedidos.length > 24 && <div className="flex justify-center items-center mt-2 h-12">
+                                <Loader texto="Cargando más..." />
+                            </div>}
+                        </div>
+                    </div>
+                    {/* CONDUCTORES */}
+                    <div className="relative w-1/2 border rounded-lg p-4 bg-rose-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto pt-14">
+                        <div className="absolute -top-0 -left-0 bg-neutral-200 text-gray-700 text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                            CONDUCTORES
                         </div>
                         {choferes.map((chofer, index) => (
                             <div key={`en_espera_${index}`}
-                                className={`relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-gray-100' : 'bg-green-100'}`}
+                                className={`text-white relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-rose-700' : 'bg-green-500'}`}
                                 data-id={`choferId_${chofer._id}`}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(74 222 128)" : "rgb(190 18 60)"; // Tailwind green-400 o rose-700
                                     e.currentTarget.style.boxShadow = chofer.checklist
-                                        ? "0 4px 6px rgba(0, 0, 0, 0.1)"
+                                        ? "0 4px 6px rgba(34, 197, 34, 0.5)"
                                         : "0 4px 12px 0 rgba(239, 68, 68, 0.5)"; // rojo-500
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "rgb(190 18 60)"; // Tailwind green-500 o rose-700
                                     e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(220 252 231)" : "rgb(243 244 246)"; // Tailwind green-100 o gray-100
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "rgb(190 18 60)"; // Tailwind green-500 o rose-700
                                     e.currentTarget.style.boxShadow = "none";
                                     if (!chofer.checklist) {
                                         toast.warning("El chofer no tiene checklist completo, no se puede asignar.");
@@ -382,12 +534,12 @@ export default function AsignacionPanel({ session }) {
                                     <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
                                 </div>
                                 {!chofer.checklist && (
-                                    <div className="flex items-center text-red-600 text-xs font-semibold">
-                                        <span className="inline-block w-2 h-2 rounded-full bg-red-600 mr-2"></span>
+                                    <div className="flex items-center text-red-200 text-xs font-semibold mt-1">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-red-300 mr-2"></span>
                                         Sin checklist
                                     </div>
                                 )}
-                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="bg-green-300 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
+                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
                                     onDragStart={() => {
                                         setSelectedChofer(chofer._id);
                                         setSelectedVenta(pedido.items[0].ventaId);
@@ -395,7 +547,7 @@ export default function AsignacionPanel({ session }) {
                                     draggable="true">
                                     <div className="flex w-full">
                                         <p className="font-md uppercase font-bold text-nowrap overflow-hidden text-ellipsis whitespace-nowrap w-11/12">{pedido.nombreCliente}</p>
-                                        <div className={`${pedido.comentario ? 'text-green-500' : 'text-gray-400'} w-1/12`}>
+                                        <div className={`${pedido.comentario ? 'text-green-300' : 'text-green-800'} w-1/12`}>
                                             <div className="cursor-pointer w-full ml-4" onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedVenta(pedido.items[0].ventaId);
@@ -410,11 +562,15 @@ export default function AsignacionPanel({ session }) {
                                     <ul className="list-disc ml-4 -mt-4">
                                         {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
                                     </ul>
-                                </div>) : <div className="absolute w-32 -top-0 right-0">
-                                    <div className="bg-gray-400 text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center">
+                                </div>) : <div>
+                                    <div className={`absolute w-32 top-0 right-0 ${chofer.checklist ? 'bg-green-600' : 'bg-rose-900'} text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center`}>
                                         <RiZzzFill size="1rem" className="mr-1" />
-                                        <p>SIN PEDIDOS</p>
+                                        <p>SIN ÓRDENES</p>
                                     </div>
+                                    {chofer.checklist && <div className="flex items-center text-green-200 text-xs font-semibold mt-1">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-green-300 mr-2"></span>
+                                        Listo para asignar
+                                    </div>}
                                 </div>}
                             </div>
                         ))}
@@ -422,8 +578,8 @@ export default function AsignacionPanel({ session }) {
                 </div>
 
                 {/* EN TRÁNSITO */}
-                <div className="relative col-span-5 border rounded-lg p-4 bg-white shadow-md h-[calc(100vh-80px)] overflow-y-auto overflow-x-hidden pt-12">
-                    <div className="absolute -top-0 -left-0 bg-gray-700 text-white text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
+                <div className="relative col-span-5 border rounded-lg p-4 bg-blue-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden pt-12">
+                    <div className="absolute -top-0 -left-0 bg-neutral-200 text-gray-700 text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                         EN TRÁNSITO ({enTransito.length})
                     </div>
                     {enTransito.length === 0 ? (
@@ -571,7 +727,7 @@ export default function AsignacionPanel({ session }) {
                 {loadingPanel && (
                     <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
-                        <p className="text-xl font-bold">CARGANDO PANEL</p>
+                        <p className="text-xl font-bold">Cargando asignaciones</p>
                     </div>
                 )}
             </div>
@@ -584,7 +740,7 @@ export default function AsignacionPanel({ session }) {
                 onClose={() => {
                     const item = document.querySelector(`[data-id="choferId_${selectedChofer}"]`);
                     if (item) {
-                        item.style.backgroundColor = "#F3F4F6";
+                        item.style.backgroundColor = "rgb(34 197 94)";
                         item.style.transform = "scale(1)";
                         item.style.boxShadow = "none";
                     }
@@ -700,6 +856,30 @@ export default function AsignacionPanel({ session }) {
                             </button>
                             <button
                                 onClick={onCloseComment}
+                                disabled={loading}
+                                className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            >
+                                CANCELAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>}
+
+            {showDetalleOrdenModal && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-1/4 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div className="mt-3 text-left">
+                        <h2 className="w-full flex justify-center text-xl font-bold mb-2">Detalle de venta</h2>                        
+                        <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <button
+                                onClick={onSaveComment}
+                                disabled={loading}
+                                className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                                {loading ? <div><Loader texto="ACTUALIZANDO" /></div> : "ACTUALIZAR"}
+                            </button>
+                            <button
+                                onClick={onCloseDetalleVenta}
                                 disabled={loading}
                                 className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                             >

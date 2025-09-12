@@ -1,8 +1,8 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/utils/authOptions";
-import PreparacionDePedidos from "@/components/PreparacionDePedidos";
+import JefaturaDespacho from "@/components/JefaturaDespacho";
 
 export default async function PreparacionDePedidosPage() {
     const session = await getServerSession(authOptions);
-    return <PreparacionDePedidos session={session}/>;
+    return <JefaturaDespacho session={session}/>;
 }
