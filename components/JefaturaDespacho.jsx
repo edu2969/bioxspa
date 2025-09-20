@@ -18,7 +18,8 @@ var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import { getColorEstanque } from "@/lib/uix";
-import { TIPO_ESTADO_ITEM_CATALOGO } from "@/app/utils/constants";
+import { TIPO_ESTADO_ITEM_CATALOGO, TIPO_ESTADO_VENTA, TIPO_ITEM_CATALOGO } from "@/app/utils/constants";
+import { LiaPencilAltSolid, LiaTimesSolid } from 'react-icons/lia';
 
 export default function JefaturaDespacho({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
@@ -33,6 +34,11 @@ export default function JefaturaDespacho({ session }) {
     const [editMode, setEditMode] = useState(false);
     const [moverCilindro, setMoverCilindro] = useState(false);
     const [corrigiendo, setCorrigiendo] = useState(false);
+    const [alMenosUnEscaneado, setAlMenosUnEscaneado] = useState(false);
+    const [showModalNombreRetira, setShowModalNombreRetira] = useState(false);
+    const [nombreRetira, setNombreRetira] = useState("");
+    const [rutRetiraNum, setRutRetiraNum] = useState("");
+    const [rutRetiraDv, setRutRetiraDv] = useState("");
 
     function getEstadoItemCatalogoLabel(value) {
         return {
@@ -47,29 +53,76 @@ export default function JefaturaDespacho({ session }) {
     }
 
     const postCargamento = async () => {
-        if (!isCompleted()) {
+        if (!isReady()) {
             console.log("Eeeeepa!");
             return;
         }
-
-        const scanCodes = cargamentos[0].ventas
-            .flatMap(venta => venta.detalles)
-            .flatMap(detalle => Array.isArray(detalle.scanCodes) ? detalle.scanCodes : []);
-
-        const response = await fetch("/api/pedidos/despacho", {
+        const response = await fetch(`/api/pedidos/despacho${cargamentos[0].rutaId ? "" : "/confirmarEntregaEnLocal"}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-                rutaId: cargamentos[0].rutaId,
-                scanCodes
+            body: JSON.stringify(cargamentos[0].rutaId ? {
+                rutaId: cargamentos[0].rutaId
+            } : {
+                ventaId: cargamentos[0].ventas[0].ventaId,
+                nombreRecibe: nombreRetira,
+                rutRecibe: `${rutRetiraNum}-${rutRetiraDv}`
             }),
         });
         if (!response.ok) {
             const errorData = await response.json();
             toast.error(`Error al guardar el cargamento: ${errorData.error}`);
         } else {
+            setAlMenosUnEscaneado(false);
+            const detallesCompletados = cargamentos[0].ventas.every(venta =>
+                venta.detalles.every(detalle =>
+                    Array.isArray(detalle.itemCatalogoIds) &&
+                    detalle.itemCatalogoIds.length >= detalle.multiplicador
+                )
+            );
+            if (detallesCompletados) {
+                handleRemoveFirst();
+            } else if (cargamentos.length > 1) {
+                if(cargamentos[0].rutaId == null) {
+                    setCargamentos(prev => {
+                        if (!prev.length) return prev;
+                        const [first, ...rest] = prev;
+                        // Si es retiro en local (rutaId == null)
+                        let updatedFirst = first;
+                        if (first.rutaId == null && first.ventas?.length > 0) {
+                            const ventasActualizadas = first.ventas.map(venta => {
+                                const codigosEscaneados = venta.detalles
+                                    .flatMap(detalle => Array.isArray(detalle.itemCatalogoIds) ? detalle.itemCatalogoIds : []);
+                                const entregas = Array.isArray(venta.entregasEnLocal) ? venta.entregasEnLocal : [];
+                                const entregados = entregas.flatMap(e => Array.isArray(e.itemCargadoIds) ? e.itemCargadoIds : []);
+                                const nuevosCodigos = codigosEscaneados.filter(codigo => !entregados.includes(codigo));
+                                let nuevasEntregas = entregas;
+                                if (nuevosCodigos.length > 0) {
+                                    nuevasEntregas = [
+                                        ...entregas,
+                                        {
+                                            nombreRecibe: first.nombreRetira || "",
+                                            rutRecibe: first.rutRetira || "",
+                                            itemCargadoIds: nuevosCodigos
+                                        }
+                                    ];
+                                }
+                                return {
+                                    ...venta,
+                                    entregasEnLocal: nuevasEntregas
+                                };
+                            });
+                            updatedFirst = { ...first, ventas: ventasActualizadas };
+                        }
+                        // Solo actualiza el primero, el resto se mantiene igual
+                        return [updatedFirst, ...rest];
+                    });
+                }
+                if(cargamentos.length > 1) {
+                    handleShowNext();
+                }
+            }
             handleRemoveFirst();
             toast.success(`Cargamento confirmado con éxito`);
             socket.emit("update-pedidos", {
@@ -106,11 +159,8 @@ export default function JefaturaDespacho({ session }) {
         setScanMode(!scanMode);
     };
 
-    const isCompleted = () => {
-        if (cargamentos.length === 0) return false;
-        return cargamentos[0].ventas.every(venta =>
-            venta.detalles.every(detalle => detalle.restantes === 0)
-        );
+    const isReady = () => {
+        return cargamentos.length > 0 && (cargamentos[0].nombreRetira ?? "").length > 3 && alMenosUnEscaneado;
     }
 
     const [loadingCargamentos, setLoadingCargamentos] = useState(true);
@@ -128,19 +178,24 @@ export default function JefaturaDespacho({ session }) {
             ventas.forEach(venta => {
                 venta.detalles?.forEach(detalle => {
                 if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
-                    if (!Array.isArray(detalle.scanCodes)) {
-                    detalle.scanCodes = [];
+                    if (!Array.isArray(detalle.itemCatalogoIds)) {
+                    detalle.itemCatalogoIds = [];
                     }
-                    if (!detalle.scanCodes.includes(item.itemId)) {
-                    detalle.scanCodes.push(item.itemId);
+                    if (!detalle.itemCatalogoIds.includes(item.itemId)) {
+                    detalle.itemCatalogoIds.push(item.itemId);
                     }
                 }
                 });
             });
             });
-        }        
+        }
         setCargamentos(carga);
-        setLoadingCargamentos(false);
+        if (Array.isArray(carga) && carga.length > 0) {
+            const algunaPreparacion = carga[0].ventas?.some(v => v.estado === TIPO_ESTADO_VENTA.preparacion);
+            if (algunaPreparacion) setAlMenosUnEscaneado(true);
+            console.log("Alguna en preparación?", algunaPreparacion);
+        }
+        setLoadingCargamentos(false);        
     }
 
     const cargarItem = useCallback(
@@ -152,7 +207,7 @@ export default function JefaturaDespacho({ session }) {
             // Verifica si el código ya fue escaneado en cualquier detalle de cualquier venta del primer cargamento
             const codigoYaEscaneado = cargamentoActual.ventas.some(venta =>
                 venta.detalles.some(detalle =>
-                    Array.isArray(detalle.scanCodes) && detalle.scanCodes.includes(item.itemId)
+                    Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.includes(item.itemId)
                 )
             );
             if (codigoYaEscaneado) {
@@ -208,12 +263,15 @@ export default function JefaturaDespacho({ session }) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    ventaId: cargamentoActual.ventas[ventaIndex].ventaId,
                     rutaDespachoId: cargamentoActual.rutaId,
                     itemId: item.itemId,
                 }),
             });
 
+            console.log("RESPONSE", response);
             if (response.ok) {
+                if(!alMenosUnEscaneado) setAlMenosUnEscaneado(true);
                 setCargamentos((prev) => {
                     if (!prev.length) return prev;
                     const newCargamentos = [...prev];
@@ -222,12 +280,12 @@ export default function JefaturaDespacho({ session }) {
                     const detalles = [...ventas[ventaIndex].detalles];
                     const detalleToUpdate = { ...detalles[detalleIndex] };
 
-                    // Evitar duplicados en scanCodes
-                    const scanCodes = Array.isArray(detalleToUpdate.scanCodes)
-                        ? [...detalleToUpdate.scanCodes]
+                    // Evitar duplicados en itemCatalogoIds
+                    const itemCatalogoIds = Array.isArray(detalleToUpdate.itemCatalogoIds)
+                        ? [...detalleToUpdate.itemCatalogoIds]
                         : [];
-                    if (!scanCodes.includes(item.itemId)) {
-                        scanCodes.push(item.itemId);
+                    if (!itemCatalogoIds.includes(item.itemId)) {
+                        itemCatalogoIds.push(item.itemId);
                     }
 
                     // Actualiza restantes y multiplicador si corresponde
@@ -244,7 +302,7 @@ export default function JefaturaDespacho({ session }) {
                         ...detalleToUpdate,
                         restantes: updatedRestantes,
                         multiplicador: updatedMultiplicador,
-                        scanCodes,
+                        itemCatalogoIds,
                     };
                     detalles[detalleIndex] = newDetalle;
                     ventas[ventaIndex] = { ...ventas[ventaIndex], detalles };
@@ -257,10 +315,10 @@ export default function JefaturaDespacho({ session }) {
                     `Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`
                 );
             } else {
-                toast.error(`Error al cargar cilindro ${item.codigo}`);
+                toast.error(`Código: ${item.codigo} ${response.error || 'Error desconocido'}`);
             }
         },
-        [setCargamentos, cargamentos]
+        [setCargamentos, cargamentos, alMenosUnEscaneado, setAlMenosUnEscaneado, setScanMode]
     );
 
     useEffect(() => {
@@ -386,7 +444,7 @@ export default function JefaturaDespacho({ session }) {
                 },
                 body: JSON.stringify({
                     id: item.itemId,
-                    estado: item.estado,
+                    estado: item.estado || TIPO_ESTADO_ITEM_CATALOGO.no_aplica,
                     reubicar: moverCilindro,
                 }),
             });
@@ -408,6 +466,56 @@ export default function JefaturaDespacho({ session }) {
         }
     }
 
+    const getDetailTitle = (nombre) => {
+        if(nombre.substring(0,4).toLowerCase() === "rack") {
+            return "Rack";
+        }
+        return nombre;
+    }
+
+    const getDetailsubtitle = (nombre) => {
+        if(nombre.substring(0,4).toLowerCase() === "rack") {
+            const partes = nombre.toLowerCase().split(" ");
+            const index = partes.findIndex(p => p === "cilindros") - 1;
+            return `${partes[index] || "??"}`;
+        }
+        return nombre;
+    }
+
+    const getPorcentajeAvance = () => {
+        if(cargamentos.length === 0) return 0;
+        const cargamento = cargamentos[0];
+        // Suma la cantidad total de cilindros requeridos en todos los detalles
+        const totalCilindros = cargamento.ventas.reduce(
+            (sum, venta) => sum + venta.detalles.reduce((s, detalle) => s + (detalle.multiplicador || detalle.cantidad || 0), 0),
+            0
+        );
+        if (totalCilindros === 0) return 100;
+        // Suma la cantidad de cilindros ya cargados (multiplicador - restantes)
+        const cilindrosCargados = cargamento.ventas.reduce(
+            (sum, venta) => sum + venta.detalles.reduce((s, detalle) => s + ((detalle.multiplicador || detalle.cantidad || 0) - (detalle.restantes || 0)), 0),
+            0
+        );
+        return Math.round((cilindrosCargados / totalCilindros) * 100);
+    }
+
+    const handleGuardarNombreRetira = () => {
+        setCargamentos(prev => {
+            if (!prev.length) return prev;
+            const nuevos = [...prev];
+            nuevos[0] = {
+                ...nuevos[0],
+                nombreRetira: nombreRetira,
+                rutRetira: `${rutRetiraNum}-${rutRetiraDv}`
+            };
+            return nuevos;
+        });
+        setNombreRetira("");
+        setRutRetiraNum("");
+        setRutRetiraDv("");
+        setShowModalNombreRetira(false);
+    };
+
     return (
         <div className="w-full h-screen" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
             <div className="w-full">
@@ -425,9 +533,22 @@ export default function JefaturaDespacho({ session }) {
                             }}
                         >
                             {cargamento.retiroEnLocal ? <div className="w-full flex text-xl font-bold px-3 py-1">
-                                <div>
-                                    <p className="text-xs">RETIRA EN LOCAL</p>
-                                    <p className="font-bold -mt-2 text-nowrap">Desconocido</p>
+                                <div className="w-full flex text-lg font-bold px-3 relative">
+                                    <div className="w-full relative">
+                                        <p className="text-xs">Nombre de quién retira en local</p>
+                                        <div className="mt-1 text-nowrap border border-gray-300 rounded px-2">
+                                            <p className="-mt-1">{cargamento.nombreRetira || 'Desconocido'}</p>
+                                            <p className="text-xs -mt-1">RUT: {cargamento.rutRetira || '-'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="absolute top-8 right-5 text-blue-500 flex items-center justify-end">
+                                        <LiaPencilAltSolid className="cursor-pointer hover:text-blue-600" size="1.3rem" onClick={() => {
+                                            setNombreRetira(cargamento.nombreRetira || "");
+                                            setRutRetiraNum(cargamento.rutRetira ? cargamento.rutRetira.split("-")[0] : "");
+                                            setRutRetiraDv(cargamento.rutRetira ? cargamento.rutRetira.split("-")[1] : "");
+                                            setShowModalNombreRetira(true);
+                                        }} />
+                                    </div>
                                 </div>
                             </div>: <div className="w-full flex text-xl font-bold px-3 py-1">
                                 <div>
@@ -445,17 +566,17 @@ export default function JefaturaDespacho({ session }) {
                                 </div>
                             </div>}
 
-                            <div className="w-full h-[calc(100dvh-234px)] overflow-y-scroll">
-                                {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-xl border-gray-300 mb-1">
+                            <div className="w-full h-[calc(100dvh-264px)] overflow-y-scroll">
+                                {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-lg border-gray-300 mb-1 mr-1 bg-neutral-200">
                                     <div className="flex">
-                                        <div className="w-10/12">
-                                            <p className="text-xs font-bold text-gray-500 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
-                                            <p className="flex text-xs text-gray-500">
-                                                <FaPhoneAlt className="mr-1" />{venta.cliente?.telefono || "Sin teléfono"}
+                                        <div className="w-10/12 pl-1">
+                                            <p className="text-xs font-bold text-gray-600 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
+                                            <p className="flex text-xs text-gray-500 mt-1">
+                                                <FaPhoneAlt className="mr-1" /><span className="-mt-0.5 orbitron">{venta.cliente?.telefono || "Sin teléfono"}</span>
                                             </p>
                                         </div>
                                         <div key={`comentario_${ventaIndex}`} className={`w-2/12 flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
-                                            <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                            <div className="cursor-pointer mt-0" onClick={(e) => {
                                                 e.stopPropagation();
                                                 toast.info(`${venta.comentario || "Sin comentarios"}`);
                                             }}>
@@ -469,67 +590,84 @@ export default function JefaturaDespacho({ session }) {
                                         {venta.detalles.map((detalle, idx) => (
                                             <li
                                                 key={`detalle_${ventaIndex}_${idx}`}
-                                                className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                                className={`w-full flex text-sm border border-gray-300 px-0 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                             >
-                                                <div className="w-full flex items-left">
-                                                    <div className="flex">
-                                                        <div>
-                                                            <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{detalle.nuCode}</div>
-                                                            {detalle.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                                                            {detalle.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
-                                                        </div>
-                                                        <div className="font-bold text-xl ml-2">
-                                                            <span>
-                                                                {(() => {
-                                                                    let match = detalle.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
-                                                                    if (!match) {
-                                                                        match = [null, (detalle.elemento ?? detalle.gas ?? detalle.nombre.split(" ")[0]), ''];
-                                                                    }
-                                                                    const [, p1, p2] = match;
-                                                                    return (
-                                                                        <>
-                                                                            {p1 ? p1.toUpperCase() : ''}
-                                                                            {p2 ? <small>{p2}</small> : ''}
-                                                                        </>
-                                                                    );
-                                                                })()}
-                                                            </span>
-                                                        </div>
+                                                {detalle.elemento && <div className="w-full flex items-left pt-1.5">
+                                                    <div className="w-18">
+                                                        <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
+                                                            <div className="bg-orange-200 border text-orange-500 border-orange-400  px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
+                                                                <p className="relative -top-0.5">{detalle.nuCode}</p>
+                                                            </div>
+                                                            {detalle.esIndustrial && <div className="bg-blue-200 text-blue-700 border border-blue-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1">
+                                                                <span className="relative -top-0.5">Industrial</span>
+                                                            </div>}
+                                                            {detalle.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded-sm ml-0.5 h-[14px]">
+                                                                <span className="relative -top-0.5">Sin Sifón</span>
+                                                            </div>}
+                                                        </div>                                                        
                                                     </div>
-                                                    <p className="text-2xl orbitron ml-2"><b>{detalle.cantidad}</b> <small>{detalle.unidad}</small></p>
-                                                </div>
-                                                <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
+                                                    <div className="font-bold text-xl ml-2 -mt-0.5">{detalle.elemento}</div>
+                                                    <div className="flex text-nowrap">
+                                                        <p className="text-xl orbitron ml-2">{detalle.cantidad}</p>
+                                                        <p>{detalle.unidad}</p>
+                                                    </div>
+                                                </div>}
+                                                {!detalle.elemento && detalle.nombre && <div className="w-full flex items-left ml-2">
+                                                    <div className="font-bold text-lg">{getDetailTitle(detalle.nombre)}</div>
+                                                    {getDetailsubtitle(detalle.nombre) && <div className="pl-3">
+                                                        <p className="text-xs text-gray-600">Capacidad</p>
+                                                        <p className="font-bold text-lg text-nowrap -mt-1">
+                                                            {getDetailsubtitle(detalle.nombre)}<span className="font-normal text-xs scale-75 ml-1">cilindros</span>
+                                                        </p>
+                                                    </div>}
+                                                </div>}
+                                                <div className="w-full flex justify-end items-center">
+                                                    <div className="w-24 flex flex-end font-bold orbitron border-l-gray-300 justify-end mr-2 mt-2">
+                                                        <p className="text-lg -mt-2 pl-2">{detalle.multiplicador - detalle.restantes}</p>
+                                                        <p className="mt-1">/</p> 
+                                                        <p className="text-md mt-2">{detalle.multiplicador}</p>
+                                                    </div>
+                                                </div>                                                
                                             </li>
                                         ))}
                                     </ul>
                                 </div>)}
 
-                                {!inputTemporalVisible ? <div className="absolute -bottom-2 flex w-full pr-4"
+                                {!inputTemporalVisible ? <div className="absolute -bottom-2 flex flex-col w-full pr-4"
                                     onClick={index == 0 ? postCargamento : undefined}>
-                                    <button className={`mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-4 ${(scanMode && !isCompleted()) ? 'bg-green-500 cursor-pointer' : isCompleted() ? 'bg-gray-600 cursor-not-allowed' : 'bg-sky-600 cursor-pointer'} text-white hover:${(scanMode && !isCompleted()) ? 'bg-green-300 cursor-pointer' : isCompleted() ? 'bg-gray-400' : 'bg-sky-700 cursor-pointer'} transition duration-300 ease-in-out`}
-                                        disabled={isCompleted() ? true : false}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleScanMode();
-                                        }}>
-                                        <BsQrCodeScan className="text-4xl" />
-                                        {scanMode && !isCompleted() && <div className="absolute top-0 left-2">
-                                            <div className="w-12 h-12 bg-gray-100 opacity-80"></div>
-                                            <div className="absolute top-2 left-2"><Loader texto="" /></div>
-                                        </div>}
-                                    </button>
-                                    <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            postCargamento();
-                                        }} disabled={!isCompleted() || posting}>
-                                        <FaRoadCircleCheck className="text-4xl pb-0" />
-                                        <p className="ml-2 mt-2 text-md font-bold">CONFIRMAR CARGA</p>
-                                        {posting && <div className="absolute w-full top-0">
-                                            <div className="w-full h-12 bg-gray-100 opacity-80"></div>
-                                            <div className="absolute top-2 w-full"><Loader texto="" /></div>
-                                        </div>}
-                                    </button>
+                                    <div className="flex">
+                                        <button className={`text-white mx-2 h-12 w-12 flex text-sm border border-gray-300 rounded-lg p-1 mb-1 bg-blue-500`}
+                                            disabled={scanMode}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleScanMode();
+                                            }}>
+                                            <BsQrCodeScan className="text-4xl" />
+                                        </button>
+                                        <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isReady() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                postCargamento();
+                                            }} disabled={!isReady() || posting}>
+                                            <FaRoadCircleCheck className="text-4xl pb-0" />
+                                            <p className="ml-2 mt-2 text-md font-bold">Confirmar carga</p>
+                                            {posting && <div className="absolute w-full top-0">
+                                                <div className="w-full h-12 bg-gray-100 opacity-80"></div>
+                                                <div className="absolute top-2 w-full"><Loader texto="" /></div>
+                                            </div>}
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center w-full mb-2 px-2">
+                                        <div className="flex-1 h-4 bg-gray-300 rounded overflow-hidden">
+                                            <div
+                                                className="h-4 bg-green-500"
+                                                style={{ width: `${getPorcentajeAvance()}%` }}
+                                            ></div>
+                                        </div>
+                                        <div className="ml-2 w-12 text-right font-bold text-gray-400 orbitron">
+                                            {getPorcentajeAvance()}%
+                                        </div>
+                                    </div>
                                 </div> :
                                     <div className="absolute bottom-3 w-full pr-8 text-center pt-2">
                                         <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
@@ -547,7 +685,6 @@ export default function JefaturaDespacho({ session }) {
                                             }}
                                         />
                                     </div>}
-
                             </div>
                         </div>
                     </div>
@@ -584,12 +721,12 @@ export default function JefaturaDespacho({ session }) {
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Información de Cilindro</h3>
                         <div className="mt-2">
                             <div className="flex items-center justify-center">
-                                <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.categoria.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />
+                                {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.categoria.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />}
                                 <div className="text-left ml-6">
                                     <div className="-mb-2">
                                         <div className="flex">
                                             {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
-                                            <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>
+                                            {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>}
                                             {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
                                         </div>
                                         <div className="flex font-bold text-4xl mt-1">
@@ -608,7 +745,7 @@ export default function JefaturaDespacho({ session }) {
                                                     );
                                                 })()}
                                             </span>
-                                            <div className="ml-3 mt-1">
+                                            {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <div className="ml-3 mt-1">
                                                 {editMode && <><p className="text-xs text-gray-600">Estado</p>
                                                     <select
                                                         className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
@@ -631,12 +768,12 @@ export default function JefaturaDespacho({ session }) {
                                                     </select>
                                                 </>}
                                                 {!editMode && <p className="bg-gray-400 text-white text-xs ml-2 px-2 py-0.5 rounded uppercase mt-4">{getEstadoItemCatalogoLabel(itemCatalogoEscaneado.estado)}</p>}
-                                            </div>
+                                            </div>}
                                         </div>
                                     </div>
                                     <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoria.cantidad} <small>{itemCatalogoEscaneado.subcategoria.unidad}</small> </p>
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
-                                    <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>
+                                    {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>}
                                     {!editMode && itemCatalogoEscaneado.direccionInvalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
                                         <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
                                         <p className="flex text-red-600 -mt-6">
@@ -716,6 +853,90 @@ export default function JefaturaDespacho({ session }) {
                 className="opacity-0 h-0 w-0 absolute"
                 inputMode="none"
             />
+
+            {scanMode && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 px-4">
+                    <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-lg p-8 max-w-xs">
+                        <BsQrCodeScan className="text-8xl text-green-500 mb-4" />
+                        <div className="flex">
+                            <Loader texto="Escaneando código..."/>
+                        </div>
+                        <p className="text-gray-500 text-sm mt-2">Por favor, escanee un código QR</p>
+                    </div>
+                </div>
+            )}
+
+            {showModalNombreRetira && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative p-5 border w-80 mx-auto shadow-lg rounded-md bg-white">
+                        <div className="absolute top-2 right-2">
+                            <button
+                                onClick={() => setShowModalNombreRetira(false)}
+                                className="text-gray-400 hover:text-gray-700 text-2xl focus:outline-none"
+                                aria-label="Cerrar"
+                                type="button"
+                            >
+                                <LiaTimesSolid />
+                            </button>
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">Nombre y RUT de quien retira</h3>
+                            <div className="mt-2 space-y-4 text-left">
+                                <div className="flex flex-col">
+                                    <label htmlFor="nombreRetira" className="text-sm text-gray-500">Nombre</label>
+                                    <input
+                                        id="nombreRetira"
+                                        type="text"
+                                        className="border rounded-md px-3 py-2 text-base"
+                                        value={nombreRetira}
+                                        onChange={e => setNombreRetira(e.target.value)}
+                                        placeholder="Nombre completo"
+                                    />
+                                </div>
+                                <div className="flex flex-col">
+                                    <label htmlFor="rutRetira" className="text-sm text-gray-500">RUT</label>
+                                    <div className="flex space-x-2">
+                                        <input
+                                            id="rutRetiraNum"
+                                            type="text"
+                                            className="border rounded-md px-3 py-2 text-base w-28 text-right"
+                                            value={rutRetiraNum}
+                                            onChange={e => setRutRetiraNum(e.target.value)}
+                                            placeholder="12.345.678"
+                                            maxLength={10}
+                                        />
+                                        <span className="text-gray-500 font-bold text-lg">-</span>
+                                        <input
+                                            id="rutRetiraDv"
+                                            type="text"
+                                            className="border rounded-md px-3 py-2 text-base w-10 text-center"
+                                            value={rutRetiraDv}
+                                            onChange={e => setRutRetiraDv(e.target.value)}
+                                            placeholder="K"
+                                            maxLength={1}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">Ejemplo: 12.345.678-K</p>
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <button
+                                    onClick={handleGuardarNombreRetira}
+                                    className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    GUARDAR
+                                </button>
+                                <button
+                                    onClick={() => setShowModalNombreRetira(false)}
+                                    className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                >
+                                    CANCELAR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -40,8 +40,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [loading, setLoading] = useState(false);
     const [categorias, setCategorias] = useState([]);
     const [subcategorias, setSubcategorias] = useState([]);
-    const [setCreandoVenta] = useState(false);
-    const [creandoOrden] = useState(false);
+    const [creandoOrden, setCreandoOrden] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
     const [loadingClients, setLoadingClients] = useState(false);
     const [loadingCliente, setLoadingCliente] = useState(false);
@@ -146,7 +145,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     };
 
     const onSubmit = async (data) => {
-        setCreandoVenta(true);
+        setCreandoOrden(true);
         // Solo incluir los precios seleccionados como items de la venta
         const payload = {
             tipo: data.tipo,
@@ -200,7 +199,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                 position: "top-center"
             });
         } finally {
-            setCreandoVenta(false);
+            setCreandoOrden(false);
         }
     };
 
@@ -442,8 +441,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                     }}
                                                     onFocus={() => setIndexFocused(1)}
                                                 />
-                                                {(loadingClients || loadingCliente) && <div className="absolute -right-2 top-1">
-                                                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-white opacity-70"></div>
+                                                {(loadingClients || loadingCliente) && <div className="absolute -right-2 top-2 md:top-1">
+                                                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-transparent md:bg-white opacity-70"></div>
                                                     <Loader texto="" />
                                                 </div>}
                                                 {(role === USER_ROLE.gerente || role === USER_ROLE.encargado || role === USER_ROLE.cobranza)
@@ -458,7 +457,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                     </button>}
                                             </div>
                                             {indexFocused == 1 && autocompleteClienteResults.length > 0 && (
-                                                <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full max-w-md">
+                                                <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full max-w-xs">
                                                     {autocompleteClienteResults.map(cliente => (
                                                         <li
                                                             key={cliente._id}

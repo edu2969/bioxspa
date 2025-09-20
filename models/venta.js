@@ -17,6 +17,15 @@ const historialEstadoSchema = new Schema({
     timestamps: false
 });
 
+const entregaEnLocalSchema = new Schema({
+    nombreRecibe: { type: String, required: true },
+    rutRecibe: { type: String, required: true },
+    itemCargadoIds: { type: [mongoose.Schema.Types.ObjectId], ref: "ItemCatalogo", default: [] }, // Referencia a los items cargados en esta entrega
+}, {
+    _id: false,
+    timestamps: true
+}); // Sub
+
 const ventaSchema = new Schema({
     temporalId: { type: String },
     tipo: { type: Number, required: true }, // 1: Venta, 2: OT, 3: Translado, 4: Cotizacion
@@ -36,7 +45,7 @@ const ventaSchema = new Schema({
     numeroDocumento: { type: String },
     numeroVale: { type: String },
     saldo: { type: Number, default: 0 },
-    documentoTributarioId: { type: mongoose.Schema.Types.ObjectId, ref: "DocumentoTributario", required: true },
+    documentoTributarioId: { type: mongoose.Schema.Types.ObjectId, ref: "DocumentoTributario" },
     direccionDespachoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     tasaImpuesto: { type: Number },
     tieneOT: { type: Boolean, default: false },
@@ -48,7 +57,8 @@ const ventaSchema = new Schema({
     cantidadReenviosSII: { type: Number },
     comentario: { type: String, default: "" },
     comentariosCobro: { type: [comentarioCobroSchema], default: [] },
-    historialEstados: { type: [historialEstadoSchema], default: [] }
+    historialEstados: { type: [historialEstadoSchema], default: [] },
+    entregasEnLocal: { type: [entregaEnLocalSchema] },
 }, {
     timestamps: true
 });

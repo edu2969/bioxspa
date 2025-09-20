@@ -1,4 +1,4 @@
-import FlotaPanel from "@/components/FlotaPanel";
+import FlotaPanel from "@/components/flota/FlotaPanel";
 
 export default async function FlotaPage() {
     return (

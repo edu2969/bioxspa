@@ -29,7 +29,9 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
         
-        const esAdmin = session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.encargado || session.user.role === USER_ROLE.cobranza;
+        const esAdmin = session.user.role === USER_ROLE.gerente 
+            || session.user.role === USER_ROLE.encargado 
+            || session.user.role === USER_ROLE.cobranza;
 
         if(body.tipo == 1 || body.tipo == 4) { 
             requiredFields.push("clienteId");
@@ -37,8 +39,11 @@ export async function POST(req) {
                 requiredFields.push("documentoTributarioId");                
             }
             if(!esAdmin) {
+                console.log("No es admin, asignando documentoTributarioId desde cliente");
                 const cliente = await Cliente.findById(body.clienteId);
-                body.documentoTributarioId = cliente ? cliente.documentoTributarioId : null;            
+                console.log("Cliente encontrado:", cliente);
+                body.documentoTributarioId = cliente ? cliente.documentoTributarioId : null;
+                console.log("Documento tributario asignado:", cliente.documentoTributarioId);
             }
         } else if (body.tipo == 2) {
             // TODO OT: ID de Empresa de servicio, tipo de servicio, listado de items            

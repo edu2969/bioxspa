@@ -54,15 +54,17 @@ export default function Asignacion({ session }) {
 
     const fetchPedidos = useCallback(async (sucursalId) => {
         try {
-            const response = await fetch(`/api/pedidos/asignacion${sucursalId ? `?sucursalId=${sucursalId}` : ''}`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch pedidos");
+            if(sucursalId) {
+                const response = await fetch(`/api/pedidos/asignacion?sucursalId=${sucursalId}`);
+                if (!response.ok) {
+                    throw new Error("Failed to fetch pedidos");
+                }
+                const data = await response.json();
+                console.log("Fetched pedidos:", data);
+                setPedidos(data.pedidos);
+                setChoferes(data.choferes);
+                setEnTransito(data.flotaEnTransito);                
             }
-            const data = await response.json();
-            console.log("Fetched pedidos:", data);
-            setPedidos(data.pedidos);
-            setChoferes(data.choferes);
-            setEnTransito(data.flotaEnTransito);
             setLoadingPanel(false);
         } catch (error) {
             console.error("Error fetching pedidos:", error);
@@ -78,10 +80,14 @@ export default function Asignacion({ session }) {
             const data = await response.json();
             console.log("Fetched sucursales:", data);
             setSucursales(data.sucursales);
+            if(data.sucursales.length === 1) {
+                setValue("sucursalId", data.sucursales[0]._id);
+                fetchPedidos(data.sucursales[0]._id);
+            }
         } catch (error) {
             console.error("Error fetching sucursales:", error);
         }
-    }, [setSucursales]);
+    }, [setSucursales, fetchPedidos, setValue]);
 
     useEffect(() => {
         fetchSucursales();        
@@ -338,7 +344,7 @@ export default function Asignacion({ session }) {
 
     return (
         <main className="w-full mt-2 h-screen overflow-hidden">
-            {sucursales.length > 1 && (
+            {sucursales.length > 0 && (
                 <div className="flex justify-center mb-2">                    
                     <div className="flex">
                         {sucursales.map((sucursal, idx) => {
@@ -349,9 +355,10 @@ export default function Asignacion({ session }) {
                                 <button
                                     key={sucursal._id}
                                     className={`
-                                        flex items-center px-5 py-2 font-semibold rounded-md
-                                        ${isFirst ? "rounded-r-none" : ""}
-                                        ${isLast ? "rounded-l-none" : ""}
+                                        flex items-center px-5 py-2 font-semibold
+                                        ${isFirst && isLast ? "rounded-md" : ""}
+                                        ${isFirst && !isLast ? "rounded-r-none rounded-l-md" : ""}
+                                        ${isLast && !isFirst ? "rounded-l-none rounded-r-md" : ""}
                                         ${!isFirst && !isLast ? "" : ""}
                                         ${isActive
                                             ? "bg-blue-600 text-white"
@@ -362,6 +369,7 @@ export default function Asignacion({ session }) {
                                         relative
                                     `}
                                     onClick={() => {
+                                        if(isActive) return;
                                         setValue("sucursalId", sucursal._id);
                                         localStorage.setItem("sucursalId", sucursal._id);
                                         setLoadingPanel(true);
@@ -377,6 +385,11 @@ export default function Asignacion({ session }) {
                             );
                         })}
                     </div>
+                </div>
+            )}
+            {sucursales.length === 0 && (
+                <div className="flex justify-center items-center">
+                    <p className="text-gray-500">No tienes sucursales asignadas.</p>
                 </div>
             )}
             <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 px-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>

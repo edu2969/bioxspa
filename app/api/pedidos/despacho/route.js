@@ -114,7 +114,7 @@ export async function GET() {
             .populate({
                 path: "ventaIds",
                 model: "Venta",
-                select: "_id clienteId comentario createdAt",
+                select: "_id clienteId estado comentario createdAt entregasEnLocal",
                 populate: {
                     path: "clienteId",
                     model: "Cliente",
@@ -137,7 +137,7 @@ export async function GET() {
             return NextResponse.json({ ok: false, error: "No dependencia found for this dependencia" }, { status: 404 });
         }
 
-        console.log("Mapping cargamentos...");
+        console.log("Mapping cargamentos en local...");
         const ventasDespachoEnLocal = await Venta.find({
             estado: { $in: [TIPO_ESTADO_VENTA.por_asignar, TIPO_ESTADO_VENTA.preparacion] },
             direccionDespachoId: null,
@@ -160,6 +160,8 @@ export async function GET() {
             })
             .lean();
 
+        console.log("Ids de detalles", detalleVentas.map(dv => dv._id));
+
         console.log("Mapping cargamentos...");
         const cargamentos = rutasDespacho.map((ruta) => {
             let fechaVentaMasReciente = null;
@@ -177,14 +179,15 @@ export async function GET() {
                             const subcategoria = detalle.subcategoriaCatalogoId;                            
                             const nuCode = subcategoria?.categoriaCatalogoId?.elemento
                                 ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
-                                : null;
+                                : null;                            
 
                             newDetalle = {
                                 nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
                                 multiplicador: detalle.cantidad,
                                 cantidad: subcategoria?.cantidad || "??",
                                 unidad: subcategoria?.unidad || null,
-                                restantes: detalle.cantidad - ruta.cargaItemIds?.filter(ic => ic.subcategoriaCatalogoId === subcategoria._id).length || 0,
+                                restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length ?? 0),
+                                itemCatalogoIds: detalle.itemCatalogoIds || [],
                                 elemento: subcategoria?.categoriaCatalogoId?.elemento,
                                 sinSifon: subcategoria?.sinSifon || false,
                                 esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
@@ -225,78 +228,62 @@ export async function GET() {
         });
 
         console.log("Adding ventas for despacho en local...");
-        cargamentos.push(...ventasDespachoEnLocal.map((venta) => ({
-            rutaId: null,
-            ventas: [{
-                ...venta,                
-                detalles: detalleVentas.filter(dv => dv.ventaId === venta._id).map((venta) => {
-                    const detallesFiltrados = detalleVentas.filter(
-                        (detalle) => detalle.ventaId.toString() === venta._id.toString()
-                    );     
-                    return {
-                        ventaId: venta._id,
-                        fecha: venta.createdAt,
-                        detalles: detallesFiltrados.map((detalle) => {
-                            let newDetalle = {};
-                            const subcategoria = detalle.subcategoriaCatalogoId;                            
-                            const nuCode = subcategoria?.categoriaCatalogoId?.elemento
-                                ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
-                                : null;
+        cargamentos.push(
+            ...ventasDespachoEnLocal.map((venta) => {
+            let fechaVentaMasReciente = venta.createdAt;
+            return {
+                rutaId: null,
+                ventas: [
+                {
+                    ventaId: venta._id,
+                    estado: venta.estado,
+                    fecha: venta.createdAt,
+                    detalles: detalleVentas
+                    .filter(detalle => detalle.ventaId.toString() === venta._id.toString())
+                    .map((detalle) => {
+                        const subcategoria = detalle.subcategoriaCatalogoId;
+                        const nuCode = subcategoria?.categoriaCatalogoId?.elemento
+                        ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
+                        : null;
 
-                            newDetalle = {
-                                nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
-                                multiplicador: detalle.cantidad,
-                                cantidad: subcategoria?.cantidad || "??",
-                                unidad: subcategoria?.unidad || null,
-                                restantes: detalle.cantidad - ruta.cargaItemIds?.filter(ic => ic.subcategoriaCatalogoId === subcategoria._id).length || 0,
-                                elemento: subcategoria?.categoriaCatalogoId?.elemento,
-                                sinSifon: subcategoria?.sinSifon || false,
-                                esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
-                                nuCode: nuCode,
-                                subcategoriaId: subcategoria?._id || null, 
-                            };                    
-
-                            if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
-                                fechaVentaMasReciente = venta.createdAt;
-                            }
-                            return newDetalle;
-                        }),
-                        comentario: venta.comentario || null,
-                        cliente: {
-                            nombre: venta.clienteId?.nombre || null,
-                            rut: venta.clienteId?.rut || null,
-                            direccion: venta.clienteId?.direccionId || null,
-                            telefono: venta.clienteId?.telefono || null,
-                            direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
-                                _id: dir._id,
-                                nombre: dir.nombre,
-                                direccionId: dir.direccionId?._id || null,
-                                latitud: dir.direccionId?.latitud || null,
-                                longitud: dir.direccionId?.longitud || null
-                            })) || []
-                        }
+                        return {
+                            nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
+                            multiplicador: detalle.cantidad,
+                            cantidad: subcategoria?.cantidad || "??",
+                            unidad: subcategoria?.unidad || null,
+                            restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length || 0), 
+                            elemento: subcategoria?.categoriaCatalogoId?.elemento,
+                            sinSifon: subcategoria?.sinSifon || false,
+                            esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
+                            nuCode: nuCode,
+                            subcategoriaId: subcategoria?._id || null,
+                            itemCatalogoIds: detalle.itemCatalogoIds || [],
+                        };
+                    }),
+                    comentario: venta.comentario || null,
+                    cliente: {
+                    nombre: venta.clienteId?.nombre || null,
+                    rut: venta.clienteId?.rut || null,
+                    direccion: venta.clienteId?.direccionId || null,
+                    telefono: venta.clienteId?.telefono || null,
+                    direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
+                        _id: dir._id,
+                        nombre: dir.nombre,
+                        direccionId: dir.direccionId?._id || null,
+                        latitud: dir.direccionId?.latitud || null,
+                        longitud: dir.direccionId?.longitud || null
+                    })) || []
                     }
-                })
-            }],
-            nombreChofer: null,
-            patenteVehiculo: null,
-            fechaVentaMasReciente: venta.createdAt,
-            cliente: {
-                nombre: venta.clienteId?.nombre || null,
-                rut: venta.clienteId?.rut || null,
-                direccion: venta.clienteId?.direccionId || null,
-                telefono: venta.clienteId?.telefono || null,
-                direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
-                    _id: dir._id,
-                    nombre: dir.nombre,
-                    direccionId: dir.direccionId?._id || null,
-                    latitud: dir.direccionId?.latitud || null,
-                    longitud: dir.direccionId?.longitud || null
-                })) || []
-            },
-            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-            retiroEnLocal: true,
-        })));
+                }
+                ],
+                nombreChofer: null,
+                patenteVehiculo: null,
+                fechaVentaMasReciente,
+                estado: null,
+                retiroEnLocal: true,
+            };
+            })
+        );
 
         console.log("Returning response with cargamentos.");
         return NextResponse.json({ ok: true, cargamentos });

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
+import User from "@/models/user";
 import Cargo from "@/models/cargo";
 
 // GET all sucursales: Trae _id y nombre de las sucursales a las cuales el usuario en sessión tiene acceso.
@@ -22,12 +23,17 @@ export async function GET() {
 
         const userId = session.user.id;
         console.log(`Fetching user with ID: ${userId}`);
-        console.log("Fetching cargo...");
+        const user = await User.findById(userId).lean();
+        if (!user) {
+            console.warn(`User not found for ID: ${userId}`);
+            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+        }
+        console.log("`Fetching cargo...");
         const cargos = await Cargo.find({ 
             userId,
             tipo: { $in: [
-                TIPO_CARGO.gerente, TIPO_CARGO.cobranza, 
-                TIPO_CARGO.responsable, TIPO_CARGO.vendedor
+                TIPO_CARGO.gerente, TIPO_CARGO.encargado, 
+                TIPO_CARGO.responsable, TIPO_CARGO.cobranza
             ] }
         }).populate("sucursalId dependenciaId").lean();
 
@@ -47,10 +53,9 @@ export async function GET() {
 
         const ventas = await Venta.find({ 
             estado: { 
-            $nin: [
-                TIPO_ESTADO_VENTA.borrador, TIPO_ESTADO_VENTA.anulado, 
-                TIPO_ESTADO_VENTA.pagado, TIPO_ESTADO_VENTA.rechazado,
-                TIPO_ESTADO_VENTA.entregado
+            $in: [
+                TIPO_ESTADO_VENTA.borrador, TIPO_ESTADO_VENTA.cotizacion,
+                TIPO_ESTADO_VENTA.anulado, TIPO_ESTADO_VENTA.rechazado
             ]
             },
             porCobrar: false

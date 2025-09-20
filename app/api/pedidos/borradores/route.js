@@ -11,11 +11,25 @@ import { connectMongoDB } from "@/lib/mongodb";
 
 // filepath: d:/git/bioxspa/app/api/pedidos/borradores/route.js
 
-export async function GET() {
+export async function GET(request) {
     await connectMongoDB();
 
+    const { searchParams } = new URL(request.url);
+    const sucursalId = searchParams.get("sucursalId");
+    if (!sucursalId) {
+        return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
+    }
+
     // Buscar ventas en estado "borrador"
-    const ventas = await Venta.find({ estado: TIPO_ESTADO_VENTA.borrador }).lean();
+    const ventas = await Venta.find({
+        sucursalId,
+        estado: {
+            $in: [
+                TIPO_ESTADO_VENTA.borrador, TIPO_ESTADO_VENTA.cotizacion,
+                TIPO_ESTADO_VENTA.anulado, TIPO_ESTADO_VENTA.rechazado
+            ]
+        },
+    }).lean();
 
     // Enriquecer ventas
     const pedidos = await Promise.all(

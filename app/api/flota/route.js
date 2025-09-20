@@ -1,23 +1,44 @@
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import Vehiculo from "@/models/vehiculo";
 import User from "@/models/user";
 
+// Obtener todos los vehículos
 export async function GET() {
     await connectMongoDB();
-    // Obtener todos los vehículos
-    const vehiculos = await Vehiculo.find().lean();
 
-    // Para cada vehículo, buscar los conductores (User) y adornar el objeto
-    for (const vehiculo of vehiculos) {
-        // choferIds es un array de ObjectId
-        if (vehiculo.choferIds && vehiculo.choferIds.length > 0) {
-            const conductores = await User.find({ _id: { $in: vehiculo.choferIds } }).lean();
-            vehiculo.conductores = conductores;
-        } else {
-            vehiculo.conductores = [];
-        }
+    console.log("TODOS los vehiculos");
+
+    if (!mongoose.models.User) {
+       mongoose.model("User", User.schema);
     }
+    const vehiculos = await Vehiculo.find().populate('choferIds').lean();
 
     return NextResponse.json({ vehiculos });
+}
+
+// Actualiza o crea un vehículo
+export async function POST(request) {
+    await connectMongoDB();
+
+    const data = await request.json();
+    const { _id, ...vehiculoData } = data;
+
+    try {
+        let vehiculo;
+        if (_id) {
+            vehiculo = await Vehiculo.findByIdAndUpdate(
+                _id,
+                { $set: vehiculoData },
+                { new: true, upsert: true }
+            );
+        } else {
+            vehiculo = await Vehiculo.create(vehiculoData);
+        }
+        return NextResponse.json({ ok: true, vehiculo });
+    } catch (error) {
+        console.error("Error al guardar el vehículo:", error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
 }

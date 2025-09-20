@@ -67,6 +67,7 @@ export const TIPO_ESTADO_VENTA = {
     rechazado: 32,
     anulado: 33,
     pagado: 64,
+    cerrado: 128
 }
 
 export const TIPO_ESTADO_RUTA_DESPACHO = {
@@ -110,7 +111,7 @@ export const TIPO_ITEM_CATALOGO = {
 }
 
 export const TIPO_ESTADO_ITEM_CATALOGO = {
-    no_aplica: 0,
+    no_aplica: 127,
     en_mantenimiento: 1,
     en_arriendo: 2,
     en_garantia: 4,    
