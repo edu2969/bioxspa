@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<DTE version="1.0">
+  <Documento ID="F1T33">
+    <Encabezado>
+      <IdDoc>
+        <TipoDTE>33</TipoDTE>
+        <Folio>1</Folio>
+        <FchEmis>2024-01-15</FchEmis>
+      </IdDoc>
+      <Emisor>
+        <RUTEmisor>12345678-9</RUTEmisor>
+        <RznSoc>EMPRESA CERTIFICACION SII</RznSoc>
+        <GiroEmis>CERTIFICACION ELECTRONICA</GiroEmis>
+        <DirOrigen>DIRECCION EMPRESA</DirOrigen>
+        <CmnaOrigen>SANTIAGO</CmnaOrigen>
+      </Emisor>
+      <Receptor>
+        <RUTRecep>96790240-3</RUTRecep>
+        <RznSocRecep>SERVICIO DE IMPUESTOS INTERNOS</RznSocRecep>
+        <GiroRecep>ADMINISTRACION PUBLICA</GiroRecep>
+        <DirRecep>TEATINOS 120</DirRecep>
+        <CmnaRecep>SANTIAGO</CmnaRecep>
+      </Receptor>
+      <Totales>
+        <MntNeto>311560</MntNeto>
+        
+        <IVA>59196</IVA>
+        <MntTotal>370756</MntTotal>
+      </Totales>
+    </Encabezado>
+    
+    <Detalle>
+      <NroLinDet>1</NroLinDet>
+      <NmbItem>Cajón AFECTO</NmbItem>
+      <QtyItem>132</QtyItem>
+      
+      <PrcItem>1396</PrcItem>
+      
+      <MontoItem>184272</MontoItem>
+    </Detalle>
+    <Detalle>
+      <NroLinDet>2</NroLinDet>
+      <NmbItem>Relleno AFECTO</NmbItem>
+      <QtyItem>56</QtyItem>
+      
+      <PrcItem>2273</PrcItem>
+      
+      <MontoItem>127288</MontoItem>
+    </Detalle>
+    
+    
+  </Documento>
+</DTE>

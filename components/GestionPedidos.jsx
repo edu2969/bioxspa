@@ -37,7 +37,19 @@ export default function GestionPedidos({ session }) {
     const [credito, setCredito] = useState(null);
     const [redirecting, setRedirecting] = useState(false);
     const [sucursales, setSucursales] = useState([]);
-    const { setValue, getValues } = useForm();
+    const { setValue, getValues } = useForm();    
+
+    const fetchPedidos = useCallback(async (sucursalId) => {
+        const res = await fetch(`/api/pedidos/borradores${sucursalId ? `?sucursalId=${sucursalId}` : ""}`);
+        if (res.ok) {
+            const data = await res.json();
+            console.log("Pedidos obtenidos:", data.pedidos);
+            setPedidos(data.pedidos);
+            setLoading(false);
+        } else {
+            console.error("Error al obtener pedidos");
+        }
+    }, [setPedidos, setLoading]);
 
     const fetchSucursales = useCallback(async () => {
         try {
@@ -56,18 +68,6 @@ export default function GestionPedidos({ session }) {
             console.error("Error fetching sucursales:", error);
         }
     }, [setSucursales, setValue, fetchPedidos]);
-
-    const fetchPedidos = useCallback(async (sucursalId) => {
-        const res = await fetch(`/api/pedidos/borradores${sucursalId ? `?sucursalId=${sucursalId}` : ""}`);
-        if (res.ok) {
-            const data = await res.json();
-            console.log("Pedidos obtenidos:", data.pedidos);
-            setPedidos(data.pedidos);
-            setLoading(false);
-        } else {
-            console.error("Error al obtener pedidos");
-        }
-    }, []);
 
     const handleOpenPedido = (pedidoData) => {
         console.log("Abriendo pedido:", pedidoData);
