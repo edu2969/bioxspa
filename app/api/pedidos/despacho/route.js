@@ -296,26 +296,89 @@ export async function GET() {
 export async function POST(request) {
     try {
         await connectMongoDB();
-        const { rutaId, scanCodes } = await request.json();
+        const { rutaId } = await request.json();
 
-        if (!Array.isArray(scanCodes) || scanCodes.length === 0 || !rutaId) {
-            return NextResponse.json({ error: "Invalid payload format. {rutaId, scanCodes[]}" }, { status: 400 });
+        if (!rutaId) {
+            return NextResponse.json({ error: "rutaId is required" }, { status: 400 });
         }
 
         // Buscar la ruta de despacho por rutaId
-        const ruta = await RutaDespacho.findById(rutaId);
+        const ruta = await RutaDespacho.findById(rutaId).populate('ventaIds');
         if (!ruta) {
             return NextResponse.json({ error: "RutaDespacho not found" }, { status: 404 });
         }
 
-        // Agregar historial de carga
+        // Obtener todas las ventas de esta ruta
+        const ventaIds = ruta.ventaIds.map(venta => venta._id);
+
+        // Buscar todos los detalles de estas ventas
+        const detallesVentas = await DetalleVenta.find({ 
+            ventaId: { $in: ventaIds } 
+        });
+
+        // Obtener todos los itemCatalogoIds escaneados de los detalles
+        const todosLosItemsEscaneados = [];
+        detallesVentas.forEach(detalle => {
+            if (Array.isArray(detalle.itemCatalogoIds)) {
+                todosLosItemsEscaneados.push(...detalle.itemCatalogoIds);
+            }
+        });
+
+        // Obtener items ya movidos en rutas anteriores de las mismas ventas
+        const rutasAnteriores = await RutaDespacho.find({
+            ventaIds: { $in: ventaIds },
+            _id: { $ne: rutaId }, // Excluir la ruta actual
+            estado: { $in: [
+                TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+                TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
+                TIPO_ESTADO_RUTA_DESPACHO.entregado,
+                TIPO_ESTADO_RUTA_DESPACHO.descarga
+            ]}
+        });
+
+        // Recopilar items ya movidos en rutas anteriores
+        const itemsYaMovidos = new Set();
+        rutasAnteriores.forEach(rutaAnterior => {
+            rutaAnterior.historialCarga?.forEach(carga => {
+                if (carga.esCarga && Array.isArray(carga.itemMovidoIds)) {
+                    carga.itemMovidoIds.forEach(itemId => {
+                        itemsYaMovidos.add(itemId.toString());
+                    });
+                }
+            });
+        });
+
+        // Filtrar items que no han sido movidos en rutas anteriores
+        const itemsParaMover = todosLosItemsEscaneados.filter(itemId => 
+            !itemsYaMovidos.has(itemId.toString())
+        );
+
+        // Convertir a ObjectId para MongoDB
+        const itemsParaMoverObjectId = itemsParaMover.map(itemId => 
+            new mongoose.Types.ObjectId(itemId)
+        );
+
+        if (itemsParaMoverObjectId.length === 0) {
+            return NextResponse.json({ 
+                error: "No hay items nuevos para mover en esta ruta",
+                message: "Todos los items ya fueron movidos en rutas anteriores"
+            }, { status: 400 });
+        }
+
+        // Agregar historial de carga con los items nuevos
         ruta.historialCarga.push({
             esCarga: true,
             fecha: new Date(),
-            itemMovidoIds: scanCodes
+            itemMovidoIds: itemsParaMoverObjectId
         });
 
-        ruta.cargaItemIds.push(...scanCodes);
+        // Agregar items a la carga de la ruta (evitar duplicados)
+        const cargaActualSet = new Set(ruta.cargaItemIds.map(id => id.toString()));
+        const itemsNuevosParaCarga = itemsParaMoverObjectId.filter(itemId => 
+            !cargaActualSet.has(itemId.toString())
+        );
+        
+        ruta.cargaItemIds.push(...itemsNuevosParaCarga);
 
         // Cambiar estado y agregar historial de estado
         ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
@@ -324,13 +387,23 @@ export async function POST(request) {
             fecha: new Date()
         });
         
-        console.log("Updating item states...", ruta);
+        console.log(`Moviendo ${itemsParaMoverObjectId.length} items nuevos en ruta ${rutaId}`);
+        console.log(`Items ya movidos en rutas anteriores: ${itemsYaMovidos.size}`);
 
         await ruta.save();
 
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ 
+            ok: true,
+            itemsMovidos: itemsParaMoverObjectId.length,
+            itemsYaMovidosAnteriormente: itemsYaMovidos.size,
+            totalItemsEscaneados: todosLosItemsEscaneados.length
+        });
+        
     } catch (error) {
         console.error("Error updating item states:", error);
-        return NextResponse.json({ error: "Error updating item states." }, { status: 500 });
+        return NextResponse.json({ 
+            error: "Error updating item states.",
+            details: error.message 
+        }, { status: 500 });
     }
 }

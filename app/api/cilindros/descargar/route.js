@@ -30,12 +30,28 @@ export async function POST(request) {
         rutaDespacho.cargaItemIds.push(item._id);
     }
 
-    // Agrega al historial de carga como descarga
-    rutaDespacho.historialCarga.push({
-        esCarga: false,
-        fecha: new Date(),
-        itemMovidoIds: [item._id]
-    });
+    // Manejo del historial de carga/descarga
+    const historial = rutaDespacho.historialCarga;
+    const now = new Date();
+
+    if (
+        historial.length > 0 &&
+        historial[historial.length - 1].esCarga === false
+    ) {
+        // Si el último es descarga, agrega el item al último movimiento
+        const ultimo = historial[historial.length - 1];
+        if (!ultimo.itemMovidoIds.some(id => id.equals(item._id))) {
+            ultimo.itemMovidoIds.push(item._id);
+            ultimo.fecha = now; // Opcional: actualiza la fecha
+        }
+    } else {
+        // Si el último es carga o no hay historial, crea nuevo movimiento de descarga
+        historial.push({
+            esCarga: false,
+            fecha: now,
+            itemMovidoIds: [item._id]
+        });
+    }
 
     await rutaDespacho.save();
 

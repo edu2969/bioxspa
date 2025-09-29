@@ -217,7 +217,7 @@ export async function GET(request) {
     .populate({
         path: "vehiculoId",
         model: "Vehiculo",
-        select: "patente marca"
+        select: "patente marca modelo"
     })
     // Poblar el chofer asignado
     .populate({

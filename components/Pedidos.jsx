@@ -57,6 +57,48 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [empresaOrigen] = useState(null);
     const [indexFocused, setIndexFocused] = useState(-1);
     const [items, setItems] = useState([]);
+    const [loadingCatalogo, setLoadingCatalogo] = useState(false);
+
+    const [busquedaCategoria, setBusquedaCategoria] = useState("");
+const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
+const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
+const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
+
+const buscarCategorias = (termino) => {
+    if (!termino || termino.length < 2) {
+        setCategoriasFiltradas([]);
+        setMostrarResultadosCategoria(false);
+        return;
+    }
+    
+    const resultados = categorias.filter(categoria => 
+        categoria.nombre.toLowerCase().includes(termino.toLowerCase())
+    );
+    
+    setCategoriasFiltradas(resultados);
+    setMostrarResultadosCategoria(true);
+};
+
+const seleccionarCategoria = async (categoria) => {
+    setCategoriaIdSeleccionada(categoria._id);
+    setCategoriaNombreSeleccionada(categoria.nombre);
+    setBusquedaCategoria(categoria.nombre);
+    setMostrarResultadosCategoria(false);
+    setCategoriasFiltradas([]);
+    
+    // Actualizar el form y precioData
+    setValue("categoriaId", categoria._id);
+    setValue("subcategoriaCatalogoId", "");
+    setPrecioData((prev) => ({
+        ...prev,
+        categoriaId: categoria._id,
+        subcategoriaCatalogoId: "",
+        valor: getValues('precio'),
+    }));
+    
+    // Fetch subcategorías
+    await fetchSubcategorias(categoria._id);
+};
 
     const isVentaDisabled = () => {
         return redirecting || !precios.length
@@ -105,8 +147,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         try {
             const response = await fetch('/api/catalogo');
             const data = await response.json();
-            setCategorias(data.sort((a, b) => a.nombre < b.nombre ? -1 : 1));
-            setLoading(false);
+            setCategorias(data.sort((a, b) => a.nombre < b.nombre ? -1 : 1));            
         } catch (error) {
             console.error('Error fetching categorias:', error);
         }
@@ -203,14 +244,18 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         }
     };
 
-    const handleCancel = () => {
-        setModalSolicitudPrecio(false);
-        setPrecioData({});
-        setCategoriaIdSeleccionada("");
-        setValue("categoriaId", "");
-        setValue("subcategoriaCatalogoId", "");
-        setValue("valor", "");
-    };
+const handleCancel = () => {
+    setModalSolicitudPrecio(false);
+    setPrecioData({});
+    setCategoriaIdSeleccionada("");
+    setCategoriaNombreSeleccionada("");
+    setBusquedaCategoria("");
+    setCategoriasFiltradas([]);
+    setMostrarResultadosCategoria(false);
+    setValue("categoriaId", "");
+    setValue("subcategoriaCatalogoId", "");
+    setValue("valor", "");
+};
 
     const handleSave = async () => {
         setSaving(true);
@@ -301,9 +346,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                 console.error('Error fetching initial data:', error);
             } finally {
                 setLoading(false);
-                fetchCategorias();
-                fetchSubcategorias();
                 fetchSucursales();
+                setLoading(false);
             }
         };
         fetchAll();
@@ -487,6 +531,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                         const preciosResp = await fetch(`/api/clientes/precios?clienteId=${cliente._id}`);
                                                                         const preciosData = await preciosResp.json();
                                                                         if (preciosResp.ok && preciosData.ok) {
+                                                                            console.log("Precios Data:", preciosData);
                                                                             setPrecios(preciosData.precios.precios);
                                                                         } else {
                                                                             console.error("Error fetching precios:", preciosData.error);
@@ -1123,8 +1168,14 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                     <p className="font-bold text-lg">Listado productos</p>
                                     <button
                                         type="button"
-                                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                                        onClick={() => {
+                                        className="h-12 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                                        onClick={async () => {
+                                            if(categorias.length == 0) {
+                                                setLoadingCatalogo(true);
+                                                await fetchCategorias();
+                                                await fetchSubcategorias();
+                                                setLoadingCatalogo(false);
+                                            }                                            
                                             setPrecioData({
                                                 categoriaId: "",
                                                 subcategoriaCatalogoId: "",
@@ -1132,10 +1183,11 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                             });
                                             setModalSolicitudPrecio(true);
                                         }}
+                                        disabled={loadingCatalogo}
                                     >
-                                        {(session.user.role == USER_ROLE.gerente
+                                        {loadingCatalogo ? <Loader texto="Cargando..." /> : (session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
-                                            || session.user.role === USER_ROLE.encargado) ? 'Nuevo' : 'Solicitar'} producto
+                                            || session.user.role === USER_ROLE.encargado) ? 'Nuevo producto' : 'Solicitar producto'}
                                     </button>
                                 </div>
                                 <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
@@ -1193,15 +1245,15 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         <div className={`${(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
                                             || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                                            <div className="flex flex-col text-xs">
-                                                <span className="text-white bg-blue-600 rounded px-2 h-4 mt-0.5">MED</span>
-                                                <span className="text-white bg-gray-600 rounded px-2 h-4 mt-0.5">S/S</span>
-                                                <span className="text-white bg-yellow-600 rounded px-2 h-4 mt-0.5">IND</span>
-                                            </div>                                            
                                             <div>
-                                                <p className="font-bold text-lg">{precio.nombre.split("-")[0]}</p>
-                                                <span className="relative -top-1">{precio.nombre.split("-")[1]}</span>                                            
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</p>
+                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId.cantidad} {precio.subcategoriaCatalogoId.unidad}</span>
                                             </div>
+                                            <div className="flex text-xs w-9">
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal && <span className="text-white bg-blue-600 rounded px-2 h-4 mt-0.5">MED</span>}
+                                                {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4 mt-0.5">S/S</span>}
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-yellow-600 rounded px-2 h-4 mt-0.5">IND</span>}
+                                            </div>                                            
                                             
                                         </div>
                                         {(session.user.role == USER_ROLE.gerente
@@ -1356,38 +1408,81 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                             <h3 className="text-lg leading-6 font-medium text-gray-900">Solicitar precio</h3>
                             <div className="mt-2">
                                 <div className="mt-4 space-y-3 text-left">
-                                    <div className="flex flex-col">
-                                        <label htmlFor="categoriaId" className="text-sm text-gray-500">Categoría</label>
-                                        <select
-                                            {...register("categoriaId")}
-                                            value={categoriaIdSeleccionada || ""}
-                                            onChange={async (e) => {
-                                                const categoriaId = e.target.value;
-                                                setPrecioData((prev) => ({
-                                                    ...prev,
-                                                    categoriaId,
-                                                    subcategoriaCatalogoId: "",
-                                                    valor: getValues('precio'),
-                                                }));
-                                                setCategoriaIdSeleccionada(categoriaId);
-                                                setValue("categoriaId", categoriaId);
-                                                setValue("subcategoriaCatalogoId", "");
-                                                if (categoriaId) {
-                                                    await fetchSubcategorias(categoriaId);
-                                                } else {
-                                                    setSubcategorias([]);
-                                                }
-                                            }}
-                                            className="border rounded-md px-3 py-2 text-base"
-                                        >
-                                            <option value="">Seleccione una categoría</option>
-                                            {categorias && categorias.map((categoria) => (
-                                                <option key={categoria._id} value={categoria._id}>
-                                                    {categoria.nombre}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    <div className="flex flex-col relative">
+    <label htmlFor="categoriaInput" className="text-sm text-gray-500">Categoría</label>
+    <div className="relative">
+        <input
+            id="categoriaInput"
+            type="text"
+            value={busquedaCategoria}
+            onChange={(e) => {
+                const valor = e.target.value;
+                setBusquedaCategoria(valor);
+                
+                // Limpiar selección si se está editando
+                if (valor !== categoriaNombreSeleccionada) {
+                    setCategoriaIdSeleccionada("");
+                    setValue("categoriaId", "");
+                    setValue("subcategoriaCatalogoId", "");
+                    setPrecioData((prev) => ({
+                        ...prev,
+                        categoriaId: "",
+                        subcategoriaCatalogoId: "",
+                        valor: getValues('precio'),
+                    }));
+                    setSubcategorias([]);
+                }
+                
+                buscarCategorias(valor);
+            }}
+            onFocus={() => {
+                if (busquedaCategoria && categoriasFiltradas.length === 0) {
+                    buscarCategorias(busquedaCategoria);
+                }
+            }}
+            onBlur={() => {
+                // Ocultar resultados después de un pequeño delay para permitir clicks
+                setTimeout(() => {
+                    setMostrarResultadosCategoria(false);
+                }, 200);
+            }}
+            className="border rounded-md px-3 py-2 pr-10 text-base w-full"
+            placeholder="Buscar categoría..."
+        />
+        
+        {/* Ícono de lupa */}
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </div>
+        
+        {/* Dropdown de resultados */}
+        {mostrarResultadosCategoria && categoriasFiltradas.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                {categoriasFiltradas.map((categoria) => (
+                    <li
+                        key={categoria._id}
+                        className="px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                        onMouseDown={(e) => {
+                            e.preventDefault(); // Prevenir que se dispare onBlur antes del click
+                            seleccionarCategoria(categoria);
+                        }}
+                    >
+                        <p className="font-medium">{categoria.nombre}</p>
+                    </li>
+                ))}
+            </ul>
+        )}
+        
+        {/* Mensaje cuando no hay resultados */}
+        {mostrarResultadosCategoria && busquedaCategoria.length >= 2 && categoriasFiltradas.length === 0 && (
+            <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 p-3">
+                <p className="text-gray-500 text-center">No se encontraron categorías</p>
+            </div>
+        )}
+    </div>
+</div>
                                     <div className="flex flex-col">
                                         <label htmlFor="subcategoriaId" className="text-sm text-gray-500">Subcategoría</label>
                                         <select

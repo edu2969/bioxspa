@@ -1,17 +1,31 @@
+import { config } from 'dotenv';
 import { CASOS_TEST } from '../app/api/dte/casos-test';
 import { XMLGenerator } from '../app/api/dte/generators/xml-generator';
+import { PDFGenerator } from '../app/api/dte/generators/pdf-generator';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
+config({ path: '.env.local' });
+
 export async function ejecutarTodosLosTests() {
-  console.log(`🚀 Generando ${Object.keys(CASOS_TEST).length} DTEs de test SII...`);
+  console.log(`🚀 Generando XMLs firmados y PDFs de ${Object.keys(CASOS_TEST).length} casos de test SII...`);
+  console.log(`🔐 Usando certificado desde variables de entorno...`);
   
-  // Crear directorio para XMLs generados
+  // Verificar variables de entorno
+  if (!process.env.PFX_BASE64) {
+    console.error('❌ PFX_BASE64 no está configurado en .env.local');
+    return;
+  }
+
+  // Crear directorios
   const outputDir = join(process.cwd(), 'generated-dtes');
+  const pdfDir = join(outputDir, 'pdfs');
+  
   try {
     mkdirSync(outputDir, { recursive: true });
+    mkdirSync(pdfDir, { recursive: true });
   } catch (error) {
-    // Directorio ya existe
+    // Directorios ya existen
   }
   
   const resultados = {
@@ -21,61 +35,38 @@ export async function ejecutarTodosLosTests() {
   };
 
   for (const [caso, datos] of Object.entries(CASOS_TEST)) {
-    console.log(`\n📋 Generando caso: ${caso}`);
+    console.log(`\n📋 Procesando caso: ${caso}`);
+    
     try {
-      // Validar estructura del caso
-      if (!datos.tipoDTE || !datos.folio) {
-        throw new Error('Faltan campos obligatorios');
-      }
+      // 1. Generar y firmar XML
+      const xmlFirmado = XMLGenerator.generarYFirmarDTE(datos);
       
-      if (!datos.receptor || !datos.receptor.rut) {
-        throw new Error('Falta información del receptor');
-      }
+      // Determinar tipo de documento
+      const tiposDoc: {[key: number]: string} = {
+        33: 'Factura_Electronica',
+        34: 'Factura_Exenta', 
+        52: 'Guia_Despacho',
+        61: 'Nota_Credito',
+        56: 'Nota_Debito'
+      };
       
-      // Generar XML según tipo de DTE
-      let xml: string;
-      let tipoDoc: string;
+      const tipoDoc = tiposDoc[datos.tipoDTE] || `Tipo_${datos.tipoDTE}`;
       
-      switch (datos.tipoDTE) {
-        case 33: // Factura Electrónica
-          xml = XMLGenerator.generarFacturaElectronica(datos);
-          tipoDoc = 'Factura Electrónica';
-          break;
-        case 34: // Factura Exenta
-          xml = XMLGenerator.generarFacturaExenta(datos);
-          tipoDoc = 'Factura Exenta';
-          break;
-        case 52: // Guía de Despacho
-          xml = XMLGenerator.generarGuiaDespacho(datos);
-          tipoDoc = 'Guía de Despacho';
-          break;
-        case 61: // Nota de Crédito
-          if (datos.referencia?.tipoDTE === 34) {
-            xml = XMLGenerator.generarFacturaExenta(datos); // Nota crédito exenta
-          } else {
-            xml = XMLGenerator.generarFacturaElectronica(datos); // Nota crédito afecta
-          }
-          tipoDoc = 'Nota de Crédito';
-          break;
-        case 56: // Nota de Débito
-          if (datos.referencia?.tipoDTE === 34 || datos.referencia?.tipoDTE === 61) {
-            xml = XMLGenerator.generarFacturaExenta(datos);
-          } else {
-            xml = XMLGenerator.generarFacturaElectronica(datos);
-          }
-          tipoDoc = 'Nota de Débito';
-          break;
-        default:
-          throw new Error(`Tipo DTE ${datos.tipoDTE} no implementado`);
-      }
+      // 2. Guardar XML firmado
+      const xmlFileName = `${caso}_${tipoDoc}_FIRMADO.xml`;
+      const xmlFilePath = join(outputDir, xmlFileName);
+      writeFileSync(xmlFilePath, xmlFirmado, 'utf-8');
       
-      // Guardar XML generado
-      const fileName = `${caso}_${tipoDoc.replace(/\s+/g, '_')}.xml`;
-      const filePath = join(outputDir, fileName);
-      writeFileSync(filePath, xml, 'utf-8');
+      // 3. Generar PDF
+      const pdfFileName = `${caso}_${tipoDoc}.pdf`;
+      const pdfFilePath = join(pdfDir, pdfFileName);
       
-      console.log(`✅ ${caso}: ${tipoDoc} generada - Folio ${datos.folio}`);
-      console.log(`📄 Archivo: ${fileName}`);
+      console.log(`📄 Generando PDF...`);
+      await PDFGenerator.generarFacturaPDF(datos, pdfFilePath);
+      
+      console.log(`✅ ${caso}: ${tipoDoc} - Folio ${datos.folio}`);
+      console.log(`   📄 XML: ${xmlFileName}`);
+      console.log(`   🎨 PDF: ${pdfFileName}`);
       
       resultados.exitosos++;
       
@@ -87,15 +78,11 @@ export async function ejecutarTodosLosTests() {
   }
 
   console.log(`\n📊 RESUMEN DE GENERACIÓN:`);
-  console.log(`✅ DTEs generados: ${resultados.exitosos}`);
+  console.log(`✅ Documentos procesados: ${resultados.exitosos}`);
   console.log(`❌ Errores: ${resultados.fallidos}`);
-  console.log(`📁 Archivos guardados en: ${outputDir}`);
+  console.log(`📁 XMLs guardados en: ${outputDir}`);
+  console.log(`🎨 PDFs guardados en: ${pdfDir}`);
   
-  if (resultados.errores.length > 0) {
-    console.log(`\n🔍 ERRORES ENCONTRADOS:`);
-    resultados.errores.forEach(error => console.log(`   - ${error}`));
-  }
-
   return resultados;
 }
 

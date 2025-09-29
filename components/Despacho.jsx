@@ -116,12 +116,44 @@ export default function Despacho({ session }) {
             })
     };
 
-    function calculateTubePosition(index) {
-        const baseTop = 28;
-        const baseLeft = 76;
-        const scaleFactor = 1.5;
+    const offsetByModel = () => {
+        const marca = (rutaDespacho?.vehiculoId?.marca.split(" ")[0] || "").toLowerCase();
+        const modelo = (rutaDespacho?.vehiculoId?.modelo.split(" ")[0] || "").toLowerCase();
+        console.log("OFFSET", marca, modelo);
+        if(!marca || !modelo) {
+            return {
+                baseTop: 28,
+                baseLeft: 76,
+                scaleFactor: 1.5,
+                verticalIncrement: 4
+            };
+        }
+        const offsets = {
+            "hyundai_porter": [-8, 96, 1.5, 4],
+            "ford_ranger": [-16, 198, 1.5, 4],
+            "mitsubishi_l200": [28, 76, 1.5, 4],
+            "volkswagen_constellation": [28, 76, 1.5, 4],
+            "volkswagen_delivery": [28, 76, 1.5, 4],
+            "kia_frontier": [28, 76, 1.5, 4],
+            "ford_transit": [-8, 186, 1.5, 4],
+            "desconocido_desconocido": [28, 76, 1.5, 4],
+        }
+        const data = offsets[marca + "_" + modelo] || offsets["desconocido_desconocido"];
+        console.log("DATA", data);
+        return {
+            baseTop: data[0],
+            baseLeft: data[1],
+            scaleFactor: data[2],
+            verticalIncrement: data[3]
+        };
+    }
 
-        const verticalIncrement = 4;
+    function calculateTubePosition(index) {
+        const offsets = offsetByModel();
+        const baseTop = offsets.baseTop;
+        const baseLeft = offsets.baseLeft;
+        const scaleFactor = offsets.scaleFactor;
+        const verticalIncrement = 5;
 
         const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
         const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
@@ -133,7 +165,6 @@ export default function Despacho({ session }) {
         const baseTop = 146;
         const baseLeft = 176;
         const scaleFactor = 1.5;
-
         const verticalIncrement = 4;
 
         const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
@@ -823,8 +854,8 @@ export default function Despacho({ session }) {
             <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
                 <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
                     <Image
-                        className="absolute top-6 left-4"
-                        src="/ui/camion.png"
+                        className="absolute top-10 left-4"
+                        src={`/ui/${rutaDespacho?.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0]}.png`}
                         alt="camion_atras"
                         width={355}
                         height={275}
@@ -850,17 +881,18 @@ export default function Despacho({ session }) {
                         })}
                     </div>
                     <Image
-                        className="absolute top-6"
-                        src="/ui/camion_front.png"
+                        className="absolute top-10 left-4"
+                        src={`/ui/${rutaDespacho?.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0] + "_front"}.png`}
                         alt="camion"
                         width={328}
                         height={254}
                         style={{ width: "90%", height: "auto" }}
                     />
-                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute top-20 left-40 mt-8" style={{ transform: "translate(0px, 0px) skew(0deg, -20deg) scale(1.5)" }}>
-                        <div className="ml-6 text-slate-800">
-                            <p className="text-xs font-bold">{rutaDespacho.vehiculoId.patente || ""}</p>
-                            <p className="text-xs">{rutaDespacho.vehiculoId.marca || ""}</p>
+                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute right-8 top-52 bg-white rounded p-0.5">
+                        <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
+                            <p className="text-lg font-bold">{rutaDespacho?.vehiculoId?.patente.substring(0, 2)}</p>
+                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
+                            <p className="text-lg font-bold">{rutaDespacho?.vehiculoId?.patente.substring(2)}</p>
                         </div>
                     </div>}
 

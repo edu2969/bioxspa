@@ -141,10 +141,42 @@ export default function Asignacion({ session }) {
         };
     }, [session]);
 
-    function calculateTubePosition(index) {
-        const baseTop = 22;
-        const baseLeft = 14;
-        const verticalIncrement = 3.2;
+    const offsetByModel = (vehiculo) => {
+        const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
+        const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
+        console.log("OFFSET", marca, modelo);
+        if(!marca || !modelo) {
+            return {
+                baseTop: 28,
+                baseLeft: 76,
+                scaleFactor: 1.5,
+                verticalIncrement: 4
+            };
+        }
+        const offsets = {
+            "hyundai_porter": [-8, 32, 1.5],
+            "ford_ranger": [-28, 106, 1.5],
+            "mitsubishi_l200": [28, 76, 1.5],
+            "volkswagen_constellation": [28, 76, 1.5],
+            "volkswagen_delivery": [28, 76, 1.5],
+            "kia_frontier": [28, 76, 1.5],
+            "ford_transit": [28, 76, 1.5],
+            "desconocido_desconocido": [28, 76, 1.5],
+        }
+        const data = offsets[marca + "_" + modelo] || offsets["desconocido_desconocido"];
+        console.log("DATA", data);
+        return {
+            baseTop: data[0],
+            baseLeft: data[1],
+            scaleFactor: data[2]
+        };
+    }
+
+    function calculateTubePosition(vehiculo, index) {
+        const offsets = offsetByModel(vehiculo);
+        const baseTop = offsets.baseTop; //22
+        const baseLeft = offsets.baseLeft; //76
+        const verticalIncrement = 5;
         const top = baseTop + !(index % 2) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
         const left = baseLeft + !(index % 2) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 2; // Ajuste horizontal con perspectiva
         return { top, left, width: '14px', height: '78px' };
@@ -342,6 +374,18 @@ export default function Asignacion({ session }) {
         });
     }
 
+    const imagenVehiculo = (vehiculo) => {
+        if(!vehiculo) return "desconocido_desconocido";
+        const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
+        const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
+        const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
+        return imagen || "desconocido_desconocido";
+    }
+
+    const getOpacityEstanque = (index) => {        
+        return index == 99;
+    }
+
     return (
         <main className="w-full mt-2 h-screen overflow-hidden">
             {sucursales.length > 0 && (
@@ -389,7 +433,9 @@ export default function Asignacion({ session }) {
             )}
             {sucursales.length === 0 && (
                 <div className="flex justify-center items-center">
-                    <p className="text-gray-500">No tienes sucursales asignadas.</p>
+                    {loadingPanel 
+                        ? <Loader texto="Cargando sucursales..." /> 
+                        : <p className="text-white py-2 bg-red-500 rounded px-4">No tienes sucursales asignadas.</p>}
                 </div>
             )}
             <div className={`grid grid-cols-12 h-[calc(100vh-40px)] gap-4 px-4 overflow-hidden ${loadingPanel ? "opacity-50" : ""}`}>
@@ -452,7 +498,8 @@ export default function Asignacion({ session }) {
                                         onClick={() => {setShowDetalleOrdenModal(true)}}
                                     >
                                         <div className="w-full">
-                                            <p className="text-md font-bold uppercase w-full">{pedido.clienteNombre}{pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2">Retiro en local</span>}</p>
+                                            <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
+                                            {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
                                             <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>                                            
                                             <ul className="w-full list-disc pl-4 mt-2">
                                                 {(() => {
@@ -614,7 +661,7 @@ export default function Asignacion({ session }) {
                                     e.currentTarget.style.backgroundColor = "#e5e7eb";
                                 }}
                                 onDrop={(e) => {
-                                    alert(`SOLTADO en camión ${ruta.vehiculoId.patent}`);
+                                    alert(`SOLTADO en camión ${ruta.vehiculoId.patente}`);
                                     e.preventDefault();
                                     e.currentTarget.style.backgroundColor = "#e5e7eb";
                                 }}>
@@ -624,7 +671,7 @@ export default function Asignacion({ session }) {
                                             data-id={ruta._id}
                                             className="relative h-56"
                                         >
-                                            <Image className="absolute top-0 left-0 ml-2" src="/ui/camion.png" alt={`camion_atras_${index}`} width={247} height={191} style={{ width: '247px', height: '191px' }} priority />
+                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}.png`} alt={`camion_atras_${index}`} width={247} height={191} priority />
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
                                                 {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && cargaActual(ruta).reverse().map((item, index) => {
                                                     const elem = item.elemento;
@@ -636,17 +683,23 @@ export default function Asignacion({ session }) {
                                                             width={14 * 2}
                                                             height={78 * 2}
                                                             className={`absolute ${item.estado === "descargando" ? "opacity-40" : item.estado === "entregado" ? "opacity-0" : "opacity-100"}`}
-                                                            style={calculateTubePosition(cargaActual(ruta).length - index - 1)}
+                                                            style={calculateTubePosition(ruta.vehiculoId, cargaActual(ruta).length - index - 1)}
                                                             priority={false}
                                                         />
                                                     )
                                                 })}
                                             </div>
-                                            <Image className="absolute top-0 left-0 ml-2" src="/ui/camion_front.png" alt="camion" width={247} height={191} style={{ width: '247px', height: '191px' }} />
-                                            <div className="absolute ml-12 mt-6" style={{ transform: "translate(60px, 34px) skew(0deg, -20deg)" }}>
+                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}_front.png`} alt="camion" width={247} height={191}/>
+                                            <div className="absolute top-46 right-6">
                                                 <div className="ml-4 text-slate-800">
-                                                    <p className="text-xl font-bold">{ruta.vehiculoId.patente}</p>
-                                                    <p className="text-xs">{ruta.vehiculoId.marca}</p>
+                                                    <div className="bg-white rounded p-0.5 mt-32">
+                                                        <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
+                                                            <p className="text-lg font-bold">{ruta?.vehiculoId?.patente.substring(0, 2)}</p>
+                                                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
+                                                            <p className="text-lg font-bold">{ruta?.vehiculoId?.patente.substring(2)}</p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs">{ruta.vehiculoId.marca}&nbsp;<small>{ruta.vehiculoId.modelo}</small></p>
                                                     <div className={`flex items-center mb-2 ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'text-green-700' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'text-orange-500' : 'text-gray-500'}`}>
                                                         {ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>}
                                                         {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
@@ -668,7 +721,7 @@ export default function Asignacion({ session }) {
                                                                 alt={`tank_${index}`}
                                                                 width={14 * 3}
                                                                 height={78 * 3}
-                                                                className={`absolute ${ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? "" : "opacity-40"}`}
+                                                                className={`absolute ${getOpacityEstanque(getCilindrosDescarga(ruta).length - index - 1) ? "" : "opacity-40"}`}
                                                                 style={calculateUploadTubePosition(getCilindrosDescarga(ruta).length - index - 1)}
                                                                 priority={false}
                                                             />
@@ -882,7 +935,7 @@ export default function Asignacion({ session }) {
             {showDetalleOrdenModal && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                 <div className="relative top-1/4 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-left">
-                        <h2 className="w-full flex justify-center text-xl font-bold mb-2">Detalle de venta</h2>                        
+                        <h2 className="w-full flex justify-center text-xl font-bold mb-2">Detalle de venta</h2>
                         <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
                             <button
                                 onClick={onSaveComment}

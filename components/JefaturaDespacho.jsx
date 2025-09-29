@@ -160,7 +160,8 @@ export default function JefaturaDespacho({ session }) {
     };
 
     const isReady = () => {
-        return cargamentos.length > 0 && (cargamentos[0].nombreRetira ?? "").length > 3 && alMenosUnEscaneado;
+        const requiereQuienRecibe = cargamentos[0]?.retiroEnLocal ? (cargamentos[0]?.nombreRetira && cargamentos[0]?.rutRetira) : true;
+        return cargamentos.length > 0 && requiereQuienRecibe && alMenosUnEscaneado;
     }
 
     const [loadingCargamentos, setLoadingCargamentos] = useState(true);
@@ -170,32 +171,71 @@ export default function JefaturaDespacho({ session }) {
         const data = await response.json();
         const carga = data.cargamentos;
         console.log("CARGAMENTOS", carga);
+
         // Actualiza scanCodes en los detalles correspondientes según subcategoriaCatalogoId de cada item en carga.items
         if (Array.isArray(carga) && carga.length > 0 && Array.isArray(carga[0].items)) {
             const items = carga[0].items;
             const ventas = carga[0].ventas;
             items.forEach(item => {
-            ventas.forEach(venta => {
-                venta.detalles?.forEach(detalle => {
-                if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
-                    if (!Array.isArray(detalle.itemCatalogoIds)) {
-                    detalle.itemCatalogoIds = [];
-                    }
-                    if (!detalle.itemCatalogoIds.includes(item.itemId)) {
-                    detalle.itemCatalogoIds.push(item.itemId);
-                    }
-                }
+                ventas.forEach(venta => {
+                    venta.detalles?.forEach(detalle => {
+                        if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
+                            if (!Array.isArray(detalle.itemCatalogoIds)) {
+                                detalle.itemCatalogoIds = [];
+                            }
+                            if (!detalle.itemCatalogoIds.includes(item.itemId)) {
+                                detalle.itemCatalogoIds.push(item.itemId);
+                            }
+                        }
+                    });
                 });
             });
-            });
         }
+
         setCargamentos(carga);
+
+        // Determinar si hay elementos escaneados pero no entregados
         if (Array.isArray(carga) && carga.length > 0) {
+            let hayEscaneadosNoEntregados = false;
+
+            // Verificar si hay ventas en preparación (ya escaneadas pero no confirmadas)
             const algunaPreparacion = carga[0].ventas?.some(v => v.estado === TIPO_ESTADO_VENTA.preparacion);
-            if (algunaPreparacion) setAlMenosUnEscaneado(true);
-            console.log("Alguna en preparación?", algunaPreparacion);
+
+            if (algunaPreparacion) {
+                hayEscaneadosNoEntregados = true;
+            } else {
+                // Verificar si hay itemCatalogoIds escaneados en los detalles
+                const hayItemsEscaneados = carga[0].ventas?.some(venta =>
+                    venta.detalles?.some(detalle =>
+                        Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length > 0
+                    )
+                );
+
+                // Para retiro en local, verificar si hay items escaneados que no están en entregasEnLocal
+                if (carga[0].retiroEnLocal && hayItemsEscaneados) {
+                    const hayNoEntregados = carga[0].ventas?.some(venta => {
+                        const codigosEscaneados = venta.detalles
+                            .flatMap(detalle => Array.isArray(detalle.itemCatalogoIds) ? detalle.itemCatalogoIds : []);
+
+                        const entregas = Array.isArray(venta.entregasEnLocal) ? venta.entregasEnLocal : [];
+                        const entregados = entregas.flatMap(e => Array.isArray(e.itemCargadoIds) ? e.itemCargadoIds : []);
+
+                        // Hay códigos escaneados que no están en los entregados
+                        return codigosEscaneados.some(codigo => !entregados.includes(codigo));
+                    });
+
+                    hayEscaneadosNoEntregados = hayNoEntregados;
+                } else {
+                    // Para rutas normales, si hay items escaneados significa que no han sido entregados
+                    hayEscaneadosNoEntregados = hayItemsEscaneados;
+                }
+            }
+
+            setAlMenosUnEscaneado(hayEscaneadosNoEntregados);
+            console.log("Hay elementos escaneados no entregados?", hayEscaneadosNoEntregados);
         }
-        setLoadingCargamentos(false);        
+
+        setLoadingCargamentos(false);
     }
 
     const cargarItem = useCallback(
@@ -593,7 +633,7 @@ export default function JefaturaDespacho({ session }) {
                                                 className={`w-full flex text-sm border border-gray-300 px-0 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                             >
                                                 {detalle.elemento && <div className="w-full flex items-left pt-1.5">
-                                                    <div className="w-18">
+                                                    <div className="w-14">
                                                         <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
                                                             <div className="bg-orange-200 border text-orange-500 border-orange-400  px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
                                                                 <p className="relative -top-0.5">{detalle.nuCode}</p>

@@ -12,31 +12,6 @@ export async function GET(req) {
         const searchText = searchParams.get("search") || "";
         const clienteId = searchParams.get("clienteId"); // Keep this for backward compatibility
         
-        // Helper function to enrich prices with category/subcategory names
-        async function enrichPricesWithNames(prices) {
-            const subcatIds = [...new Set(prices.map(p => p.subcategoriaCatalogoId))];
-            const subcategories = await SubcategoriaCatalogo.find({ _id: { $in: subcatIds } })
-                .select("nombre categoriaCatalogoId").lean();
-            
-            const catIds = [...new Set(subcategories.map(s => s.categoriaCatalogoId))];
-            const categories = await CategoriaCatalogo.find({ _id: { $in: catIds } })
-                .select("nombre").lean();
-            
-            const subcatMap = Object.fromEntries(subcategories.map(s => [s._id.toString(), s]));
-            const catMap = Object.fromEntries(categories.map(c => [c._id.toString(), c]));
-            
-            return prices.map(precio => {
-                const subcategoria = subcatMap[precio.subcategoriaCatalogoId.toString()];
-                if (subcategoria) {
-                    const categoria = catMap[subcategoria.categoriaCatalogoId.toString()];
-                    if (categoria) {
-                        precio.nombre = `${categoria.nombre} - ${subcategoria.nombre}`;
-                    }
-                }
-                return precio;
-            });
-        }
-
         // Optional clienteId support for backward compatibility
         if (clienteId) {
             const cliente = await Cliente.findById(clienteId).select("nombre rut tipoPrecio");
@@ -44,8 +19,14 @@ export async function GET(req) {
                 return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
             }
 
-            const preciosList = await Precio.find({ clienteId }).select("-__v -createdAt -updatedAt").lean();
-            const enrichedPrices = await enrichPricesWithNames(preciosList);
+            const preciosList = await Precio.find({ clienteId }).select("-__v -createdAt -updatedAt")
+            .populate({ 
+                path: "subcategoriaCatalogoId", 
+                select: "nombre cantidad unidad sinSifon categoriaCatalogoId", 
+                populate: { 
+                    path: "categoriaCatalogoId", 
+                    select: "nombre tipo gas elemento esIndustrial esMedicial" } })            
+            .lean();
 
             return NextResponse.json({
                 ok: true,
@@ -53,7 +34,7 @@ export async function GET(req) {
                     tipoPrecio: cliente.tipoPrecio,
                     nombre: cliente.nombre,
                     rut: cliente.rut,
-                    precios: enrichedPrices
+                    precios: preciosList
                 }
             });
         } 
@@ -85,7 +66,13 @@ export async function GET(req) {
                     { clienteId: { $in: matchingClientes.map(c => c._id) } },
                     { subcategoriaCatalogoId: { $in: matchingSubcategorias.map(s => s._id) } }
                 ]
-            }).lean();
+            }).populate({ 
+                path: "subcategoriaCatalogoId", 
+                select: "nombre cantidad unidad sinSifon categoriaCatalogoId", 
+                populate: { 
+                    path: "categoriaCatalogoId", 
+                    select: "nombre tipo gas elemento esIndustrial esMedicial" } })            
+            .lean();
             
             // Get unique client IDs from the prices
             const clienteIds = [...new Set(precios.map(p => p.clienteId.toString()))];
@@ -109,13 +96,12 @@ export async function GET(req) {
             for (const cliente of clientes) {
                 const clienteId = cliente._id.toString();
                 if (preciosPorCliente[clienteId]) {
-                    const enrichedPrices = await enrichPricesWithNames(preciosPorCliente[clienteId]);
                     resultados.push({
                         clienteId: cliente._id,
                         nombre: cliente.nombre,
                         rut: cliente.rut,
                         tipoPrecio: cliente.tipoPrecio,
-                        precios: enrichedPrices
+                        precios: preciosPorCliente[clienteId]
                     });
                 }
             }

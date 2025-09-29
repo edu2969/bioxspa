@@ -1,7 +1,44 @@
 import { DTETest } from '../casos-test';
+import { DigitalSigner } from './digital-signer';
 
 export class XMLGenerator {
   
+  static generarYFirmarDTE(data: DTETest): string {
+    let xml: string;
+    
+    switch (data.tipoDTE) {
+      case 33: // Factura Electrónica
+        xml = this.generarFacturaElectronica(data);
+        break;
+      case 34: // Factura Exenta
+        xml = this.generarFacturaExenta(data);
+        break;
+      case 52: // Guía de Despacho
+        xml = this.generarGuiaDespacho(data);
+        break;
+      case 61: // Nota de Crédito
+        if (data.referencia?.tipoDTE === 34) {
+          xml = this.generarFacturaExenta({...data, tipoDTE: 61});
+        } else {
+          xml = this.generarFacturaElectronica({...data, tipoDTE: 61});
+        }
+        break;
+      case 56: // Nota de Débito
+        if (data.referencia?.tipoDTE === 34 || data.referencia?.tipoDTE === 61) {
+          xml = this.generarFacturaExenta({...data, tipoDTE: 56});
+        } else {
+          xml = this.generarFacturaElectronica({...data, tipoDTE: 56});
+        }
+        break;
+      default:
+        throw new Error(`Tipo DTE ${data.tipoDTE} no implementado`);
+    }
+
+    // Firmar el XML usando certificado de variables de entorno
+    const signer = new DigitalSigner();
+    return signer.firmarXML(xml);
+  }
+
   static generarFacturaElectronica(data: DTETest): string {
     const { items, receptor, descuentoGlobal } = data;
     
