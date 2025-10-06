@@ -884,6 +884,14 @@ export default function Conductor({ session }) {
         console.log("Ruta despacho actualizada:", rutaDespacho);
     }, [rutaDespacho]);
 
+    const imagenVehiculo = (vehiculo) => {
+        if (!vehiculo) return "desconocido_desconocido";
+        const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
+        const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
+        const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
+        return imagen || "desconocido_desconocido";
+    }
+
     return (
         <div className="w-full h-dvh overflow-hidden">
                     
@@ -891,7 +899,7 @@ export default function Conductor({ session }) {
                 <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
                     <Image
                         className="absolute top-10 left-4"
-                        src={`/ui/${rutaDespacho.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0]}.png`}
+                        src={`/ui/${imagenVehiculo(rutaDespacho.vehiculoId)}.png`}
                         alt="camion_atras"
                         width={355}
                         height={275}
@@ -918,7 +926,7 @@ export default function Conductor({ session }) {
                     </div>
                     <Image
                         className="absolute top-10 left-4"
-                        src={`/ui/${rutaDespacho?.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0] + "_front"}.png`}
+                        src={`/ui/${imagenVehiculo(rutaDespacho.vehiculoId)}_front.png`}
                         alt="camion"
                         width={328}
                         height={254}
