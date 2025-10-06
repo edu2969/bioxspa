@@ -7,7 +7,7 @@ export default function About() {
                 <div className="scale-75 sm:scale-100">
                     <div className="flex">
                         <p className="text-6xl text-gray-700 mb-6">B I O X</p>
-                        <span className="text-xs ml-7 text-gray-400 mt-10">versión 0.9</span>
+                        <span className="text-xs ml-7 text-gray-400 mt-10">versión 0.92</span>
                     </div>                    
                     <div className="ml-2 opacity-90 text-right">
                         <span>Powered By</span>
