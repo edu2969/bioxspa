@@ -21,11 +21,11 @@ export default function HomeConductor({ contadores, checklists }) {
             <div className={`absolute w-full max-w-lg grid grid-cols-1 md:grid-cols-2 gap-4 px-12 ${routingIndex == -2 ? "opacity-20" : ""}`}>
                 <div className="relative">
                     <Link href="/modulos/homeConductor/pedidos" onClick={() => setRoutingIndex(0)}>
-                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${routingIndex != -1 && faltaChecklistVehiculo() ? "border-red-500 bg-red-200" : ""}`}>  
+                        <div className={`w-full shadow-lg rounded-lg py-4 hover:scale-105 border-2 hover:border-blue-100 mb-2 text-center relative ${routingIndex == 0 ? "opacity-20" : ""} ${routingIndex === -1 && faltaChecklistVehiculo() ? "border-red-500 bg-red-200" : ""}`}>  
                             <div className="w-full inline-flex text-center text-slate-500 p-4 relative">
                                 <FaRoute className="mx-auto mb-1" size="6rem" />
                             </div>
-                            <span>PEDIDOS</span>
+                            <span>PEDIDOS!</span>
                         </div>
                         {contadores && contadores.pedidos ? (
                             <div className="absolute top-8 right-24 bg-blue-500 text-white text-xs font-bold rounded-full pl-2 pr-1.5 h-8 w-8 flex items-center justify-center">
@@ -36,7 +36,7 @@ export default function HomeConductor({ contadores, checklists }) {
                                 <span className="text-lg mr-1">0</span>
                             </div>
                         )}
-                        {routingIndex != -1 && faltaChecklistVehiculo() && (
+                        {routingIndex === -1 && faltaChecklistVehiculo() && (
                             <div className="absolute top-4 left-4">
                                 <div className="flex items-center">
                                     <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>

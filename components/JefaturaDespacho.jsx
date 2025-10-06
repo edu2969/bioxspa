@@ -20,6 +20,7 @@ import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import { getColorEstanque } from "@/lib/uix";
 import { TIPO_ESTADO_ITEM_CATALOGO, TIPO_ESTADO_VENTA, TIPO_ITEM_CATALOGO } from "@/app/utils/constants";
 import { LiaPencilAltSolid, LiaTimesSolid } from 'react-icons/lia';
+import { IoIosWarning } from "react-icons/io";
 
 export default function JefaturaDespacho({ session }) {
     const [cargamentos, setCargamentos] = useState([]);
@@ -39,6 +40,7 @@ export default function JefaturaDespacho({ session }) {
     const [nombreRetira, setNombreRetira] = useState("");
     const [rutRetiraNum, setRutRetiraNum] = useState("");
     const [rutRetiraDv, setRutRetiraDv] = useState("");
+    const [modalConfirmarCargaParcial, setModalConfirmarCargaParcial] = useState(false);
 
     function getEstadoItemCatalogoLabel(value) {
         return {
@@ -53,7 +55,7 @@ export default function JefaturaDespacho({ session }) {
     }
 
     const postCargamento = async () => {
-        if (!isReady()) {
+        if (!loadState().partial && !loadState().complete) {
             console.log("Eeeeepa!");
             return;
         }
@@ -159,9 +161,17 @@ export default function JefaturaDespacho({ session }) {
         setScanMode(!scanMode);
     };
 
-    const isReady = () => {
+    const loadState = () => {
         const requiereQuienRecibe = cargamentos[0]?.retiroEnLocal ? (cargamentos[0]?.nombreRetira && cargamentos[0]?.rutRetira) : true;
-        return cargamentos.length > 0 && requiereQuienRecibe && alMenosUnEscaneado;
+        const completo = cargamentos.length > 0 && cargamentos[0].ventas.every(venta =>
+            venta.detalles.every(detalle => detalle.restantes === 0)
+        );
+        if(completo) {
+            return { complete: true }
+        }
+        return {
+            partial: cargamentos.length > 0 && requiereQuienRecibe && alMenosUnEscaneado
+        }
     }
 
     const [loadingCargamentos, setLoadingCargamentos] = useState(true);
@@ -245,16 +255,18 @@ export default function JefaturaDespacho({ session }) {
             if (!cargamentoActual) return false;
 
             // Verifica si el código ya fue escaneado en cualquier detalle de cualquier venta del primer cargamento
-            const codigoYaEscaneado = cargamentoActual.ventas.some(venta =>
-                venta.detalles.some(detalle =>
-                    Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.includes(item.itemId)
-                )
-            );
-            if (codigoYaEscaneado) {
-                toast.warn(`CODIGO ${codigo} ya escaneado`);
-                setScanMode(false);
-                return;
-            }
+            if (item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
+                const codigoYaEscaneado = cargamentoActual.ventas.some(venta =>
+                    venta.detalles.some(detalle =>
+                        Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.includes(item.itemId)
+                    )
+                );
+                if (codigoYaEscaneado) {
+                    toast.warn(`CODIGO ${codigo} ya escaneado`);
+                    setScanMode(false);
+                    return;
+                }
+            }            
 
             // Buscar la venta y el detalle que corresponde al subcategoriaCatalogoId
             let ventaIndex = -1;
@@ -281,7 +293,7 @@ export default function JefaturaDespacho({ session }) {
                 return;
             }
 
-            if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio) {
+            if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio && item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
                 setScanMode(false);
                 setShowModalCilindroErroneo(true);
                 toast.warn(
@@ -290,14 +302,14 @@ export default function JefaturaDespacho({ session }) {
                 return;
             }
 
-            if(item.direccionInvalida) {
+            if(item.direccionInvalida && item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
                 setScanMode(false);
                 setEditMode(false);
                 setShowModalCilindroErroneo(true);
                 return;
             }
 
-            const response = await fetch('/api/cilindros/cargar', {
+            const response = await fetch(`/api/${item.tipo === TIPO_ITEM_CATALOGO.cilindro ? 'cilindros' : 'insumos'}/cargar`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -506,20 +518,29 @@ export default function JefaturaDespacho({ session }) {
         }
     }
 
-    const getDetailTitle = (nombre) => {
-        if(nombre.substring(0,4).toLowerCase() === "rack") {
+    const getDetailTitle = (detalle) => {
+        if(detalle.nombre.substring(0,4).toLowerCase() === "rack") {
             return "Rack";
         }
-        return nombre;
+        return detalle.nombre.split(" ")[0];
     }
 
-    const getDetailsubtitle = (nombre) => {
-        if(nombre.substring(0,4).toLowerCase() === "rack") {
-            const partes = nombre.toLowerCase().split(" ");
+    const getDetailSubtitle = (detalle) => {
+        if(detalle.nombre.substring(0,4).toLowerCase() === "rack") {
+            const partes = detalle.nombre.toLowerCase().split(" ");
             const index = partes.findIndex(p => p === "cilindros") - 1;
             return `${partes[index] || "??"}`;
+        } else if(detalle.nombre.includes("Insumos")) {
+            return detalle.nombre.split("-")[1] || "??";
         }
-        return nombre;
+        return detalle.nombre;
+    }
+
+    const getAditionalInfo = (detalle) => {
+        if(detalle.nombre.toLowerCase().includes("insumos")) {
+            return detalle.nombre.split("-")[2] || "??";
+        }
+        return "";
     }
 
     const getPorcentajeAvance = () => {
@@ -635,13 +656,13 @@ export default function JefaturaDespacho({ session }) {
                                                 {detalle.elemento && <div className="w-full flex items-left pt-1.5">
                                                     <div className="w-14">
                                                         <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
-                                                            <div className="bg-orange-200 border text-orange-500 border-orange-400  px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
+                                                            <div className="bg-orange-200 border text-orange-500 border-orange-400 px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
                                                                 <p className="relative -top-0.5">{detalle.nuCode}</p>
                                                             </div>
-                                                            {detalle.esIndustrial && <div className="bg-blue-200 text-blue-700 border border-blue-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1">
+                                                            {detalle.esIndustrial && <div className="bg-blue-200 text-blue-700 border border-blue-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
                                                                 <span className="relative -top-0.5">Industrial</span>
                                                             </div>}
-                                                            {detalle.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded-sm ml-0.5 h-[14px]">
+                                                            {detalle.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
                                                                 <span className="relative -top-0.5">Sin Sifón</span>
                                                             </div>}
                                                         </div>                                                        
@@ -652,14 +673,16 @@ export default function JefaturaDespacho({ session }) {
                                                         <p>{detalle.unidad}</p>
                                                     </div>
                                                 </div>}
-                                                {!detalle.elemento && detalle.nombre && <div className="w-full flex items-left ml-2">
-                                                    <div className="font-bold text-lg">{getDetailTitle(detalle.nombre)}</div>
-                                                    {getDetailsubtitle(detalle.nombre) && <div className="pl-3">
-                                                        <p className="text-xs text-gray-600">Capacidad</p>
-                                                        <p className="font-bold text-lg text-nowrap -mt-1">
-                                                            {getDetailsubtitle(detalle.nombre)}<span className="font-normal text-xs scale-75 ml-1">cilindros</span>
+                                                {!detalle.elemento && <div className="w-full flex items-left ml-2">
+                                                    {detalle.nombre.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(detalle)}</div>}
+                                                    <div className="pl-3">
+                                                        {detalle.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
+                                                        <p className="font-bold text-lg text-nowrap mt-0">
+                                                            {getDetailSubtitle(detalle)}
+                                                            {detalle.nombre.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
                                                         </p>
-                                                    </div>}
+                                                        {getAditionalInfo(detalle) && <p className="text-xs text-gray-600 -mt-2">{getAditionalInfo(detalle)} </p>}
+                                                    </div>
                                                 </div>}
                                                 <div className="w-full flex justify-end items-center">
                                                     <div className="w-24 flex flex-end font-bold orbitron border-l-gray-300 justify-end mr-2 mt-2">
@@ -684,11 +707,16 @@ export default function JefaturaDespacho({ session }) {
                                             }}>
                                             <BsQrCodeScan className="text-4xl" />
                                         </button>
-                                        <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isReady() ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+                                        <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${loadState().complete ? 'bg-green-500 cursor-pointer' : loadState().partial ? 'bg-yellow-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                console.log("Load state:", loadState());
+                                                if(loadState().partial) {
+                                                    setModalConfirmarCargaParcial(true);
+                                                    return;
+                                                } 
                                                 postCargamento();
-                                            }} disabled={!isReady() || posting}>
+                                            }} disabled={(!loadState().partial && !loadState().complete) || posting}>
                                             <FaRoadCircleCheck className="text-4xl pb-0" />
                                             <p className="ml-2 mt-2 text-md font-bold">Confirmar carga</p>
                                             {posting && <div className="absolute w-full top-0">
@@ -770,11 +798,11 @@ export default function JefaturaDespacho({ session }) {
                                             {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
                                         </div>
                                         <div className="flex font-bold text-4xl mt-1">
-                                            <span className="pb-0 mt-4">
-                                                {(() => {
+                                            <span className="pb-0 mt-4">                                                
+                                                {(itemCatalogoEscaneado.elemento || itemCatalogoEscaneado.categoria.gas) ? (() => {
                                                     let match = itemCatalogoEscaneado.categoria.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
                                                     if (!match) {
-                                                        match = [null, (itemCatalogoEscaneado.categoria.elemento ?? itemCatalogoEscaneado.categoria.gas ?? itemCatalogoEscaneado.categoria.nombre.split(" ")[0]), ''];
+                                                        match = [null, (itemCatalogoEscaneado.categoria.elemento ?? itemCatalogoEscaneado.categoria.gas), ''];
                                                     };
                                                     const [, p1, p2] = match;
                                                     return (
@@ -783,7 +811,7 @@ export default function JefaturaDespacho({ session }) {
                                                             {p2 ? <small>{p2}</small> : ''}
                                                         </>
                                                     );
-                                                })()}
+                                                })() : itemCatalogoEscaneado.categoria.nombre}
                                             </span>
                                             {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <div className="ml-3 mt-1">
                                                 {editMode && <><p className="text-xs text-gray-600">Estado</p>
@@ -973,6 +1001,45 @@ export default function JefaturaDespacho({ session }) {
                                     CANCELAR
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {modalConfirmarCargaParcial && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div className="relative p-5 border w-80 mx-auto shadow-lg rounded-md bg-white">
+                        <div className="absolute top-2 right-2">
+                            <button
+                                onClick={() => setModalConfirmarCargaParcial(false)}
+                                className="text-gray-400 hover:text-gray-700 text-2xl focus:outline-none"
+                                aria-label="Cerrar"
+                                type="button"
+                            >
+                                <LiaTimesSolid />
+                            </button>                            
+                        </div>
+                        <div className="mt-4">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">Confirmar carga parcial</h3>                                
+                            <div className="flex">                                
+                                <IoIosWarning className="text-6xl text-yellow-500 mx-auto mr-2 w-64" />                            
+                                <p className="text-md text-gray-500">¡Falta carga!. Tendrá que completarla más tarde. ¿Seguro desea continuar?</p>                            
+                            </div>
+                            <button
+                                onClick={() => {
+                                    postCargamento();
+                                    setModalConfirmarCargaParcial(false);
+                                }}
+                                className="mt-4 px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                Confirmar
+                            </button>
+                            <button
+                                onClick={() => setModalConfirmarCargaParcial(false)}
+                                className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            >
+                                Cancelar
+                            </button>
                         </div>
                     </div>
                 </div>

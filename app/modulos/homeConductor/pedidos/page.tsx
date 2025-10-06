@@ -1,8 +1,8 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/utils/authOptions";
-import Despacho from "@/components/Despacho";
+import Conductor from "@/components/Conductor";
 
-export default async function PreparacionDePedidosPage() {
+export default async function ConductorPage() {
     const session = await getServerSession(authOptions);
-    return <Despacho session={session}/>;
+    return <Conductor session={session}/>;
 }

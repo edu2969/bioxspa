@@ -2,6 +2,8 @@ import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
 import ItemCatalogo from "@/models/itemCatalogo";
+import DetalleVenta from "@/models/detalleVenta";
+import Venta from "@/models/venta";
 
 export async function POST(request) {
     await connectMongoDB();
@@ -23,6 +25,21 @@ export async function POST(request) {
     const rutaDespacho = await RutaDespacho.findById(rutaDespachoId);
     if (!rutaDespacho) {
         return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
+    }
+
+    // Verifica que el item pertenezca a la venta de la última dirección arribada
+    const ultimaDireccion = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
+    const venta = await Venta.findOne({ _id: { $in: rutaDespacho.ventaIds }, direccionDespachoId: ultimaDireccion }).select("_id").lean();
+    const detalles = await DetalleVenta.find({ ventaId: venta._id }).select("itemCatalogoIds").lean();
+
+    const perteneceAlCliente = detalles.some(detalle =>
+        Array.isArray(detalle.itemCatalogoIds) &&
+        detalle.itemCatalogoIds.some(id => String(id) === String(item._id))
+    );
+
+    if (!perteneceAlCliente) {
+        toast.error(`${codigo} no pertenece a éste cliente!`);
+        return;
     }
 
     // Agrega el item a cargaItemIds si no está

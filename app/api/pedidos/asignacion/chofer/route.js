@@ -108,7 +108,7 @@ export async function GET() {
             const detallesPorVenta = await DetalleVenta.find({
                 ventaId: { $in: ventaIds }
             })
-            .select("ventaId subcategoriaCatalogoId cantidad")
+            .select("ventaId subcategoriaCatalogoId cantidad itemCatalogoIds")
             .populate({
                 path: "subcategoriaCatalogoId",
                 model: "SubcategoriaCatalogo",
@@ -135,7 +135,8 @@ export async function GET() {
                     unidad: det.subcategoriaCatalogoId.unidad,
                     capacidad: det.subcategoriaCatalogoId.cantidad,
                     esIndustrial: det.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial,
-                    esMedicinal: det.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal
+                    esMedicinal: det.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal,
+                    itemCatalogoIds: det.itemCatalogoIds
                 });
             });
 

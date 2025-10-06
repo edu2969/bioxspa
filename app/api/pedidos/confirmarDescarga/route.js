@@ -7,7 +7,8 @@ import Cargo from "@/models/cargo";
 import RutaDespacho from "@/models/rutaDespacho";
 import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import ItemCatalogo from "@/models/itemCatalogo";
-import Venta from "@/models/venta"; // Import Venta model dynamically
+import Venta from "@/models/venta"; 
+import DetalleVenta from "@/models/detalleVenta";
 
 // filepath: d:\git\bioxspa\app\api\pedidos\confirmarDescarga\route.js
 
@@ -118,27 +119,38 @@ export async function POST(request) {
             ventasEnDireccion = ventasDocs.filter(v => v.direccionDespachoId?.toString() === lastDireccionId?.toString());
 
             const ventasEnDireccionIds = ventasEnDireccion.map(v => v._id);
-
+            
             // Actualiza las ventas correspondientes: cambia estado y flag porCobrar
             if (ventasEnDireccionIds.length > 0) {
-                await Venta.updateMany(
-                    { _id: { $in: ventasEnDireccionIds } },
-                    {
-                        $set: {
-                            estado: TIPO_ESTADO_VENTA.entregado,
-                            porCobrar: true
-                        }
-                    }
-                );
                 for (const venta of ventasEnDireccion) {
+                    // Obtiene los detalles de la venta
+                    const detalles = await DetalleVenta.find({ ventaId: venta._id });
+                    // Verifica si todos los restantes son cero
+                    // Verifica si todos los items de cada detalle han sido escaneados
+                    const todosEscaneados = detalles.every(detalle => {
+                        // detalle.itemCatalogIds es un array de items escaneados
+                        // detalle.cantidad es la cantidad total esperada
+                        return Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length === detalle.cantidad;
+                    });
+
+                    // Determina el nuevo estado y porCobrar
+                    const nuevoEstado = todosEscaneados ? TIPO_ESTADO_VENTA.entregado : TIPO_ESTADO_VENTA.por_asignar;
+                    const nuevoPorCobrar = todosEscaneados;
+
+                    await Venta.findByIdAndUpdate(
+                        venta._id,
+                        {
+                            estado: nuevoEstado,
+                            porCobrar: nuevoPorCobrar
+                        }
+                    );
+
                     // Encuentra el índice de la dirección destino en la ruta
                     const direccionIndex = rutaDespacho.ruta.findIndex(
                         r => (r.direccionDestinoId?._id || r.direccionDestinoId)?.toString() === venta.direccionDespachoId?.toString()
                     );
                     if (direccionIndex !== -1) {
                         // Filtra los items movidos que pertenecen a esta venta
-                        // Si tienes una relación directa entre venta y items, puedes filtrar aquí
-                        // Si no, se asume que todos los itemMovidoIds son descargados en esa dirección
                         await ItemCatalogo.updateMany(
                             { _id: { $in: itemMovidoIds } },
                             { $set: { direccionId: rutaDespacho.ruta[direccionIndex].direccionDestinoId } }

@@ -109,7 +109,7 @@ export default function HomeAdministrador({ contadores }) {
                                 ))}
                             </div>                            
                         </Link>
-                        {routingIndex == mod.index && (
+                        {routingIndex != -1 && routingIndex == mod.index && (
                             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                                 <div className="w-full h-full flex items-center justify-center">
                                     <Loader texto="" />

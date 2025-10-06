@@ -19,7 +19,7 @@ import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';
 import { getColorEstanque } from "@/lib/uix";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 
-export default function Despacho({ session }) {
+export default function Conductor({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
     const [vehiculos, setVehiculos] = useState([]);
     const [resumenCarga, setResumenCarga] = useState([]);
@@ -119,7 +119,6 @@ export default function Despacho({ session }) {
     const offsetByModel = () => {
         const marca = (rutaDespacho?.vehiculoId?.marca.split(" ")[0] || "").toLowerCase();
         const modelo = (rutaDespacho?.vehiculoId?.modelo.split(" ")[0] || "").toLowerCase();
-        console.log("OFFSET", marca, modelo);
         if(!marca || !modelo) {
             return {
                 baseTop: 28,
@@ -139,7 +138,6 @@ export default function Despacho({ session }) {
             "desconocido_desconocido": [28, 76, 1.5, 4],
         }
         const data = offsets[marca + "_" + modelo] || offsets["desconocido_desconocido"];
-        console.log("DATA", data);
         return {
             baseTop: data[0],
             baseLeft: data[1],
@@ -326,7 +324,30 @@ export default function Despacho({ session }) {
     const isCompleted = (rd) => {
         const descarga = getResumenDescarga(rd);
         if (descarga.length === 0) return false;
-        return descarga.every((item) => item.restantes <= 0);
+        if (!rd || !Array.isArray(rd.historialCarga) || rd.historialCarga.length === 0) return false;
+
+        // Encuentra el último historial de descarga (esCarga === false)
+        const lastDescarga = [...rd.historialCarga].reverse().find(h => h.esCarga === false);
+        if (!lastDescarga || !Array.isArray(lastDescarga.itemMovidoIds)) return false;
+
+        // Encuentra la venta actual por dirección
+        const currentRoute = rd.ruta[rd.ruta.length - 1];
+        const currentDireccionId = currentRoute.direccionDestinoId?._id || currentRoute.direccionDestinoId;
+        const currentVenta = rd.ventaIds.find(venta =>
+            venta.direccionDespachoId?.toString() === currentDireccionId?.toString()
+        );
+        if (!currentVenta || !Array.isArray(currentVenta.detalles)) return false;
+
+        // Suma el total de itemCatalogoIds de los detalles de la venta actual
+        const totalItemCatalogoIds = currentVenta.detalles.reduce((acc, det) => {
+            if (Array.isArray(det.itemCatalogoIds)) {
+                return acc + det.itemCatalogoIds.length;
+            }
+            return acc;
+        }, 0);
+
+        // El largo de itemMovidoIds debe ser igual al total de itemCatalogoIds
+        return lastDescarga.itemMovidoIds.length === totalItemCatalogoIds;
     }
 
     const fetchRutaAsignada = useCallback(async () => {
@@ -562,6 +583,21 @@ export default function Despacho({ session }) {
             );
             if (!item) {
                 toast.error(`${codigo} no encontrado! WoW...`);
+                return;
+            }
+
+            console.log("ITEM A DESCARGAR --->", item);
+
+            const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id;
+            const ventaActual = rutaDespacho.ventaIds.find(v => v.direccionDespachoId === currentDireccionId);
+            // Verifica que el item esté en el arreglo de itemCatalogoIds de algún detalle de la venta actual
+            const perteneceAlCliente = ventaActual?.detalles?.some(detalle =>
+                Array.isArray(detalle.itemCatalogoIds) &&
+                detalle.itemCatalogoIds.some(id => String(id) === String(item._id))
+            );
+
+            if (!perteneceAlCliente) {
+                toast.error(`${codigo} no pertenece a éste cliente!`);
                 return;
             }
 
@@ -850,12 +886,12 @@ export default function Despacho({ session }) {
 
     return (
         <div className="w-full h-dvh overflow-hidden">
-
-            <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
+                    
+            {rutaDespacho && <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
                 <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
                     <Image
                         className="absolute top-10 left-4"
-                        src={`/ui/${rutaDespacho?.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0]}.png`}
+                        src={`/ui/${rutaDespacho.vehiculoId?.marca.split(" ")[0] + "_" + rutaDespacho?.vehiculoId?.modelo.split(" ")[0]}.png`}
                         alt="camion_atras"
                         width={355}
                         height={275}
@@ -888,7 +924,7 @@ export default function Despacho({ session }) {
                         height={254}
                         style={{ width: "90%", height: "auto" }}
                     />
-                    {rutaDespacho && rutaDespacho.vehiculoId && <div className="absolute right-8 top-52 bg-white rounded p-0.5">
+                    {rutaDespacho.vehiculoId && <div className="absolute right-8 top-52 bg-white rounded p-0.5">
                         <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
                             <p className="text-lg font-bold">{rutaDespacho?.vehiculoId?.patente.substring(0, 2)}</p>
                             <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
@@ -913,13 +949,9 @@ export default function Despacho({ session }) {
                         })}
                     </div>}
                 </div>
-            </div>
+            </div>}
 
-
-
-
-            {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">
-                
+            {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">                
                 
                 {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion
                     || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && (
@@ -1115,7 +1147,7 @@ export default function Despacho({ session }) {
                                                     {item.subcategoriaCatalogoId.categoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
                                                 </div>
                                                 <div className="font-bold text-xl ml-2">
-                                                    <span>
+                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <span>
                                                         {(() => {
                                                             const elem = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
                                                             let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
@@ -1130,7 +1162,7 @@ export default function Despacho({ session }) {
                                                                 </>
                                                             );
                                                         })()}
-                                                    </span>
+                                                    </span>}
                                                 </div>
                                             </div>
                                             <p className="text-2xl orbitron ml-2"><b>{item.subcategoriaCatalogoId.cantidad}</b> <small>{item.subcategoriaCatalogoId.unidad}</small></p>
@@ -1298,7 +1330,7 @@ export default function Despacho({ session }) {
 
 
             {/* Todo en orden */}
-            {loadingState == -1 && !rutaDespacho && (
+            {loadingState == -1 && rutaDespacho == null && (
                 <div className="w-full py-6 px-12 mt-64 bg-white mx-auto">
                     <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
                     <p className="text-center text-2xl font-bold mb-4">¡TODO EN ORDEN!</p>

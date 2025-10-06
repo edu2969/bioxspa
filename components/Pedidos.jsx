@@ -60,45 +60,45 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [loadingCatalogo, setLoadingCatalogo] = useState(false);
 
     const [busquedaCategoria, setBusquedaCategoria] = useState("");
-const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
-const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
-const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
+    const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
+    const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
+    const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
 
-const buscarCategorias = (termino) => {
-    if (!termino || termino.length < 2) {
-        setCategoriasFiltradas([]);
+    const buscarCategorias = (termino) => {
+        if (!termino || termino.length < 2) {
+            setCategoriasFiltradas([]);
+            setMostrarResultadosCategoria(false);
+            return;
+        }
+        
+        const resultados = categorias.filter(categoria => 
+            categoria.nombre.toLowerCase().includes(termino.toLowerCase())
+        );
+        
+        setCategoriasFiltradas(resultados);
+        setMostrarResultadosCategoria(true);
+    };
+
+    const seleccionarCategoria = async (categoria) => {
+        setCategoriaIdSeleccionada(categoria._id);
+        setCategoriaNombreSeleccionada(categoria.nombre);
+        setBusquedaCategoria(categoria.nombre);
         setMostrarResultadosCategoria(false);
-        return;
-    }
-    
-    const resultados = categorias.filter(categoria => 
-        categoria.nombre.toLowerCase().includes(termino.toLowerCase())
-    );
-    
-    setCategoriasFiltradas(resultados);
-    setMostrarResultadosCategoria(true);
-};
-
-const seleccionarCategoria = async (categoria) => {
-    setCategoriaIdSeleccionada(categoria._id);
-    setCategoriaNombreSeleccionada(categoria.nombre);
-    setBusquedaCategoria(categoria.nombre);
-    setMostrarResultadosCategoria(false);
-    setCategoriasFiltradas([]);
-    
-    // Actualizar el form y precioData
-    setValue("categoriaId", categoria._id);
-    setValue("subcategoriaCatalogoId", "");
-    setPrecioData((prev) => ({
-        ...prev,
-        categoriaId: categoria._id,
-        subcategoriaCatalogoId: "",
-        valor: getValues('precio'),
-    }));
-    
-    // Fetch subcategorías
-    await fetchSubcategorias(categoria._id);
-};
+        setCategoriasFiltradas([]);
+        
+        // Actualizar el form y precioData
+        setValue("categoriaId", categoria._id);
+        setValue("subcategoriaCatalogoId", "");
+        setPrecioData((prev) => ({
+            ...prev,
+            categoriaId: categoria._id,
+            subcategoriaCatalogoId: "",
+            valor: getValues('precio'),
+        }));
+        
+        // Fetch subcategorías
+        await fetchSubcategorias(categoria._id);
+    };
 
     const isVentaDisabled = () => {
         return redirecting || !precios.length
@@ -244,18 +244,18 @@ const seleccionarCategoria = async (categoria) => {
         }
     };
 
-const handleCancel = () => {
-    setModalSolicitudPrecio(false);
-    setPrecioData({});
-    setCategoriaIdSeleccionada("");
-    setCategoriaNombreSeleccionada("");
-    setBusquedaCategoria("");
-    setCategoriasFiltradas([]);
-    setMostrarResultadosCategoria(false);
-    setValue("categoriaId", "");
-    setValue("subcategoriaCatalogoId", "");
-    setValue("valor", "");
-};
+    const handleCancel = () => {
+        setModalSolicitudPrecio(false);
+        setPrecioData({});
+        setCategoriaIdSeleccionada("");
+        setCategoriaNombreSeleccionada("");
+        setBusquedaCategoria("");
+        setCategoriasFiltradas([]);
+        setMostrarResultadosCategoria(false);
+        setValue("categoriaId", "");
+        setValue("subcategoriaCatalogoId", "");
+        setValue("valor", "");
+    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -1244,17 +1244,19 @@ const handleCancel = () => {
                                         </div>
                                         <div className={`${(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
-                                            || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                                            <div>
+                                            || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>                                                
+                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento ? <div className='w-full'>
                                                 <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</p>
                                                 <span className="relative -top-1">{precio.subcategoriaCatalogoId.cantidad} {precio.subcategoriaCatalogoId.unidad}</span>
-                                            </div>
-                                            <div className="flex text-xs w-9">
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal && <span className="text-white bg-blue-600 rounded px-2 h-4 mt-0.5">MED</span>}
-                                                {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4 mt-0.5">S/S</span>}
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-yellow-600 rounded px-2 h-4 mt-0.5">IND</span>}
-                                            </div>                                            
-                                            
+                                            </div> : <div className='w-full'>
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.nombre}</p>
+                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId.nombre}</span>
+                                            </div>}
+                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento &&<div className="w-full flex items-end justify-end text-xs space-x-1">
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
+                                                {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
+                                            </div>}
                                         </div>
                                         {(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza

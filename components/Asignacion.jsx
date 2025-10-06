@@ -1,4 +1,5 @@
 "use client";
+
 import Image from 'next/image';
 import Link from 'next/link';
 import React, { useCallback, useRef } from 'react';
@@ -12,8 +13,8 @@ import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
-import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle } from 'react-icons/fa';
-import {  TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
+import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle, FaClock } from 'react-icons/fa';
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from './Loader';
 import { getColorEstanque } from '@/lib/uix';
@@ -45,7 +46,7 @@ export default function Asignacion({ session }) {
     const [cargandoMas, setCargandoMas] = useState(false);
     const [showDetalleOrdenModal, setShowDetalleOrdenModal] = useState(false);
     const [sucursales, setSucursales] = useState([]);
-    const { setValue, getValues } = useForm();    
+    const { setValue, getValues } = useForm();
 
     const nombreChofer = (choferId) => {
         const chofer = choferes.find((chofer) => chofer._id === choferId);
@@ -54,7 +55,7 @@ export default function Asignacion({ session }) {
 
     const fetchPedidos = useCallback(async (sucursalId) => {
         try {
-            if(sucursalId) {
+            if (sucursalId) {
                 const response = await fetch(`/api/pedidos/asignacion?sucursalId=${sucursalId}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch pedidos");
@@ -63,7 +64,7 @@ export default function Asignacion({ session }) {
                 console.log("Fetched pedidos:", data);
                 setPedidos(data.pedidos);
                 setChoferes(data.choferes);
-                setEnTransito(data.flotaEnTransito);                
+                setEnTransito(data.flotaEnTransito);
             }
             setLoadingPanel(false);
         } catch (error) {
@@ -80,7 +81,7 @@ export default function Asignacion({ session }) {
             const data = await response.json();
             console.log("Fetched sucursales:", data);
             setSucursales(data.sucursales);
-            if(data.sucursales.length === 1) {
+            if (data.sucursales.length === 1) {
                 setValue("sucursalId", data.sucursales[0]._id);
                 fetchPedidos(data.sucursales[0]._id);
             }
@@ -90,9 +91,9 @@ export default function Asignacion({ session }) {
     }, [setSucursales, fetchPedidos, setValue]);
 
     useEffect(() => {
-        fetchSucursales();        
+        fetchSucursales();
         const sucursalId = localStorage.getItem("sucursalId") || null;
-        if(sucursalId) {
+        if (sucursalId) {
             setValue("sucursalId", sucursalId);
         }
         fetchPedidos(sucursalId);
@@ -145,7 +146,7 @@ export default function Asignacion({ session }) {
         const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
         const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
         console.log("OFFSET", marca, modelo);
-        if(!marca || !modelo) {
+        if (!marca || !modelo) {
             return {
                 baseTop: 28,
                 baseLeft: 76,
@@ -350,8 +351,8 @@ export default function Asignacion({ session }) {
     }
 
     const handlePedidosScroll = (e) => {
-        if(cargandoMas) return; // Evita múltiples cargas simultáneas
-        const { scrollTop, scrollHeight, clientHeight } = e.target; 
+        if (cargandoMas) return; // Evita múltiples cargas simultáneas
+        const { scrollTop, scrollHeight, clientHeight } = e.target;
         // Detecta si el scroll llegó al fondo (con un margen de 10px)
         if (scrollTop + clientHeight >= scrollHeight - 10) {
             cargarMasPedidos();
@@ -375,21 +376,21 @@ export default function Asignacion({ session }) {
     }
 
     const imagenVehiculo = (vehiculo) => {
-        if(!vehiculo) return "desconocido_desconocido";
+        if (!vehiculo) return "desconocido_desconocido";
         const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
         const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
         const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
         return imagen || "desconocido_desconocido";
     }
 
-    const getOpacityEstanque = (index) => {        
+    const getOpacityEstanque = (index) => {
         return index == 99;
     }
 
     return (
         <main className="w-full mt-2 h-screen overflow-hidden">
             {sucursales.length > 0 && (
-                <div className="flex justify-center mb-2">                    
+                <div className="flex justify-center mb-2">
                     <div className="flex">
                         {sucursales.map((sucursal, idx) => {
                             const isActive = getValues("sucursalId") === sucursal._id;
@@ -413,7 +414,7 @@ export default function Asignacion({ session }) {
                                         relative
                                     `}
                                     onClick={() => {
-                                        if(isActive) return;
+                                        if (isActive) return;
                                         setValue("sucursalId", sucursal._id);
                                         localStorage.setItem("sucursalId", sucursal._id);
                                         setLoadingPanel(true);
@@ -433,8 +434,8 @@ export default function Asignacion({ session }) {
             )}
             {sucursales.length === 0 && (
                 <div className="flex justify-center items-center">
-                    {loadingPanel 
-                        ? <Loader texto="Cargando sucursales..." /> 
+                    {loadingPanel
+                        ? <Loader texto="Cargando sucursales..." />
                         : <p className="text-white py-2 bg-red-500 rounded px-4">No tienes sucursales asignadas.</p>}
                 </div>
             )}
@@ -481,12 +482,12 @@ export default function Asignacion({ session }) {
                             ref={pedidosScrollRef}
                             onScroll={handlePedidosScroll}
                         >
-                            
+
                             {pedidos.length === 0 ? (
                                 <div
                                     className="flex flex-col items-center justify-center"
                                     style={{ height: "calc(100vh - 200px)" }}>
-                                        <BiTask size="6rem" className="mr-1" />
+                                    <BiTask size="6rem" className="mr-1" />
                                     <p className="text-gray-500 text-lg font-semibold">SIN ÓRDENES</p>
                                 </div>
                             ) : (
@@ -495,12 +496,12 @@ export default function Asignacion({ session }) {
                                         className={`pl-2 mr-1 border rounded-lg mb-2 ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} cursor-pointer flex items-start relative`}
                                         draggable={pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal}
                                         onDragStart={() => setSelectedPedido(pedido._id)}
-                                        onClick={() => {setShowDetalleOrdenModal(true)}}
+                                        onClick={() => { setShowDetalleOrdenModal(true) }}
                                     >
                                         <div className="w-full">
                                             <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
                                             {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
-                                            <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>                                            
+                                            <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>
                                             <ul className="w-full list-disc pl-4 mt-2">
                                                 {(() => {
                                                     const items = pedido.items || [];
@@ -540,9 +541,9 @@ export default function Asignacion({ session }) {
                                                             )}
                                                         </div>
                                                     );
-                                                })()}                                                
+                                                })()}
                                             </ul>
-                                        </div>                                        
+                                        </div>
                                         {(pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal) && (
                                             <div className="absolute top-2 right-2 text-gray-500">
                                                 <MdDragIndicator size="1.5rem" />
@@ -689,7 +690,7 @@ export default function Asignacion({ session }) {
                                                     )
                                                 })}
                                             </div>
-                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}_front.png`} alt="camion" width={247} height={191}/>
+                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}_front.png`} alt="camion" width={247} height={191} />
                                             <div className="absolute top-46 right-6">
                                                 <div className="ml-4 text-slate-800">
                                                     <div className="bg-white rounded p-0.5 mt-32">
@@ -713,7 +714,7 @@ export default function Asignacion({ session }) {
                                             </div>
                                             {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
                                                 || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <div className="absolute top-6 left-8 ml-2 mt-2 w-full">
-                                                    {getCilindrosDescarga(ruta).reverse().map((elem, index) => {                                                        
+                                                    {getCilindrosDescarga(ruta).reverse().map((elem, index) => {
                                                         return (
                                                             <Image
                                                                 key={index}
@@ -728,7 +729,7 @@ export default function Asignacion({ session }) {
                                                         )
                                                     })}
                                                 </div>}
-                                        </div>                                        
+                                        </div>
                                         <div className="flex mb-2">
                                             <BsGeoAltFill size="1.25rem" className="text-gray-700 dark:text-gray-300 ml-2" />
                                             <p className="text-xs text-gray-500 ml-2">{ruta.ruta[ruta.ruta.length - 1].direccionDestinoId.nombre || '??'}</p>
@@ -758,7 +759,14 @@ export default function Asignacion({ session }) {
                                                     </div>
                                                     <div className="flex flex-wrap -mt-6">
                                                         {/* Mostrar cada carga de la venta */}
-                                                        {Array.isArray(venta.detalles) && venta.detalles.map((detalle, idxDetalle) => {
+                                                        {Array.isArray(venta.detalles) && venta.detalles.filter(detalle => {
+                                                            return ruta.cargaItemIds.some(
+                                                                (item) =>
+                                                                    item.subcategoriaCatalogoId &&
+                                                                    detalle.subcategoriaCatalogoId &&
+                                                                    String(item.subcategoriaCatalogoId._id || item.subcategoriaCatalogoId) === String(detalle.subcategoriaCatalogoId._id || detalle.subcategoriaCatalogoId)
+                                                            );
+                                                        }).map((detalle, idxDetalle) => {
                                                             // Buscar el item de carga correspondiente por subcategoriaCatalogoId
                                                             const carga = Array.isArray(ruta.cargaItemIds)
                                                                 ? ruta.cargaItemIds.find(
@@ -836,7 +844,11 @@ export default function Asignacion({ session }) {
                             socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
                             toast.success("Pedido asignado con éxito");
                             setLoadingPanel(true);
-                            fetchPedidos();
+                            let sucursalId = localStorage.getItem("sucursalId") || null;
+                            if (!sucursalId) {
+                                sucursalId = getValue("sucursalId");
+                            }
+                            fetchPedidos(sucursalId);
                         } catch (error) {
                             console.error("Error al asignar el pedido:", error);
                             toast.error(error.message || "Error al asignar el pedido");
@@ -887,7 +899,11 @@ export default function Asignacion({ session }) {
                             setSelectedVenta(null);
                             setSelectedChofer(null);
                             socket.emit("update-pedidos", { room: "room-pedidos", userId: selectedChofer });
-                            fetchPedidos();
+                            let sucursalId = localStorage.getItem("sucursalId") || null;
+                            if (!sucursalId) {
+                                sucursalId = getValue("sucursalId");
+                            }
+                            fetchPedidos(sucursalId);
                         } catch (error) {
                             toast.error(error.message || "Error al deshacer la asignación del pedido");
                         } finally {
@@ -897,7 +913,7 @@ export default function Asignacion({ session }) {
                     };
                     deshacerAsignarPedido();
                 }}
-                confirmationLabel="DESHASIGNAR"
+                confirmationLabel="DESASIGNAR"
             />
 
             {showCommentModal > 0 && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -936,14 +952,98 @@ export default function Asignacion({ session }) {
                 <div className="relative top-1/4 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-left">
                         <h2 className="w-full flex justify-center text-xl font-bold mb-2">Detalle de venta</h2>
+                        <div className="flex flex-row items-start justify-center gap-3 mb-6 h-64 overflow-y-auto">
+                            {/* Trazado vertical con checks y tiempos a la izquierda */}
+                            <div className="flex flex-row items-start">
+                                {/* Tiempos a la izquierda */}
+                                <div className="flex flex-col items-end mr-2">
+                                    {/* Ejemplo de tiempos, reemplaza por tus datos dinámicos */}
+                                    {[
+                                        { tiempo: "15min" },
+                                        { tiempo: "30min" },
+                                        { tiempo: "10min" },
+                                        { tiempo: "5min" },
+                                        { tiempo: "20min" }
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="flex flex-col items-end justify-center h-16">
+                                            <div className="flex items-center mt-8">
+                                                <FaClock className="mr-1 text-gray-400" />
+                                                <span className={`text-xs`}>{item.tiempo}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Trazado vertical con checks */}
+                                <div className="flex flex-col items-center mt-1 ml-2">
+                                    {/* Estados, reemplaza por tus datos dinámicos */}
+                                    {[0, 1, 2, 3, 4, 5].map((item, idx, arr) => (
+                                        <React.Fragment key={idx}>
+                                            {/* Punto con check */}
+                                            <div className={`w-6 h-6 rounded-full bg-blue-700 border-4 border-blue-400 flex items-center justify-center`}>
+                                                <svg className={`w-4 h-4 text-blue-400`} fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                                                    <path stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            {/* Línea vertical excepto el último */}
+                                            {idx < arr.length - 1 && (
+                                                <div className={`w-2 h-[40px] bg-blue-400 mx-auto`} />
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Detalle de cada punto */}
+                            <div className="flex flex-col items-start justify-start h-full ml-2 mt-1">
+                                {/* Por asignar */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Por asignar</div>
+                                        <div className="text-xs text-gray-500">12/06/2024 09:00</div>
+                                    </div>
+                                </div>
+                                {/* Cargado */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Cargado</div>
+                                        <div className="text-xs text-gray-500">por Juan Perez</div>
+                                        <div className="text-xs text-gray-500">12/06/2024 09:15</div>
+                                    </div>
+                                </div>
+                                {/* Arribo */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Arribo</div>
+                                        <div className="text-xs text-gray-500">Empresa S.A.</div>
+                                        <div className="flex items-center text-xs text-gray-500">
+                                            <BsGeoAltFill className="mr-1" /> 12/06/2024 09:45
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Recibe */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Recibe</div>
+                                        <div className="text-xs text-gray-500">Pedro Soto 12.345.678-9</div>                                        
+                                        <div className="text-xs text-gray-500">12/06/2024 09:55</div>
+                                    </div>
+                                </div>
+                                {/* Descarga */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Descarga</div>
+                                        <div className="text-xs text-gray-500">12/06/2024 10:00</div>
+                                    </div>
+                                </div>
+                                {/* Retorno */}
+                                <div className="h-16">
+                                    <div className="flex flex-col h-16">
+                                        <div className="font-bold">Retorno</div>
+                                        <div className="text-xs text-gray-500">12/06/2024 10:20</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <button
-                                onClick={onSaveComment}
-                                disabled={loading}
-                                className="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                                {loading ? <div><Loader texto="ACTUALIZANDO" /></div> : "ACTUALIZAR"}
-                            </button>
                             <button
                                 onClick={onCloseDetalleVenta}
                                 disabled={loading}
