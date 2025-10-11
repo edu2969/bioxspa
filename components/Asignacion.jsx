@@ -14,7 +14,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle, FaClock } from 'react-icons/fa';
-import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from './Loader';
 import { getColorEstanque } from '@/lib/uix';
@@ -387,6 +387,12 @@ export default function Asignacion({ session }) {
         return index == 99;
     }
 
+    const getVentaActiva = (ruta) => {
+        if (!ruta || !Array.isArray(ruta.ventaIds) || !Array.isArray(ruta.ruta) || ruta.ruta.length === 0) return null;
+        const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
+        return ruta.ventaIds.find(v => String(v.direccionDespachoId) === String(ultimaDireccionId)) || null;
+    }
+
     return (
         <main className="w-full mt-2 h-screen overflow-hidden">
             {sucursales.length > 0 && (
@@ -500,6 +506,7 @@ export default function Asignacion({ session }) {
                                     >
                                         <div className="w-full">
                                             <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
+                                            {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-teal-100 text-xs bg-neutral-900 rounded px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
                                             {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
                                             <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>
                                             <ul className="w-full list-disc pl-4 mt-2">
@@ -564,22 +571,22 @@ export default function Asignacion({ session }) {
                         </div>
                         {choferes.map((chofer, index) => (
                             <div key={`en_espera_${index}`}
-                                className={`text-white relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-rose-700' : 'bg-green-500'}`}
+                                className={`text-white relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-rose-500' : 'bg-green-500'}`}
                                 data-id={`choferId_${chofer._id}`}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(74 222 128)" : "rgb(190 18 60)"; // Tailwind green-400 o rose-700
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(74 222 128)" : "#f43f5e";
                                     e.currentTarget.style.boxShadow = chofer.checklist
                                         ? "0 4px 6px rgba(34, 197, 34, 0.5)"
                                         : "0 4px 12px 0 rgba(239, 68, 68, 0.5)"; // rojo-500
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "rgb(190 18 60)"; // Tailwind green-500 o rose-700
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "#f43f5e)";
                                     e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "rgb(190 18 60)"; // Tailwind green-500 o rose-700
+                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "#f43f5e"; 
                                     e.currentTarget.style.boxShadow = "none";
                                     if (!chofer.checklist) {
                                         toast.warning("El chofer no tiene checklist completo, no se puede asignar.");
@@ -603,11 +610,14 @@ export default function Asignacion({ session }) {
                                 {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
                                     onDragStart={() => {
                                         setSelectedChofer(chofer._id);
-                                        setSelectedVenta(pedido.items[0].ventaId);
+                                        setSelectedVenta(pedido.tipo === TIPO_ORDEN.traslado ? pedido._id : pedido.items[0].ventaId);
                                     }}
                                     draggable="true">
                                     <div className="flex w-full">
-                                        <p className="font-md uppercase font-bold text-nowrap overflow-hidden text-ellipsis whitespace-nowrap w-11/12">{pedido.nombreCliente}</p>
+                                        <div className='w-full'>
+                                            <p className="font-md uppercase font-bold text-nowrap overflow-hidden text-ellipsis whitespace-nowrap w-11/12">{pedido.nombreCliente}</p>
+                                            {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-xs text-green-800 rounded-sm bg-green-200 px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
+                                        </div>
                                         <div className={`${pedido.comentario ? 'text-green-300' : 'text-green-800'} w-1/12`}>
                                             <div className="cursor-pointer w-full ml-4" onClick={(e) => {
                                                 e.stopPropagation();
@@ -692,8 +702,8 @@ export default function Asignacion({ session }) {
                                             </div>
                                             <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}_front.png`} alt="camion" width={247} height={191} />
                                             <div className="absolute top-46 right-6">
-                                                <div className="ml-4 text-slate-800">
-                                                    <div className="bg-white rounded p-0.5 mt-32">
+                                                <div className="flex flex-col items-end ml-4 text-slate-800">
+                                                    <div className="bg-white rounded p-0.5 mt-32 w-24">
                                                         <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
                                                             <p className="text-lg font-bold">{ruta?.vehiculoId?.patente.substring(0, 2)}</p>
                                                             <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
@@ -707,8 +717,9 @@ export default function Asignacion({ session }) {
                                                             || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>}
                                                         {ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>}
                                                         <span className="text-xs font-semibold">{ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'EN RUTA'
-                                                            : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'DESCARGA'
-                                                                : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESO' : 'OTRO'}</span>
+                                                        : getVentaActiva(ruta)?.tipo === TIPO_ORDEN.traslado ? 'RETIRANDO'
+                                                            : (ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) ? 'DESCARGA'
+                                                                : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESO' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.carga ? 'CARGA' : 'OTRO'}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -741,19 +752,25 @@ export default function Asignacion({ session }) {
                                             <p className="text-xs">Conductor</p>
                                             <p className="text-lg uppercase font-bold -mt-1 mb-2">{ruta.choferId.name}</p>
                                             {Array.isArray(ruta.ventaIds) && ruta.ventaIds.map((venta, idxVenta) => (
-                                                <div key={venta._id || idxVenta} className={`border rounded-lg mb-2 pl-2 pr-6 py-1 shadow ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'border-green-500 bg-green-50' : 'border-blue-400 bg-white/80'}`}>
+                                                <div key={venta._id || idxVenta} className={`border rounded-lg mb-2 pl-2 pr-6 py-1 shadow ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'border-green-500 bg-green-50' : 'border-blue-400 bg-white/80'} min-h-12`}>
                                                     <div className={`flex font-bold text-xs mb-1 ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'text-green-600' : 'text-blue-700'}`}>
                                                         {venta.estado === TIPO_ESTADO_VENTA.entregado && <FaRegCheckCircle size="1rem" />}
                                                         {venta.estado === TIPO_ESTADO_VENTA.reparto && <FaTruckFast size="1rem" />}
-                                                        <span className="uppercase pr-10 w-11/12 pl-1">{venta.clienteId?.nombre || "Desconocido"}</span>
+                                                        <div className="w-full">
+                                                            <p className="uppercase pr-10 w-11/12 pl-1">{venta.clienteId?.nombre || "Desconocido"}</p>
+                                                            {venta.tipo === TIPO_ORDEN.traslado && <span className="text-xs text-blue-800 rounded-sm bg-blue-200 px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
+                                                        </div>
                                                         <div className={`${venta.comentario ? 'text-blue-500 ' : 'text-gray-500 '} w-1/12`}>
-                                                            <div className="mr-2 cursor-pointer" onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedVenta(venta._id);
-                                                                setComentario(venta.comentario);
-                                                                setShowCommentModal(2);
-                                                            }}>
-                                                                {!venta.comentario ? <VscCommentDraft size="2.5rem" /> : <VscCommentUnresolved size="2.5rem" />}
+                                                            <div className="relative">
+                                                                <div className="mr-2 cursor-pointer" onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedVenta(venta._id);
+                                                                    setComentario(venta.comentario);
+                                                                    setShowCommentModal(2);
+                                                                }}>
+                                                                    {!venta.comentario ? <VscCommentDraft size="2.5rem" /> : <VscCommentUnresolved size="2.5rem" />}
+                                                                </div>
+                                                                {venta.comentario && <div className="absolute top-[22px] left-[22px] w-[15px] h-[15px] rounded-full bg-red-600"></div>}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -951,7 +968,17 @@ export default function Asignacion({ session }) {
             {showDetalleOrdenModal && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                 <div className="relative top-1/4 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                     <div className="mt-3 text-left">
-                        <h2 className="w-full flex justify-center text-xl font-bold mb-2">Detalle de venta</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <button className="flex-1 text-center py-2 font-semibold rounded-tl-md border-b-2 border-blue-600 bg-blue-50 text-blue-700 focus:outline-none">
+                                Operaciones
+                            </button>
+                            <button className="flex-1 text-center py-2 font-semibold border-b-2 border-gray-200 bg-gray-50 text-gray-500 focus:outline-none">
+                                Historial
+                            </button>
+                            <button className="flex-1 text-center py-2 font-semibold rounded-tr-md border-b-2 border-gray-200 bg-gray-50 text-gray-500 focus:outline-none">
+                                Mensajería
+                            </button>
+                        </div>                       
                         <div className="flex flex-row items-start justify-center gap-3 mb-6 h-64 overflow-y-auto">
                             {/* Trazado vertical con checks y tiempos a la izquierda */}
                             <div className="flex flex-row items-start">

@@ -19,8 +19,7 @@ export async function POST(req) {
 
         const requiredFields = [
             "tipo",
-            "usuarioId",
-            "items"
+            "usuarioId"
         ];
 
         const session = await getServerSession(authOptions);
@@ -34,7 +33,7 @@ export async function POST(req) {
             || session.user.role === USER_ROLE.cobranza;
 
         if(body.tipo == 1 || body.tipo == 4) { 
-            requiredFields.push("clienteId");
+            requiredFields.push("clienteId", "items");
             if(esAdmin && body.tipo == 1) {
                 requiredFields.push("documentoTributarioId");                
             }
@@ -46,7 +45,7 @@ export async function POST(req) {
                 console.log("Documento tributario asignado:", cliente.documentoTributarioId);
             }
         } else if (body.tipo == 2) {
-            // TODO OT: ID de Empresa de servicio, tipo de servicio, listado de items            
+            requiredFields.push("motivoTraslado", "empresaDondeRetirarId", "direccionRetiroId");     
         } else if (body.tipo == 3) {
             // TODO Orden de traslado - empresaOrigenId, direccionOrigenId, empresaDestinoId, direccionDespacho, razón traslado, items
         }
@@ -68,15 +67,13 @@ export async function POST(req) {
                     return NextResponse.json({ error: errorMessage }, { status: 400 });
                 }
             }
-        } else {
-            // TODO Los items no llevan precio, solo cantidad y subcategoriaId
         }        
 
-        const valorNeto = body.items.reduce((total, item) => {
+        const valorNeto = body.tipo == 1 || body.tipo == 4 ? body.items.reduce((total, item) => {
             return total + (item.cantidad * item.precio);
-        }, 0);
+        }, 0) : 0;
 
-        const cliente = await Cliente.findById(body.clienteId);
+        const cliente = await Cliente.findById(body.tipo == 1 || body.tipo == 4 ? body.clienteId : body.empresaDondeRetirarId);
         if (!cliente) {
             const errorMessage = "Cliente not found";
             console.error("Validation Error:", errorMessage);
@@ -101,7 +98,8 @@ export async function POST(req) {
             } else body.sucursalId = cargo.sucursalId;
         }
 
-        const tieneArriendo = cliente.arriendo;
+        if(body.tipo == 1 || body.tipo == 4) {
+            const tieneArriendo = cliente.arriendo;
         const estadoInicial = (body.tipo == 1 && (session.user.role == USER_ROLE.gerente 
                 || session.user.role == USER_ROLE.cobranza 
                 || session.user.role == USER_ROLE.encargado)) 
@@ -177,8 +175,28 @@ export async function POST(req) {
                 await nuevoPrecio.save();
             }
         }
-
         return NextResponse.json({ ok: true, venta: savedVenta });
+        } else if (body.tipo == 2) {
+            const nuevaVenta = new Venta({
+                tipo: body.tipo,
+                sucursalId: body.sucursalId,
+                dependenciaId: body.dependenciaId || null,
+                vendedorId: body.usuarioId,
+                fecha: new Date(),
+                estado: TIPO_ESTADO_VENTA.por_asignar,
+                historialEstados: [{
+                    estado: TIPO_ESTADO_VENTA.por_asignar,
+                    fecha: new Date(),
+                }],
+                motivoTraslado: body.motivoTraslado,
+                clienteId: body.empresaDondeRetirarId,
+                direccionDespachoId: body.direccionRetiroId,
+                comentario: body.comentario || ""
+            });            
+            const savedVenta = await nuevaVenta.save();
+            return NextResponse.json({ ok: true, venta: savedVenta });
+        }
+        return NextResponse.json({ ok: true });        
     } catch (error) {
         console.error("ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });

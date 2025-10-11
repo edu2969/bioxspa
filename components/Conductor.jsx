@@ -6,7 +6,7 @@ import { MdOutlineKeyboardDoubleArrowUp } from "react-icons/md";
 import Loader from "./Loader";
 import { FaClipboardCheck, FaFlagCheckered } from "react-icons/fa";
 import { socket } from "@/lib/socket-client";
-import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN, USER_ROLE } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
 import { ToastContainer, toast } from 'react-toastify';
@@ -18,6 +18,7 @@ import CheckList from './CheckList';
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';
 import { getColorEstanque } from "@/lib/uix";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
+import reproducirSonido from '@/app/utils/sounds';
 
 export default function Conductor({ session }) {
     const [rutaDespacho, setRutaDespacho] = useState(null);
@@ -119,7 +120,7 @@ export default function Conductor({ session }) {
     const offsetByModel = () => {
         const marca = (rutaDespacho?.vehiculoId?.marca.split(" ")[0] || "").toLowerCase();
         const modelo = (rutaDespacho?.vehiculoId?.modelo.split(" ")[0] || "").toLowerCase();
-        if(!marca || !modelo) {
+        if (!marca || !modelo) {
             return {
                 baseTop: 28,
                 baseLeft: 76,
@@ -313,7 +314,7 @@ export default function Conductor({ session }) {
         return Object.values(resumen);
     };
 
-    const getClientedescarga = (rd) => {
+    const getClienteDescarga = (rd) => {
         if (!rd || !Array.isArray(rd.ruta) || rd.ruta.length === 0 || !Array.isArray(rd.ventaIds)) return null;
         const lastDireccionId = rd.ruta[rd.ruta.length - 1].direccionDestinoId?._id || rd.ruta[rd.ruta.length - 1].direccionDestinoId;
         const venta = rd.ventaIds.find(v => String(v.direccionDespachoId) === String(lastDireccionId));
@@ -321,7 +322,23 @@ export default function Conductor({ session }) {
         return venta.clienteId;
     }
 
+    const getVentaDescarga = (rd) => {
+        if (!rd || !Array.isArray(rd.ruta) || rd.ruta.length === 0 || !Array.isArray(rd.ventaIds)) return null;
+        const lastDireccionId = rd.ruta[rd.ruta.length - 1].direccionDestinoId?._id || rd.ruta[rd.ruta.length - 1].direccionDestinoId;
+        const venta = rd.ventaIds.find(v => String(v.direccionDespachoId) === String(lastDireccionId));
+        return venta;
+    }
+
+    const getAlmenosUnRetiro = (rd) => {
+        if (!rd || !Array.isArray(rd.ventaIds) || rd.ventaIds.length === 0) return false;
+        return Array.isArray(rd.historialCarga) && rd.historialCarga.some(hist => Array.isArray(hist.itemMovidoIds) && hist.itemMovidoIds.length > 0);
+    }
+
     const isCompleted = (rd) => {
+        const tipoOrden = getVentaDescarga(rd)?.tipo ?? null;
+        if (tipoOrden === TIPO_ORDEN.traslado) {
+            return getAlmenosUnRetiro(rd);
+        }
         const descarga = getResumenDescarga(rd);
         if (descarga.length === 0) return false;
         if (!rd || !Array.isArray(rd.historialCarga) || rd.historialCarga.length === 0) return false;
@@ -450,14 +467,15 @@ export default function Conductor({ session }) {
     }, [setRutaDespacho, setLoadingState, rutaDespacho, session]);
 
     const handleHeLlegado = async () => {
-        setLoadingState(TIPO_ESTADO_RUTA_DESPACHO.descarga);
+        const venta = getVentaDescarga(rutaDespacho);
+        setLoadingState(venta.tipo === TIPO_ORDEN.traslado ? TIPO_ESTADO_RUTA_DESPACHO.carga : TIPO_ESTADO_RUTA_DESPACHO.descarga);
         setRutaDespacho({
             ...rutaDespacho,
             historialCarga: [
                 ...(rutaDespacho.historialCarga || []),
                 {
                     itemMovidoIds: [],
-                    esCarga: false
+                    esCarga: venta.tipo === TIPO_ORDEN.traslado
                 }
             ]
         });
@@ -575,78 +593,133 @@ export default function Conductor({ session }) {
         setLoadingState(-1);
     }
 
-    const descargarItem = useCallback(
+    const moverItem = useCallback(
         async (codigo) => {
-            // Busca el item por código en la carga actual
-            const item = rutaDespacho?.cargaItemIds?.find(
-                item => item.codigo === codigo
-            );
-            if (!item) {
-                toast.error(`${codigo} no encontrado! WoW...`);
-                return;
-            }
+            const tipoOrden = getVentaDescarga(rutaDespacho)?.tipo ?? null;
+            if (tipoOrden === TIPO_ORDEN.venta) {
+                // Busca el item por código en la carga actual
+                const item = rutaDespacho?.cargaItemIds?.find(item => item.codigo === codigo);
+                if (!item) {
+                    toast.error(`${codigo} no encontrado! WoW...`);
+                    return;
+                }
 
-            console.log("ITEM A DESCARGAR --->", item);
+                console.log("ITEM A DESCARGAR --->", item);
 
-            const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id;
-            const ventaActual = rutaDespacho.ventaIds.find(v => v.direccionDespachoId === currentDireccionId);
-            // Verifica que el item esté en el arreglo de itemCatalogoIds de algún detalle de la venta actual
-            const perteneceAlCliente = ventaActual?.detalles?.some(detalle =>
-                Array.isArray(detalle.itemCatalogoIds) &&
-                detalle.itemCatalogoIds.some(id => String(id) === String(item._id))
-            );
+                const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id;
+                const ventaActual = rutaDespacho.ventaIds.find(v => v.direccionDespachoId === currentDireccionId);
+                // Verifica que el item esté en el arreglo de itemCatalogoIds de algún detalle de la venta actual
+                const perteneceAlCliente = ventaActual?.detalles?.some(detalle =>
+                    Array.isArray(detalle.itemCatalogoIds) &&
+                    detalle.itemCatalogoIds.some(id => String(id) === String(item._id))
+                );
 
-            if (!perteneceAlCliente) {
-                toast.error(`${codigo} no pertenece a éste cliente!`);
-                return;
-            }
+                if (!perteneceAlCliente) {
+                    toast.error(`${codigo} no pertenece a éste cliente!`);
+                    return;
+                }
 
-            // Busca el historial de descarga actual (último registro con esCarga === false)
-            const lastDescargaIdx = rutaDespacho.historialCarga
-                ? rutaDespacho.historialCarga.length - 1
-                : -1;
+                // Busca el historial de descarga actual (último registro con esCarga === false)
+                const lastDescargaIdx = rutaDespacho.historialCarga
+                    ? rutaDespacho.historialCarga.length - 1
+                    : -1;
 
-            if (lastDescargaIdx < 0 || !rutaDespacho.historialCarga[lastDescargaIdx].itemMovidoIds) {
-                toast.error("No hay historial de descarga disponible.");
-                return;
-            }
+                if (lastDescargaIdx < 0 || !rutaDespacho.historialCarga[lastDescargaIdx].itemMovidoIds) {
+                    toast.error("No hay historial de descarga disponible.");
+                    return;
+                }
 
-            // Verifica si el item ya fue descargado en el último registro
-            const yaDescargado = rutaDespacho.historialCarga.filter(h => h.esCarga === false).map(h => h.itemMovidoIds).flat().includes(item._id);
+                // Verifica si el item ya fue descargado en el último registro
+                const yaDescargado = rutaDespacho.historialCarga.filter(h => h.esCarga === false).map(h => h.itemMovidoIds).flat().includes(item._id);
 
-            if (yaDescargado) {
-                toast.error(`${codigo} ya descargado!.`);
-                return;
-            }
+                if (yaDescargado) {
+                    toast.error(`${codigo} ya descargado!.`);
+                    return;
+                }
 
-            const response = await fetch("/api/cilindros/descargar", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    rutaDespachoId: rutaDespacho._id,
-                    codigo
-                }),
-            });
-
-            if (response.ok) {
-                // Agrega el item._id al itemMovidoIds del último historial de descarga
-                setRutaDespacho(prev => {
-                    const updatedHistorial = [...prev.historialCarga];
-                    updatedHistorial[lastDescargaIdx] = {
-                        ...updatedHistorial[lastDescargaIdx],
-                        itemMovidoIds: [...updatedHistorial[lastDescargaIdx].itemMovidoIds, item._id]
-                    };
-                    return {
-                        ...prev,
-                        historialCarga: updatedHistorial
-                    };
+                const response = await fetch("/api/cilindros/descargar", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        rutaDespachoId: rutaDespacho._id,
+                        codigo
+                    }),
                 });
-                toast.success(`${codigo} descargado correctamente`);
+
+                if (response.ok) {
+                    // Agrega el item._id al itemMovidoIds del último historial de descarga
+                    setRutaDespacho(prev => {
+                        const updatedHistorial = [...prev.historialCarga];
+                        updatedHistorial[lastDescargaIdx] = {
+                            ...updatedHistorial[lastDescargaIdx],
+                            itemMovidoIds: [...updatedHistorial[lastDescargaIdx].itemMovidoIds, item._id]
+                        };
+                        return {
+                            ...prev,
+                            historialCarga: updatedHistorial
+                        };
+                    });
+                    toast.success(`${codigo} descargado correctamente`);
+                } else {
+                    toast.error(`Error al descargar ${codigo}`);
+                }
             } else {
-                toast.error(`Error al descargar ${codigo}`);
+                const yaCargado = rutaDespacho.historialCarga.filter(h => h.esCarga).map(h => h.itemMovidoIds).flat().includes(codigo);
+                if (yaCargado) {
+                    reproducirSonido('/sounds/error_01.mp3');
+                    toast.error(`${codigo} ya cargado!.`);
+                }
+
+                await fetch("/api/cilindros/cargar", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        rutaDespachoId: rutaDespacho._id,
+                        codigo
+                    }),
+                })
+                    .then(async (resp) => {
+                        const data = await resp.json();
+                        if (data.ok) {
+                            console.log("Cilindro cargado:", data);
+                            setRutaDespacho(prev => {
+                                const lastCargaIdx = prev.historialCarga.length - 1;
+                                if (lastCargaIdx < 0) return prev;
+
+                                const updatedHistorial = [...prev.historialCarga];
+                                updatedHistorial[lastCargaIdx] = {
+                                    ...updatedHistorial[lastCargaIdx],
+                                    itemMovidoIds: [...updatedHistorial[lastCargaIdx].itemMovidoIds, data.item._id]
+                                };
+                                return {
+                                    ...prev,
+                                    cargaItemIds: [...prev.cargaItemIds, data.item],
+                                    historialCarga: updatedHistorial
+                                };
+                            });
+                            reproducirSonido('/sounds/accept_02.mp3');
+                            toast.success(`${codigo} cargado correctamente`);
+                        } else {
+                            const errorData = await resp.json();
+                            console.error("Error al cargar el cilindro:", errorData);
+                            reproducirSonido('/sounds/error_01.mp3');
+                            toast.error(errorData.error || `Error al cargar ${codigo}`);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error al actualizar estado tras cargar:", err);
+                        reproducirSonido('/sounds/error_02.mp3');
+                    });
             }
+            setInputTemporalVisible(false);
+            setTimeout(() => {
+                if (hiddenInputRef.current)
+                    hiddenInputRef.current.focus();
+            }, 0);
         },
         [rutaDespacho, setRutaDespacho]
     );
@@ -724,7 +797,7 @@ export default function Conductor({ session }) {
                     }, 0);
                     return;
                 }
-                descargarItem(codigo);
+                moverItem(codigo);
             }
         }
 
@@ -741,7 +814,7 @@ export default function Conductor({ session }) {
                 inputElement.removeEventListener('textInput', handleTextInput);
             }
         };
-    }, [scanMode, descargarItem, temporalRef]);
+    }, [scanMode, moverItem, temporalRef]);
 
     // Mantener el foco en el input oculto para capturar eventos
     useEffect(() => {
@@ -894,8 +967,10 @@ export default function Conductor({ session }) {
 
     return (
         <div className="w-full h-dvh overflow-hidden">
-                    
-            {rutaDespacho && <div className={`w-full ${loadingState == -2 || !rutaDespacho || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
+
+            {rutaDespacho && <div className={`w-full ${loadingState == -2 || !rutaDespacho
+                || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || loadingState == TIPO_ESTADO_RUTA_DESPACHO.carga
+                || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
                 <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
                     <Image
                         className="absolute top-10 left-4"
@@ -959,12 +1034,14 @@ export default function Conductor({ session }) {
                 </div>
             </div>}
 
-            {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">                
-                
+            {loadingState != -2 && rutaDespacho && <div className="w-full absolute bottom-0 right-0 flex items-center justify-center">
+
                 {(rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion
                     || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && (
                         <div className="w-full py-2 px-2 border rounded-t-xl shadow-lg bg-white mx-2 -mb-1">
                             <MdOutlineKeyboardDoubleArrowUp className="text-gray-400 mx-auto -mt-1 mb-1" style={{ transform: "scaleX(6)" }} />
+
+                            {/* VENTA EN PREPARACION */}
                             {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && <div className="py-4 text-center">
                                 <div className="py-4">
                                     <Loader texto="EN PROCESO DE CARGA" />
@@ -972,6 +1049,7 @@ export default function Conductor({ session }) {
                                 <p className="mx-auto my-4 px-4">{rutaDespacho.encargado} esta cargando. Pronto podrás iniciar tu viaje.</p>
                             </div>}
 
+                            {/* ORDEN CARGADA - CONFIRMAR CARGA */}
                             {rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
                                 <p className="text-center text-xl font-bold">CONFIRMA{`${loadingState == TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada ? 'NDO' : ''}`} LA CARGA</p>
                                 <div className="flex flex-col md:flex-row px-4 py-2">
@@ -997,71 +1075,151 @@ export default function Conductor({ session }) {
                         </div>
                     )}
 
+                {/* ORDEN Y CARGA CONFIRMADA */}
                 {rutaDespacho.estado >= TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                    && rutaDespacho.estado <= TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada
+                    && rutaDespacho.estado <= TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada
                     && (<div className="w-full text-center mt-4 mx-6">
 
                         {/* En ruta listo para presionar HE LLEGADO */}
                         {loadingState === -1 && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <>
-                        <h1 className="text-xl">Conduce con precaución.</h1>
-                        <span className="text-md">Al llegar, avisas de tu arribo.</span>
-                        <button
-                            className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md mb-4 h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
-                            onClick={() => handleHeLlegado()}>
-                            <FaFlagCheckered className="mt-1 mr-2" /><span>HE LLEGADO</span>
-                            {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga &&
-                                <div className="absolute -mt-1">
-                                    <Loader texto="REPORTANDO" />
-                                </div>
-                            }
-                        </button></>}
-
-                        {/* Confirmación de que se ha llegado con datos de quien recibe */}
-                        {loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="w-full mb-4">
-                            <FaBuildingFlag size="9rem" className="text-green-500 mb-4 mx-auto" />
-                            <div>
-                                <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
-                                <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
-                                <span className="text-xl">{rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId.nombre || "un destino"}</span>
-
-                                <div className="w-full px-6 py-4 bg-white mx-auto">
-                                    <h2 className="text-xl font-bold mb-4">Datos de quién recibe</h2>
-                                    <div className="flex flex-col md:flex-row text-left">
-                                        <label htmlFor="rut" className="text-xs">RUT</label>
-                                        <input
-                                            type="text"
-                                            className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
-                                            placeholder="RUT (opcional)*"
-                                        />
-                                        <label htmlFor="nombre" className="text-xs mt-4">Nombre</label>
-                                        <input
-                                            type="text"
-                                            className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
-                                            placeholder="Nombre quien recibe"
-                                        />
-                                    </div>
-                                </div>
-
-                            </div>
+                            <h1 className="text-xl">Conduce con precaución.</h1>
+                            <span className="text-md">Al llegar, avisas de tu arribo.</span>
                             <button
-                                className={`w-full flex justify-center mt-4 py-3 px-8 bg-green-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'opacity-50' : ''}`}
-                                onClick={handleConfirmarDestino}>
-                                <FaBuildingFlag className="mt-1 mr-2" /><span>CONFIRMO</span>
-                                {loadingState != TIPO_ESTADO_RUTA_DESPACHO.descarga &&
+                                className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md mb-4 h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga ? 'opacity-50' : ''}`}
+                                onClick={() => handleHeLlegado()}>
+                                <FaFlagCheckered className="mt-1 mr-2" /><span>HE LLEGADO</span>
+                                {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga &&
                                     <div className="absolute -mt-1">
-                                        <Loader texto="" />
+                                        <Loader texto="REPORTANDO" />
                                     </div>
                                 }
-                            </button>                            
-                            <button
-                                className={`w-full flex justify-center mt-4 py-3 px-8 bg-gray-400 text-white font-bold rounded-lg shadow-md h-12`}
-                                onClick={handleCrregirDestino}>
-                                <LuFlagOff className="mt-1 mr-2" /><span>ES OTRO DESTINO</span>
-                            </button>
-                        </div>}
+                            </button></>}
+
+                        {/* Confirmación de que se ha llegado con datos de quien recibe */}
+                        {(loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga
+                            || loadingState === TIPO_ESTADO_RUTA_DESPACHO.carga) && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="w-full mb-4">
+                                <FaBuildingFlag size="9rem" className="text-green-500 mb-4 mx-auto" />
+                                <div>
+                                    <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
+                                    <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
+                                    <span className="text-xl">{rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId.nombre || "un destino"}</span>
+
+                                    <div className="w-full px-6 py-4 bg-white mx-auto">
+                                        <h2 className="text-xl font-bold mb-4">Datos de quién {getVentaDescarga(rutaDespacho).tipo === TIPO_ORDEN.traslado ? 'entrega' : 'recibe'}</h2>
+                                        <div className="flex flex-col md:flex-row text-left">
+                                            <label htmlFor="rut" className="text-xs">RUT</label>
+                                            <input
+                                                type="text"
+                                                className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
+                                                placeholder="RUT (opcional)*"
+                                            />
+                                            <label htmlFor="nombre" className="text-xs mt-4">Nombre</label>
+                                            <input
+                                                type="text"
+                                                className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
+                                                placeholder="Nombre quien recibe"
+                                            />
+                                        </div>
+                                    </div>
+
+                                </div>
+                                <button
+                                    className={`w-full flex justify-center mt-4 py-3 px-8 bg-green-400 text-white font-bold rounded-lg shadow-md h-12 ${loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? 'opacity-50' : ''}`}
+                                    onClick={handleConfirmarDestino}>
+                                    <FaBuildingFlag className="mt-1 mr-2" /><span>CONFIRMO</span>
+                                    {!(loadingState === TIPO_ESTADO_RUTA_DESPACHO.descarga || loadingState === TIPO_ESTADO_RUTA_DESPACHO.carga) &&
+                                        <div className="absolute -mt-1">
+                                            <Loader texto="" />
+                                        </div>
+                                    }
+                                </button>
+                                <button
+                                    className={`w-full flex justify-center mt-4 py-3 px-8 bg-gray-400 text-white font-bold rounded-lg shadow-md h-12`}
+                                    onClick={handleCrregirDestino}>
+                                    <LuFlagOff className="mt-1 mr-2" /><span>ES OTRO DESTINO</span>
+                                </button>
+                            </div>}
+
+                            {/* RETIRO DE CILINDROS */}
+                {loadingState === -1
+                    && getVentaDescarga(rutaDespacho).tipo === TIPO_ORDEN.traslado
+                    && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga
+                    && getAlmenosUnRetiro(rutaDespacho) && (<div className="flex flex-col w-full">
+                                                
+                        <div className="w-full mb-2">
+                            {(() => {
+                                const cliente = getClienteDescarga(rutaDespacho);
+                                // Busca la venta actual por dirección
+                                const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
+                                const ventaActual = rutaDespacho.ventaIds.find(v => String(v.direccionDespachoId) === String(currentDireccionId));
+                                return (
+                                    <div className="w-full flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
+                                        <div className="w-full">
+                                            <p className="text-md text-blue-700 font-bold truncate">{cliente?.nombre || "Sin cliente"}</p>
+                                            {ventaActual.tipo === TIPO_ORDEN.traslado
+                                                ? <div className="text-sm font-bold text-gray-700">
+                                                    <p>RETIRO DE CILINDROS</p>
+                                                    <span className="text-xs">Escanee cilindros a retirar</span>
+                                                </div>
+                                                : <p className="text-sm font-bold text-gray-700">{cliente?.giro || "Sin giro"}</p>}
+                                        </div>
+                                        <div className={`relative flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                                            <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                                e.stopPropagation();
+                                                toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
+                                            }}>
+                                                {!ventaActual?.comentario
+                                                    ? <VscCommentDraft size="1.75rem" />
+                                                    : <VscCommentUnresolved size="1.75rem" />}
+                                            </div>
+                                            {ventaActual?.comentario && <div className="absolute top-[16px] right-[11px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+<ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">
+                            {resumenCarga.map((item, idx) => (
+                                <li
+                                    key={`item_${idx}`}
+                                    className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && resumenCarga.length != 1) ? 'rounded-t-lg' : (idx === resumenCarga.length - 1 && resumenCarga.length != 1) ? 'rounded-b-lg' : resumenCarga.length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                >
+                                    <div className="w-full flex items-left">
+                                        <div className="flex">
+                                            <div>
+                                                <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(item.elemento)}</div>
+                                                {item.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                                {item.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                            </div>
+                                            <div className="font-bold text-xl ml-2">
+                                                {item.elemento && <span>
+                                                    {(() => {
+                                                        const elem = item.elemento;
+                                                        let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
+                                                        if (!match) {
+                                                            match = [null, (elem ?? item.nombre.split(" ")[0]), ''];
+                                                        }
+                                                        const [, p1, p2] = match;
+                                                        return (
+                                                            <>
+                                                                {p1 ? p1.toUpperCase() : ''}
+                                                                {p2 ? <small>{p2}</small> : ''}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </span>}
+                                            </div>
+                                        </div>
+                                        <p className="text-2xl orbitron ml-2"><b>{item.subcategoriaCatalogoId.cantidad}</b> <small>{item.subcategoriaCatalogoId.unidad}</small></p>
+                                    </div>
+                                    <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{item.multiplicador - item.restantes} <small>/</small> {item.multiplicador}</div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>)}
 
                         {/* RUTA vertical de destinos */}
-                        {loadingState === -1 
+                        {loadingState === -1
                             && rutaDespacho.ruta?.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length
                             && (rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
                                 || rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
@@ -1111,81 +1269,11 @@ export default function Conductor({ session }) {
                                 </div>
                             </div>}
 
-                        {/* Resumen de descarga */}
-                        {loadingState === -1 && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && (<>
-                            <div className="w-full flex justify-center mb-2">
-                                {(() => {
-                                    const cliente = getClientedescarga(rutaDespacho);
-                                    // Busca la venta actual por dirección
-                                    const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
-                                    const ventaActual = rutaDespacho.ventaIds.find(v => String(v.direccionDespachoId) === String(currentDireccionId));
-                                    return (
-                                        <div className="w-full flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
-                                            <div className="w-10/12">
-                                                <p className="text-xs font-bold text-gray-500 truncate">{cliente?.nombre || "Sin cliente"}</p>
-                                                <p className="flex text-xs text-gray-500">
-                                                    {/* Si tienes teléfono, agrégalo aquí */}
-                                                </p>
-                                            </div>
-                                            <div className={`w-2/12 flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
-                                                <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
-                                                }}>
-                                                    {!ventaActual?.comentario
-                                                        ? <VscCommentDraft size="1.75rem" />
-                                                        : <VscCommentUnresolved size="1.75rem" />}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                            <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">
-                                {getResumenDescarga(rutaDespacho).map((item, idx) => (
-                                    <li
-                                        key={`item_${idx}`}
-                                        className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-t-lg' : (idx === getResumenDescarga(rutaDespacho).length - 1 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-b-lg' : getResumenDescarga(rutaDespacho).length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
-                                    >
-                                        <div className="w-full flex items-left">
-                                            <div className="flex">
-                                                <div>
-                                                    <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
-                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
-                                                </div>
-                                                <div className="font-bold text-xl ml-2">
-                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <span>
-                                                        {(() => {
-                                                            const elem = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                                                            let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
-                                                            if (!match) {
-                                                                match = [null, (elem ?? item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.split(" ")[0]), ''];
-                                                            }
-                                                            const [, p1, p2] = match;
-                                                            return (
-                                                                <>
-                                                                    {p1 ? p1.toUpperCase() : ''}
-                                                                    {p2 ? <small>{p2}</small> : ''}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </span>}
-                                                </div>
-                                            </div>
-                                            <p className="text-2xl orbitron ml-2"><b>{item.subcategoriaCatalogoId.cantidad}</b> <small>{item.subcategoriaCatalogoId.unidad}</small></p>
-                                        </div>
-                                        <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{item.multiplicador - item.restantes} <small>/</small> {item.multiplicador}</div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </>)}
-
                         {/* SELECT de destinos */}
                         {loadingState === -1
                             && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                            || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                            || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada)
+                                || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                                || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada)
                             && rutaDespacho.ruta.length < rutaDespacho.ventaIds.length && (
                                 <div className="flex mt-1">
                                     <select
@@ -1254,8 +1342,8 @@ export default function Conductor({ session }) {
                         {/* Iniciar viaje - Botón */}
                         {loadingState === -1
                             && (rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
-                            || rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                            || rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada)
+                                || rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                                || rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada)
                             && rutaDespacho.ruta?.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length && <div className="flex flex-row items-center justify-center">
                                 <button className={`flex w-full justify-center h-10 px-4 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer mb-4 ${loadingState === TIPO_ESTADO_RUTA_DESPACHO.en_ruta || rutaDespacho.ruta.length == 0 || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].fechaArribo ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     onClick={handleIniciarViaje}
@@ -1264,7 +1352,7 @@ export default function Conductor({ session }) {
                                         <span className="mt-2">INICIAR VIAJE</span>
                                     </div>}
                                 </button>
-                            </div>}                        
+                            </div>}
 
                         {/* Botones descarga */}
                         {loadingState === -1 && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && (!inputTemporalVisible ? <div className="absolute bottom-3 flex w-full pr-8">
@@ -1274,15 +1362,13 @@ export default function Conductor({ session }) {
                                     handleScanMode();
                                 }}>
                                 <BsQrCodeScan className="text-4xl" />
-                                {scanMode && <div className="absolute top-2 left-2">
-                                    <Loader texto="" />
-                                </div>}
                             </button>
                             <button className={`w-full ml-16 mr-4 h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isCompleted(rutaDespacho) ? 'bg-green-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
                                 disabled={!isCompleted(rutaDespacho)}
                                 onClick={postDescarga}>
                                 <FaRoadCircleCheck className="text-4xl pb-0" />
-                                <p className="ml-2 mt-1 text-lg">FIN DESCARGA</p>
+                                <p className="ml-2 mt-1 text-lg">FIN {getVentaDescarga(rutaDespacho).tipo === TIPO_ORDEN.traslado
+                                    ? 'RETIRO' : 'DESCARGA'}</p>
                                 {loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada &&
                                     <div className="absolute mt-1"><Loader texto="" /></div>}
                             </button>
@@ -1297,7 +1383,7 @@ export default function Conductor({ session }) {
                                         if (e.key === 'Enter') {
                                             console.log("Código temporal ingresado:", e.target.value);
                                             setInputTemporalVisible(false);
-                                            descargarItem(e.target.value);
+                                            moverItem(e.target.value);
                                             e.target.value = '';
                                         }
                                     }}
@@ -1317,7 +1403,14 @@ export default function Conductor({ session }) {
                             </div>}
 
                     </div>)}
+
                 
+
+                {loadingState == -1 && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.carga && <div className="absolute text-center bottom-4 w-full px-4">
+                    <p className="text-xl">Excelente ruta</p>
+                    <p>Retira los cilindros y confirma la carga.</p>
+                </div>}
+
                 {/* He regresado - botón */}
                 {loadingState == -1 && rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && <div className="absolute text-center bottom-4 w-full px-4">
                     <p className="text-xl">Excelente ruta</p>
@@ -1363,6 +1456,18 @@ export default function Conductor({ session }) {
             />
 
             {vehiculos?.length > 0 && !loadingChecklist && !checkListPassed && <CheckList session={session} onFinish={onFinish} vehiculos={vehiculos} tipo={TIPO_CHECKLIST.vehiculo} loading={endingChecklist} />}
+
+            {scanMode && (
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 px-4">
+                    <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-lg p-8 max-w-xs">
+                        <BsQrCodeScan className="text-8xl text-green-500 mb-4" />
+                        <div className="flex">
+                            <Loader texto="Escaneando código..." />
+                        </div>
+                        <p className="text-gray-500 text-sm mt-2">Por favor, escanee un código QR</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

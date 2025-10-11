@@ -12,20 +12,21 @@ export async function POST(request) {
     await connectMongoDB();
 
     const body = await request.json();
-    const { rutaDespachoId, itemId, ventaId } = body;
+    const { rutaDespachoId, itemId, ventaId, codigo } = body;
+    console.log("BODY", { rutaDespachoId, itemId, ventaId, codigo });
 
-    if (!itemId) {
+    if (!itemId && !codigo) {
         console.log("Missing itemId", { itemId });
-        return NextResponse.json({ ok: false, error: "Missing itemId" }, { status: 400 }); 
+        return NextResponse.json({ ok: false, error: "Missing itemId or codigo" }, { status: 400 }); 
     }
 
     // Verifica que el item exista
-    const item = await ItemCatalogo.findById(itemId).select("_id subcategoriaCatalogoId").lean();
-    if (!item) {
-        return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
-    }
-    console.log("ITEM", item);
     if(ventaId) {
+        const item = await ItemCatalogo.findById(itemId).select("_id subcategoriaCatalogoId").lean();
+        if (!item) {
+            return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
+        }
+        console.log("ITEM", item);
         const detalles = await DetalleVenta.find({ ventaId }).lean();
         console.log("DETALLES", detalles);
         // Verifica si el item ya fue cargado previamente en algún detalle de la venta        
@@ -68,12 +69,32 @@ export async function POST(request) {
             venta.estado = TIPO_ESTADO_VENTA.preparacion;
             venta.historialEstados.push({ estado: TIPO_ESTADO_VENTA.preparacion, fecha: new Date() });
             await Venta.findByIdAndUpdate(ventaId, { estado: venta.estado, historialEstados: venta.historialEstados });
-        }
+        } 
     } else if(rutaDespachoId) {
         // Busca la ruta de despacho
         const rutaDespacho = await RutaDespacho.findById(rutaDespachoId);
         if (!rutaDespacho) {
             return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
+        }
+        const direccionActualId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1]?.direccionDestinoId;
+        if (!direccionActualId) {
+            console.log("La ruta no tiene una dirección actual", { ruta: rutaDespacho.ruta });
+            return NextResponse.json({ ok: false, error: "La ruta no tiene una dirección actual" }, { status: 400 });
+        }
+        const item = await ItemCatalogo.findOne(itemId ? { _id: itemId, direccionId: direccionActualId } : { codigo, direccionId: direccionActualId })
+        .populate({
+            path: "subcategoriaCatalogoId",
+            model: "SubcategoriaCatalogo",
+            select: "nombre cantidad unidad sinSifon nombreGas categoriaCatalogoId ownerId",
+            populate: {
+                path: "categoriaCatalogoId",
+                model: "CategoriaCatalogo",
+                select: "nombre elemento esIndustrial esMedicinal"
+            }
+        })
+        .lean();
+        if(!item) {
+            return NextResponse.json({ ok: false, error: "Item not found or does not belong to the route's address" }, { status: 404 });
         }
         // Agrega el item a cargaItemIds si no está
         if (!rutaDespacho.cargaItemIds?.some(id => id.equals(item._id))) {
@@ -97,7 +118,8 @@ export async function POST(request) {
                 itemMovidoIds: [item._id]
             });
         }        
-        await rutaDespacho.save();
+        await rutaDespacho.save();        
+        return NextResponse.json({ ok: true, item });
     }
     return NextResponse.json({ ok: true });
 }

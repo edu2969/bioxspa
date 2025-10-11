@@ -56,6 +56,13 @@ export const TIPO_OPERACION_DOCUMENTO_TRIBUTARIO = {
     resta: 2
 }
 
+export const TIPO_ORDEN = {
+    'venta': 1,
+    'traslado': 2,
+    'orden_de_trabajo': 3,
+    'cotizacion': 4
+}
+
 export const TIPO_ESTADO_VENTA = {
     borrador: 0,
     por_asignar: 10,

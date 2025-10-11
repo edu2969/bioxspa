@@ -83,7 +83,7 @@ export async function GET() {
         }).populate({
             path: "ventaIds",
             model: "Venta",
-            select: "_id clienteId direccionDespachoId estado",
+            select: "_id clienteId direccionDespachoId estado tipo comentario",
             populate: {
                 path: "clienteId",
                 model: "Cliente",

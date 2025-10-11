@@ -7,7 +7,7 @@ import Cliente from "@/models/cliente";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import Cargo from "@/models/cargo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST, TIPO_ORDEN } from "@/app/utils/constants";
 import DetalleVenta from "@/models/detalleVenta";
 import Direccion from "@/models/direccion";
 import ItemCatalogo from "@/models/itemCatalogo";
@@ -91,6 +91,7 @@ export async function GET(request) {
 
             return {
                 _id: venta._id,
+                tipo: venta.tipo,
                 comentario: venta.comentario || "",
                 clienteId: venta.clienteId,
                 clienteNombre,
@@ -172,6 +173,9 @@ export async function GET(request) {
 
                         return {
                             _id: venta._id,
+                            tipo: venta.tipo,
+                            estado: venta.estado,
+                            fecha: venta.fecha,
                             nombreCliente,
                             rutCliente,
                             comentario: venta.comentario,
@@ -244,7 +248,7 @@ export async function GET(request) {
     .populate({
         path: "ventaIds",
         model: "Venta",
-        select: "clienteId comentario direccionDespachoId estado",
+        select: "clienteId comentario direccionDespachoId estado tipo",
         populate: {
             path: "clienteId",
             model: "Cliente",
@@ -342,11 +346,13 @@ export async function POST(request) {
             vehiculoId = checklist.vehiculoId;
 
             // Create a new RutaDespacho
+            const estadoInicial = venta.tipo === TIPO_ORDEN.traslado 
+                ? TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada : TIPO_ESTADO_RUTA_DESPACHO.preparacion
             const nuevaRutaDespacho = new RutaDespacho({
                 vehiculoId, // Assign the vehicle if found
                 choferId,
-                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                historialEstado: [{ estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion, fecha: new Date() }],
+                estado: estadoInicial,
+                historialEstado: [{ estado: estadoInicial, fecha: new Date() }],
                 checklist: [],
                 ventaIds: [ventaId],
             });

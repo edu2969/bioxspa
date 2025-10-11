@@ -28,20 +28,20 @@ const entregaEnLocalSchema = new Schema({
 
 const ventaSchema = new Schema({
     temporalId: { type: String },
-    tipo: { type: Number, required: true }, // 1: Venta, 2: OT, 3: Translado, 4: Cotizacion
+    tipo: { type: Number, required: true }, // 1: Venta, 2: Translado, 3: Orden de Trabajo, 4: Cotizacion
     clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "Cliente", required: true },
     codigo: { type: String },
     vendedorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     sucursalId: { type: mongoose.Schema.Types.ObjectId, ref: "Sucursal", required: true },
     dependenciaId: { type: mongoose.Schema.Types.ObjectId, ref: "Dependencia" },
-    fecha: { type: Date, required: true },
+    fecha: { type: Date },
     estado: { type: Number, required: true },
     porCobrar: { type: Boolean, default: false },
-    valorNeto: { type: Number, required: true },
-    valorExento: { type: Number, default: 0 },
-    valorIva: { type: Number, required: true },
-    valorBruto: { type: Number, required: true },
-    valorTotal: { type: Number, required: true },
+    valorNeto: { type: Number },
+    valorExento: { type: Number },
+    valorIva: { type: Number },
+    valorBruto: { type: Number },
+    valorTotal: { type: Number },
     numeroDocumento: { type: String },
     numeroVale: { type: String },
     saldo: { type: Number, default: 0 },

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO, USER_ROLE } from '@/app/utils/constants';
@@ -14,24 +14,16 @@ import { MdAddLocationAlt } from 'react-icons/md';
 import Autocomplete from "react-google-autocomplete";
 import { FaCheck, FaTimes } from 'react-icons/fa';
 
-const TIPO_REGISTRO = [
-    { value: 1, label: "Venta" },
-    { value: 2, label: "Cotizacion" },
-    { value: 3, label: "OT" },
-    { value: 4, label: "Venta Firmada" }
-]
-
 export default function Pedidos({ session, googleMapsApiKey }) {
     const router = useRouter();
-    const { register, handleSubmit, setValue, getValues } = useForm();
+    const { register, handleSubmit, setValue, getValues, control } = useForm();
     const [usuarios, setUsuarios] = useState([]);
     const [precios, setPrecios] = useState([]);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
     const [itemsVenta] = useState([]);
     const [documentosTributarios, setDocumentosTributarios] = useState([]);
-    const [ setDocumentoTributarioSeleccionado] = useState(null);
-    const [setRegistroSelected] = useState(0);
+    const [setDocumentoTributarioSeleccionado] = useState(null);
     const [total, setTotal] = useState(0);
     const [modalSolicitudPrecio, setModalSolicitudPrecio] = useState(false);
     const [precioData, setPrecioData] = useState({});
@@ -45,7 +37,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [loadingClients, setLoadingClients] = useState(false);
     const [loadingCliente, setLoadingCliente] = useState(false);
     const [role, setRole] = useState(-1);
-    const [editDireccionDespacho, setEditDireccionDespacho] = useState(false);
+    const [editDireccion, setEditDireccion] = useState(false);
     const [autocompleteResults, setAutocompleteResults] = useState([]);
     const autocompleteRef = useRef(null);
     const [selectedPlace, setSelectedPlace] = useState(null);
@@ -54,15 +46,23 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [sucursalesACargo, setSucursalesACargo] = useState([]);
     const [loadingSucursales, setLoadingSucursales] = useState(true);
     const [tipoOrden, setTipoOrden] = useState(0);
-    const [empresaOrigen] = useState(null);
     const [indexFocused, setIndexFocused] = useState(-1);
-    const [items, setItems] = useState([]);
     const [loadingCatalogo, setLoadingCatalogo] = useState(false);
+    const [cilindros, setCilindros] = useState([]);
 
     const [busquedaCategoria, setBusquedaCategoria] = useState("");
     const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
     const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
-    const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
+    const [empresaDondeRetirar, setEmpresaDondeRetirar] = useState(null);    
+
+    const direccionRetiroSeleccionado = useWatch({
+        control,
+        name: 'direccionRetiroId'
+    });
+    const motivoTrasladoSeleccionado = useWatch({
+        control,
+        name: 'motivoTraslado'
+    });
 
     const buscarCategorias = (termino) => {
         if (!termino || termino.length < 2) {
@@ -70,11 +70,11 @@ export default function Pedidos({ session, googleMapsApiKey }) {
             setMostrarResultadosCategoria(false);
             return;
         }
-        
-        const resultados = categorias.filter(categoria => 
+
+        const resultados = categorias.filter(categoria =>
             categoria.nombre.toLowerCase().includes(termino.toLowerCase())
         );
-        
+
         setCategoriasFiltradas(resultados);
         setMostrarResultadosCategoria(true);
     };
@@ -85,7 +85,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         setBusquedaCategoria(categoria.nombre);
         setMostrarResultadosCategoria(false);
         setCategoriasFiltradas([]);
-        
+
         // Actualizar el form y precioData
         setValue("categoriaId", categoria._id);
         setValue("subcategoriaCatalogoId", "");
@@ -95,18 +95,26 @@ export default function Pedidos({ session, googleMapsApiKey }) {
             subcategoriaCatalogoId: "",
             valor: getValues('precio'),
         }));
-        
+
         // Fetch subcategorías
         await fetchSubcategorias(categoria._id);
     };
 
-    const isVentaDisabled = () => {
-        return redirecting || !precios.length
-            || !precios.some(precio => precio.seleccionado)
-            || precios.some(precio => precio.cantidad <= 0 && precio.seleccionado)
-            || !clienteSelected
-            || !getValues("usuarioId") 
-            || ((session.user.role == USER_ROLE.encargado || session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.cobranza) && !getValues("documentoTributarioId"));    }
+    const isOrderDisabled = () => {
+        if (tipoOrden == 0) return true;
+        return redirecting
+            || (tipoOrden == 1 || tipoOrden == 4
+                ? !precios.length
+                    || !precios.some(precio => precio.seleccionado)
+                    || precios.some(precio => precio.cantidad <= 0 && precio.seleccionado)
+                    || !clienteSelected
+                    || !getValues("usuarioId")
+                    || ((session.user.role == USER_ROLE.encargado || session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.cobranza) && !getValues("documentoTributarioId"))
+                : tipoOrden == 2
+                    ? !cilindros.length || !empresaDondeRetirar || !direccionRetiroSeleccionado || !motivoTrasladoSeleccionado
+                    : true
+            );
+    }
 
     const handlePlaceChanged = (autocomplete) => {
         const place = autocomplete;
@@ -147,7 +155,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         try {
             const response = await fetch('/api/catalogo');
             const data = await response.json();
-            setCategorias(data.sort((a, b) => a.nombre < b.nombre ? -1 : 1));            
+            setCategorias(data.sort((a, b) => a.nombre < b.nombre ? -1 : 1));
         } catch (error) {
             console.error('Error fetching categorias:', error);
         }
@@ -191,10 +199,10 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         const payload = {
             tipo: data.tipo,
             usuarioId: data.usuarioId,
-            comentario: data.comentario || ""            
-        }
+            comentario: data.comentario || ""
+        };
         // Ventas y cotizaciones
-        if(data.tipo == 1 || data.tipo == 4) {
+        if (data.tipo == 1 || data.tipo == 4) {
             payload.clienteId = clienteSelected?._id;
             payload.documentoTributarioId = data.documentoTributarioId;
             payload.direccionDespachoId = data.direccionDespachoId;
@@ -206,9 +214,11 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                     precio: parseInt(item.valor),
                     subcategoriaId: item.subcategoriaCatalogoId
                 }));
-        } else if(data.tipo == 2) {
-            // TODO OT: ID de Empresa de servicio, tipo de servicio, listado de items            
-        } else if(data.tipo == 3) {
+        } else if (data.tipo == 2) {
+            payload.motivoTraslado = motivoTrasladoSeleccionado;
+            payload.empresaDondeRetirarId = empresaDondeRetirar?._id;            
+            payload.direccionRetiroId = direccionRetiroSeleccionado;
+        } else if (data.tipo == 3) {
             // TODO Orden de traslado - empresaOrigenId, direccionOrigenId, empresaDestinoId, direccionDespacho, razón traslado, items
         }
         console.log("PAYLOAD2", payload);
@@ -296,11 +306,11 @@ export default function Pedidos({ session, googleMapsApiKey }) {
 
     useEffect(() => {
         if (getValues('sucursalId') == undefined) {
-            let sucursalInicial = clienteSelected?.sucursalId ?? false;            
+            let sucursalInicial = clienteSelected?.sucursalId ?? false;
             if (!sucursalInicial) {
-                sucursalInicial = localStorage.getItem('sucursalId');            
+                sucursalInicial = localStorage.getItem('sucursalId');
             }
-            setValue('sucursalId', sucursalInicial || "");            
+            setValue('sucursalId', sucursalInicial || "");
         }
     }, [clienteSelected, setValue, getValues]);
 
@@ -375,6 +385,16 @@ export default function Pedidos({ session, googleMapsApiKey }) {
             || ([USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado].includes(role) && !getValues('precio'));
     };
 
+    const cargarListadoParaRetiro = async (direccionId) => {
+        if (!direccionId || direccionId === "" || !sucursalesACargo.length) return;
+        const items = await fetch(`/api/cilindros/porDireccion/${direccionId}`);
+        const data = await items.json();
+        if (data.ok) {
+            console.log("CILINDROS", data.cilindros);
+            setCilindros(data.cilindros);
+        }
+    }
+
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
             <div className="w-full pb-2 mt-14 h-[calc(100vh-116px)] overflow-y-auto" ref={formScrollRef}>
@@ -403,9 +423,9 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                     <div className="w-full pr-0">
                                         <label htmlFor="sucursalId" className="block text-sm font-medium text-gray-700">Sucursal</label>
                                         <select id="sucursalId" {...register('sucursalId')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                        onChange={(e) => {
-                                            localStorage.setItem('sucursalId', e.target.value);
-                                        }}>
+                                            onChange={(e) => {
+                                                localStorage.setItem('sucursalId', e.target.value);
+                                            }}>
                                             <option value="">Seleccione una sucursal</option>
                                             {sucursalesACargo.map(sucursal => (
                                                 <option key={sucursal._id} value={sucursal._id}>{sucursal.nombre}</option>
@@ -423,17 +443,17 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         onChange={(e) => {
                                             setClienteSelected(null);
                                             setPrecios([]);
-                                            setTipoOrden(e.target.value);                                            
+                                            setTipoOrden(e.target.value);
                                         }}
                                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                     >
                                         <option value={0}>Seleccione tipo</option>
                                         <option value={1}>Venta</option>
                                         <option value={2}>Traslado</option>
-                                        <option value={3}>OT</option>
+                                        <option value={3}>Órden de Trabajo</option>
                                         <option value={4}>Cotización</option>
                                     </select>
-                                </div>                                
+                                </div>
 
                                 {/*COMENTARIO */}
                                 <div className="w-full">
@@ -468,7 +488,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                     onChange={(e) => {
                                                         const value = e.target.value;
                                                         setLoadingClients(true);
-                                                        if(value == "") {
+                                                        if (value == "") {
                                                             setAutocompleteClienteResults([]);
                                                             setClienteSelected(null);
                                                         }
@@ -518,7 +538,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                                         setClienteSelected(clienteData.cliente);
                                                                         setAutocompleteClienteResults([]);
                                                                         // Setear documentoTributarioId si corresponde
-                                                                        if(session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.encargado || session.user.role == USER_ROLE.cobranza) {
+                                                                        if (session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.encargado || session.user.role == USER_ROLE.cobranza) {
                                                                             if (clienteData.cliente.documentoTributarioId) {
                                                                                 setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == clienteData.cliente.documentoTributarioId)?._id);
                                                                             }
@@ -583,7 +603,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                 </div>}
 
                                 {/*EDICIÓN DE DIRECCIÓN DE DESPACHO */}
-                                {clienteSelected && editDireccionDespacho && <div className="w-full pr-0 md:pr-4">
+                                {clienteSelected && editDireccion && <div className="w-full pr-0 md:pr-4">
                                     <div className="relative w-full">
                                         <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
                                         <div className="flex">
@@ -641,7 +661,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                             }));
                                                             setValue("direccionDespachoId", result.direccion._id);
                                                             toast.success("Dirección agregada exitosamente.");
-                                                            setEditDireccionDespacho(false);
+                                                            setEditDireccion(false);
                                                         } else {
                                                             toast.error(result.error || "No se pudo agregar la dirección.");
                                                         }
@@ -658,7 +678,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                 type="button"
                                                 className="ml-2 flex items-center px-2 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-semibold"
                                                 onClick={() => {
-                                                    setEditDireccionDespacho(false);
+                                                    setEditDireccion(false);
                                                 }}
                                             >
                                                 <FaTimes size="1.6rem" />
@@ -681,7 +701,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                 </div>}
 
                                 {/* DIRECCION DESPACHO */}
-                                {clienteSelected && !editDireccionDespacho && <div className="w-full pr-0 md:pr-4 flex">
+                                {clienteSelected && !editDireccion && <div className="w-full pr-0 md:pr-4 flex">
                                     <div className="w-full">
                                         <label htmlFor="direccionesDespacho" className="block text-sm font-medium text-gray-700">Dirección de despacho</label>
                                         <select
@@ -703,7 +723,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         type="button"
                                         className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
                                         onClick={() => {
-                                            setEditDireccionDespacho(true);
+                                            setEditDireccion(true);
                                         }}
                                     >
                                         <MdAddLocationAlt size="1.8rem" />
@@ -711,36 +731,53 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                 </div>}
 
                                 {/* DOCUMENTO TRIBUTARIO */}
-                                {(session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.cobranza || session.user.role === USER_ROLE.encargado) 
+                                {(session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.cobranza || session.user.role === USER_ROLE.encargado)
                                     && clienteSelected && tipoOrden == 1 && <div className="w-full pr-0 md:pr-4">
-                                    <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
-                                    <select id="documentoTributarioId" {...register('documentoTributarioId')}
-                                        onChange={(e) => {
-                                            setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
-                                        }}
-                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                        <option value="">Seleccione un documento</option>
-                                        {documentosTributarios.length && documentosTributarios.map(documento => (
-                                            <option key={documento._id} value={documento._id}>{documento.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>}
+                                        <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
+                                        <select id="documentoTributarioId" {...register('documentoTributarioId')}
+                                            onChange={(e) => {
+                                                setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
+                                            }}
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
+                                            <option value="">Seleccione un documento</option>
+                                            {documentosTributarios.length && documentosTributarios.map(documento => (
+                                                <option key={documento._id} value={documento._id}>{documento.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>}
                             </fieldset>}
 
                             {/* TRASLADO */}
                             {tipoOrden == 2 && <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
                                 <legend className="font-bold text-gray-700 px-2">Detalle de Traslado</legend>
+
+                                {/* MOTIVO DE TRASLADO */}
                                 <div className="w-full">
+                                    <label htmlFor="motivoTraslado" className="block text-sm font-medium text-gray-700">Motivo de traslado</label>
+                                    <select
+                                        id="motivoTraslado"
+                                        {...register('motivoTraslado', { required: true, valueAsNumber: true })}
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                    >
+                                        <option value={0}>Seleccione motivo</option>
+                                        <option value={1}>Retiro de cilindros</option>
+                                        <option value={2}>Solo transporte</option>
+                                        <option value={3}>Llenado de cilindros</option>
+                                    </select>
+                                </div>
+
+                                {/* EMPRESA PARA RETIRO */}
+                                {motivoTrasladoSeleccionado == 1 && <div className="w-full">
                                     <div className="w-full pr-0 md:pr-4">
-                                        <label htmlFor="empresaOrigen" className="block text-sm font-medium text-gray-700">
-                                            Empresa de origen
-                                            {empresaOrigen != null && empresaOrigen.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
+                                        <label htmlFor="empresaDondeRetirar" className="block text-sm font-medium text-gray-700">
+                                            Empresa dónde retirar
+                                            {empresaDondeRetirar != null && empresaDondeRetirar.enQuiebra && <span className="bg-orange-600 text-white rounded-md py-0 px-2 text-xs mx-1">EN QUIEBRA</span>}
                                         </label>
                                         <div className="w-full">
                                             <div className="relative w-full pr-0 flex items-end">
                                                 <input
-                                                    id="empresaOrigen"
-                                                    {...register('empresaOrigen')}
+                                                    id="empresaDondeRetirar"
+                                                    {...register('empresaDondeRetirar')}
                                                     type="text"
                                                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                     onChange={(e) => {
@@ -757,13 +794,13 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                     }}
                                                     onFocus={() => setIndexFocused(2)}
                                                 />
-                                                {indexFocused == 2 && (loadingClients || loadingCliente) && <div className="absolute -right-2 top-1">
-                                                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-white opacity-70"></div>
+                                                {indexFocused == 2 && (loadingClients || loadingCliente) && <div className="absolute -right-2 top-1 md:top-1.5">
+                                                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-white md:bg-transparent opacity-70"></div>
                                                     <Loader texto="" />
                                                 </div>}
                                             </div>
                                             {indexFocused == 2 && autocompleteClienteResults.length > 0 && (
-                                                <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full">
+                                                <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full max-w-md">
                                                     {autocompleteClienteResults.map(cliente => (
                                                         <li
                                                             key={cliente._id}
@@ -771,66 +808,18 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                             onClick={async () => {
                                                                 try {
                                                                     setLoadingCliente(true);
-                                                                    setValue('cliente', cliente.nombre);
+                                                                    setValue('empresaDondeRetirar', cliente.nombre);
                                                                     // Primero, obtener el cliente completo desde la API
                                                                     const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
                                                                     const clienteData = await clienteResp.json();
                                                                     console.log("Cliente Data:", clienteData);
                                                                     if (clienteResp.ok && clienteData.ok) {
-                                                                        setClienteSelected(clienteData.cliente);
                                                                         setAutocompleteClienteResults([]);
-                                                                        // Setear documentoTributarioId si corresponde
-                                                                        if (clienteData.cliente.documentoTributarioId) {
-                                                                            setValue("documentoTributarioId", documentosTributarios.find(documento => documento._id == clienteData.cliente.documentoTributarioId)?._id);
-                                                                        }
-                                                                        if (clienteData.cliente.direccionesDespacho?.length === 1) {
-                                                                            setValue("direccionDespachoId", clienteData.cliente.direccionesDespacho[0].direccionId._id);
-                                                                        }
-                                                                        // Setear tipoRegistro si corresponde
-                                                                        if (clienteData.cliente.ordenCompra === true) {
-                                                                            setValue("tipoRegistro", 3);
-                                                                            setRegistroSelected(3);
-                                                                        }
-                                                                        setValue("cliente", clienteData.cliente.nombre);
-                                                                        // Ahora cargar los precios
-                                                                        const preciosResp = await fetch(`/api/clientes/precios?clienteId=${cliente._id}`);
-                                                                        const preciosData = await preciosResp.json();
-                                                                        if (preciosResp.ok && preciosData.ok) {
-                                                                            setPrecios(preciosData.precios.precios);
-                                                                        } else {
-                                                                            console.error("Error fetching precios:", preciosData.error);
-                                                                            toast.error("Error al cargar los precios del cliente.", {
-                                                                                position: "top-right",
-                                                                                autoClose: 5000,
-                                                                                hideProgressBar: false,
-                                                                                closeOnClick: true,
-                                                                                pauseOnHover: true,
-                                                                                draggable: true,
-                                                                                progress: undefined,
-                                                                            });
-                                                                        }
-                                                                    } else {
-                                                                        toast.error("No se pudo cargar el cliente seleccionado.", {
-                                                                            position: "top-right",
-                                                                            autoClose: 5000,
-                                                                            hideProgressBar: false,
-                                                                            closeOnClick: true,
-                                                                            pauseOnHover: true,
-                                                                            draggable: true,
-                                                                            progress: undefined,
-                                                                        });
+                                                                        setEmpresaDondeRetirar(clienteData.cliente);
                                                                     }
                                                                 } catch (error) {
                                                                     console.error("Fetch error:", error);
-                                                                    toast.error("Error al cargar los datos del cliente.", {
-                                                                        position: "top-right",
-                                                                        autoClose: 5000,
-                                                                        hideProgressBar: false,
-                                                                        closeOnClick: true,
-                                                                        pauseOnHover: true,
-                                                                        draggable: true,
-                                                                        progress: undefined,
-                                                                    });
+                                                                    toast.error("Error al cargar los datos del cliente.");
                                                                 } finally {
                                                                     setLoadingCliente(false);
                                                                 }
@@ -844,216 +833,24 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                             )}
                                         </div>
                                     </div>
-                                </div>
-
-                                {/*EDICIÓN DE ORIGEN */}
-                                {indexFocused == 2 && clienteSelected && !editDireccionDespacho && <div className="w-full pr-0 md:pr-4">
-                                    <div className="relative w-full">
-                                        <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                                        <div className="flex">
-                                            <Autocomplete
-                                                apiKey={googleMapsApiKey}
-                                                onPlaceSelected={(place) => {
-                                                    handlePlaceChanged(place);
-                                                }}
-                                                options={{
-                                                    types: ['address'],
-                                                    componentRestrictions: { country: 'cl' }
-                                                }}
-                                                ref={autocompleteRef}
-                                                defaultValue={''}
-                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                className={`ml-2 flex items-center pl-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${savingPlace ? 'cursor-not-allowed opacity-50' : ''}`}
-                                                disabled={savingPlace}
-                                                onClick={async () => {
-                                                    setSavingPlace(true);
-                                                    if (!selectedPlace) {
-                                                        toast.error("Seleccione una dirección válida antes de guardar.");
-                                                        setSavingPlace(false);
-                                                        return;
-                                                    }
-                                                    try {
-                                                        const resp = await fetch('/api/ventas/direccionDespacho', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({
-                                                                clienteId: clienteSelected._id,
-                                                                direccion: {
-                                                                    nombre: selectedPlace.formatted_address,
-                                                                    latitud: selectedPlace.geometry.location.lat(),
-                                                                    longitud: selectedPlace.geometry.location.lng(),
-                                                                    apiId: selectedPlace.place_id
-                                                                },
-                                                                direccionId: false,
-                                                            })
-                                                        });
-                                                        console.log("RESP", resp);
-                                                        const result = await resp.json();
-                                                        console.log("RESULT", result);
-                                                        if (resp.ok) {
-                                                            // Agregar la nueva dirección al cliente actual
-                                                            const nuevaDireccion = {
-                                                                direccionId: result.direccion,
-                                                                comentario: null
-                                                            };
-                                                            setClienteSelected(prev => ({
-                                                                ...prev,
-                                                                direccionesDespacho: [...(prev.direccionesDespacho || []), nuevaDireccion]
-                                                            }));
-                                                            setValue("direccionDespachoId", result.direccion._id);
-                                                            toast.success("Dirección agregada exitosamente.");
-                                                            setEditDireccionDespacho(false);
-                                                        } else {
-                                                            toast.error(result.error || "No se pudo agregar la dirección.");
-                                                        }
-                                                    } catch {
-                                                        toast.error("Error al guardar la dirección.");
-                                                    } finally {
-                                                        setSavingPlace(false);
-                                                    }
-                                                }}
-                                            >
-                                                <FaCheck className="mr-2" size="1.6rem" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="ml-2 flex items-center px-2 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-semibold"
-                                                onClick={() => {
-                                                    setEditDireccionDespacho(false);
-                                                }}
-                                            >
-                                                <FaTimes size="1.6rem" />
-                                            </button>
-                                        </div>
-                                        {autocompleteResults.length > 0 && (
-                                            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1">
-                                                {autocompleteResults.map((result, index) => (
-                                                    <li
-                                                        key={index}
-                                                        className="px-4 py-2 cursor-pointer hover:bg-gray-100"
-                                                        onClick={() => handleSelectPlace(result)}
-                                                    >
-                                                        {result.formatted_address}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
                                 </div>}
 
-                                {indexFocused == 2 && clienteSelected && editDireccionDespacho && <div className="w-full pr-0 md:pr-4">
-                                    <div className="relative w-full">
-                                        <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                                        <div className="flex">
-                                            <Autocomplete
-                                                apiKey={googleMapsApiKey}
-                                                onPlaceSelected={(place) => {
-                                                    handlePlaceChanged(place);
-                                                }}
-                                                options={{
-                                                    types: ['address'],
-                                                    componentRestrictions: { country: 'cl' }
-                                                }}
-                                                ref={autocompleteRef}
-                                                defaultValue={''}
-                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                className={`ml-2 flex items-center pl-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${savingPlace ? 'cursor-not-allowed opacity-50' : ''}`}
-                                                disabled={savingPlace}
-                                                onClick={async () => {
-                                                    setSavingPlace(true);
-                                                    if (!selectedPlace) {
-                                                        toast.error("Seleccione una dirección válida antes de guardar.");
-                                                        setSavingPlace(false);
-                                                        return;
-                                                    }
-                                                    try {
-                                                        const resp = await fetch('/api/ventas/direccionDespacho', {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({
-                                                                clienteId: clienteSelected._id,
-                                                                direccion: {
-                                                                    nombre: selectedPlace.formatted_address,
-                                                                    latitud: selectedPlace.geometry.location.lat(),
-                                                                    longitud: selectedPlace.geometry.location.lng(),
-                                                                    apiId: selectedPlace.place_id
-                                                                },
-                                                                direccionId: false,
-                                                            })
-                                                        });
-                                                        console.log("RESP", resp);
-                                                        const result = await resp.json();
-                                                        console.log("RESULT", result);
-                                                        if (resp.ok) {
-                                                            // Agregar la nueva dirección al cliente actual
-                                                            const nuevaDireccion = {
-                                                                direccionId: result.direccion,
-                                                                comentario: null
-                                                            };
-                                                            setClienteSelected(prev => ({
-                                                                ...prev,
-                                                                direccionesDespacho: [...(prev.direccionesDespacho || []), nuevaDireccion]
-                                                            }));
-                                                            setValue("direccionDespachoId", result.direccion._id);
-                                                            toast.success("Dirección agregada exitosamente.");
-                                                            setEditDireccionDespacho(false);
-                                                        } else {
-                                                            toast.error(result.error || "No se pudo agregar la dirección.");
-                                                        }
-                                                    } catch {
-                                                        toast.error("Error al guardar la dirección.");
-                                                    } finally {
-                                                        setSavingPlace(false);
-                                                    }
-                                                }}
-                                            >
-                                                <FaCheck className="mr-2" size="1.6rem" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="ml-2 flex items-center px-2 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-semibold"
-                                                onClick={() => {
-                                                    setEditDireccionDespacho(false);
-                                                }}
-                                            >
-                                                <FaTimes size="1.6rem" />
-                                            </button>
-                                        </div>
-                                        {autocompleteResults.length > 0 && (
-                                            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1">
-                                                {autocompleteResults.map((result, index) => (
-                                                    <li
-                                                        key={index}
-                                                        className="px-4 py-2 cursor-pointer hover:bg-gray-100"
-                                                        onClick={() => handleSelectPlace(result)}
-                                                    >
-                                                        {result.formatted_address}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>}
-
-                                {/* DIRECCION DESPACHO */}
-                                {indexFocused == 2 && clienteSelected && !editDireccionDespacho && <div className="w-full pr-0 md:pr-4 flex">
+                                {/*DIRECCIÓN DONDE RETIRAR */}                                
+                                {empresaDondeRetirar && !editDireccion && <div className="w-full pr-0 md:pr-4 flex">
                                     <div className="w-full">
-                                        <label htmlFor="direccionesDespacho" className="block text-sm font-medium text-gray-700">Dirección de despacho</label>
+                                        <label htmlFor="direccionesRetiro" className="block text-sm font-medium text-gray-700">Dirección de retiro</label>
                                         <select
-                                            id="direccionDespachoId"
-                                            {...register('direccionDespachoId')}
+                                            id="direccionRetiroId"
+                                            {...register('direccionRetiroId')}
+                                            onClick={(e) => {
+                                                cargarListadoParaRetiro(e.currentTarget.value);
+                                            }}
                                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                         >
                                             <option value="">Seleccione dirección</option>
-                                            {clienteSelected.direccionesDespacho
-                                                && clienteSelected.direccionesDespacho.length > 0
-                                                && clienteSelected.direccionesDespacho.map(dir => (
+                                            {empresaDondeRetirar.direccionesDespacho
+                                                && empresaDondeRetirar.direccionesDespacho.length > 0
+                                                && empresaDondeRetirar.direccionesDespacho.map(dir => (
                                                     <option key={dir.direccionId._id} value={dir.direccionId._id}>
                                                         {dir.direccionId.nombre}
                                                     </option>
@@ -1064,47 +861,115 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         type="button"
                                         className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
                                         onClick={() => {
-                                            setEditDireccionDespacho(true);
+                                            setEditDireccion(true);
                                         }}
                                     >
                                         <MdAddLocationAlt size="1.8rem" />
                                     </button>
                                 </div>}
 
-                                {/* DOCUMENTO TRIBUTARIO */}
-                                {clienteSelected && <div className="w-full pr-0 md:pr-4">
-                                    <label htmlFor="documentoTributarioId" className="block text-sm font-medium text-gray-700">Documento Tributario</label>
-                                    <select id="documentoTributarioId" {...register('documentoTributarioId')}
-                                        onChange={(e) => {
-                                            setDocumentoTributarioSeleccionado(documentosTributarios.find(documento => documento._id == e.target.value));
-                                        }}
-                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                        <option value="">Seleccione un documento</option>
-                                        {documentosTributarios.length && documentosTributarios.map(documento => (
-                                            <option key={documento._id} value={documento._id}>{documento.nombre}</option>
-                                        ))}
-                                    </select>
-                                </div>}
-
-                                {/* REGISTRO */}
-                                {clienteSelected && <div className="w-full pr-0 md:pr-4">
-                                    <label htmlFor="tipoRegistro" className="block text-sm font-medium text-gray-700">Registro</label>
-                                    <select name="tipoRegistro" id="tipoRegistro" {...register('tipoRegistro', { valueAsNumber: true })}
-                                        onChange={(e) => {
-                                            setRegistroSelected(e.target.value);
-                                        }}
-                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm">
-                                        {TIPO_REGISTRO.map((registro) => (
-                                            <option key={registro.value} value={registro.value}>{registro.label}</option>
-                                        ))}
-                                    </select>
+                                {indexFocused == 2 && clienteSelected && editDireccion && <div className="w-full pr-0 md:pr-4">
+                                    <div className="relative w-full">
+                                        <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección de origen</label>
+                                        <div className="flex">
+                                            <Autocomplete
+                                                apiKey={googleMapsApiKey}
+                                                onPlaceSelected={(place) => {
+                                                    handlePlaceChanged(place);
+                                                }}
+                                                options={{
+                                                    types: ['address'],
+                                                    componentRestrictions: { country: 'cl' }
+                                                }}
+                                                ref={autocompleteRef}
+                                                defaultValue={''}
+                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                className={`ml-2 flex items-center pl-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${savingPlace ? 'cursor-not-allowed opacity-50' : ''}`}
+                                                disabled={savingPlace}
+                                                onClick={async () => {
+                                                    setSavingPlace(true);
+                                                    if (!selectedPlace) {
+                                                        toast.error("Seleccione una dirección válida antes de guardar.");
+                                                        setSavingPlace(false);
+                                                        return;
+                                                    }
+                                                    try {
+                                                        const resp = await fetch('/api/ventas/direccionDespacho', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                clienteId: clienteSelected._id,
+                                                                direccion: {
+                                                                    nombre: selectedPlace.formatted_address,
+                                                                    latitud: selectedPlace.geometry.location.lat(),
+                                                                    longitud: selectedPlace.geometry.location.lng(),
+                                                                    apiId: selectedPlace.place_id
+                                                                },
+                                                                direccionId: false,
+                                                            })
+                                                        });
+                                                        console.log("RESP", resp);
+                                                        const result = await resp.json();
+                                                        console.log("RESULT", result);
+                                                        if (resp.ok) {
+                                                            // Agregar la nueva dirección al cliente actual
+                                                            const nuevaDireccion = {
+                                                                direccionId: result.direccion,
+                                                                comentario: null
+                                                            };
+                                                            setClienteSelected(prev => ({
+                                                                ...prev,
+                                                                direccionesDespacho: [...(prev.direccionesDespacho || []), nuevaDireccion]
+                                                            }));
+                                                            setValue("direccionDespachoId", result.direccion._id);
+                                                            toast.success("Dirección agregada exitosamente.");
+                                                            setEditDireccion(false);
+                                                        } else {
+                                                            toast.error(result.error || "No se pudo agregar la dirección.");
+                                                        }
+                                                    } catch {
+                                                        toast.error("Error al guardar la dirección.");
+                                                    } finally {
+                                                        setSavingPlace(false);
+                                                    }
+                                                }}
+                                            >
+                                                <FaCheck className="mr-2" size="1.6rem" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ml-2 flex items-center px-2 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm font-semibold"
+                                                onClick={() => {
+                                                    setEditDireccion(false);
+                                                }}
+                                            >
+                                                <FaTimes size="1.6rem" />
+                                            </button>
+                                        </div>
+                                        {autocompleteResults.length > 0 && (
+                                            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1">
+                                                {autocompleteResults.map((result, index) => (
+                                                    <li
+                                                        key={index}
+                                                        className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                                                        onClick={() => handleSelectPlace(result)}
+                                                    >
+                                                        {result.formatted_address}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
                                 </div>}
                             </fieldset>}
 
-                            {/* OT */}
+                            {/* ÓRDEN DE TRABAJO */}
                             {tipoOrden == 3 && <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
                                 <legend className="font-bold text-gray-700 px-2">Detalle de orden</legend>
-                                <div className="w-full flex-col mt-3 space-y-4">                                    
+                                <div className="w-full flex-col mt-3 space-y-4">
                                     <div className="w-full">
                                         <label htmlFor="motivo" className="block text-sm font-medium text-gray-700">Prestador</label>
                                         <select
@@ -1120,15 +985,15 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                             <option value="10">Linde Gas Chile S.A.</option>
                                         </select>
                                     </div>
-                                     <div className="w-full">
+                                    <div className="w-full">
                                         <label htmlFor="controlEnvase" className="block text-sm font-medium text-gray-700">Control de envase</label>
                                         <input
                                             id="controlEnvase"
                                             {...register(`controlEnvase`)}
                                             type="text"
-                                            className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"                                            
+                                            className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
                                         />
-                                    </div>                                    
+                                    </div>
                                     <div className="w-full">
                                         <label htmlFor="servicio" className="block text-sm font-medium text-gray-700">Servicio</label>
                                         <select
@@ -1144,7 +1009,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         </select>
                                     </div>
                                 </div>
-                            </fieldset>}                            
+                            </fieldset>}
 
                             {/* INFORMACION EXTRA */}
                             {(session.user.role == USER_ROLE.gerente || session.user.role == USER_ROLE.encargado || session.user.role == USER_ROLE.cobranza) && clienteSelected != null && (<div className="border rounded-md p-4">
@@ -1158,9 +1023,9 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         <p className="text-gray-400 text-xs mt-2"><span className={`${clienteSelected.credito ? "text-green-600" : "text-red-600"}`}>{clienteSelected.credito ? "CON" : "SIN"}&nbsp;CRÉDITO</span> / {clienteSelected.arriendo ? "CON" : "SIN"}&nbsp;ARRIENDO</p>
                                     </div>
                                 </div>
-                            </div>)}
+                            </div>)}                            
                         </div>
-                        
+
                         {/* SECCION DE PRECIOS */}
                         {(tipoOrden == 1 || tipoOrden == 4) && clienteSelected && <div className="mt-6">
                             <div className={`w-full ${clienteSelected != null && clienteSelected.credito ? '' : 'opacity-20'}`}>
@@ -1170,12 +1035,12 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         type="button"
                                         className="h-12 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                                         onClick={async () => {
-                                            if(categorias.length == 0) {
+                                            if (categorias.length == 0) {
                                                 setLoadingCatalogo(true);
                                                 await fetchCategorias();
                                                 await fetchSubcategorias();
                                                 setLoadingCatalogo(false);
-                                            }                                            
+                                            }
                                             setPrecioData({
                                                 categoriaId: "",
                                                 subcategoriaCatalogoId: "",
@@ -1195,18 +1060,18 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         <p className="font-bold">Cantidad</p>
                                     </div>
                                     <div className={`${(session.user.role == USER_ROLE.gerente
-                                            || session.user.role == USER_ROLE.cobranza
-                                            || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} pr-4`}>
+                                        || session.user.role == USER_ROLE.cobranza
+                                        || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} pr-4`}>
                                         <p className="font-bold">ITEM</p>
                                     </div>
-                                    {(session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.cobranza || session.user.role === USER_ROLE.encargado) && <> 
+                                    {(session.user.role === USER_ROLE.gerente || session.user.role === USER_ROLE.cobranza || session.user.role === USER_ROLE.encargado) && <>
                                         <div className="w-3/12 pr-4">
                                             <p className="font-bold text-center">Precio</p>
                                         </div>
                                         <div className="w-3/12 pr-4">
                                             <p className="font-bold text-center">SubTotal</p>
                                         </div>
-                                    </>}                                    
+                                    </>}
                                 </div>
                                 {precios.map((precio, index) => (
                                     <div key={`precio_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-2 bg-gray-100 ${precios[index].seleccionado == true ? '' : 'opacity-50'}`}>
@@ -1244,7 +1109,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         </div>
                                         <div className={`${(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
-                                            || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>                                                
+                                            || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
                                             {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento ? <div className='w-full'>
                                                 <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</p>
                                                 <span className="relative -top-1">{precio.subcategoriaCatalogoId.cantidad} {precio.subcategoriaCatalogoId.unidad}</span>
@@ -1252,7 +1117,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                                 <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.nombre}</p>
                                                 <span className="relative -top-1">{precio.subcategoriaCatalogoId.nombre}</span>
                                             </div>}
-                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento &&<div className="w-full flex items-end justify-end text-xs space-x-1">
+                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
                                                 {precio.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
                                                 {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
                                                 {precio.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
@@ -1261,21 +1126,21 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         {(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
                                             || session.user.role === USER_ROLE.encargado) && <><div className="w-3/12 pr-4">
-                                            <div className="flex">
-                                                <span className="font-bold mt-2 px-4">$</span>
-                                                <span className="w-full font-bold text-sm text-right mt-2">
-                                                    {(precios[index].valor || 0).toLocaleString('es-CL')}
-                                                </span>
+                                                <div className="flex">
+                                                    <span className="font-bold mt-2 px-4">$</span>
+                                                    <span className="w-full font-bold text-sm text-right mt-2">
+                                                        {(precios[index].valor || 0).toLocaleString('es-CL')}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="w-3/12 pr-4">
-                                            <div className="flex">
-                                                <span className="font-bold mt-2 px-4">$</span>
-                                                <span className="w-full font-bold text-sm text-right mt-2">
-                                                    {(precios[index].cantidad * precios[index].valor || 0).toLocaleString('es-CL')}
-                                                </span>
-                                            </div>
-                                        </div></>}
+                                                <div className="w-3/12 pr-4">
+                                                    <div className="flex">
+                                                        <span className="font-bold mt-2 px-4">$</span>
+                                                        <span className="w-full font-bold text-sm text-right mt-2">
+                                                            {(precios[index].cantidad * precios[index].valor || 0).toLocaleString('es-CL')}
+                                                        </span>
+                                                    </div>
+                                                </div></>}
                                     </div>
                                 ))}
 
@@ -1285,69 +1150,43 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                         {/* SELECTOR DE ITEMS */}
                         {(tipoOrden == 2 || tipoOrden == 3) && <div className="mt-6">
                             <div className={`w-full`}>
-                                <div className="flex justify-between items-center">
-                                    <p className="font-bold text-lg">LISTADO DE ITEMS</p>
-                                    <button
-                                        type="button"
-                                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                                        onClick={() => {
-                                            setItems([...items, { cantidad: 1, precio: 0, nombre: "" }]);
-                                        }}
-                                    >
-                                        NUEVO ITEM
-                                    </button>
-                                </div>
+                                <p className="font-bold text-lg">{tipoOrden == 2 ? 'CILINDROS PARA TRASLADO' : 'CILINDROS DISPONIBLES'}</p>
                                 <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
                                     <div className="w-3/12 pr-4">
                                         <p className="font-bold">CODIGO</p>
                                     </div>
                                     <div className="w-3/12 pr-4">
-                                        <p className="font-bold">ITEM</p>
+                                        <p className="font-bold">Nombre</p>
                                     </div>
                                     <div className="w-2/12 pr-4">
                                         <p className="font-bold">Propietario</p>
                                     </div>
                                     <div className="w-2/12 pr-4">
                                         <p className="font-bold text-center">Fecha PH</p>
-                                    </div>                                    
+                                    </div>
                                     <div className="w-2/12 pr-4">
                                         <p className="font-bold text-center">Estado</p>
                                     </div>
                                 </div>
-                                {items.map((item, index) => (
-                                    <div key={`item_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-2 bg-gray-100`}>
+                                {cilindros.length > 0 && cilindros.map((cilindro, index) => (
+                                    <div key={`cilindro_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-2 bg-gray-100`}>
                                         <div className="w-2/12">
-                                            <div className="flex">
-                                                <span className="font-bold mt-3 mr-2">1. </span>
-                                                <input
-                                                    id={`item-codigo-${index}`}
-                                                    {...register(`items[${index}].codigo`)}
-                                                    type="text"
-                                                    min={0}
-                                                    max={99}
-                                                    defaultValue={item.codigo || ""}
-                                                    className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
-                                                    onChange={(e) => {
-                                                        const newCodigo = e.target.value || "";
-                                                        const updatedItems = [...items];
-                                                        updatedItems[index].codigo = newCodigo;
-                                                        setItems(updatedItems);
-                                                    }}
-                                                />
-                                            </div>
+                                            <span className="font-bold mt-3 mr-2">{cilindro.codigo}</span>
                                         </div>
                                         <div className="w-4/12 pr-4">
                                             <p className="flex space-x-1 mt-1">
-                                                <span className="font-bold text-xl">O2</span>
-                                                <span className="mt-1">10 m3</span>
-                                                <span className="text-xs text-white bg-blue-600 rounded px-2 pt-0.5 h-5 mt-1">MED</span>
-                                                <span className="text-xs text-white bg-gray-600 rounded px-2 pt-0.5 h-5 mt-1">S/S</span>
-                                                <span className="text-xs text-white bg-yellow-600 rounded px-2 pt-0.5 h-5 mt-1">IND</span>
+                                                <span className="font-bold text-xl">{cilindro.categoria.elemento}</span>
+                                                <span className="text-xl orbitron mt-0">{cilindro.subcategoria.cantidad}</span>
+                                                <span className="mt-1">{cilindro.subcategoria.unidad}</span>
+                                                {cilindro.categoria.esMedicinal && <span className="text-xs text-white bg-blue-600 rounded px-2 pt-0.5 h-5 mt-1">MED</span>}
+                                                {cilindro.categoria.esIndustrial && <span className="text-xs text-white bg-yellow-600 rounded px-2 pt-0.5 h-5 mt-1">IND</span>}
+                                                {cilindro.subcategoria.sinSifon && <span className="text-xs text-white bg-gray-600 rounded px-2 pt-0.5 h-5 mt-1">S/S</span>}                                                
                                             </p>
                                         </div>
                                         <div className="w-3/12 pr-4">
-                                            <span className="text-xs border-gray-500 bg-gray-400 rounded px-2 pt-0 h-5 mr-2 text-white font-bold">TP</span>
-                                            <span className="mt-1">Alexander Corraza</span>
+                                            {cilindro.ownerId && <span className="text-xs border-gray-500 bg-gray-400 rounded px-2 pt-0 h-5 mr-2 text-white font-bold">TP</span>}
+                                            {cilindro.ownerId && <span className="mt-1">{cilindro.ownerId.nombre}</span>}
+                                            {!cilindro.ownerId && <span className="mt-1">BIOX</span>}
                                         </div>
                                         <div className="w-2/12 pr-4">
                                             <div className="flex">
@@ -1377,11 +1216,11 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                     router.back()
                                 }}>CANCELAR</button>
                             <button
-                                className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isVentaDisabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isOrderDisabled() ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 type="submit"
-                                disabled={isVentaDisabled()}
+                                disabled={isOrderDisabled()}
                             >
-                                {creandoOrden ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> : "CREAR VENTA"}
+                                {creandoOrden ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> : `CREAR ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
                             </button>
                         </div>
 
@@ -1411,80 +1250,80 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                             <div className="mt-2">
                                 <div className="mt-4 space-y-3 text-left">
                                     <div className="flex flex-col relative">
-    <label htmlFor="categoriaInput" className="text-sm text-gray-500">Categoría</label>
-    <div className="relative">
-        <input
-            id="categoriaInput"
-            type="text"
-            value={busquedaCategoria}
-            onChange={(e) => {
-                const valor = e.target.value;
-                setBusquedaCategoria(valor);
-                
-                // Limpiar selección si se está editando
-                if (valor !== categoriaNombreSeleccionada) {
-                    setCategoriaIdSeleccionada("");
-                    setValue("categoriaId", "");
-                    setValue("subcategoriaCatalogoId", "");
-                    setPrecioData((prev) => ({
-                        ...prev,
-                        categoriaId: "",
-                        subcategoriaCatalogoId: "",
-                        valor: getValues('precio'),
-                    }));
-                    setSubcategorias([]);
-                }
-                
-                buscarCategorias(valor);
-            }}
-            onFocus={() => {
-                if (busquedaCategoria && categoriasFiltradas.length === 0) {
-                    buscarCategorias(busquedaCategoria);
-                }
-            }}
-            onBlur={() => {
-                // Ocultar resultados después de un pequeño delay para permitir clicks
-                setTimeout(() => {
-                    setMostrarResultadosCategoria(false);
-                }, 200);
-            }}
-            className="border rounded-md px-3 py-2 pr-10 text-base w-full"
-            placeholder="Buscar categoría..."
-        />
-        
-        {/* Ícono de lupa */}
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-        </div>
-        
-        {/* Dropdown de resultados */}
-        {mostrarResultadosCategoria && categoriasFiltradas.length > 0 && (
-            <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
-                {categoriasFiltradas.map((categoria) => (
-                    <li
-                        key={categoria._id}
-                        className="px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
-                        onMouseDown={(e) => {
-                            e.preventDefault(); // Prevenir que se dispare onBlur antes del click
-                            seleccionarCategoria(categoria);
-                        }}
-                    >
-                        <p className="font-medium">{categoria.nombre}</p>
-                    </li>
-                ))}
-            </ul>
-        )}
-        
-        {/* Mensaje cuando no hay resultados */}
-        {mostrarResultadosCategoria && busquedaCategoria.length >= 2 && categoriasFiltradas.length === 0 && (
-            <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 p-3">
-                <p className="text-gray-500 text-center">No se encontraron categorías</p>
-            </div>
-        )}
-    </div>
-</div>
+                                        <label htmlFor="categoriaInput" className="text-sm text-gray-500">Categoría</label>
+                                        <div className="relative">
+                                            <input
+                                                id="categoriaInput"
+                                                type="text"
+                                                value={busquedaCategoria}
+                                                onChange={(e) => {
+                                                    const valor = e.target.value;
+                                                    setBusquedaCategoria(valor);
+
+                                                    // Limpiar selección si se está editando
+                                                    if (valor !== categoriaNombreSeleccionada) {
+                                                        setCategoriaIdSeleccionada("");
+                                                        setValue("categoriaId", "");
+                                                        setValue("subcategoriaCatalogoId", "");
+                                                        setPrecioData((prev) => ({
+                                                            ...prev,
+                                                            categoriaId: "",
+                                                            subcategoriaCatalogoId: "",
+                                                            valor: getValues('precio'),
+                                                        }));
+                                                        setSubcategorias([]);
+                                                    }
+
+                                                    buscarCategorias(valor);
+                                                }}
+                                                onFocus={() => {
+                                                    if (busquedaCategoria && categoriasFiltradas.length === 0) {
+                                                        buscarCategorias(busquedaCategoria);
+                                                    }
+                                                }}
+                                                onBlur={() => {
+                                                    // Ocultar resultados después de un pequeño delay para permitir clicks
+                                                    setTimeout(() => {
+                                                        setMostrarResultadosCategoria(false);
+                                                    }, 200);
+                                                }}
+                                                className="border rounded-md px-3 py-2 pr-10 text-base w-full"
+                                                placeholder="Buscar categoría..."
+                                            />
+
+                                            {/* Ícono de lupa */}
+                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                            </div>
+
+                                            {/* Dropdown de resultados */}
+                                            {mostrarResultadosCategoria && categoriasFiltradas.length > 0 && (
+                                                <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                                                    {categoriasFiltradas.map((categoria) => (
+                                                        <li
+                                                            key={categoria._id}
+                                                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault(); // Prevenir que se dispare onBlur antes del click
+                                                                seleccionarCategoria(categoria);
+                                                            }}
+                                                        >
+                                                            <p className="font-medium">{categoria.nombre}</p>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+
+                                            {/* Mensaje cuando no hay resultados */}
+                                            {mostrarResultadosCategoria && busquedaCategoria.length >= 2 && categoriasFiltradas.length === 0 && (
+                                                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 p-3">
+                                                    <p className="text-gray-500 text-center">No se encontraron categorías</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                     <div className="flex flex-col">
                                         <label htmlFor="subcategoriaId" className="text-sm text-gray-500">Subcategoría</label>
                                         <select
