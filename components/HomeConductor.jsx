@@ -12,7 +12,6 @@ export default function HomeConductor({ contadores, checklists }) {
     const faltaChecklistVehiculo = () => {
         if(!contadores || !checklists) return false;
         const checklistVehiculo = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.vehiculo && checklist.aprobado);
-        console.log("------------------> Checklist vehiculo:", checklistVehiculo);
         return !checklistVehiculo;
     }
 

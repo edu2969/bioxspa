@@ -19,7 +19,7 @@ export async function POST(request) {
     }
 
     // Obtiene la venta actual
-    const venta = await Venta.findById(ventaId).select("estado historialEstados entregasEnLocal").lean();
+    const venta = await Venta.findById(ventaId).select("estado historialEstados entregasEnLocal tipo").lean();
     if (!venta) {
         return NextResponse.json({ ok: false, error: "Venta not found" }, { status: 404 });
     }

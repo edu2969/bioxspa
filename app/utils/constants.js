@@ -88,6 +88,7 @@ export const TIPO_ESTADO_RUTA_DESPACHO = {
     descarga_confirmada: 9,
     carga: 10,
     carga_confirmada: 11,
+    retirado: 12,
     regreso: 16,
     regreso_confirmado: 17,
     terminado: 32,

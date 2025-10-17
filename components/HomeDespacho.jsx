@@ -23,7 +23,7 @@ export default function HomeDespacho({ contadores }) {
                             </div>
                             <span>PEDIDOS</span>
                             <div className={`absolute top-12 right-24 ${contadores.preparacion > 0 ? "bg-red-500" : "bg-green-500"} text-white text-md font-bold rounded-full pl-1 w-8 h-8 flex items-center justify-center`}>
-                                <span className="text-sm mr-1">{contadores.preparacion}</span>
+                                <span className="text-sm mr-1">{contadores.ordenes}</span>
                             </div>
                             {routingIndex === 0 && (
                                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">

@@ -173,6 +173,26 @@ export default function Asignacion({ session }) {
         };
     }
 
+    const sizeByModel = (vehiculo) => {
+        const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
+        const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
+        if (!marca || !modelo) {
+            return { width: 247, height: 191 };
+        }
+        const sizes = {
+            "hyundai_porter": [247, 173],
+            "ford_ranger": [300, 200],
+            "mitsubishi_l200": [247, 191],
+            "volkswagen_constellation": [300, 200],
+            "volkswagen_delivery": [300, 200],
+            "kia_frontier": [247, 191],
+            "ford_transit": [300, 200],
+            "desconocido_desconocido": [247, 191],
+        }
+        const size = sizes[marca + "_" + modelo] || sizes["desconocido_desconocido"];
+        return { width: size[0], height: size[1] };
+    }
+
     function calculateTubePosition(vehiculo, index) {
         const offsets = offsetByModel(vehiculo);
         const baseTop = offsets.baseTop; //22
@@ -303,51 +323,51 @@ export default function Asignacion({ session }) {
         return elementos;
     }
 
+    const getVentaActual = (rd) => {
+        if (!rd || !Array.isArray(rd.ruta) || rd.ruta.length === 0 || !Array.isArray(rd.ventaIds)) return null;
+        const index = rd.ruta.findIndex(r => r.fechaArribo === null);
+        const lastDireccionId = rd.ruta[index != -1 ? index : rd.ruta.length - 1].direccionDestinoId?._id || rd.ruta[rd.ruta.length - 1].direccionDestinoId;
+        const venta = rd.ventaIds.find(v => v.direccionDespachoId === lastDireccionId);
+        return venta;
+    }
+
     const cargaActual = (rutaDespacho) => {
         if (!rutaDespacho || !Array.isArray(rutaDespacho.cargaItemIds)) return [];
 
-        // Determina la última dirección de la ruta
-        const ultimaDireccionId = rutaDespacho.ruta?.length
-            ? rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId
-            : null;
-
-        // Busca la venta correspondiente a esa dirección
-        const ventaActual = rutaDespacho.ventaIds?.find(
-            v => String(v.direccionDespachoId) === String(ultimaDireccionId)
-        );
+        let venta = getVentaActual(rutaDespacho);
+        console.log("VENTA", venta);
 
         // Obtén los IDs de los items descargados según historialCarga
-        const descargadosSet = new Set();
-        if (Array.isArray(rutaDespacho.historialCarga)) {
-            rutaDespacho.historialCarga.forEach(hist => {
-                if (!hist.esCarga && Array.isArray(hist.itemMovidoIds)) {
-                    hist.itemMovidoIds.forEach(id => descargadosSet.add(id));
-                }
-            });
-        }
-
-        return rutaDespacho.cargaItemIds.map(item => {
-            let estado = "cargado"; // default
+        const descargados = rutaDespacho.historialCarga[rutaDespacho.historialCarga.length - 1]?.itemMovidoIds || [];
+        const estadoRuta = rutaDespacho.estado;
+        return rutaDespacho.cargaItemIds.map(item => {            
+            let estado = {}
 
             // Si el item está en el historial de descarga, está entregado
-            if (descargadosSet.has(item._id)) {
-                estado = "entregado";
+            if (descargados.some(id => id === item._id)) {
+                if(venta && venta.tipo === TIPO_ORDEN.traslado) {
+                    estado.cargado = estadoRuta === TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada;
+                } else {
+                    estado.entregado = estadoRuta === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
+                }
             } else if (
-                rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga &&
-                ventaActual &&
-                ventaActual.detalles.some(
+                (rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga) &&
+                venta &&
+                venta.detalles.some(
                     det => String(det.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
                 )
             ) {
                 // Solo los items que pertenecen a la venta de la última dirección están "descargando"
-                estado = "descargando";
+                estado.descargando = true;
+            } else {
+                estado.cargado = true;
             }
 
             return {
                 elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
-                estado
+                ...estado
             };
-        });
+        });       
     }
 
     const handlePedidosScroll = (e) => {
@@ -376,11 +396,15 @@ export default function Asignacion({ session }) {
     }
 
     const imagenVehiculo = (vehiculo) => {
-        if (!vehiculo) return "desconocido_desconocido";
+        const defecto = { url: "desconocido_desconocido", width: 247, height: 191 };
+        if (!vehiculo) return defecto;
         const marca = (vehiculo?.marca.split(" ")[0] || "").toLowerCase();
         const modelo = (vehiculo?.modelo.split(" ")[0] || "").toLowerCase();
         const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
-        return imagen || "desconocido_desconocido";
+        return {
+            url: imagen,
+            ...sizeByModel(vehiculo)
+        } || defecto;
     }
 
     const getOpacityEstanque = (index) => {
@@ -391,6 +415,16 @@ export default function Asignacion({ session }) {
         if (!ruta || !Array.isArray(ruta.ventaIds) || !Array.isArray(ruta.ruta) || ruta.ruta.length === 0) return null;
         const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
         return ruta.ventaIds.find(v => String(v.direccionDespachoId) === String(ultimaDireccionId)) || null;
+    }
+
+    const getTextoEstado = (ruta) => {
+        if (!ruta) return "OTRO";
+        return ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'EN RUTA'
+            : getVentaActiva(ruta)?.tipo === TIPO_ORDEN.traslado ? 'RETIRANDO'
+                : (ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) ? 'DESCARGA'
+                    : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.carga ? 'CARGA'
+                        : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada ? 'CARGA CONFIRMADA'
+                            : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESANDO' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.terminado ? 'TERMINADO' : 'OTRO';
     }
 
     return (
@@ -439,7 +473,7 @@ export default function Asignacion({ session }) {
                 </div>
             )}
             {sucursales.length === 0 && (
-                <div className="flex justify-center items-center">
+                <div className="flex justify-center items-center h-12">
                     {loadingPanel
                         ? <Loader texto="Cargando sucursales..." />
                         : <p className="text-white py-2 bg-red-500 rounded px-4">No tienes sucursales asignadas.</p>}
@@ -682,9 +716,9 @@ export default function Asignacion({ session }) {
                                             data-id={ruta._id}
                                             className="relative h-56"
                                         >
-                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}.png`} alt={`camion_atras_${index}`} width={247} height={191} priority />
+                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId).url}.png`} alt={`camion_atras_${index}`} width={imagenVehiculo(ruta.vehiculoId).width} height={imagenVehiculo(ruta.vehiculoId).height} priority />
                                             <div className="absolute top-0 left-0 ml-10 mt-2 w-full h-fit">
-                                                {ruta.estado != TIPO_ESTADO_RUTA_DESPACHO.regreso && cargaActual(ruta).reverse().map((item, index) => {
+                                                {cargaActual(ruta).reverse().map((item, index) => {
                                                     const elem = item.elemento;
                                                     return (
                                                         <Image
@@ -693,20 +727,22 @@ export default function Asignacion({ session }) {
                                                             alt={`tank_${index}`}
                                                             width={14 * 2}
                                                             height={78 * 2}
-                                                            className={`absolute ${item.estado === "descargando" ? "opacity-40" : item.estado === "entregado" ? "opacity-0" : "opacity-100"}`}
+                                                            className={`absolute ${item.descargando ? "opacity-40" : item.entregado ? "opacity-0" : "opacity-100"}`}
                                                             style={calculateTubePosition(ruta.vehiculoId, cargaActual(ruta).length - index - 1)}
-                                                            priority={false}
+                                                            priority
                                                         />
                                                     )
                                                 })}
                                             </div>
-                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId)}_front.png`} alt="camion" width={247} height={191} />
+                                            <Image className="absolute top-0 left-0 ml-2" src={`/ui/${imagenVehiculo(ruta.vehiculoId).url}_front.png`} alt="camion" width={imagenVehiculo(ruta.vehiculoId).width} height={imagenVehiculo(ruta.vehiculoId).height} priority/>
                                             <div className="absolute top-46 right-6">
                                                 <div className="flex flex-col items-end ml-4 text-slate-800">
-                                                    <div className="bg-white rounded p-0.5 mt-32 w-24">
+                                                    <div className="bg-white rounded p-0.5 mt-32 w-26">
                                                         <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
                                                             <p className="text-lg font-bold">{ruta?.vehiculoId?.patente.substring(0, 2)}</p>
-                                                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
+                                                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" 
+                                                                width={12} height={9} priority
+                                                                style={ { "width": "auto", "height": "auto" } }/>
                                                             <p className="text-lg font-bold">{ruta?.vehiculoId?.patente.substring(2)}</p>
                                                         </div>
                                                     </div>
@@ -716,10 +752,7 @@ export default function Asignacion({ session }) {
                                                         {(ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga
                                                             || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) && <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>}
                                                         {ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso && <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>}
-                                                        <span className="text-xs font-semibold">{ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.en_ruta ? 'EN RUTA'
-                                                        : getVentaActiva(ruta)?.tipo === TIPO_ORDEN.traslado ? 'RETIRANDO'
-                                                            : (ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) ? 'DESCARGA'
-                                                                : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESO' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.carga ? 'CARGA' : 'OTRO'}</span>
+                                                        <span className="text-xs font-semibold">{getTextoEstado(ruta)}</span>
                                                     </div>
                                                 </div>
                                             </div>

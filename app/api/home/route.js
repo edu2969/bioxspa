@@ -13,7 +13,8 @@ import {
     TIPO_CARGO,
     TIPO_ESTADO_VENTA,
     TIPO_ESTADO_RUTA_DESPACHO,
-    TIPO_CHECKLIST
+    TIPO_CHECKLIST,
+    TIPO_ORDEN
 } from "@/app/utils/constants";
 
 export async function GET() {
@@ -134,19 +135,26 @@ export async function GET() {
                 }, {
                     estado: TIPO_ESTADO_VENTA.por_asignar,
                     direccionDespachoId: null
+                }, {
+                    estado: TIPO_ESTADO_VENTA.entregado
                 }]
             });
 
-            const ventaIds = ventas.filter(venta => venta.estado === TIPO_ESTADO_VENTA.preparacion).map(venta => venta._id);
+            const ventaIds = ventas.filter(venta => {
+                if(venta.estado === TIPO_ESTADO_VENTA.entregado) {
+                    return venta.tipo === TIPO_ORDEN.traslado;
+                }
+                return true;
+            }).map(venta => venta._id);
             const ventasDespachoEnLocal = ventas.filter(venta => !venta.direccionDespachoId).length;
 
             // Count rutasDespacho where the ventas are present
             const contadores = await RutaDespacho.countDocuments({
                 ventaIds: { $in: ventaIds },
                 choferId: { $in: choferIds },
-                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion
+                estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado] }
             });
-            return NextResponse.json({ ok: true, contadores: { preparacion: (contadores + ventasDespachoEnLocal) }, checklists: checklistResults });
+            return NextResponse.json({ ok: true, contadores: { ordenes: (contadores + ventasDespachoEnLocal) }, checklists: checklistResults });
         }
 
         // CHOFER

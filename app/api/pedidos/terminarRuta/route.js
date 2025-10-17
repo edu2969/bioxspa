@@ -5,7 +5,7 @@ import { connectMongoDB } from "@/lib/mongodb";
 import RutaDespacho from "@/models/rutaDespacho";
 import User from "@/models/user";
 import Cargo from "@/models/cargo";
-import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO, USER_ROLE, TIPO_ORDEN } from "@/app/utils/constants";
 
 // filepath: d:/git/bioxspa/app/api/pedidos/terminarRuta/route.js
 
@@ -37,6 +37,9 @@ export async function POST(req) {
         const rutaDespacho = await RutaDespacho.findOne({
             _id: rutaId,
             estado: TIPO_ESTADO_RUTA_DESPACHO.regreso
+        }).populate({
+            path: 'ventaIds',
+            select: 'tipo'
         });
         
         if (!rutaDespacho) {
@@ -81,13 +84,9 @@ export async function POST(req) {
             }, { status: 403 });
         }
 
-        // Update estado to regreso_confirmado
-        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.terminado;
-        
-        console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.terminado}`);
+        const ventasTraslado = rutaDespacho.ventaIds.filter(venta => venta.tipo === TIPO_ORDEN.traslado);        
+        rutaDespacho.estado = ventasTraslado.length > 0 ? TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado : TIPO_ESTADO_RUTA_DESPACHO.terminado;
         await rutaDespacho.save();
-
-        console.log("RutaDespacho updated successfully.");
         return NextResponse.json({ 
             ok: true, 
             message: "Ruta completada correctamente", 

@@ -5,30 +5,24 @@ import { authOptions } from "@/app/utils/authOptions";
 import User from "@/models/user";
 import Cargo from "@/models/cargo";
 import RutaDespacho from "@/models/rutaDespacho";
-import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta"; 
 import DetalleVenta from "@/models/detalleVenta";
 
-// filepath: d:\git\bioxspa\app\api\pedidos\confirmarDescarga\route.js
+// filepath: d:\git\bioxspa\app\api\pedidos\confirmarMovimientoCarga\route.js
 
 export async function POST(request) {
-    console.log("Starting confirmarDescarga process");
+    console.log("Starting confirmarMovimientoCarga process");
     try {
         await connectMongoDB();
 
-        // Get rutaId and itemMovidoIds from request
-        const { rutaId, itemMovidoIds } = await request.json();
-        console.log("Request received with rutaId:", rutaId, "itemMovidoIds:", itemMovidoIds);
+        const { rutaId } = await request.json();
+        console.log("Request received with rutaId:", rutaId);
 
         // Validate rutaId
         if (!rutaId) {
             return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
-        }
-
-        // Validate itemMovidoIds
-        if (!Array.isArray(itemMovidoIds)) {
-            return NextResponse.json({ ok: false, error: "itemMovidoIds must be an array" }, { status: 400 });
         }
 
         // Get user from session
@@ -74,31 +68,12 @@ export async function POST(request) {
 
         // Get current date
         const now = new Date();
-        
-
-        // Update the route: set estado to descarga_confirmada, update historialEstado, and add to historialCarga
-        await RutaDespacho.findByIdAndUpdate(
-            rutaId,
-            {
-                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada,
-                $push: {
-                    historialEstado: {
-                        estado: TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada,
-                        fecha: now
-                    },
-                    historialCarga: {
-                        fecha: now,
-                        itemMovidoIds,
-                        esCarga: false
-                    }
-                }
-            }
-        );
 
         // Encuentra la última dirección destino de la ruta
         const lastRoute = rutaDespacho.ruta[rutaDespacho.ruta.length - 1];
         const lastDireccionId = lastRoute.direccionDestinoId?._id || lastRoute.direccionDestinoId;
-
+        
+        const itemMovidoIds = rutaDespacho.cargaItemIds;
         // Actualiza la direccionId de cada item movido
         await ItemCatalogo.updateMany(
             { _id: { $in: itemMovidoIds } },
@@ -133,9 +108,12 @@ export async function POST(request) {
                         return Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length === detalle.cantidad;
                     });
 
-                    // Determina el nuevo estado y porCobrar
-                    const nuevoEstado = todosEscaneados ? TIPO_ESTADO_VENTA.entregado : TIPO_ESTADO_VENTA.por_asignar;
-                    const nuevoPorCobrar = todosEscaneados;
+                    const tipoOrden = venta.tipo;
+                    // Determina el nuevo estado y porCobrar                    
+                    const nuevoEstado = tipoOrden === TIPO_ORDEN.traslado 
+                        ? TIPO_ESTADO_VENTA.retirado
+                        : (todosEscaneados ? TIPO_ESTADO_VENTA.entregado : TIPO_ESTADO_VENTA.por_asignar);
+                    const nuevoPorCobrar = todosEscaneados; // @TODO: Si el cliente tiene arriendos y todosEscaneados, al parecer es true.
 
                     await Venta.findByIdAndUpdate(
                         venta._id,
@@ -160,13 +138,35 @@ export async function POST(request) {
             }
         }
 
+        // Update the route: set estado to descarga_confirmada, update historialEstado, and add to historialCarga
+        const tieneRetiro = ventasEnDireccion.some(v => v.tipo === TIPO_ORDEN.traslado);
+        const estadoFinal = tieneRetiro ? TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada 
+            : TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada
+        await RutaDespacho.findByIdAndUpdate(
+            rutaId,
+            {
+                estado: estadoFinal,
+                $push: {
+                    historialEstado: {
+                        estado: estadoFinal,
+                        fecha: now
+                    },
+                    historialCarga: {
+                        fecha: now,
+                        itemMovidoIds: rutaDespacho.cargaItemIds,
+                        esCarga: tieneRetiro
+                    }
+                }
+            }
+        );
+
         return NextResponse.json({
             ok: true,
             message: "Unloading confirmation successful"
         });
 
     } catch (error) {
-        console.error("Error in POST /confirmarDescarga:", error);
+        console.error("Error in POST /confirmarMovimientoCarga:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
 }

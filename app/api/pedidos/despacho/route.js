@@ -17,7 +17,7 @@ import Venta from "@/models/venta";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
-import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN } from "@/app/utils/constants";
 
 export async function GET() {
     try {
@@ -90,7 +90,8 @@ export async function GET() {
                 { 
                     estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
                     direccionId: dependenciaId 
-                }
+                },
+                { estado: TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado }
             ]
         };
         
@@ -100,6 +101,16 @@ export async function GET() {
                 path: "cargaItemIds",
                 model: "ItemCatalogo",
                 select: "_id codigo subcategoriaCatalogoId",
+                populate: {
+                    path: "subcategoriaCatalogoId",
+                    model: "SubcategoriaCatalogo",
+                    select: "nombre unidad categoriaCatalogoId cantidad sinSifon",
+                    populate: {
+                        path: "categoriaCatalogoId",
+                        model: "CategoriaCatalogo",
+                        select: "nombre tipo gas elemento esIndustrial"
+                    }
+                }
             })
             .populate({
                 path: "choferId",
@@ -114,7 +125,7 @@ export async function GET() {
             .populate({
                 path: "ventaIds",
                 model: "Venta",
-                select: "_id clienteId estado comentario createdAt entregasEnLocal",
+                select: "_id clienteId estado comentario createdAt entregasEnLocal tipo",
                 populate: {
                     path: "clienteId",
                     model: "Cliente",
@@ -173,6 +184,7 @@ export async function GET() {
                     );     
                     return {
                         ventaId: venta._id,
+                        tipo: venta.tipo,
                         fecha: venta.createdAt,
                         detalles: detallesFiltrados.map((detalle) => {
                             let newDetalle = {};
@@ -220,8 +232,19 @@ export async function GET() {
                 patenteVehiculo: ruta.vehiculoId?.patente || null,
                 fechaVentaMasReciente,
                 items: ruta.cargaItemIds?.map((item) => ({
+                    nombre: (item.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre + item.subcategoriaCatalogoId?.nombre) || null,
+                    multiplicador: 1,
+                    cantidad: item.subcategoriaCatalogoId?.cantidad || "??",
+                    unidad: item.subcategoriaCatalogoId?.unidad || null,
+                    restantes: null, // Se calcula más arriba
+                    itemCatalogoIds: [item._id],
+                    elemento: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento,
+                    sinSifon: item.subcategoriaCatalogoId?.sinSifon || false,
+                    esIndustrial: item.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false,
+                    nuCode: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento ? getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento) : null,
                     codigo: item.codigo,
-                    _id: item._id
+                    _id: item._id,
+                    subcategoriaId: item.subcategoriaCatalogoId                    
                 })) || [],
                 estado: ruta.estado,
             };
@@ -380,12 +403,28 @@ export async function POST(request) {
         
         ruta.cargaItemIds.push(...itemsNuevosParaCarga);
 
-        // Cambiar estado y agregar historial de estado
-        ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
-        ruta.historialEstado.push({
-            estado: TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
-            fecha: new Date()
-        });
+        // Determinar el tipo de orden de las ventas asociadas
+        const ventasRuta = await Venta.find({ _id: { $in: ventaIds } }).select("tipo estado").lean();
+        const todasSonTraslado = ventasRuta.every(v => v.tipo === TIPO_ORDEN.traslado);
+
+        if (todasSonTraslado) {
+            ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.terminado;
+            ruta.historialEstado.push({
+                estado: TIPO_ESTADO_RUTA_DESPACHO.terminado,
+                fecha: new Date()
+            });
+            // Cambiar estado de las ventas a entregado
+            await Venta.updateMany({ _id: { $in: ventaIds } }, {
+                $set: { estado: TIPO_ESTADO_VENTA.entregado },
+                $push: { historialEstados: { estado: TIPO_ESTADO_VENTA.entregado, fecha: new Date() } }
+            });
+        } else {
+            ruta.estado = TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
+            ruta.historialEstado.push({
+                estado: TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+                fecha: new Date()
+            });            
+        }
         
         console.log(`Moviendo ${itemsParaMoverObjectId.length} items nuevos en ruta ${rutaId}`);
         console.log(`Items ya movidos en rutas anteriores: ${itemsYaMovidos.size}`);

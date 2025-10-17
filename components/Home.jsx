@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import HomeAdministrador from "./HomeAdministrador";
 import HomeConductor from "./HomeConductor";
 import HomeDespacho from "./HomeDespacho";
@@ -13,6 +13,7 @@ import CheckList from "@/components/CheckList";
 import { TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
 import { useSession } from "next-auth/react";
+import reproducirSonido from '@/app/utils/sounds'; // Agregar import
 
 export default function Home() {
     const [checklists, setChecklists] = useState([]);
@@ -21,6 +22,11 @@ export default function Home() {
     const [loadingChecklist, setLoadingChecklist] = useState(false);
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const { data: session, status } = useSession();
+    
+    // Referencias para comparar cambios
+    const prevCountersRef = useRef({});
+    const prevChecklistsRef = useRef([]);
+    const isFirstLoadRef = useRef(true);
 
     const faltaChecklistPersonal = () => {
         if (!session || !session.user) return false;
@@ -30,7 +36,38 @@ export default function Home() {
         if(!checklists || checklists.length === 0) return true;
         const checklistPersonal = checklists.find(checklist => checklist.tipo === TIPO_CHECKLIST.personal && checklist.aprobado);        
         return !checklistPersonal || !checklistPersonal.aprobado || checklistPersonal.fecha < new Date(new Date().setHours(0, 0, 0, 0));
-    }    
+    }
+
+    // Función para detectar cambios en counters
+    const hasCountersChanged = (newCounters, prevCounters) => {
+        if (!prevCounters || Object.keys(prevCounters).length === 0) return false;
+        
+        const keys = [...new Set([...Object.keys(newCounters), ...Object.keys(prevCounters)])];
+        
+        return keys.some(key => {
+            const newValue = newCounters[key] || 0;
+            const prevValue = prevCounters[key] || 0;
+            return newValue !== prevValue;
+        });
+    };
+
+    // Función para detectar cambios en checklists
+    const hasChecklistsChanged = (newChecklists, prevChecklists) => {
+        if (!prevChecklists || prevChecklists.length === 0) return false;
+        
+        if (newChecklists.length !== prevChecklists.length) return true;
+        
+        return newChecklists.some((newItem, index) => {
+            const prevItem = prevChecklists[index];
+            if (!prevItem) return true;
+            
+            return (
+                newItem.tipo !== prevItem.tipo ||
+                newItem.aprobado !== prevItem.aprobado ||
+                new Date(newItem.fecha).getTime() !== new Date(prevItem.fecha).getTime()
+            );
+        });
+    };
     
     useOnVisibilityChange(() => {
         const fetch = async () => {
@@ -100,9 +137,27 @@ export default function Home() {
             const data = await response.json();                
             console.log("Fetched counters:", data);
             if (data.ok) {
+                // Detectar cambios antes de actualizar el estado
+                const countersChanged = hasCountersChanged(data.contadores, prevCountersRef.current);
+                const checklistsChanged = hasChecklistsChanged(data.checklists, prevChecklistsRef.current);
+                
+                // Reproducir sonido si hay cambios (pero no en la primera carga)
+                if (!isFirstLoadRef.current && (countersChanged || checklistsChanged)) {
+                    console.log("Cambios detectados - reproduciendo sonido");
+                    reproducirSonido('/sounds/bubble_01.mp3');
+                }
+                
+                // Actualizar referencias previas
+                prevCountersRef.current = { ...data.contadores };
+                prevChecklistsRef.current = [...data.checklists];
+                
+                // Actualizar estados
                 setCounters(data.contadores);
                 setChecklists(data.checklists);
                 setRoutingIndex(-1);
+                
+                // Marcar que ya no es la primera carga
+                isFirstLoadRef.current = false;
             } else {
                 toast.warn("No se pudieron cargar los contadores");
             }
@@ -115,7 +170,7 @@ export default function Home() {
     useEffect(() => {
         if(!session || !session.user) return;
         fetchDataHome();
-    }, [session]);
+    }, [session, fetchDataHome]);
 
     useEffect(() => {
         // Verifica si hay sesión y el socket está conectado
@@ -154,7 +209,7 @@ export default function Home() {
         return () => {
             socket.off("update-pedidos");
         };
-    }, []);
+    }, [fetchDataHome]);
 
     return (
         <div>

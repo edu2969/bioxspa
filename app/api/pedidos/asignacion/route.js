@@ -53,7 +53,8 @@ export async function GET(request) {
             estado: {
                 $in: [
                     TIPO_ESTADO_VENTA.pagado,
-                    TIPO_ESTADO_VENTA.entregado
+                    TIPO_ESTADO_VENTA.entregado,
+                    TIPO_ESTADO_VENTA.cerrado,
                 ]
             }
         }]
