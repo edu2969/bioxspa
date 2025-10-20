@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "fecha": "2025-10-18T22:22:54.519Z",
+    "empresa": "GASES BIOBIO SPA",
+    "rut": "77908357-8",
+    "ambiente": "CERTIFICACION",
+    "totalCasos": 19,
+    "exitosos": 0,
+    "fallidos": 19,
+    "tasaExito": "0.0%"
+  },
+  "resultados": [
+    {
+      "caso": "4444651-1",
+      "tipoDTE": 33,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:21:57.820Z"
+    },
+    {
+      "caso": "4444651-2",
+      "tipoDTE": 33,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:01.404Z"
+    },
+    {
+      "caso": "4444651-3",
+      "tipoDTE": 33,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:04.511Z"
+    },
+    {
+      "caso": "4444651-4",
+      "tipoDTE": 33,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:07.625Z"
+    },
+    {
+      "caso": "4444651-5",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:10.745Z"
+    },
+    {
+      "caso": "4444651-6",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:13.864Z"
+    },
+    {
+      "caso": "4444651-7",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:16.994Z"
+    },
+    {
+      "caso": "4444651-8",
+      "tipoDTE": 56,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:20.105Z"
+    },
+    {
+      "caso": "4444652-1",
+      "tipoDTE": 52,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:23.229Z"
+    },
+    {
+      "caso": "4444652-2",
+      "tipoDTE": 52,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:26.329Z"
+    },
+    {
+      "caso": "4444652-3",
+      "tipoDTE": 52,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:29.438Z"
+    },
+    {
+      "caso": "4444653-1",
+      "tipoDTE": 34,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:32.555Z"
+    },
+    {
+      "caso": "4444653-2",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:35.675Z"
+    },
+    {
+      "caso": "4444653-3",
+      "tipoDTE": 34,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:38.805Z"
+    },
+    {
+      "caso": "4444653-4",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:41.923Z"
+    },
+    {
+      "caso": "4444653-5",
+      "tipoDTE": 56,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:45.041Z"
+    },
+    {
+      "caso": "4444653-6",
+      "tipoDTE": 34,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:48.162Z"
+    },
+    {
+      "caso": "4444653-7",
+      "tipoDTE": 61,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:51.282Z"
+    },
+    {
+      "caso": "4444653-8",
+      "tipoDTE": 56,
+      "error": "No se obtuvo TRACKID",
+      "exitoso": false,
+      "timestamp": "2025-10-18T22:22:54.402Z"
+    }
+  ]
+}

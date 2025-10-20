@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<EnvioDTE version="1.0" xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v10.xsd">
+    <SetDTE ID="SetDoc2025-10-201504">
+        <Caratula version="1.0">
+            <RutEmisor>77908357-8</RutEmisor>
+            <RutEnvia>77908357-8</RutEnvia>
+            <RutReceptor>60803000-K</RutReceptor>
+            <FchResol>2006-02-17</FchResol>
+            <NroResol>102</NroResol>
+            <TmstFirmaEnv>2025-10-20T15:04:37.376Z</TmstFirmaEnv>
+            <SubTotDTE>
+                <TpoDTE>33</TpoDTE>
+                <NroDTE>1</NroDTE>
+            </SubTotDTE>
+        </Caratula>
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+<DTE version="1.0">
+    <Documento ID="T33F33085">
+        <Encabezado>
+            <IdDoc>
+                <TipoDTE>33</TipoDTE>
+                <Folio>33085</Folio>
+                <FchEmis>2025-10-20</FchEmis>
+            </IdDoc>
+            <Emisor>
+                <RUTEmisor>77908357-8</RUTEmisor>
+                <RznSoc>GASES BIOBIO SPA</RznSoc>
+                <GiroEmis>VENTA DE GASES INDUSTRIALES</GiroEmis>
+                <Acteco>251199</Acteco>
+                <DirOrigen>AV BRASIL 2950</DirOrigen>
+                <CmnaOrigen>SAN MIGUEL</CmnaOrigen>
+                <CiudadOrigen>SANTIAGO</CiudadOrigen>
+            </Emisor>
+            <Receptor>
+                <RUTRecep>96790240-3</RUTRecep>
+                <RznSocRecep>SERVICIO DE IMPUESTOS INTERNOS</RznSocRecep>
+                <DirRecep>TEATINOS 120</DirRecep>
+                <CmnaRecep>SANTIAGO</CmnaRecep>
+                <CiudadRecep>SANTIAGO</CiudadRecep>
+            </Receptor>
+            <Totales>
+                <MntNeto>10000</MntNeto>
+                <IVA>1900</IVA>
+                <MntTotal>11900</MntTotal>
+            </Totales>
+        </Encabezado>
+        <Detalle>
+            <item>
+                <NroLinDet>1</NroLinDet>
+                <NmbItem>PRODUCTO DE PRUEBA</NmbItem>
+                <QtyItem>1</QtyItem>
+                <PrcItem>10000</PrcItem>
+                <MontoItem>10000</MontoItem>
+            </item>
+        </Detalle>
+    </Documento>
+</DTE>
+    </SetDTE>
+</EnvioDTE>

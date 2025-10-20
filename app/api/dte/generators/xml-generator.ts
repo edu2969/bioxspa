@@ -1,225 +1,71 @@
 import { DTETest } from '../casos-test';
-import { DigitalSigner } from './digital-signer';
+import { XMLSigner } from './xml-signer';
 
 export class XMLGenerator {
-  
-  static generarYFirmarDTE(data: DTETest): string {
-    let xml: string;
-    
-    switch (data.tipoDTE) {
-      case 33: // Factura Electrónica
-        xml = this.generarFacturaElectronica(data);
-        break;
-      case 34: // Factura Exenta
-        xml = this.generarFacturaExenta(data);
-        break;
-      case 52: // Guía de Despacho
-        xml = this.generarGuiaDespacho(data);
-        break;
-      case 61: // Nota de Crédito
-        if (data.referencia?.tipoDTE === 34) {
-          xml = this.generarFacturaExenta({...data, tipoDTE: 61});
-        } else {
-          xml = this.generarFacturaElectronica({...data, tipoDTE: 61});
-        }
-        break;
-      case 56: // Nota de Débito
-        if (data.referencia?.tipoDTE === 34 || data.referencia?.tipoDTE === 61) {
-          xml = this.generarFacturaExenta({...data, tipoDTE: 56});
-        } else {
-          xml = this.generarFacturaElectronica({...data, tipoDTE: 56});
-        }
-        break;
-      default:
-        throw new Error(`Tipo DTE ${data.tipoDTE} no implementado`);
-    }
-
-    // Firmar el XML usando certificado de variables de entorno
-    const signer = new DigitalSigner();
-    return signer.firmarXML(xml);
-  }
-
-  static generarFacturaElectronica(data: DTETest): string {
-    const { items, receptor, descuentoGlobal } = data;
-    
-    // Calcular totales
-    const itemsAfectos = items.filter(item => item.afecto);
-    const itemsExentos = items.filter(item => !item.afecto);
-    
-    const subtotalAfecto = itemsAfectos.reduce((sum, item) => sum + item.montoItem, 0);
-    const subtotalExento = itemsExentos.reduce((sum, item) => sum + item.montoItem, 0);
-    
-    // Aplicar descuento global si existe
-    let descuentoTotal = 0;
-    if (descuentoGlobal && descuentoGlobal.sobreAfectos) {
-      descuentoTotal = descuentoGlobal.tipo === 'P' 
-        ? Math.round(subtotalAfecto * (descuentoGlobal.valor / 100))
-        : descuentoGlobal.valor;
+    static generarYFirmarDTE(caso: DTETest): string {
+        console.log(`🔧 Generando XML para caso tipo ${caso.tipoDTE}...`);
+        
+        // Generar XML básico del DTE
+        const xmlDTE = this.generarXMLDTE(caso);
+        
+        // Firmarlo
+        const signer = new XMLSigner();
+        const xmlFirmado = signer.firmarXML(xmlDTE);
+        
+        console.log(`✅ XML generado y firmado para tipo ${caso.tipoDTE}`);
+        return xmlFirmado;
     }
     
-    const neto = subtotalAfecto - descuentoTotal;
-    const iva = Math.round(neto * 0.19);
-    const total = neto + iva + subtotalExento;
-
-    return `<?xml version="1.0" encoding="ISO-8859-1"?>
+    private static generarXMLDTE(caso: DTETest): string {
+        const fechaEmision = new Date().toISOString().split('T')[0];
+        const folio = Math.floor(Math.random() * 1000000) + 1;
+        
+        // Calcular totales
+        const montoNeto = caso.items.reduce((sum, item) => sum + item.montoItem, 0);
+        const montoIVA = Math.round(montoNeto * 0.19);
+        const montoTotal = montoNeto + montoIVA;
+        
+        return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <DTE version="1.0">
-  <Documento ID="F${data.folio}T${data.tipoDTE}">
-    <Encabezado>
-      <IdDoc>
-        <TipoDTE>${data.tipoDTE}</TipoDTE>
-        <Folio>${data.folio}</Folio>
-        <FchEmis>${data.fechaEmision}</FchEmis>
-      </IdDoc>
-      <Emisor>
-        <RUTEmisor>12345678-9</RUTEmisor>
-        <RznSoc>EMPRESA CERTIFICACION SII</RznSoc>
-        <GiroEmis>CERTIFICACION ELECTRONICA</GiroEmis>
-        <DirOrigen>DIRECCION EMPRESA</DirOrigen>
-        <CmnaOrigen>SANTIAGO</CmnaOrigen>
-      </Emisor>
-      <Receptor>
-        <RUTRecep>${receptor.rut}</RUTRecep>
-        <RznSocRecep>${receptor.razonSocial}</RznSocRecep>
-        <GiroRecep>${receptor.giro}</GiroRecep>
-        <DirRecep>${receptor.direccion}</DirRecep>
-        <CmnaRecep>${receptor.comuna}</CmnaRecep>
-      </Receptor>
-      <Totales>
-        ${neto > 0 ? `<MntNeto>${neto}</MntNeto>` : ''}
-        ${subtotalExento > 0 ? `<MntExe>${subtotalExento}</MntExe>` : ''}
-        ${iva > 0 ? `<IVA>${iva}</IVA>` : ''}
-        <MntTotal>${total}</MntTotal>
-      </Totales>
-    </Encabezado>
-    ${items.map((item) => `
-    <Detalle>
-      <NroLinDet>${item.nroLinDet}</NroLinDet>
-      <NmbItem>${item.nombre}</NmbItem>
-      <QtyItem>${item.cantidad}</QtyItem>
-      ${item.unidadMedida ? `<UnmdItem>${item.unidadMedida}</UnmdItem>` : ''}
-      <PrcItem>${item.precioUnitario}</PrcItem>
-      ${item.descuentoPct ? `<DescuentoPct>${item.descuentoPct}</DescuentoPct>` : ''}
-      <MontoItem>${item.montoItem}</MontoItem>
-    </Detalle>`).join('')}
-    ${descuentoGlobal ? `
-    <DscRcgGlobal>
-      <TpoMov>D</TpoMov>
-      <TpoValor>${descuentoGlobal.tipo}</TpoValor>
-      <ValorDR>${descuentoGlobal.valor}</ValorDR>
-    </DscRcgGlobal>` : ''}
-    ${data.referencia ? `
-    <Referencia>
-      <NroLinRef>${data.referencia.nroLinRef}</NroLinRef>
-      <TpoDocRef>${data.referencia.tipoDTE}</TpoDocRef>
-      <FolioRef>${data.referencia.folio}</FolioRef>
-      <FchRef>${data.referencia.fechaDocRef}</FchRef>
-      <CodRef>${data.referencia.codRef}</CodRef>
-      <RazonRef>${data.referencia.razonRef}</RazonRef>
-    </Referencia>` : ''}
-  </Documento>
+    <Documento ID="DTE-${caso.tipoDTE}-${folio}">
+        <Encabezado>
+            <IdDoc>
+                <TipoDTE>${caso.tipoDTE}</TipoDTE>
+                <Folio>${folio}</Folio>
+                <FchEmis>${fechaEmision}</FchEmis>
+            </IdDoc>
+            <Emisor>
+                <RUTEmisor>77908357-8</RUTEmisor>
+                <RznSoc>GASES BIOBIO SPA</RznSoc>
+                <GiroEmis>VENTA DE GASES INDUSTRIALES</GiroEmis>
+                <Acteco>251199</Acteco>
+                <DirOrigen>AV. BRASIL 2950</DirOrigen>
+                <CmnaOrigen>SAN MIGUEL</CmnaOrigen>
+                <CiudadOrigen>SANTIAGO</CiudadOrigen>
+            </Emisor>
+            <Receptor>
+                <RUTRecep>${caso.receptor.rut}</RUTRecep>
+                <RznSocRecep>${caso.receptor.razonSocial}</RznSocRecep>
+                <DirRecep>${caso.receptor.direccion}</DirRecep>
+                <CmnaRecep>${caso.receptor.comuna}</CmnaRecep>
+                <CiudadRecep>${caso.receptor.ciudad}</CiudadRecep>
+            </Receptor>
+            <Totales>
+                <MntNeto>${montoNeto}</MntNeto>
+                <IVA>${montoIVA}</IVA>
+                <MntTotal>${montoTotal}</MntTotal>
+            </Totales>
+        </Encabezado>
+        <Detalle>
+${caso.items.map((item, index) => `            <item>
+                <NroLinDet>${index + 1}</NroLinDet>
+                <NmbItem>${item.nombre}</NmbItem>
+                <QtyItem>${item.cantidad}</QtyItem>
+                <PrcItem>${item.precioUnitario}</PrcItem>
+                <MontoItem>${item.montoItem}</MontoItem>
+            </item>`).join('\n')}
+        </Detalle>
+    </Documento>
 </DTE>`;
-  }
-
-  static generarFacturaExenta(data: DTETest): string {
-    const { items, receptor } = data;
-    const total = items.reduce((sum, item) => sum + item.montoItem, 0);
-
-    return `<?xml version="1.0" encoding="ISO-8859-1"?>
-<DTE version="1.0">
-  <Documento ID="F${data.folio}T34">
-    <Encabezado>
-      <IdDoc>
-        <TipoDTE>34</TipoDTE>
-        <Folio>${data.folio}</Folio>
-        <FchEmis>${data.fechaEmision}</FchEmis>
-      </IdDoc>
-      <Emisor>
-        <RUTEmisor>12345678-9</RUTEmisor>
-        <RznSoc>EMPRESA CERTIFICACION SII</RznSoc>
-        <GiroEmis>CERTIFICACION ELECTRONICA</GiroEmis>
-        <DirOrigen>DIRECCION EMPRESA</DirOrigen>
-        <CmnaOrigen>SANTIAGO</CmnaOrigen>
-      </Emisor>
-      <Receptor>
-        <RUTRecep>${receptor.rut}</RUTRecep>
-        <RznSocRecep>${receptor.razonSocial}</RznSocRecep>
-        <GiroRecep>${receptor.giro}</GiroRecep>
-        <DirRecep>${receptor.direccion}</DirRecep>
-        <CmnaRecep>${receptor.comuna}</CmnaRecep>
-      </Receptor>
-      <Totales>
-        <MntExe>${total}</MntExe>
-        <MntTotal>${total}</MntTotal>
-      </Totales>
-    </Encabezado>
-    ${items.map(item => `
-    <Detalle>
-      <NroLinDet>${item.nroLinDet}</NroLinDet>
-      <NmbItem>${item.nombre}</NmbItem>
-      <QtyItem>${item.cantidad}</QtyItem>
-      ${item.unidadMedida ? `<UnmdItem>${item.unidadMedida}</UnmdItem>` : ''}
-      <PrcItem>${item.precioUnitario}</PrcItem>
-      <MontoItem>${item.montoItem}</MontoItem>
-    </Detalle>`).join('')}
-    ${data.referencia ? `
-    <Referencia>
-      <NroLinRef>${data.referencia.nroLinRef}</NroLinRef>
-      <TpoDocRef>${data.referencia.tipoDTE}</TpoDocRef>
-      <FolioRef>${data.referencia.folio}</FolioRef>
-      <FchRef>${data.referencia.fechaDocRef}</FchRef>
-      <CodRef>${data.referencia.codRef}</CodRef>
-      <RazonRef>${data.referencia.razonRef}</RazonRef>
-    </Referencia>` : ''}
-  </Documento>
-</DTE>`;
-  }
-
-  static generarGuiaDespacho(data: DTETest): string {
-    const { items, receptor } = data;
-    const total = items.reduce((sum, item) => sum + item.montoItem, 0);
-
-    return `<?xml version="1.0" encoding="ISO-8859-1"?>
-<DTE version="1.0">
-  <Documento ID="F${data.folio}T52">
-    <Encabezado>
-      <IdDoc>
-        <TipoDTE>52</TipoDTE>
-        <Folio>${data.folio}</Folio>
-        <FchEmis>${data.fechaEmision}</FchEmis>
-        <IndTraslado>${data.tipoTraslado || 1}</IndTraslado>
-      </IdDoc>
-      <Emisor>
-        <RUTEmisor>12345678-9</RUTEmisor>
-        <RznSoc>EMPRESA CERTIFICACION SII</RznSoc>
-        <GiroEmis>CERTIFICACION ELECTRONICA</GiroEmis>
-        <DirOrigen>DIRECCION EMPRESA</DirOrigen>
-        <CmnaOrigen>SANTIAGO</CmnaOrigen>
-      </Emisor>
-      <Receptor>
-        <RUTRecep>${receptor.rut}</RUTRecep>
-        <RznSocRecep>${receptor.razonSocial}</RznSocRecep>
-        <GiroRecep>${receptor.giro}</GiroRecep>
-        <DirRecep>${receptor.direccion}</DirRecep>
-        <CmnaRecep>${receptor.comuna}</CmnaRecep>
-      </Receptor>
-      ${total > 0 ? `
-      <Totales>
-        <MntTotal>${total}</MntTotal>
-      </Totales>` : ''}
-      ${data.transportista ? `
-      <Transporte>
-        <Transportista>${data.transportista}</Transportista>
-      </Transporte>` : ''}
-    </Encabezado>
-    ${items.map(item => `
-    <Detalle>
-      <NroLinDet>${item.nroLinDet}</NroLinDet>
-      <NmbItem>${item.nombre}</NmbItem>
-      <QtyItem>${item.cantidad}</QtyItem>
-      ${item.precioUnitario > 0 ? `<PrcItem>${item.precioUnitario}</PrcItem>` : ''}
-      ${item.montoItem > 0 ? `<MontoItem>${item.montoItem}</MontoItem>` : ''}
-    </Detalle>`).join('')}
-  </Documento>
-</DTE>`;
-  }
+    }
 }

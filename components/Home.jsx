@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import HomeAdministrador from "./HomeAdministrador";
 import HomeConductor from "./HomeConductor";
 import HomeDespacho from "./HomeDespacho";
@@ -131,7 +131,7 @@ export default function Home() {
             });
     };
     
-    async function fetchDataHome() {        
+    const fetchDataHome = useCallback(async () => {
         try {
             const response = await fetch('/api/home');
             const data = await response.json();                
@@ -165,12 +165,7 @@ export default function Home() {
         } catch (error) {
             console.error('Error fetching counters:', error);
         }
-    }
-
-    useEffect(() => {
-        if(!session || !session.user) return;
-        fetchDataHome();
-    }, [session, fetchDataHome]);
+    }, [setCounters, setChecklists]);
 
     useEffect(() => {
         // Verifica si hay sesión y el socket está conectado
@@ -202,7 +197,13 @@ export default function Home() {
     }, [session]);
 
     useEffect(() => {
+        if(!session || !session.user) return;
+        fetchDataHome();
+    }, [session, fetchDataHome]);
+
+    useEffect(() => {
         socket.on("update-pedidos", () => {
+            console.log("POR SOCKET-ON, fetching home data");
             fetchDataHome();
         });
 

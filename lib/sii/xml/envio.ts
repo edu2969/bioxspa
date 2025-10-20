@@ -1,26 +1,29 @@
-import { create as createXml } from 'xmlbuilder2';
-import { XMLBuilder } from 'xmlbuilder2/lib/interfaces';
+export function buildEnvioDTE(
+    dtesXML: string[],
+    rutEmisor: string,
+    rutReceptor: string
+): string {
+    console.log(`📦 Construyendo envío con ${dtesXML.length} DTEs...`);
 
-export function buildEnvioDTE(xmlDTEs: string[], emisorRut: string, receptorRut: string) {
-  const doc = createXml({ version: '1.0', encoding: 'ISO-8859-1' })
-    .ele('EnvioDTE', { xmlns: 'http://www.sii.cl/SiiDte', version: '1.0' })
-      .ele('SetDTE', { ID: 'SIISetDTE1' })
-        .ele('Caratula', { version: '1.0' })
-          .ele('RutEmisor').txt(emisorRut).up()
-          .ele('RutEnvia').txt(receptorRut).up()
-          .ele('RutReceptor').txt('60803000-K').up()
-          .ele('FchResol').txt('2020-01-01').up()
-          .ele('NroResol').txt('80').up()
-          .ele('TmstFirmaEnv').txt(new Date().toISOString()).up()
-        .up();  
+    const fechaEnvio = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+    const idEnvio = `ENV${fechaEnvio}`;
 
-  
-
-  const setNode = doc.find((node: XMLBuilder) => node.node.nodeName === 'SetDTE') as XMLBuilder;
-  xmlDTEs.forEach(x => {
-    const dteNode = createXml(x);
-    setNode.import(dteNode);
-  });
-
-  return doc.end({ prettyPrint: true });
+    return `<?xml version="1.0" encoding="ISO-8859-1"?>
+<EnvioDTE version="1.0" xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v10.xsd">
+    <SetDTE ID="SetDoc">
+        <Caratula version="1.0">
+            <RutEmisor>${rutEmisor}</RutEmisor>
+            <RutEnvia>${rutReceptor}</RutEnvia>
+            <RutReceptor>60803000-K</RutReceptor>
+            <FchResol>${fechaEnvio}</FchResol>
+            <NroResol>${idEnvio}</NroResol>
+            <TmstFirmaEnv>${new Date().toISOString()}</TmstFirmaEnv>
+            <SubTotDTE>
+                <TpoDTE>33</TpoDTE>
+                <NroDTE>${dtesXML.length}</NroDTE>
+            </SubTotDTE>
+        </Caratula>
+${dtesXML.join('\n')}
+    </SetDTE>
+</EnvioDTE>`;
 }

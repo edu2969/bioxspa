@@ -126,6 +126,8 @@ export const TIPO_ESTADO_ITEM_CATALOGO = {
     vacio: 8,
     en_llenado: 9,    
     lleno: 16,
+    contaminado: 32, 
+    dado_baja: 64        
 }
 
 export const TIPO_CHECKLIST = {

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:impl="http://DefaultNamespace">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <getToken xmlns="http://DefaultNamespace"><pszXml>&amp;lt;?xml version=&amp;quot;1.0&amp;quot; encoding=&amp;quot;UTF-8&amp;quot;?&amp;gt;
+&amp;lt;getToken&amp;gt;
+&amp;lt;item&amp;gt;
+&amp;lt;Semilla&amp;gt;150050931118&amp;lt;/Semilla&amp;gt;
+&amp;lt;/item&amp;gt;
+&amp;lt;Signature&amp;gt;
+&amp;lt;SignedInfo&amp;gt;
+&amp;lt;CanonicalizationMethod Algorithm=&amp;quot;http://www.w3.org/TR/2001/REC-xml-c14n-20010315&amp;quot;/&amp;gt;
+&amp;lt;SignatureMethod Algorithm=&amp;quot;http://www.w3.org/2000/09/xmldsig#rsa-sha1&amp;quot;/&amp;gt;
+&amp;lt;Reference URI=&amp;quot;&amp;quot;&amp;gt;
+&amp;lt;Transforms&amp;gt;
+&amp;lt;Transform Algorithm=&amp;quot;http://www.w3.org/2000/09/xmldsig#enveloped-signature&amp;quot;/&amp;gt;
+&amp;lt;/Transforms&amp;gt;
+&amp;lt;DigestMethod Algorithm=&amp;quot;http://www.w3.org/2000/09/xmldsig#sha1&amp;quot;/&amp;gt;
+&amp;lt;DigestValue&amp;gt;FyrvNZlrNqWYF+M/j4BHVVK7y38=&amp;lt;/DigestValue&amp;gt;
+&amp;lt;/Reference&amp;gt;
+&amp;lt;/SignedInfo&amp;gt;
+&amp;lt;SignatureValue&amp;gt;WJHF32Lh9VXvnJJCl0QTxui1Z4TRAwirD4FzKFoBJke4QDHITWKkcsX5ymuYveUv1gPcG6dmXOlsNVfzFyITgb4VHKP93n2360qrVQz9ssAdRJaUDTjyJCM19KoNV55CgjOTNPwuXFEEuEt7p6AsEmJFWF8oftKD/+V/ZN4ufeGloiurI47A9K4k7xQKVtGN9lPA7QoXFRS1BrSND0JvE7/v38HhobLuyTUdIVsN6OzViNxc3wYohsFJbNvCo5iLK7QR1eNqvfW5KL2+8a32AjvQW/90sBWeqx4ZgD4pG08CHRC6oetFNI818t5xxCeBglFQJTdpBrwKuOcP9bPclg==&amp;lt;/SignatureValue&amp;gt;
+&amp;lt;KeyInfo&amp;gt;
+&amp;lt;X509Data&amp;gt;
+&amp;lt;X509Certificate&amp;gt;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&amp;lt;/X509Certificate&amp;gt;
+&amp;lt;/X509Data&amp;gt;
+&amp;lt;/KeyInfo&amp;gt;
+&amp;lt;/Signature&amp;gt;
+&amp;lt;/getToken&amp;gt;</pszXml></getToken>
+    </soapenv:Body>
+</soapenv:Envelope>

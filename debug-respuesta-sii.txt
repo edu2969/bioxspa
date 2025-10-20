@@ -1,0 +1,34 @@
+<HTML>
+<HEAD>
+<TITLE>Error 501</TITLE>
+</HEAD>
+<BODY>
+<div align="center"><center>
+<table border="0" cellpadding="0" cellspacing="0" width="630">
+<tr>
+<td colspan="2"></tr>
+<tr>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2"><b><font face="Arial" size="2"><br>
+</font><font face="Arial" size="4">ERROR : 501 </font></b></td>
+</tr>
+<tr>
+<td height="40" colspan="2"><hr>
+</td>
+</tr>
+<tr>
+<td colspan="2"><p align="justify"><font face="Arial" size="2"><h4>
+Error : ptr NULL (ptrTkn)
+</h4>
+<h4>
+Codigo de Error : 01.02.28.413.211.1000.
+</h4>
+</font></p></td>
+</tr>
+</table>
+</center></div>
+</BODY>
+</HTML>

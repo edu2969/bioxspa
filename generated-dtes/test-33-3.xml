@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<DTE version="1.0">
+  <Documento ID="F3T33">
+    <Encabezado>
+      <IdDoc>
+        <TipoDTE>33</TipoDTE>
+        <Folio>3</Folio>
+        <FchEmis>2024-01-17</FchEmis>
+      </IdDoc>
+      <Emisor>
+        <RUTEmisor>12345678-9</RUTEmisor>
+        <RznSoc>EMPRESA CERTIFICACION SII</RznSoc>
+        <GiroEmis>CERTIFICACION ELECTRONICA</GiroEmis>
+        <DirOrigen>DIRECCION EMPRESA</DirOrigen>
+        <CmnaOrigen>SANTIAGO</CmnaOrigen>
+      </Emisor>
+      <Receptor>
+        <RUTRecep>96790240-3</RUTRecep>
+        <RznSocRecep>SERVICIO DE IMPUESTOS INTERNOS</RznSocRecep>
+        <GiroRecep>ADMINISTRACION PUBLICA</GiroRecep>
+        <DirRecep>TEATINOS 120</DirRecep>
+        <CmnaRecep>SANTIAGO</CmnaRecep>
+      </Receptor>
+      <Totales>
+        <MntNeto>594474</MntNeto>
+        <MntExe>34813</MntExe>
+        <IVA>112950</IVA>
+        <MntTotal>742237</MntTotal>
+      </Totales>
+    </Encabezado>
+    
+    <Detalle>
+      <NroLinDet>1</NroLinDet>
+      <NmbItem>Pintura B&amp;W AFECTO</NmbItem>
+      <QtyItem>28</QtyItem>
+      
+      <PrcItem>2928</PrcItem>
+      
+      <MontoItem>81984</MontoItem>
+    </Detalle>
+    <Detalle>
+      <NroLinDet>2</NroLinDet>
+      <NmbItem>ITEM 2 AFECTO</NmbItem>
+      <QtyItem>165</QtyItem>
+      
+      <PrcItem>3106</PrcItem>
+      
+      <MontoItem>512490</MontoItem>
+    </Detalle>
+    <Detalle>
+      <NroLinDet>3</NroLinDet>
+      <NmbItem>ITEM 3 SERVICIO EXENTO</NmbItem>
+      <QtyItem>1</QtyItem>
+      
+      <PrcItem>34813</PrcItem>
+      
+      <MontoItem>34813</MontoItem>
+    </Detalle>
+    
+    
+  </Documento>
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+  <SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+  <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+  <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+  <Reference URI="#F3T33">
+    <Transforms>
+      <Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+    </Transforms>
+    <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+    <DigestValue>un0VjhyCHYiuStc9WuQMaEHKCIE=</DigestValue>
+  </Reference>
+</SignedInfo>
+  <SignatureValue>IfRDLlDtLlcC1rdc/HEayQClyrTQwP4mb49EPfhQHmQEN46g66+XaPLtb8t2UKgTKfH6ny9bVqiD5PvBde6vgQdA3hB4ZqZm73qCkusC+GNBvM3El12JZU3yQqXwZqNLp1JqzBCE+gE+yhoSdxCsM0nrOUQ2vN3iXt4K+c3/dVAyLFX+rmsqSaoS1/ThraxO+WBdwSpgBYTl3HgqG/Uu82zd/fLhX8fmbxZySJeckuT8Lu2BoqfO60S5QIlsQQeNSNjDWLjuDA/nk382KsL+g0IFcFbeIYgRSIElDlsWLH8icMqe18+FIp5HCP50/ZVHOlSudqUpftd+HateBGFB+A==</SignatureValue>
+  <KeyInfo>
+    <KeyValue>
+      <RSAKeyValue>
+        <Modulus>qK9SOlwBZ52FQLTyqNytvyRon3O4jDhV9dRKpf+Zh/jMDZ/C5atEtubO59jGPICT4OMMSQ4QKuITWwvwknrMdV3NnZ/xiWe7g6ucCPBdUZpanLm0lBRu9jBKRgepwrY/RwK1XS5jeLDWKpmgaQ0jW1b9bLz5eDAV1Wu/1WWojMhEzxaVWK/ogn42syKeW2v40VBK9ppcJy4gpI7/kRVd3lXZDDR0J+UoEjwU3aNnrOIhu4uJfQHOwqsHjYOhqmTReFsJnizazO5t/ByCczfVxf3B3EQfOsDvJ5b5Pa1Q0tEvakOnVXMNSnCSARAv6jIRqjVlt9kSUGvV+h3ldeAdkQ==</Modulus>
+        <Exponent>AQAB</Exponent>
+      </RSAKeyValue>
+    </KeyValue>
+    <X509Data>
+      <X509Certificate>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</X509Certificate>
+    </X509Data>
+  </KeyInfo>
+</Signature></DTE>
