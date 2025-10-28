@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import HomeAdministrador from "./HomeAdministrador";
 import HomeConductor from "./HomeConductor";
 import HomeDespacho from "./HomeDespacho";
-import HomeGerencia from "./branch/BranchBussinessView";
+import HomeGerencia from "./HomeGerencia";
 import { USER_ROLE } from "@/app/utils/constants";
 import { socket } from '@/lib/socket-client';
 import { ToastContainer, toast } from 'react-toastify';
@@ -139,7 +139,7 @@ export default function Home() {
             if (data.ok) {
                 // Detectar cambios antes de actualizar el estado
                 const countersChanged = hasCountersChanged(data.contadores, prevCountersRef.current);
-                const checklistsChanged = hasChecklistsChanged(data.checklists, prevChecklistsRef.current);
+                const checklistsChanged = data.checklists && hasChecklistsChanged(data.checklists, prevChecklistsRef.current);
                 
                 // Reproducir sonido si hay cambios (pero no en la primera carga)
                 if (!isFirstLoadRef.current && (countersChanged || checklistsChanged)) {
@@ -149,11 +149,12 @@ export default function Home() {
                 
                 // Actualizar referencias previas
                 prevCountersRef.current = { ...data.contadores };
-                prevChecklistsRef.current = [...data.checklists];
-                
+                if(data.checklists) {
+                    prevChecklistsRef.current = [...data.checklists];
+                    setChecklists(data.checklists);
+                }
                 // Actualizar estados
-                setCounters(data.contadores);
-                setChecklists(data.checklists);
+                setCounters(data.contadores);                
                 setRoutingIndex(-1);
                 
                 // Marcar que ya no es la primera carga

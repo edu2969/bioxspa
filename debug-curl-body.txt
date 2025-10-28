@@ -1,7 +1,7 @@
 ------formdata-curl-equivalent
 Content-Disposition: form-data; name="token"
 
-MCTX764SSOPNA
+J8U9HTVY5GKPZ
 ------formdata-curl-equivalent
 Content-Disposition: form-data; name="rutSender"
 
@@ -16,14 +16,14 @@ Content-Type: text/xml
 
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <EnvioDTE version="1.0" xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v10.xsd">
-    <SetDTE ID="SetDoc2025-10-201504">
+    <SetDTE ID="SetDoc2025-10-221339">
         <Caratula version="1.0">
             <RutEmisor>77908357-8</RutEmisor>
             <RutEnvia>77908357-8</RutEnvia>
             <RutReceptor>60803000-K</RutReceptor>
             <FchResol>2006-02-17</FchResol>
             <NroResol>102</NroResol>
-            <TmstFirmaEnv>2025-10-20T15:04:37.376Z</TmstFirmaEnv>
+            <TmstFirmaEnv>2025-10-22T13:39:20.766Z</TmstFirmaEnv>
             <SubTotDTE>
                 <TpoDTE>33</TpoDTE>
                 <NroDTE>1</NroDTE>
@@ -31,12 +31,12 @@ Content-Type: text/xml
         </Caratula>
         <?xml version="1.0" encoding="ISO-8859-1"?>
 <DTE version="1.0">
-    <Documento ID="T33F33085">
+    <Documento ID="T33F58857">
         <Encabezado>
             <IdDoc>
                 <TipoDTE>33</TipoDTE>
-                <Folio>33085</Folio>
-                <FchEmis>2025-10-20</FchEmis>
+                <Folio>58857</Folio>
+                <FchEmis>2025-10-22</FchEmis>
             </IdDoc>
             <Emisor>
                 <RUTEmisor>77908357-8</RUTEmisor>

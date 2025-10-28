@@ -7,7 +7,7 @@ import Venta from "@/models/venta";
 import { authOptions } from "@/app/utils/authOptions";
 import { getServerSession } from "next-auth";
 import Cliente from "@/models/cliente";
-import BIDeuda from "@/models/biDeuda";
+
 import {
     USER_ROLE,
     TIPO_CARGO,
@@ -69,28 +69,6 @@ export async function GET() {
             // Clientes en quiebra
             const clientesEnQuiebra = await Cliente.countDocuments({ activo: true, enQuiebra: true });
 
-            // Obtener todas las deudas agrupadas por cliente
-            const deudasPorCliente = await BIDeuda.aggregate([
-                {
-                    $group: {
-                        _id: "$clienteId",
-                        totalDeuda: { $sum: "$monto" }
-                    }
-                }
-            ]);
-
-            // Obtener los créditos de los clientes
-            const clientes = await Cliente.find({ activo: true }).select("_id credito").lean();
-
-            // Calcular crédito restante por cliente
-            const creditoRestantePorCliente = clientes.map(cliente => {
-                const deuda = deudasPorCliente.find(d => String(d._id) === String(cliente._id));
-                const totalDeuda = deuda ? deuda.totalDeuda : 0;
-                return {
-                    clienteId: cliente._id,
-                    creditoRestante: cliente.credito - totalDeuda
-                };
-            });
             const contadores = {
                 pedidos: pedidosCount,
                 asignaciones: {
@@ -100,10 +78,9 @@ export async function GET() {
                 },
                 clientes: {
                     activos: clientesActivos,
-                    enQuiebra: clientesEnQuiebra,
-                    creditoRestante: creditoRestantePorCliente
+                    enQuiebra: clientesEnQuiebra
                 },
-                deudas: 0
+                cobros: 0
             }
             return NextResponse.json({ ok: true, contadores, checklists: checklistResults });
         }

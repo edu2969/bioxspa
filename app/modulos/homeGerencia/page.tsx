@@ -1,7 +1,7 @@
-import BranchBussinessView from "@/components/branch/BranchBussinessView";
+import HomeGerencia from "@/components/HomeGerencia";
 
-export default function SucursalesVistaCliente() {    
+export default function HomeGerenciaPage() {    
     return (<div>
-        <BranchBussinessView googleMapsApiKey={process.env.GOOGLE_API_KEY} />
+        <HomeGerencia googleMapsApiKey={process.env.GOOGLE_API_KEY} />
     </div>);
 }

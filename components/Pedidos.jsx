@@ -54,6 +54,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
     const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
     const [empresaDondeRetirar, setEmpresaDondeRetirar] = useState(null);    
+    const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
 
     const direccionRetiroSeleccionado = useWatch({
         control,
@@ -1110,17 +1111,17 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         <div className={`${(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
                                             || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento ? <div className='w-full'>
-                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</p>
+                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento ? <div className='w-full'>
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento}</p>
                                                 <span className="relative -top-1">{precio.subcategoriaCatalogoId.cantidad} {precio.subcategoriaCatalogoId.unidad}</span>
                                             </div> : <div className='w-full'>
-                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId.nombre}</p>
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId?.nombre}</p>
                                                 <span className="relative -top-1">{precio.subcategoriaCatalogoId.nombre}</span>
                                             </div>}
-                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
+                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId?.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
                                                 {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
+                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId?.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
                                             </div>}
                                         </div>
                                         {(session.user.role == USER_ROLE.gerente

@@ -61,21 +61,10 @@ export default function HomeAdministrador({ contadores }) {
                     color: "bg-green-500",
                     value: contadores?.clientes?.activos > 999999 ? '999999+' : contadores?.clientes?.activos,
                     text: "x ACTIVOS"
-                },
-                contadores?.clientes?.sinCredito > 0 && {
-                    color: "bg-red-500",
-                    value: contadores?.clientes?.sinCredito > 999999 ? '999999+' : contadores?.clientes?.sinCredito,
-                    text: "s/CREDITO"
-                },
-                contadores?.clientes?.enQuiebra > 0 && {
+                },contadores?.clientes?.enQuiebra > 0 && {
                     color: "bg-gray-500",
                     value: contadores?.clientes?.enQuiebra > 999999 ? '999999+' : contadores?.clientes?.enQuiebra,
                     text: "en QUIEBRA"
-                },
-                contadores?.clientes?.pendientes > 0 && {
-                    color: "bg-orange-500",
-                    value: contadores?.clientes?.pendientes > 999999 ? '999999+' : contadores?.clientes?.pendientes,
-                    text: "x PENDIENTES"
                 }
             ]
         }

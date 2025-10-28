@@ -2,20 +2,20 @@
 
 import { RiHomeOfficeFill } from "react-icons/ri";
 import { MdOutlinePropaneTank } from "react-icons/md";
-import BarChart from "../charts/BarChart";
-import Gaugue from "../charts/Gaugue";
-import MultiLineChart from "../charts/MultiLineChart";
+import BarChart from "./charts/BarChart";
+import Gaugue from "./charts/Gaugue";
+import MultiLineChart from "./charts/MultiLineChart";
 import { TbMoneybag, TbReportMoney, TbShoppingBagPlus } from "react-icons/tb";
 import { CiBellOn } from "react-icons/ci";
 import { FaWhatsappSquare } from "react-icons/fa";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IoSettingsSharp } from "react-icons/io5"
-import NotificationsPanel from "../NotificationsPanel";
-import MessagesPanel from "../MessagesPanel";
+import NotificationsPanel from "./NotificationsPanel";
+import MessagesPanel from "./MessagesPanel";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import Link from "next/link";
-import Loader from "../Loader";
-import MapaCilindros from "../maps/MapaCilindros";
+import Loader from "./Loader";
+import MapaCilindros from "./maps/MapaCilindros";
 
 const stateColors = [
     "bg-white",
@@ -28,7 +28,7 @@ const stateColors = [
     "bg-green-600",
 ];
 
-export default function BranchBussinessView({ googleMapsApiKey }) {
+export default function HomeGenerencia({ googleMapsApiKey }) {
     const [loadingAdmingPanel, setLoadingAdminPanel] = useState(true);
     const [branches, setBranches] = useState(null);
     const [notificationVisible, setNotificationVisible] = useState(false);

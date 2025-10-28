@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const CategoriaProductoSchema = new mongoose.Schema({
+const XategoriaProductoSchema = new mongoose.Schema({
     id: { type: String, required: true },
     nombre: { type: String, required: true },
     seguir: { type: String },
@@ -10,6 +10,6 @@ const CategoriaProductoSchema = new mongoose.Schema({
     updated_at: { type: Date }
 });
 
-const CategoriaProducto = mongoose.models.CategoriaProducto || mongoose.model('CategoriaProducto', CategoriaProductoSchema);
+const XategoriaProducto = mongoose.models.XategoriaProducto || mongoose.model('XategoriaProducto', XategoriaProductoSchema);
 
-export default CategoriaProducto;
+export default XategoriaProducto;

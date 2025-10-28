@@ -99,7 +99,7 @@ export const TIPO_ESTADO_RUTA_DESPACHO = {
 
 export const TIPO_CATEGORIA_CATALOGO = {
     sinCategoria: 0,
-    gas: 1,
+    cilindro: 1,
     arriendo: 2,
     insumo: 4, 
     servicio: 8,

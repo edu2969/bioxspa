@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const CategoriaCatalogoSchema = new mongoose.Schema({
+    temporalId: { type: String },
     nombre: { type: String, required: true },
     descripcion: { type: String, default: null },
     seguir: { type: Boolean, default: false },
