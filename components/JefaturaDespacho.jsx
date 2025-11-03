@@ -167,6 +167,10 @@ export default function JefaturaDespacho({ session }) {
         const cargamento = cargamentos[0];
         const requiereQuienRecibe = cargamento?.retiroEnLocal ? (cargamento?.nombreRetira && cargamento?.rutRetira) : true;
 
+        // Determinar si es proceso de carga o descarga según el estado
+        const esProcesoCarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
+        const esProcesoDescarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
+
         // Si hay al menos una venta de traslado
         const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
 
@@ -181,7 +185,7 @@ export default function JefaturaDespacho({ session }) {
             };
         }
 
-        // Para ventas normales
+        // Para ventas normales: diferenciar entre carga y descarga
         const detallesCompletos = cargamento.ventas.every(venta =>
             venta.detalles.every(detalle => detalle.restantes === 0)
         );
@@ -190,6 +194,33 @@ export default function JefaturaDespacho({ session }) {
         if (detallesCompletos && itemsRetirados && requiereQuienRecibe) {
             return { complete: true };
         }
+
+        // Lógica de partial diferenciada por tipo de proceso
+        if (esProcesoCarga) {
+            // En CARGA: partial = true si al menos hay un item escaneado por cada venta
+            const todasLasVentasTienenAlMenosUno = cargamento.ventas.every(venta =>
+                venta.detalles.some(detalle =>
+                    Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length > 0
+                )
+            );
+            
+            return {
+                partial: cargamentos.length > 0
+                    && requiereQuienRecibe
+                    && todasLasVentasTienenAlMenosUno
+                    && !detallesCompletos // No está completo al 100%
+            };
+        } else if (esProcesoDescarga) {
+            // En DESCARGA: partial = true si al menos hay items escaneados pero no todos descargados
+            return {
+                partial: cargamentos.length > 0
+                    && requiereQuienRecibe
+                    && alMenosUnEscaneado
+                    && !itemsRetirados
+            };
+        }
+
+        // Fallback para otros estados
         return {
             partial: cargamentos.length > 0
                 && requiereQuienRecibe
@@ -681,53 +712,45 @@ export default function JefaturaDespacho({ session }) {
         if (cargamentos.length === 0) return 0;
         const cargamento = cargamentos[0];
 
-        // Agrupa por subcategoriaId para sumar correctamente
-        const itemsPorSubcat = {};
-        if (Array.isArray(cargamento.items)) {
-            cargamento.items.forEach(item => {
-                const key = item.subcategoriaId?._id || item.subcategoriaId;
-                if (!key) return;
-                if (!itemsPorSubcat[key]) itemsPorSubcat[key] = 0;
-                itemsPorSubcat[key]++;
-            });
-        }
+        // Determinar si es proceso de carga o descarga según el estado
+        const esProcesoCarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
+        const esProcesoDescarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
 
-        const detallesPorSubcat = {};
-        if (Array.isArray(cargamento.ventas)) {
-            cargamento.ventas.forEach(venta => {
-                if (Array.isArray(venta.detalles)) {
-                    venta.detalles.forEach(detalle => {
-                        const key = detalle.subcategoriaId?._id || detalle.subcategoriaId;
-                        if (!key) return;
-                        if (!detallesPorSubcat[key]) detallesPorSubcat[key] = 0;
+        // Si no hay ventas, retornar 100% para evitar división por cero
+        if (!Array.isArray(cargamento.ventas) || cargamento.ventas.length === 0) return 100;
+
+        // Obtener el total requerido desde los detalles de venta (multiplicador)
+        let totalRequerido = 0;
+        let totalCompletado = 0;
+
+        cargamento.ventas.forEach(venta => {
+            if (Array.isArray(venta.detalles)) {
+                venta.detalles.forEach(detalle => {
+                    // Total requerido según el multiplicador del detalle
+                    totalRequerido += detalle.multiplicador || 0;
+                    
+                    if (esProcesoCarga) {
+                        // En CARGA: avance = items escaneados / total requerido
+                        // Contar items escaneados (itemCatalogoIds)
                         if (Array.isArray(detalle.itemCatalogoIds)) {
-                            detallesPorSubcat[key] += detalle.itemCatalogoIds.length;
+                            totalCompletado += detalle.itemCatalogoIds.length;
                         }
-                    });
-                }
-            });
-        }
-
-        // Unifica todas las subcategorías presentes
-        const todasLasSubcats = Array.from(
-            new Set([
-                ...Object.keys(itemsPorSubcat),
-                ...Object.keys(detallesPorSubcat)
-            ])
-        );
-
-        // Suma total y cargados
-        let total = 0;
-        let cargados = 0;
-        todasLasSubcats.forEach(key => {
-            const enCamion = itemsPorSubcat[key] || 0;
-            const yaCargados = detallesPorSubcat[key] || 0;
-            total += enCamion + yaCargados;
-            cargados += yaCargados;
+                    } else if (esProcesoDescarga) {
+                        // En DESCARGA: avance = items descargados / total requerido  
+                        // En descarga, comenzamos con items en el camión y van desapareciendo
+                        const itemsDescargados = (detalle.multiplicador || 0) - (detalle.restantes || 0);
+                        totalCompletado += itemsDescargados;
+                    }
+                });
+            }
         });
 
-        if (total === 0) return 100;
-        return Math.round((cargados / total) * 100);
+        // Si no hay total requerido, retornar 100%
+        if (totalRequerido === 0) return 100;
+        
+        // Calcular porcentaje y asegurar que esté entre 0 y 100
+        const porcentaje = Math.round((totalCompletado / totalRequerido) * 100);
+        return Math.max(0, Math.min(100, porcentaje));
     }
 
     const handleGuardarNombreRetira = () => {
@@ -809,12 +832,25 @@ export default function JefaturaDespacho({ session }) {
                 }, 0);
             }
 
-            // MULTIPLICADOR: Total que se necesita = items disponibles + ya cargados
-            // (porque los items van desapareciendo del camión conforme se cargan)
-            const multiplicador = itemsDisponibles + cargados;
+            // MULTIPLICADOR: Usar el multiplicador del detalle si existe, si no calcular
+            let multiplicador = 0;
+            if (detalle && typeof detalle.multiplicador === 'number') {
+                // Si el detalle tiene multiplicador, usarlo directamente
+                multiplicador = detalle.multiplicador;
+            } else {
+                // Si no, calcular como items disponibles + ya cargados
+                multiplicador = itemsDisponibles + cargados;
+            }
 
-            // RESTANTES: lo que aún falta por cargar (items que están en el camión)
-            const restantes = itemsDisponibles;
+            // RESTANTES: Usar restantes del detalle si existe, si no usar items disponibles
+            let restantes = 0;
+            if (detalle && typeof detalle.restantes === 'number') {
+                // Si el detalle tiene restantes, usarlo directamente
+                restantes = detalle.restantes;
+            } else {
+                // Si no, usar items disponibles en el camión
+                restantes = itemsDisponibles;
+            }
 
             // --- AJUSTE: Si el elemento es nulo, intenta obtenerlo desde el detalle ---
             let subcategoriaId = itemEjemplo?.subcategoriaId || detalle?.subcategoriaId || key;
@@ -849,11 +885,24 @@ export default function JefaturaDespacho({ session }) {
             }
 
             // Devuelve un objeto resumen, usando la estructura de los items para mostrar info visual
+            // Priorizar datos del detalle sobre los del item
+            const baseData = detalle || itemEjemplo || {};
+            
             return {
-                ...(itemEjemplo || detalle || {}),
+                ...baseData,
                 subcategoriaId,
                 multiplicador,
                 restantes,
+                // Asegurar que tenemos los campos necesarios del detalle si existen
+                ...(detalle && {
+                    elemento: detalle.elemento,
+                    nombre: detalle.nombre,
+                    cantidad: detalle.cantidad,
+                    unidad: detalle.unidad,
+                    nuCode: detalle.nuCode,
+                    esIndustrial: detalle.esIndustrial,
+                    sinSifon: detalle.sinSifon
+                })
             };
         });
         
@@ -981,7 +1030,7 @@ export default function JefaturaDespacho({ session }) {
                                     {getResumenCarga(cargamento).map((item, itemIndex) => (
                                         <li
                                             key={`item${ventaIndex}_${itemIndex}`}
-                                            className={`w-full flex text-sm border border-gray-300 px-0 ${(itemIndex === 0 && cargamento.items.length != 1) ? 'rounded-t-lg' : (itemIndex === cargamento.items.length - 1 && cargamento.items.length != 1) ? 'rounded-b-lg' : cargamento.items.length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                            className={`w-full flex text-sm border border-gray-300 px-0 ${(itemIndex === 0 && cargamento.items?.length != 1) ? 'rounded-t-lg' : (itemIndex === cargamento.items?.length - 1 && cargamento.items?.length != 1) ? 'rounded-b-lg' : cargamento.items?.length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                         >                                                    
                                             {item.elemento && <div className="w-full flex items-left pt-1.5">
                                                 <div className="w-14">
@@ -1047,7 +1096,7 @@ export default function JefaturaDespacho({ session }) {
                                                     return;
                                                 } 
                                                 postCargamento();
-                                            }} disabled={(!loadState().partial && !loadState().complete) || posting}>
+                                            }} disabled={index !== 0 || (!loadState().partial && !loadState().complete) || posting}>
                                             <FaRoadCircleCheck className="text-4xl pb-0" />
                                             <p className="ml-2 mt-2 text-md font-bold">FIN {cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion ? 'CARGA' : 'DESCARGA'}</p>
                                             {posting && <div className="absolute w-full top-0">

@@ -49,13 +49,8 @@ export default function Pedidos({ session, googleMapsApiKey }) {
     const [indexFocused, setIndexFocused] = useState(-1);
     const [loadingCatalogo, setLoadingCatalogo] = useState(false);
     const [cilindros, setCilindros] = useState([]);
-
-    const [busquedaCategoria, setBusquedaCategoria] = useState("");
-    const [categoriasFiltradas, setCategoriasFiltradas] = useState([]);
-    const [mostrarResultadosCategoria, setMostrarResultadosCategoria] = useState(false);
     const [empresaDondeRetirar, setEmpresaDondeRetirar] = useState(null);    
-    const [categoriaNombreSeleccionada, setCategoriaNombreSeleccionada] = useState("");
-
+    
     const direccionRetiroSeleccionado = useWatch({
         control,
         name: 'direccionRetiroId'
@@ -80,25 +75,21 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         setMostrarResultadosCategoria(true);
     };
 
-    const seleccionarCategoria = async (categoria) => {
-        setCategoriaIdSeleccionada(categoria._id);
-        setCategoriaNombreSeleccionada(categoria.nombre);
-        setBusquedaCategoria(categoria.nombre);
-        setMostrarResultadosCategoria(false);
-        setCategoriasFiltradas([]);
-
+    const seleccionarCategoria = async (categoriaId) => {
+        setCategoriaIdSeleccionada(categoriaId);
+        
         // Actualizar el form y precioData
-        setValue("categoriaId", categoria._id);
+        setValue("categoriaId", categoriaId);
         setValue("subcategoriaCatalogoId", "");
         setPrecioData((prev) => ({
             ...prev,
-            categoriaId: categoria._id,
+            categoriaId: categoriaId,
             subcategoriaCatalogoId: "",
             valor: getValues('precio'),
         }));
 
         // Fetch subcategorías
-        await fetchSubcategorias(categoria._id);
+        await fetchSubcategorias(categoriaId);
     };
 
     const isOrderDisabled = () => {
@@ -259,10 +250,6 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         setModalSolicitudPrecio(false);
         setPrecioData({});
         setCategoriaIdSeleccionada("");
-        setCategoriaNombreSeleccionada("");
-        setBusquedaCategoria("");
-        setCategoriasFiltradas([]);
-        setMostrarResultadosCategoria(false);
         setValue("categoriaId", "");
         setValue("subcategoriaCatalogoId", "");
         setValue("valor", "");
@@ -1250,80 +1237,23 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                             <h3 className="text-lg leading-6 font-medium text-gray-900">Solicitar precio</h3>
                             <div className="mt-2">
                                 <div className="mt-4 space-y-3 text-left">
-                                    <div className="flex flex-col relative">
-                                        <label htmlFor="categoriaInput" className="text-sm text-gray-500">Categoría</label>
-                                        <div className="relative">
-                                            <input
-                                                id="categoriaInput"
-                                                type="text"
-                                                value={busquedaCategoria}
-                                                onChange={(e) => {
-                                                    const valor = e.target.value;
-                                                    setBusquedaCategoria(valor);
-
-                                                    // Limpiar selección si se está editando
-                                                    if (valor !== categoriaNombreSeleccionada) {
-                                                        setCategoriaIdSeleccionada("");
-                                                        setValue("categoriaId", "");
-                                                        setValue("subcategoriaCatalogoId", "");
-                                                        setPrecioData((prev) => ({
-                                                            ...prev,
-                                                            categoriaId: "",
-                                                            subcategoriaCatalogoId: "",
-                                                            valor: getValues('precio'),
-                                                        }));
-                                                        setSubcategorias([]);
-                                                    }
-
-                                                    buscarCategorias(valor);
-                                                }}
-                                                onFocus={() => {
-                                                    if (busquedaCategoria && categoriasFiltradas.length === 0) {
-                                                        buscarCategorias(busquedaCategoria);
-                                                    }
-                                                }}
-                                                onBlur={() => {
-                                                    // Ocultar resultados después de un pequeño delay para permitir clicks
-                                                    setTimeout(() => {
-                                                        setMostrarResultadosCategoria(false);
-                                                    }, 200);
-                                                }}
-                                                className="border rounded-md px-3 py-2 pr-10 text-base w-full"
-                                                placeholder="Buscar categoría..."
-                                            />
-
-                                            {/* Ícono de lupa */}
-                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                </svg>
-                                            </div>
-
-                                            {/* Dropdown de resultados */}
-                                            {mostrarResultadosCategoria && categoriasFiltradas.length > 0 && (
-                                                <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
-                                                    {categoriasFiltradas.map((categoria) => (
-                                                        <li
-                                                            key={categoria._id}
-                                                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
-                                                            onMouseDown={(e) => {
-                                                                e.preventDefault(); // Prevenir que se dispare onBlur antes del click
-                                                                seleccionarCategoria(categoria);
-                                                            }}
-                                                        >
-                                                            <p className="font-medium">{categoria.nombre}</p>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-
-                                            {/* Mensaje cuando no hay resultados */}
-                                            {mostrarResultadosCategoria && busquedaCategoria.length >= 2 && categoriasFiltradas.length === 0 && (
-                                                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 p-3">
-                                                    <p className="text-gray-500 text-center">No se encontraron categorías</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                    <div className="flex flex-col">
+                                        <label htmlFor="categoriaSelect" className="text-sm text-gray-500">Categoría</label>
+                                        <select
+                                            id="categoriaSelect"
+                                            value={categoriaIdSeleccionada}
+                                            onChange={(e) => {
+                                                seleccionarCategoria(e.target.value);
+                                            }}
+                                            className="border rounded-md px-3 py-2 text-base"
+                                        >
+                                            <option value="">Seleccione una categoría</option>
+                                            {categorias.map((categoria) => (
+                                                <option key={categoria._id} value={categoria._id}>
+                                                    {categoria.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="flex flex-col">
                                         <label htmlFor="subcategoriaId" className="text-sm text-gray-500">Subcategoría</label>

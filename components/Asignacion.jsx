@@ -605,22 +605,19 @@ export default function Asignacion({ session }) {
                         </div>
                         {choferes.map((chofer, index) => (
                             <div key={`en_espera_${index}`}
-                                className={`text-white relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-rose-500' : 'bg-green-500'}`}
+                                className={`text-white relative p-2 border rounded-lg mb-2 ${!chofer.checklist ? 'bg-neutral-400' : 'bg-green-500'}`}
                                 data-id={`choferId_${chofer._id}`}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(74 222 128)" : "#f43f5e";
-                                    e.currentTarget.style.boxShadow = chofer.checklist
-                                        ? "0 4px 6px rgba(34, 197, 34, 0.5)"
-                                        : "0 4px 12px 0 rgba(239, 68, 68, 0.5)"; // rojo-500
+                                    if (chofer.checklist) {
+                                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(0, 0, 0, 0.2)";
+                                    }
                                 }}
                                 onDragLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "#f43f5e)";
                                     e.currentTarget.style.boxShadow = "none";
                                 }}
                                 onDrop={(e) => {
-                                    e.preventDefault();
-                                    e.currentTarget.style.backgroundColor = chofer.checklist ? "rgb(34 197 94)" : "#f43f5e"; 
+                                    e.preventDefault();                                    
                                     e.currentTarget.style.boxShadow = "none";
                                     if (!chofer.checklist) {
                                         toast.warning("El chofer no tiene checklist completo, no se puede asignar.");
@@ -636,8 +633,8 @@ export default function Asignacion({ session }) {
                                     <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
                                 </div>
                                 {!chofer.checklist && (
-                                    <div className="flex items-center text-red-200 text-xs font-semibold mt-1">
-                                        <span className="inline-block w-2 h-2 rounded-full bg-red-300 mr-2"></span>
+                                    <div className="flex items-center text-red-600 text-xs font-semibold mt-1">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-red-600 mr-2"></span>
                                         Sin checklist
                                     </div>
                                 )}
@@ -668,7 +665,7 @@ export default function Asignacion({ session }) {
                                         {pedido.items?.map((item, indexItem) => <li key={`item_en_espera_${indexItem}`}>{item.cantidad}x {item.nombre}</li>)}
                                     </ul>
                                 </div>) : <div>
-                                    <div className={`absolute w-32 top-0 right-0 ${chofer.checklist ? 'bg-green-600' : 'bg-rose-900'} text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center`}>
+                                    <div className={`absolute w-32 top-0 right-0 ${chofer.checklist ? 'bg-green-600' : 'bg-neutral-500'} text-white text-xs font-bold px-2 py-1 rounded-tr-md rounded-bl-md flex items-center`}>
                                         <RiZzzFill size="1rem" className="mr-1" />
                                         <p>SIN ÓRDENES</p>
                                     </div>

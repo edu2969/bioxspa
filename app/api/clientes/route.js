@@ -19,7 +19,7 @@ export async function GET(req) {
 
         // Busca el cliente y popula documentoTributarioId y direccionDespachoIds
         const cliente = await Cliente.findById(id)
-            .select("nombre rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionesDespacho documentoTributarioId credito mesesAumento")
+            .select("nombre giro  rut direccionId telefono email emailIntercambio ordenCompra arriendo cilindrosMin cilindrosMax activo enQuiebra tipoPrecio direccionesDespacho documentoTributarioId credito mesesAumento")
             .populate({
                 path: "direccionesDespacho.direccionId",
                 model: "Direccion",

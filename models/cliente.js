@@ -27,7 +27,6 @@ const clienteSchema = new Schema({
     urlWeb: { type: String },
     comentario: { type: String },
     contacto: { type: String },
-    tipoPrecio: { type: Number, required: true }, // Mayorista, Minorista
     documentoTributarioId: { type: Schema.Types.ObjectId, ref: 'DocumentoTributario', default: null }, 
     activo: { type: Boolean, default: true },
     cilindrosMin: { type: String, default: 0 },

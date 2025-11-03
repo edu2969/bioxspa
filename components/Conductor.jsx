@@ -648,6 +648,7 @@ export default function Conductor({ session }) {
                 });
 
                 if (response.ok) {
+                    const data = await response.json();
                     console.log("Cilindro cargado:", data);
                     const nuevoItem = {
                         _id: data.item._id,
@@ -967,7 +968,7 @@ export default function Conductor({ session }) {
             }
 
             return {
-                elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
+                elemento: item.elemento,
                 ...estado
             };
         });
@@ -1238,6 +1239,81 @@ export default function Conductor({ session }) {
                                 </ul>
                             </div>)}
 
+                        {/* ENTREGA DE CILINDROS (VENTA NORMAL) */}
+                        {loadingState === -1
+                            && getVentaActual(rutaDespacho)?.tipo === TIPO_ORDEN.venta
+                            && rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga
+                            && (<div className="flex flex-col w-full">
+
+                                <div className="w-full mb-2">
+                                    {(() => {
+                                        const cliente = getClienteDescarga(rutaDespacho);
+                                        const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
+                                        const ventaActual = rutaDespacho.ventaIds.find(v => String(v.direccionDespachoId) === String(currentDireccionId));
+                                        return (
+                                            <div className="w-full flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
+                                                <div className="w-full">
+                                                    <p className="text-md text-blue-700 font-bold truncate">{cliente?.nombre || "Sin cliente"}</p>
+                                                    <div className="text-sm font-bold text-gray-700">
+                                                        <p>ENTREGA DE CILINDROS</p>
+                                                        <span className="text-xs">Escanee cilindros a entregar</span>
+                                                    </div>
+                                                </div>
+                                                <div className={`relative flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                                                    <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
+                                                    }}>
+                                                        {!ventaActual?.comentario
+                                                            ? <VscCommentDraft size="1.75rem" />
+                                                            : <VscCommentUnresolved size="1.75rem" />}
+                                                    </div>
+                                                    {ventaActual?.comentario && <div className="absolute top-[16px] right-[11px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <ul className="flex-1 flex flex-wrap items-center justify-center mt-2 mb-20">
+                                    {getResumenDescarga(rutaDespacho).map((item, idx) => (
+                                        <li
+                                            key={`descarga_${idx}`}
+                                            className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-t-lg' : (idx === getResumenDescarga(rutaDespacho).length - 1 && getResumenDescarga(rutaDespacho).length != 1) ? 'rounded-b-lg' : getResumenDescarga(rutaDespacho).length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                                        >
+                                            <div className="w-full flex items-left">
+                                                <div className="flex">
+                                                    <div>
+                                                        <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(item.elemento)}</div>
+                                                        {item.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                                        {item.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                                    </div>
+                                                    <div className="font-bold text-xl ml-2">
+                                                        {item.elemento && <span>
+                                                            {(() => {
+                                                                const elem = item.elemento;
+                                                                let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
+                                                                if (!match) {
+                                                                    match = [null, (elem ?? 'N/A'), ''];
+                                                                }
+                                                                const [, p1, p2] = match;
+                                                                return (
+                                                                    <>
+                                                                        {p1 ? p1.toUpperCase() : ''}
+                                                                        {p2 ? <small>{p2}</small> : ''}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </span>}
+                                                    </div>
+                                                </div>
+                                                <p className="text-2xl orbitron ml-2"><b>{item.cantidad}</b> <small>{item.unidad}</small></p>
+                                            </div>
+                                            <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{item.multiplicador - item.restantes} <small>/</small> {item.multiplicador}</div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>)}
+
                         {/* RUTA vertical de destinos */}
                         {loadingState === -1
                             && rutaDespacho.ruta?.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length
@@ -1359,7 +1435,7 @@ export default function Conductor({ session }) {
                                                     }))
                                             )
                                             .map(({ ventaId, clienteNombre, direccion }) => (
-                                                <option key={`venta_${ventaId}_dir_${direccion._id}`} value={direccion.direccionId._id}>
+                                                <option key={`venta_${ventaId}_dir_${direccion.direccionId._id}`} value={direccion.direccionId._id}>
                                                     {clienteNombre}|{direccion.direccionId.nombre}
                                                 </option>
                                             ))}
