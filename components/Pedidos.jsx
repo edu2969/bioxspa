@@ -60,21 +60,6 @@ export default function Pedidos({ session, googleMapsApiKey }) {
         name: 'motivoTraslado'
     });
 
-    const buscarCategorias = (termino) => {
-        if (!termino || termino.length < 2) {
-            setCategoriasFiltradas([]);
-            setMostrarResultadosCategoria(false);
-            return;
-        }
-
-        const resultados = categorias.filter(categoria =>
-            categoria.nombre.toLowerCase().includes(termino.toLowerCase())
-        );
-
-        setCategoriasFiltradas(resultados);
-        setMostrarResultadosCategoria(true);
-    };
-
     const seleccionarCategoria = async (categoriaId) => {
         setCategoriaIdSeleccionada(categoriaId);
         
