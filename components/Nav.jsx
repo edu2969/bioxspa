@@ -97,7 +97,7 @@ export default function Nav() {
         } finally {
             setLoadingItem(false);
         }
-    }, [reset, setLoadingCliente, setLoadingItem, setShowCilindroModal, setDireccionesCliente, setClienteSelected]);
+    }, [reset, setLoadingItem, setShowCilindroModal, setDireccionesCliente, setClienteSelected]);
 
     // Función para buscar clientes (basada en Pedidos.jsx)
     const buscarClientes = async (query) => {

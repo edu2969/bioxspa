@@ -8,15 +8,15 @@ import { MdDragIndicator } from 'react-icons/md';
 import { GoCopilot } from 'react-icons/go';
 import { useEffect, useState } from "react";
 import { RiZzzFill } from 'react-icons/ri';
-import { ConfirmModal } from './modals/ConfirmModal';
+import { ConfirmModal } from '../modals/ConfirmModal';
 import 'dayjs/locale/es';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
-import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle, FaClock } from 'react-icons/fa';
+import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle } from 'react-icons/fa';
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from '@/app/utils/constants';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
-import Loader from './Loader';
+import Loader from '../Loader';
 import { getColorEstanque } from '@/lib/uix';
 import { FaTruckFast } from 'react-icons/fa6';
 import dayjs from 'dayjs';
@@ -24,6 +24,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/es';
 import { BiTask } from 'react-icons/bi';
 import { useForm } from 'react-hook-form';
+import InformacionDeOrden from './InformacionDeOrden';
 dayjs.locale('es');
 dayjs.extend(relativeTime);
 
@@ -45,6 +46,7 @@ export default function Asignacion({ session }) {
     const pedidosScrollRef = useRef(null);
     const [cargandoMas, setCargandoMas] = useState(false);
     const [showDetalleOrdenModal, setShowDetalleOrdenModal] = useState(false);
+    const [selectedPedidoDetalle, setSelectedPedidoDetalle] = useState(null);
     const [sucursales, setSucursales] = useState([]);
     const { setValue, getValues } = useForm();
 
@@ -291,6 +293,7 @@ export default function Asignacion({ session }) {
 
     const onCloseDetalleVenta = () => {
         setShowDetalleOrdenModal(false);
+        setSelectedPedidoDetalle(null);
     }
 
     const getCilindrosDescarga = (ruta) => {
@@ -536,7 +539,10 @@ export default function Asignacion({ session }) {
                                         className={`pl-2 mr-1 border rounded-lg mb-2 ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} cursor-pointer flex items-start relative`}
                                         draggable={pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal}
                                         onDragStart={() => setSelectedPedido(pedido._id)}
-                                        onClick={() => { setShowDetalleOrdenModal(true) }}
+                                        onClick={() => { 
+                                            setSelectedPedidoDetalle(pedido);
+                                            setShowDetalleOrdenModal(true);
+                                        }}
                                     >
                                         <div className="w-full">
                                             <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
@@ -995,123 +1001,12 @@ export default function Asignacion({ session }) {
                 </div>
             </div>}
 
-            {showDetalleOrdenModal && <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                <div className="relative top-1/4 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                    <div className="mt-3 text-left">
-                        <div className="flex justify-between items-center mb-4">
-                            <button className="flex-1 text-center py-2 font-semibold rounded-tl-md border-b-2 border-blue-600 bg-blue-50 text-blue-700 focus:outline-none">
-                                Operaciones
-                            </button>
-                            <button className="flex-1 text-center py-2 font-semibold border-b-2 border-gray-200 bg-gray-50 text-gray-500 focus:outline-none">
-                                Historial
-                            </button>
-                            <button className="flex-1 text-center py-2 font-semibold rounded-tr-md border-b-2 border-gray-200 bg-gray-50 text-gray-500 focus:outline-none">
-                                Mensajería
-                            </button>
-                        </div>                       
-                        <div className="flex flex-row items-start justify-center gap-3 mb-6 h-64 overflow-y-auto">
-                            {/* Trazado vertical con checks y tiempos a la izquierda */}
-                            <div className="flex flex-row items-start">
-                                {/* Tiempos a la izquierda */}
-                                <div className="flex flex-col items-end mr-2">
-                                    {/* Ejemplo de tiempos, reemplaza por tus datos dinámicos */}
-                                    {[
-                                        { tiempo: "15min" },
-                                        { tiempo: "30min" },
-                                        { tiempo: "10min" },
-                                        { tiempo: "5min" },
-                                        { tiempo: "20min" }
-                                    ].map((item, idx) => (
-                                        <div key={idx} className="flex flex-col items-end justify-center h-16">
-                                            <div className="flex items-center mt-8">
-                                                <FaClock className="mr-1 text-gray-400" />
-                                                <span className={`text-xs`}>{item.tiempo}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                {/* Trazado vertical con checks */}
-                                <div className="flex flex-col items-center mt-1 ml-2">
-                                    {/* Estados, reemplaza por tus datos dinámicos */}
-                                    {[0, 1, 2, 3, 4, 5].map((item, idx, arr) => (
-                                        <React.Fragment key={idx}>
-                                            {/* Punto con check */}
-                                            <div className={`w-6 h-6 rounded-full bg-blue-700 border-4 border-blue-400 flex items-center justify-center`}>
-                                                <svg className={`w-4 h-4 text-blue-400`} fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                                                    <path stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </div>
-                                            {/* Línea vertical excepto el último */}
-                                            {idx < arr.length - 1 && (
-                                                <div className={`w-2 h-[40px] bg-blue-400 mx-auto`} />
-                                            )}
-                                        </React.Fragment>
-                                    ))}
-                                </div>
-                            </div>
-                            {/* Detalle de cada punto */}
-                            <div className="flex flex-col items-start justify-start h-full ml-2 mt-1">
-                                {/* Por asignar */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Por asignar</div>
-                                        <div className="text-xs text-gray-500">12/06/2024 09:00</div>
-                                    </div>
-                                </div>
-                                {/* Cargado */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Cargado</div>
-                                        <div className="text-xs text-gray-500">por Juan Perez</div>
-                                        <div className="text-xs text-gray-500">12/06/2024 09:15</div>
-                                    </div>
-                                </div>
-                                {/* Arribo */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Arribo</div>
-                                        <div className="text-xs text-gray-500">Empresa S.A.</div>
-                                        <div className="flex items-center text-xs text-gray-500">
-                                            <BsGeoAltFill className="mr-1" /> 12/06/2024 09:45
-                                        </div>
-                                    </div>
-                                </div>
-                                {/* Recibe */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Recibe</div>
-                                        <div className="text-xs text-gray-500">Pedro Soto 12.345.678-9</div>                                        
-                                        <div className="text-xs text-gray-500">12/06/2024 09:55</div>
-                                    </div>
-                                </div>
-                                {/* Descarga */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Descarga</div>
-                                        <div className="text-xs text-gray-500">12/06/2024 10:00</div>
-                                    </div>
-                                </div>
-                                {/* Retorno */}
-                                <div className="h-16">
-                                    <div className="flex flex-col h-16">
-                                        <div className="font-bold">Retorno</div>
-                                        <div className="text-xs text-gray-500">12/06/2024 10:20</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <button
-                                onClick={onCloseDetalleVenta}
-                                disabled={loading}
-                                className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                            >
-                                CANCELAR
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>}
+            <InformacionDeOrden
+                show={showDetalleOrdenModal}
+                onClose={onCloseDetalleVenta}
+                pedido={selectedPedidoDetalle}
+                loading={loading}
+            />
 
             <ToastContainer />
         </main>

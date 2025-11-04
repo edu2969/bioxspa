@@ -1,4 +1,4 @@
-import Asignacion from "@/components/Asignacion";
+import Asignacion from "@/components/asignacion/Asignacion";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 
