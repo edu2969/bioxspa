@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { TIPO_CARGO } from "@/app/utils/constants";
-import { getNUCode } from "@/lib/nuConverter";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import Cargo from "@/models/cargo";
@@ -188,23 +187,13 @@ export async function GET() {
                         fecha: venta.createdAt,
                         detalles: detallesFiltrados.map((detalle) => {
                             let newDetalle = {};
-                            const subcategoria = detalle.subcategoriaCatalogoId;                            
-                            const nuCode = subcategoria?.categoriaCatalogoId?.elemento
-                                ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
-                                : null;                            
+                            const subcategoria = detalle.subcategoriaCatalogoId;                          
 
                             newDetalle = {
-                                nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
                                 multiplicador: detalle.cantidad,
-                                cantidad: subcategoria?.cantidad || "??",
-                                unidad: subcategoria?.unidad || null,
                                 restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length ?? 0),
                                 itemCatalogoIds: detalle.itemCatalogoIds || [],
-                                elemento: subcategoria?.categoriaCatalogoId?.elemento,
-                                sinSifon: subcategoria?.sinSifon || false,
-                                esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
-                                nuCode: nuCode,
-                                subcategoriaId: subcategoria?._id || null, 
+                                subcategoriaId: subcategoria, 
                             };                    
 
                             if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
@@ -232,18 +221,11 @@ export async function GET() {
                 patenteVehiculo: ruta.vehiculoId?.patente || null,
                 fechaVentaMasReciente,
                 items: ruta.cargaItemIds?.map((item) => ({
-                    nombre: (item.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre + item.subcategoriaCatalogoId?.nombre) || null,
                     multiplicador: 1,
                     cantidad: item.subcategoriaCatalogoId?.cantidad || "??",
                     unidad: item.subcategoriaCatalogoId?.unidad || null,
                     restantes: null, // Se calcula más arriba
                     itemCatalogoIds: [item._id],
-                    elemento: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento,
-                    sinSifon: item.subcategoriaCatalogoId?.sinSifon || false,
-                    esIndustrial: item.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false,
-                    nuCode: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento ? getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento) : null,
-                    codigo: item.codigo,
-                    _id: item._id,
                     subcategoriaId: item.subcategoriaCatalogoId                    
                 })) || [],
                 estado: ruta.estado,
@@ -265,20 +247,9 @@ export async function GET() {
                     .filter(detalle => detalle.ventaId.toString() === venta._id.toString())
                     .map((detalle) => {
                         const subcategoria = detalle.subcategoriaCatalogoId;
-                        const nuCode = subcategoria?.categoriaCatalogoId?.elemento
-                        ? getNUCode(subcategoria.categoriaCatalogoId.elemento)
-                        : null;
-
                         return {
-                            nombre: (subcategoria?.categoriaCatalogoId?.nombre + subcategoria?.nombre) || null,
                             multiplicador: detalle.cantidad,
-                            cantidad: subcategoria?.cantidad || "??",
-                            unidad: subcategoria?.unidad || null,
                             restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length || 0), 
-                            elemento: subcategoria?.categoriaCatalogoId?.elemento,
-                            sinSifon: subcategoria?.sinSifon || false,
-                            esIndustrial: subcategoria?.categoriaCatalogoId?.esIndustrial || false,
-                            nuCode: nuCode,
                             subcategoriaId: subcategoria?._id || null,
                             itemCatalogoIds: detalle.itemCatalogoIds || [],
                         };

@@ -1098,7 +1098,7 @@ export default function JefaturaDespacho({ session }) {
                                                 postCargamento();
                                             }} disabled={index !== 0 || (!loadState().partial && !loadState().complete) || posting}>
                                             <FaRoadCircleCheck className="text-4xl pb-0" />
-                                            <p className="ml-2 mt-2 text-md font-bold">FIN {cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion ? 'CARGA' : 'DESCARGA'}</p>
+                                            <p className="ml-2 mt-2 text-md font-bold">{loadState().complete ? 'CARGA COMPLETA' : loadState().partial ? 'CARGA PARCIAL' : 'CARGA NO INICIADA'}</p>
                                             {posting && <div className="absolute w-full top-0">
                                                 <div className="w-full h-12 bg-gray-100 opacity-80"></div>
                                                 <div className="absolute top-2 w-full"><Loader texto="" /></div>

@@ -46,7 +46,6 @@ export default function Conductor({ session }) {
             });
             if (response.ok) {
                 const data = await response.json();
-                console.log("CHECKLISTS --->", data.checklists);
                 // Busca si existe un checklist del tipo vehiculo aprobado hoy
                 setCheckListPassed(
                     Array.isArray(data.checklists) &&
@@ -76,10 +75,6 @@ export default function Conductor({ session }) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session]);
-
-    useEffect(() => {
-        console.log("Loading-State", loadingState);
-    }, [loadingState]);
 
     const onFinish = (checklist) => {
         console.log("DESPACHO ---> onFinish called with checklist:", checklist);
@@ -214,6 +209,16 @@ export default function Conductor({ session }) {
         const ultimaDireccionId = ruta.ruta[ruta.ruta.length - 1].direccionDestinoId?._id || ruta.ruta[ruta.ruta.length - 1].direccionDestinoId;
         const venta = ruta.ventaIds.find(v => String(v.direccionDespachoId) === String(ultimaDireccionId));
         if (!venta || !Array.isArray(venta.detalles)) return [];
+
+        // Obtener los items descargados del último historial de descarga (esCarga === false)
+        let itemsDescargados = [];
+        if (Array.isArray(ruta.historialCarga) && ruta.historialCarga.length > 0) {
+            const ultimaDescarga = [...ruta.historialCarga].reverse().find(h => h.esCarga === false);
+            if (ultimaDescarga && Array.isArray(ultimaDescarga.itemMovidoIds)) {
+                itemsDescargados = ultimaDescarga.itemMovidoIds.map(id => String(id));
+            }
+        }
+
         const elementos = [];
         venta.detalles.forEach(detalle => {
             const cantidad = Number(detalle.cantidad) || 0;
@@ -232,8 +237,26 @@ export default function Conductor({ session }) {
             } else {
                 elemento = detalle.elemento || "?";
             }
-            for (let i = 0; i < cantidad; i++) {
-                elementos.push(elemento);
+
+            // Para cada item de esta subcategoría en la carga, verificar si está descargado
+            if (Array.isArray(detalle.itemCatalogoIds)) {
+                detalle.itemCatalogoIds.forEach(itemId => {
+                    const descargado = itemsDescargados.includes(String(itemId));
+                    elementos.push({
+                        elemento,
+                        descargado,
+                        itemId: String(itemId)
+                    });
+                });
+            } else {
+                // Si no hay itemCatalogoIds específicos, crear elementos genéricos basados en cantidad
+                for (let i = 0; i < cantidad; i++) {
+                    elementos.push({
+                        elemento,
+                        descargado: false, // Sin items específicos, no se puede verificar descarga
+                        itemId: null
+                    });
+                }
             }
         });
         return elementos;
@@ -279,32 +302,23 @@ export default function Conductor({ session }) {
             resumen[key].multiplicador += detalle.cantidad;
         });
 
-        // Calcula los restantes por subcategoria, solo para los items físicos que coinciden con la dirección y subcategoria
-        // Encuentra el último registro de descarga en el historialCarga
-        let descargadosUltimaDescarga = [];
-        if (Array.isArray(rd.historialCarga) && rd.historialCarga.length > 0) {
-            // Busca el último historial donde esCarga es false
-            const lastDescarga = [...rd.historialCarga].reverse().find(h => h.esCarga === false);
-            if (lastDescarga && Array.isArray(lastDescarga.itemMovidoIds)) {
-                descargadosUltimaDescarga = lastDescarga.itemMovidoIds.map(id => String(id));
-            }
-        }
-
         Object.keys(resumen).forEach(key => {
-            // Filtra solo los items que corresponden a la venta actual (por dirección de despacho)
-            const itemsDeVentaActual = rd.cargaItemIds.filter(item => {
-                // El item debe ser de la subcategoria actual
-                return String(item.subcategoriaCatalogoId?._id) === String(key);
-            });
 
             // Busca el multiplicador (cantidad) de la venta actual para esta subcategoria
             const detalleVenta = currentVenta.detalles.find(det => String(det.subcategoriaCatalogoId?._id) === String(key));
-            const multiplicadorVenta = detalleVenta ? detalleVenta.cantidad : 0;
 
+            const multiplicadorVenta = detalleVenta ? detalleVenta.cantidad : 0;
             // Cuenta cuántos de estos items han sido descargados en la última descarga
-            const descargados = itemsDeVentaActual.filter(item =>
-                descargadosUltimaDescarga.includes(String(item._id))
-            ).length;
+            const descargados = rutaDespacho.historialCarga
+                .filter(h => !h.esCarga)
+                .flatMap(h => h.itemMovidoIds || [])
+                .filter(itemId => 
+                    currentVenta.detalles.some(detalle =>
+                        Array.isArray(detalle.itemCatalogoIds) &&
+                        detalle.itemCatalogoIds.some(catalogoId => String(catalogoId) === String(itemId)) &&
+                        String(detalle.subcategoriaCatalogoId._id) === String(key)
+                    )
+                ).length;
 
             // Restantes son los que faltan por descargar
             resumen[key].restantes = Math.max(0, multiplicadorVenta - descargados);
@@ -371,7 +385,6 @@ export default function Conductor({ session }) {
             const response = await fetch("/api/pedidos/asignacion/chofer");
             const data = await response.json();
             if (data.ok) {
-                console.log("Ruta asignada:", data.rutaDespacho);
                 setRutaDespacho(data.rutaDespacho);
                 if (data.rutaDespacho && data.rutaDespacho.cargaItemIds && data.rutaDespacho.cargaItemIds.length > 0) {
                     setResumenCarga(getResumenCarga(data.rutaDespacho.cargaItemIds));
@@ -599,11 +612,10 @@ export default function Conductor({ session }) {
                 // Busca el item por código en la carga actual
                 const item = rutaDespacho?.cargaItemIds?.find(item => item.codigo === codigo);
                 if (!item) {
+                    reproducirSonido('/sounds/error_01.mp3');
                     toast.error(`${codigo} no encontrado! WoW...`);
                     return;
                 }
-
-                console.log("ITEM A DESCARGAR --->", item);
 
                 const currentDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?._id;
                 const ventaActual = rutaDespacho.ventaIds.find(v => v.direccionDespachoId === currentDireccionId);
@@ -614,6 +626,7 @@ export default function Conductor({ session }) {
                 );
 
                 if (!perteneceAlCliente) {
+                    reproducirSonido('/sounds/error_02.mp3');
                     toast.error(`${codigo} no pertenece a éste cliente!`);
                     return;
                 }
@@ -649,17 +662,10 @@ export default function Conductor({ session }) {
 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log("Cilindro cargado:", data);
-                    const nuevoItem = {
-                        _id: data.item._id,
-                        codigo: data.item.codigo,
-                        subcategoriaCatalogoId: data.item.subcategoriaCatalogoId,
-                    };
+                    const nuevoItem = data.item;
 
                     // Calcular el nuevo array de cargaItemIds
-                    const nuevaCarga = [...rutaDespacho.cargaItemIds, nuevoItem];
-                    console.log("NUEVA CARGA --->", nuevaCarga);
-                    
+                    const nuevaCarga = [...rutaDespacho.cargaItemIds, nuevoItem];                    
                     setRutaDespacho(prev => {
                         const lastCargaIdx = prev.historialCarga.length - 1;
                         if (lastCargaIdx < 0) return prev;
@@ -667,7 +673,7 @@ export default function Conductor({ session }) {
                         const updatedHistorial = [...prev.historialCarga];
                         updatedHistorial[lastCargaIdx] = {
                             ...updatedHistorial[lastCargaIdx],
-                            itemMovidoIds: [...updatedHistorial[lastCargaIdx].itemMovidoIds, data.item._id]
+                            itemMovidoIds: [...updatedHistorial[lastCargaIdx].itemMovidoIds, nuevoItem._id]
                         };
                         return {
                             ...prev,
@@ -703,12 +709,7 @@ export default function Conductor({ session }) {
                     .then(async (resp) => {
                         const data = await resp.json();
                         if (data.ok) {
-                            console.log("Cilindro cargado:", data);
-                            const nuevoItem = {
-                                _id: data.item._id,
-                                codigo: data.item.codigo,
-                                subcategoriaCatalogoId: data.item.subcategoriaCatalogoId,
-                            }
+                            const nuevoItem = data.item._id;
                             setRutaDespacho(prev => {
                                 const lastCargaIdx = prev.historialCarga.length - 1;
                                 if (lastCargaIdx < 0) return prev;
@@ -716,7 +717,7 @@ export default function Conductor({ session }) {
                                 const updatedHistorial = [...prev.historialCarga];
                                 updatedHistorial[lastCargaIdx] = {
                                     ...updatedHistorial[lastCargaIdx],
-                                    itemMovidoIds: [...updatedHistorial[lastCargaIdx].itemMovidoIds, data.item._id]
+                                    itemMovidoIds: [...updatedHistorial[lastCargaIdx].itemMovidoIds, nuevoItem]
                                 };
                                 return {
                                     ...prev,
@@ -966,17 +967,13 @@ export default function Conductor({ session }) {
             } else {
                 estado.cargado = true;
             }
-
+            console.log("ESTADO ITEM", item.codigo, estado);
             return {
-                elemento: item.elemento,
+                elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
                 ...estado
             };
         });
     }
-
-    useEffect(() => {
-        console.log("Ruta despacho actualizada:", rutaDespacho);
-    }, [rutaDespacho]);
 
     const imagenVehiculo = (vehiculo) => {
         if (!vehiculo) return "desconocido_desconocido";
@@ -1031,21 +1028,21 @@ export default function Conductor({ session }) {
                     {rutaDespacho.vehiculoId && <div className="absolute right-8 top-52 bg-white rounded p-0.5">
                         <div className="flex text-slate-800 border-black border-2 px-1 py-0 rounded">
                             <p className="text-lg font-bold">{rutaDespacho?.vehiculoId?.patente.substring(0, 2)}</p>
-                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={9} />
+                            <Image className="inline-block mx-0.5 py-2" src="/ui/escudo.png" alt="escudo chile" width={12} height={12} style={{ width: "12px", height: "auto" }} />
                             <p className="text-lg font-bold">{rutaDespacho?.vehiculoId?.patente.substring(2)}</p>
                         </div>
                     </div>}
 
                     {rutaDespacho && (rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga || rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada) && <div className="absolute top-6 left-0 mt-2 w-full">
-                        {getCilindrosDescarga(rutaDespacho).reverse().map((elemento, index) => {
+                        {getCilindrosDescarga(rutaDespacho).reverse().map((item, index) => {
                             return (
                                 <Image
                                     key={index}
-                                    src={`/ui/tanque_biox${getColorEstanque(elemento)}.png`}
+                                    src={`/ui/tanque_biox${getColorEstanque(item.elemento)}.png`}
                                     alt={`tank_${index}`}
                                     width={14 * 3}
                                     height={78 * 3}
-                                    className={`absolute ${rutaDespacho.estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada ? "" : "opacity-40"}`}
+                                    className={`absolute ${item.descargado ? "" : "opacity-40"}`}
                                     style={calculateUploadTubePosition(getCilindrosDescarga(rutaDespacho).length - index - 1)}
                                     priority={false}
                                 />

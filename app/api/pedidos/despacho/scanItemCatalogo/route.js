@@ -87,17 +87,22 @@ export async function GET(request) {
                 populate: {
                     path: 'categoriaCatalogoId',
                     model: 'CategoriaCatalogo',
-                    select: '_id nombre gas elemento esIndustrial esMedicinal'
+                    select: '_id tipo nombre gas elemento esIndustrial esMedicinal'
                 }
             })
             .lean();
 
 
+        console.log("cargo:", cargo);
         console.log("Item found:", item);
+
+        if(!item) {
+            return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
+        }
 
         return NextResponse.json({
             ok: true,
-            tipo: item.tipo,
+            tipo: item.subcategoriaCatalogoId.categoriaCatalogoId.tipo,
             gas: item.subcategoriaCatalogoId.categoriaCatalogoId.gas,
             elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
             esIndustrial: item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial,
@@ -111,7 +116,7 @@ export async function GET(request) {
             categoria: item.subcategoriaCatalogoId.categoriaCatalogoId,
             subcategoria: item.subcategoriaCatalogoId,
             cliente: item.ownerId,
-            direccionInvalida: cargo.dependenciaId.direccionId._id.toString() !== item.direccionId._id.toString(),
+            direccionInvalida: cargo.dependenciaId.direccionId._id.toString() !== item.direccionId?._id.toString(),
             codigo,
             direccionActual: {
                 nombreDependencia: cargo.dependenciaId.nombre,

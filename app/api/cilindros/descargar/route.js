@@ -130,7 +130,7 @@ export async function POST(request) {
             // Si el detalle es de tipo retiro y corresponde a la subcategoría del item, lo usamos
             if (
                 Array.isArray(detalle.itemCatalogoIds) &&
-                detalle.subcategoriaCatalogoId &&
+                detalle.subcategoriaCatalogoId._id &&
                 String(detalle.subcategoriaCatalogoId) === String(itemCompleto.subcategoriaCatalogoId?._id) &&
                 detalle.tipo === 2 // tipo retiro
             ) {
@@ -148,11 +148,9 @@ export async function POST(request) {
                 ventaId: venta._id,
                 glosa: `Retiro de ${item.subcategoriaCatalogoId?.nombre || 'cilindro'}`,
                 codigo: item.codigo,
-                codigoProducto: item.subcategoriaCatalogoId?.codigo || '',
-                codigoCilindro: item.codigo,
-                subcategoriaCatalogoId: item.subcategoriaCatalogoId?._id,
+                subcategoriaCatalogoId: item.subcategoriaCatalogoId,
                 itemCatalogoIds: [item._id],
-                tipo: 2, // 2: retiro
+                tipo: venta.tipo, 
                 cantidad: 1,
                 especifico: 0,
                 neto: 0,
@@ -170,19 +168,7 @@ export async function POST(request) {
 
         return NextResponse.json({
             ok: true,
-            item: {
-                cantidad: item.subcategoriaCatalogoId.cantidad,
-                codigo: item.codigo,
-                elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
-                esIndustrial: item.subcategoriaCatalogoId.esIndustrial,
-                itemCatalogoIds: [item._id],
-                multiplicador: 1,
-                nombre: item.subcategoriaCatalogoId?.nombre || 'Desconocido',
-                restantes: rutaDespacho.cargaItemIds.length,
-                sinSifon: item.sinSifon,
-                subcategoriaId: item.subcategoriaCatalogoId?._id,
-                unidad: item.subcategoriaCatalogoId.unidad
-            }
+            ...item
         });
     }
 
@@ -222,18 +208,6 @@ export async function POST(request) {
 
     return NextResponse.json({
         ok: true,
-        item: {
-            cantidad: item.subcategoriaCatalogoId.cantidad,
-            codigo: item.codigo,
-            elemento: item.subcategoriaCatalogoId.categoriaCatalogoId.elemento,
-            esIndustrial: item.subcategoriaCatalogoId.esIndustrial,
-            itemCatalogoIds: [item._id],
-            multiplicador: 1,
-            nombre: item.subcategoriaCatalogoId?.nombre || 'Desconocido',
-            restantes: rutaDespacho.cargaItemIds.length,
-            sinSifon: item.sinSifon,
-            subcategoriaId: item.subcategoriaCatalogoId?._id,
-            unidad: item.subcategoriaCatalogoId.unidad
-        }
+        ...item        
     });
 }

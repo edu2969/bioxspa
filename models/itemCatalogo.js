@@ -18,7 +18,6 @@ const ItemCatalogoSchema = new mongoose.Schema({
     stockActual: { type: Number, required: true },
     visible: { type: Boolean, default: true },
     url: { type: String },
-    tipo: { type: Number, required: false },
     direccionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Direccion', required: false },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cliente', required: false },
     fechaMantencion: { type: Date, default: null }

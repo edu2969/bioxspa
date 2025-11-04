@@ -17,6 +17,7 @@ import User from "@/models/user";
 import Comuna from "@/models/comuna";
 import Regione from "@/models/regione";
 import DocumentoTributario from "@/models/documentoTributario";
+import mongoose from 'mongoose';
 
 export async function GET(request) {
     console.log("Connecting to MongoDB...");
@@ -78,6 +79,12 @@ export async function GET(request) {
         console.log("Starting orphaned address deletion...");
         await eliminarDireccionesHuerfanas();
         console.log("Orphaned address deletion completed successfully");
+    }
+
+    if(q === "encontrarCilindros") {
+        console.log("Starting cylinder address assignment...");
+        await encontrarCilindros();
+        console.log("Cylinder address assignment completed successfully");
     }
     
     return NextResponse.json({ message: "Success migrate and improve" });
@@ -696,6 +703,25 @@ const eliminarDireccionesHuerfanas = async () => {
         }
     }
     console.log('Orphaned address deletion completed');
+}
+
+const encontrarCilindros = async () => {
+    try {
+        await connectMongoDB();
+        
+        const targetDireccionId = new mongoose.Types.ObjectId('686ab4ac49e6cb8c30c59f99');
+        
+        const result = await ItemCatalogo.updateMany(
+            { direccionId: { $exists: false } },
+            { $set: { direccionId: targetDireccionId } }
+        );
+        
+        console.log(`Updated ${result.modifiedCount} items without direccionId`);
+        return result;
+    } catch (error) {
+        console.error("Error updating ItemCatalogo direccionId:", error);
+        throw error;
+    }
 }
 
 
