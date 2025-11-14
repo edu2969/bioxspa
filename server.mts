@@ -21,6 +21,49 @@ app.prepare().then(() => {
             console.log(`SOCKET-IO: Ha entrado en ${data.room} el chofer ${data.userId}`);
         });
 
+        // Evento para unirse a un chat específico de una venta
+        socket.on("join-chat", (data) => {
+            console.log("SOCKET-IO: join-chat", data);
+            const chatRoom = `chat-venta-${data.ventaId}`;
+            socket.join(chatRoom);
+            console.log(`SOCKET-IO: Usuario ${data.userId} se unió al chat de la venta ${data.ventaId}`);
+        });
+
+        // Evento para salir de un chat específico
+        socket.on("leave-chat", (data) => {
+            console.log("SOCKET-IO: leave-chat", data);
+            const chatRoom = `chat-venta-${data.ventaId}`;
+            socket.leave(chatRoom);
+            console.log(`SOCKET-IO: Usuario ${data.userId} salió del chat de la venta ${data.ventaId}`);
+        });
+
+        // Evento para indicar que alguien está escribiendo
+        socket.on("typing", (data) => {
+            const chatRoom = `chat-venta-${data.ventaId}`;
+            socket.to(chatRoom).emit("user-typing", {
+                userId: data.userId,
+                userName: data.userName,
+                isTyping: data.isTyping
+            });
+        });
+
+        // Evento para nuevo mensaje en chat
+        socket.on("new-chat-message", (data) => {
+            console.log("SOCKET-IO: new-chat-message", data);
+            const chatRoom = `chat-venta-${data.ventaId}`;
+            // Emitir a todos en la sala excepto al remitente
+            socket.to(chatRoom).emit("message-received", data.mensaje);
+        });
+
+        // Evento para confirmar entrega de mensaje
+        socket.on("message-delivered", (data) => {
+            const chatRoom = `chat-venta-${data.ventaId}`;
+            socket.to(chatRoom).emit("message-status-update", {
+                messageId: data.messageId,
+                status: "delivered"
+            });
+        });
+
         socket.on("update-pedidos", (data) => {
             console.log("SOCKET-IO: update-pedidos", data);
             socket.to("room-pedidos").emit("update-pedidos", data);
