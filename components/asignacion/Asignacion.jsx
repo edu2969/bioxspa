@@ -430,6 +430,40 @@ export default function Asignacion({ session }) {
                             : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.regreso ? 'REGRESANDO' : ruta.estado == TIPO_ESTADO_RUTA_DESPACHO.terminado ? 'TERMINADO' : 'OTRO';
     }
 
+    // Touch drag & drop helpers
+const touchDragState = useRef({});
+
+function handleTouchStartPedido(e, pedidoId) {
+    touchDragState.current = {
+        pedidoId,
+        startY: e.touches[0].clientY,
+        startX: e.touches[0].clientX,
+        dragging: true
+    };
+    setSelectedPedido(pedidoId);
+}
+function handleTouchMovePedido(e) {
+    if (!touchDragState.current.dragging) return;
+    // Optionally, add visual feedback here
+}
+function handleTouchEndPedido(e) {
+    if (!touchDragState.current.dragging) return;
+    // Find drop target by position
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el) {
+        // Try to find chofer drop zone
+        let choferDiv = el.closest('[data-id^="choferId_"]');
+        if (choferDiv && choferDiv.dataset.id) {
+            const choferId = choferDiv.dataset.id.replace('choferId_', '');
+            setSelectedChofer(choferId);
+            setShowConfirmModal(true);
+        }
+    }
+    touchDragState.current = {};
+    setSelectedPedido(null);
+}
+
     return (
         <main className="w-full mt-2 h-screen overflow-hidden">
             {sucursales.length > 0 && (
@@ -543,6 +577,9 @@ export default function Asignacion({ session }) {
                                             setSelectedPedidoDetalle(pedido);
                                             setShowDetalleOrdenModal(true);
                                         }}
+                                        onTouchStart={e => handleTouchStartPedido(e, pedido._id)}
+                                        onTouchMove={handleTouchMovePedido}
+                                        onTouchEnd={handleTouchEndPedido}
                                     >
                                         <div className="w-full">
                                             <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
@@ -633,6 +670,15 @@ export default function Asignacion({ session }) {
                                         setSelectedChofer(chofer._id);
                                         setShowConfirmModal(true);
                                     }
+                                }}
+                                // Opcional: feedback visual para touch
+                                onTouchMove={e => {
+                                    if (touchDragState.current.dragging && chofer.checklist) {
+                                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(0, 0, 0, 0.2)";
+                                    }
+                                }}
+                                onTouchEnd={e => {
+                                    e.currentTarget.style.boxShadow = "none";
                                 }}
                             >
                                 <div className="font-bold uppercase flex">
