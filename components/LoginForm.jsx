@@ -88,7 +88,7 @@ export default function LoginForm() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-between py-8 px-6">
 
-      <div className="area z-0">
+      <div className="cilindro-bg area z-0">
         <ul className="circles">
           <li></li><li></li><li></li><li></li><li></li>
           <li></li><li></li><li></li><li></li><li></li>
