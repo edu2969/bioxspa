@@ -11,7 +11,7 @@ import { socket } from "@/lib/socket-client";
 import { MdAddLocationAlt } from 'react-icons/md';
 import Autocomplete from "react-google-autocomplete";
 import { FaCheck, FaTimes } from 'react-icons/fa';
-import Toaster, { toast } from "react-hot-toast";
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function Pedidos({ session, googleMapsApiKey }) {
     const router = useRouter();
