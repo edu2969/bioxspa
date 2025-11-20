@@ -12,8 +12,7 @@ import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import { FaRegTrashAlt } from 'react-icons/fa';
 import Loader from './Loader';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import dayjs from 'dayjs';
 import { getColorEstanque } from '@/lib/uix';
@@ -788,8 +787,6 @@ export default function Nav() {
                 className="opacity-0 h-0 w-0 absolute"
                 inputMode="none"
             />
-
-            <ToastContainer />
         </div>
     )
 }

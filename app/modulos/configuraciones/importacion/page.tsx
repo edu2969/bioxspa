@@ -1,9 +1,8 @@
 "use client"
+
 import React, { useState } from 'react';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
 import { TbDatabaseImport } from 'react-icons/tb';
+import toast, { Toaster } from 'react-hot-toast';
 
 const ImportacionPage = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -67,7 +66,7 @@ const ImportacionPage = () => {
                     IMPORTAR
                 </button>
             </div>
-            <ToastContainer />
+            <Toaster />
         </div>
     );
 };

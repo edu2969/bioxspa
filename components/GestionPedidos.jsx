@@ -2,8 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { LiaTimesSolid } from "react-icons/lia";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
@@ -12,6 +10,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import Link from "next/link";
 import { MdAddTask } from "react-icons/md";
 import { useForm } from "react-hook-form";
+import Toaster, { toast } from "react-hot-toast";
 
 function formatFecha(fecha) {
     return new Date(fecha).toLocaleDateString("es-CL", {
@@ -523,7 +522,7 @@ export default function GestionPedidos({ session }) {
                     </div>
                 </div>
             )}
-            <ToastContainer />
+            <Toaster />
         </main>
     );
 }

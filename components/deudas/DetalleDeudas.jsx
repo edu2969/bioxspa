@@ -15,11 +15,10 @@ import { FaChevronDown, FaChevronUp, FaCloudUploadAlt, FaRegSave } from "react-i
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { useForm } from "react-hook-form";
 import { TbMoneybag } from "react-icons/tb";
 import Image from "next/image";
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function DetalleDeudas({ clienteId }) {
     const [cliente, setCliente] = useState(null);
@@ -594,7 +593,7 @@ export default function DetalleDeudas({ clienteId }) {
                     </div>}
                 </div>
             </div>
-            <ToastContainer />
+            <Toaster />
 
             {pagarModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">

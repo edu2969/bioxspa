@@ -10,8 +10,7 @@ import { socket } from "@/lib/socket-client";
 import { TIPO_CHECKLIST, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN, USER_ROLE } from "@/app/utils/constants";
 import { FaBuildingFlag, FaHouseFlag, FaMapLocationDot, FaRoadCircleCheck, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill, BsQrCodeScan } from "react-icons/bs";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast, { Toaster } from 'react-hot-toast';
 import { LuFlagOff } from "react-icons/lu";
 import { getNUCode } from "@/lib/nuConverter";
 import { TbFlagCheck, TbHomeShare } from "react-icons/tb";
@@ -54,7 +53,7 @@ export default function Conductor({ session }) {
                     ) !== undefined
                 );
             } else {
-                toast.error("Error al obtener el estado del checklist. Por favor, inténtelo más tarde.");
+                toast("Error al obtener el estado del checklist. Por favor, inténtelo más tarde.");
             }
         } catch (error) {
             console.error('Error fetching checklist status:', error);
@@ -104,7 +103,7 @@ export default function Conductor({ session }) {
             })
             .catch((err) => {
                 console.error('Error al guardar el checklist:', err);
-                toast.error("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
+                toast("Error al guardar el checklist. Por favor, inténtelo más tarde.", {
                     position: "top-center"
                 });
             })
@@ -410,7 +409,7 @@ export default function Conductor({ session }) {
             });
             const data = await response.json();
             if (data.ok) {
-                toast.success("Carga confirmada correctamente");
+                toast("Carga confirmada correctamente");
                 if (rutaDespacho.ventaIds.length === 1 && rutaDespacho.ventaIds[0].clienteId.direccionesDespacho.length == 1) {
                     setRutaDespacho({
                         ...rutaDespacho,
@@ -433,11 +432,11 @@ export default function Conductor({ session }) {
                     userId: session.user.id
                 });
             } else {
-                toast.error(data.error || "Error al confirmar la carga");
+                toast(data.error || "Error al confirmar la carga");
             }
         } catch (error) {
             console.error("Error al confirmar la carga:", error);
-            toast.error("Error de conexión al confirmar la carga");
+            toast("Error de conexión al confirmar la carga");
         } finally {
             setLoadingState(-1);
         }
@@ -459,7 +458,7 @@ export default function Conductor({ session }) {
 
             const data = await response.json();
             if (data.ok) {
-                toast.success("Viaje iniciado correctamente");
+                toast("Viaje iniciado correctamente");
                 setRutaDespacho({
                     ...rutaDespacho,
                     estado: TIPO_ESTADO_RUTA_DESPACHO.en_ruta
@@ -468,11 +467,11 @@ export default function Conductor({ session }) {
                     userId: session.user.id
                 });
             } else {
-                toast.error(data.error || "Error al iniciar el viaje");
+                toast(data.error || "Error al iniciar el viaje");
             }
         } catch (error) {
             console.error("Error al iniciar el viaje:", error);
-            toast.error("Error de conexión al iniciar el viaje");
+            toast("Error de conexión al iniciar el viaje");
         } finally {
             setLoadingState(-1);
         }
@@ -555,9 +554,7 @@ export default function Conductor({ session }) {
         );
 
         if (!venta) {
-            toast.error("No se encontró la venta para la dirección actual.", {
-                position: "top-center",
-            });
+            toast.error("No se encontró la venta para la dirección actual.");
             setLoadingState(-1);
             return;
         }
@@ -578,13 +575,9 @@ export default function Conductor({ session }) {
         });
         if (!response.ok) {
             const errorData = await response.json();
-            toast.error(`Error al guardar el cargamento: ${errorData.error}`, {
-                position: "top-center",
-            });
+            toast.error(`Error al guardar el cargamento: ${errorData.error}`);
         } else {
-            toast.success(`Descarga confirmada con éxito`, {
-                position: "top-center",
-            });
+            toast.success(`Descarga confirmada con éxito`);
             socket.emit("update-pedidos", {
                 userId: session.user.id
             });
@@ -661,9 +654,8 @@ export default function Conductor({ session }) {
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
-                    const nuevoItem = data.item;
-
+                    const nuevoItem = await response.json();
+                                        
                     // Calcular el nuevo array de cargaItemIds
                     const nuevaCarga = [...rutaDespacho.cargaItemIds, nuevoItem];                    
                     setRutaDespacho(prev => {
@@ -763,13 +755,9 @@ export default function Conductor({ session }) {
         });
         if (!response.ok) {
             const errorData = await response.json();
-            toast.error(`Error al marcar el regreso: ${errorData.error}`, {
-                position: "top-center",
-            });
+            toast.error(`Error al marcar el regreso: ${errorData.error}`);
         } else {
-            toast.success(`Regreso informado con éxito`, {
-                position: "top-center",
-            });
+            toast.success(`Regreso informado con éxito`);
             socket.emit("update-pedidos", {
                 userId: session.user.id
             });
@@ -795,13 +783,9 @@ export default function Conductor({ session }) {
         });
         if (!response.ok) {
             const errorData = await response.json();
-            toast.error(`Error al terminar la ruta: ${errorData.error}`, {
-                position: "top-center",
-            });
+            toast.error(`Error al terminar la ruta: ${errorData.error}`);                
         } else {
-            toast.success(`Ruta terminada con éxito`, {
-                position: "top-center",
-            });
+            toast.success(`Ruta terminada con éxito`);
             socket.emit("update-pedidos", {
                 userId: session.user.id
             });
@@ -985,7 +969,7 @@ export default function Conductor({ session }) {
 
     return (
         <div className="w-full h-dvh overflow-hidden">
-
+            <Toaster/>
             {rutaDespacho && <div className={`w-full ${loadingState == -2 || !rutaDespacho
                 || loadingState == TIPO_ESTADO_RUTA_DESPACHO.descarga || loadingState == TIPO_ESTADO_RUTA_DESPACHO.carga
                 || !rutaDespacho.vehiculoId ? "opacity-20" : ""}`}>
@@ -1184,7 +1168,7 @@ export default function Conductor({ session }) {
                                                 {getAlmenosUnRetiro(rutaDespacho) && <div className={`relative flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
                                                     <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
                                                         e.stopPropagation();
-                                                        toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
+                                                        toast(`${ventaActual?.comentario || "Sin comentarios"}`, { icon: '💬' });
                                                     }}>
                                                         {!ventaActual?.comentario
                                                             ? <VscCommentDraft size="1.75rem" />
@@ -1259,7 +1243,7 @@ export default function Conductor({ session }) {
                                                 <div className={`relative flex justify-end ${ventaActual?.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
                                                     <div className="mr-2 cursor-pointer mt-0" onClick={(e) => {
                                                         e.stopPropagation();
-                                                        toast.info(`${ventaActual?.comentario || "Sin comentarios"}`);
+                                                        toast(`${ventaActual?.comentario || "Sin comentarios"}`, { icon: '💬' });
                                                     }}>
                                                         {!ventaActual?.comentario
                                                             ? <VscCommentDraft size="1.75rem" />
@@ -1556,8 +1540,6 @@ export default function Conductor({ session }) {
                     <Loader texto="CARGANDO PEDIDOS" />
                 </div>
             </div>}
-
-            <ToastContainer />
 
             <input
                 ref={hiddenInputRef}

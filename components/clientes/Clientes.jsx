@@ -11,8 +11,7 @@ import MapWithDraggableMarker from "@/components/maps/MapWithDraggableMarker";
 import { MdAddLocationAlt } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { IoChevronBack } from "react-icons/io5";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast, { Toaster } from 'react-hot-toast';
 
 // Direcciones de despacho editor
 export default function Clientes() {
@@ -465,7 +464,7 @@ export default function Clientes() {
                     </div>
                 </div>)}
             </form>
-            <ToastContainer/>
+            <Toaster />
         </div>
     );
 }

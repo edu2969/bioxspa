@@ -9,9 +9,6 @@ import { GoCopilot } from 'react-icons/go';
 import { useEffect, useState } from "react";
 import { RiZzzFill } from 'react-icons/ri';
 import { ConfirmModal } from '../modals/ConfirmModal';
-import 'dayjs/locale/es';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { socket } from "@/lib/socket-client";
 import { FaCartPlus, FaChevronDown, FaChevronUp, FaRegCheckCircle } from 'react-icons/fa';
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from '@/app/utils/constants';
@@ -19,14 +16,15 @@ import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import Loader from '../Loader';
 import { getColorEstanque } from '@/lib/uix';
 import { FaTruckFast } from 'react-icons/fa6';
-import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import 'dayjs/locale/es';
 import { BiTask } from 'react-icons/bi';
 import { useForm } from 'react-hook-form';
 import InformacionDeOrden from './InformacionDeOrden';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 dayjs.locale('es');
 dayjs.extend(relativeTime);
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function Asignacion({ session }) {
     const [pedidos, setPedidos] = useState([]);
@@ -267,7 +265,7 @@ export default function Asignacion({ session }) {
                         }))
                     );
                 }
-                showCommentModal(0);
+                setShowCommentModal(0);
             } else {
                 toast.error(`Error al guardar el comentario: ${data.error}`);
             }
@@ -663,7 +661,7 @@ function handleTouchEndPedido(e) {
                                     e.preventDefault();                                    
                                     e.currentTarget.style.boxShadow = "none";
                                     if (!chofer.checklist) {
-                                        toast.warning("El chofer no tiene checklist completo, no se puede asignar.");
+                                        toast.error("El chofer no tiene checklist completo, no se puede asignar.");
                                         return;
                                     };
                                     if (selectedPedido) {
@@ -690,10 +688,14 @@ function handleTouchEndPedido(e) {
                                         Sin checklist
                                     </div>
                                 )}
-                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
+                                {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="cursor-pointer bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
                                     onDragStart={() => {
                                         setSelectedChofer(chofer._id);
                                         setSelectedVenta(pedido.tipo === TIPO_ORDEN.traslado ? pedido._id : pedido.items[0].ventaId);
+                                    }}
+                                    onClick={() => { 
+                                        setSelectedPedidoDetalle(pedido);
+                                        setShowDetalleOrdenModal(true);
                                     }}
                                     draggable="true">
                                     <div className="flex w-full">
@@ -1054,7 +1056,7 @@ function handleTouchEndPedido(e) {
                 loading={loading}
             />
 
-            <ToastContainer />
+            <Toaster />
         </main>
     );
 }

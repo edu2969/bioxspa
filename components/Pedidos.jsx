@@ -5,14 +5,13 @@ import { useForm, useWatch } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import formatRUT from '@/app/utils/idetificationDocument';
 import { TIPO_PRECIO, USER_ROLE } from '@/app/utils/constants';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { LiaPencilAltSolid, LiaTimesSolid } from 'react-icons/lia';
 import Loader from '@/components/Loader';
 import { socket } from "@/lib/socket-client";
 import { MdAddLocationAlt } from 'react-icons/md';
 import Autocomplete from "react-google-autocomplete";
 import { FaCheck, FaTimes } from 'react-icons/fa';
+import Toaster, { toast } from "react-hot-toast";
 
 export default function Pedidos({ session, googleMapsApiKey }) {
     const router = useRouter();
@@ -1083,17 +1082,17 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                                         <div className={`${(session.user.role == USER_ROLE.gerente
                                             || session.user.role == USER_ROLE.cobranza
                                             || session.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento ? <div className='w-full'>
-                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento}</p>
-                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId.cantidad} {precio.subcategoriaCatalogoId.unidad}</span>
+                                            {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento ? <div className='w-full'>
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento}</p>
+                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId?.cantidad} {precio.subcategoriaCatalogoId?.unidad}</span>
                                             </div> : <div className='w-full'>
-                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId.categoriaCatalogoId?.nombre}</p>
-                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId.nombre}</span>
+                                                <p className="font-bold text-lg">{precio.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre}</p>
+                                                <span className="relative -top-1">{precio.subcategoriaCatalogoId?.nombre}</span>
                                             </div>}
-                                            {precio.subcategoriaCatalogoId.categoriaCatalogoId?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId?.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
-                                                {precio.subcategoriaCatalogoId.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
-                                                {precio.subcategoriaCatalogoId.categoriaCatalogoId?.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
+                                            {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
+                                                {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
+                                                {precio.subcategoriaCatalogoId?.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
+                                                {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
                                             </div>}
                                         </div>
                                         {(session.user.role == USER_ROLE.gerente
@@ -1203,7 +1202,7 @@ export default function Pedidos({ session, googleMapsApiKey }) {
                     </div>}
                 </div>
             </div>
-            <ToastContainer />
+            <Toaster />
 
             {modalSolicitudPrecio && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">

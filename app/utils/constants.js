@@ -137,7 +137,7 @@ export const TIPO_CHECKLIST = {
 
 export const TIPO_CHECKLIST_ITEM = {
     tarjeta_combustible: 1,
-    /*hoja_seguridad_transporte: 3,
+    hoja_seguridad_transporte: 3,
     permiso_circulacion: 5,
     seguro_obligatorio: 7,
     botiquien: 9,
@@ -161,17 +161,17 @@ export const TIPO_CHECKLIST_ITEM = {
     neumaticos_traseros: 44,
     neumatico_repuesto: 46,
     limpieza_exterior: 49,
-    conos_seguridad: 50,*/
+    conos_seguridad: 50,
 
     zapatos_seguridad: 128,
-    /*polera_geologo: 130,
+    polera_geologo: 130,
     guantes_seguridad: 133,
     bloqueador_solar: 135,
     intercomunicador: 137,
     pantalon: 138,
     casco: 140,
     lentes: 142,
-    impresora: 144*/
+    impresora: 144
 }
 
 export const TIPO_ESTADO_CHECKLIST = {

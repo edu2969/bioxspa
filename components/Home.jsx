@@ -7,8 +7,7 @@ import HomeDespacho from "./HomeDespacho";
 import HomeGerencia from "./HomeGerencia";
 import { USER_ROLE } from "@/app/utils/constants";
 import { socket } from '@/lib/socket-client';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast from 'react-hot-toast';
 import CheckList from "@/components/CheckList";
 import { TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useOnVisibilityChange } from '@/components/uix/useOnVisibilityChange';    
@@ -229,7 +228,6 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
                 <p className="text-xl font-bold">Cargando panel</p>
             </div>}
-            <ToastContainer />
         </div>
     )
 }

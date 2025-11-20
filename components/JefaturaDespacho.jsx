@@ -6,8 +6,7 @@ import { FaRoadCircleCheck } from "react-icons/fa6";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
 import { FaClipboardCheck, FaPhoneAlt } from "react-icons/fa";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast from 'react-hot-toast';
 import { useRef } from "react";
 import dayjs from "dayjs";
 import 'dayjs/locale/es';
@@ -18,7 +17,7 @@ var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import { getColorEstanque } from "@/lib/uix";
-import { TIPO_ESTADO_ITEM_CATALOGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ITEM_CATALOGO, TIPO_ORDEN } from "@/app/utils/constants";
+import { TIPO_CATEGORIA_CATALOGO, TIPO_ESTADO_ITEM_CATALOGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
 import { LiaPencilAltSolid, LiaTimesSolid } from 'react-icons/lia';
 import { IoIosWarning } from "react-icons/io";
 import reproducirSonido from '@/app/utils/sounds';
@@ -244,7 +243,7 @@ export default function JefaturaDespacho({ session }) {
             items.forEach(item => {
                 ventas.forEach(venta => {
                     venta.detalles?.forEach(detalle => {
-                        if (detalle.subcategoriaId === item.subcategoriaCatalogoId) {
+                        if (detalle.subcategoriaCategoriaId === item.subcategoriaCatalogoId) {
                             if (!Array.isArray(detalle.itemCatalogoIds)) {
                                 detalle.itemCatalogoIds = [];
                             }
@@ -311,7 +310,7 @@ export default function JefaturaDespacho({ session }) {
             if (!cargamentoActual) return false;
 
             // Verifica si el código ya fue escaneado en cualquier detalle de cualquier venta del primer cargamento
-            if (item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
+            if (item.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro) {
                 const codigoYaEscaneado = cargamentoActual.ventas.some(venta =>
                     venta.detalles.some(detalle =>
                         Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.includes(item.itemId)
@@ -369,8 +368,8 @@ export default function JefaturaDespacho({ session }) {
 
                             // Buscar si ya existe un detalle para esta subcategoría
                             let detalleIdx = detalles.findIndex(
-                                d => d.subcategoriaId === item.subcategoria._id ||
-                                     (typeof d.subcategoriaId === "object" && d.subcategoriaId?._id === item.subcategoria._id)
+                                d => d.subcategoriaCategoriaId === item.subcategoria._id ||
+                                     (typeof d.subcategoriaCategoriaId === "object" && d.subcategoriaCategoriaId?._id === item.subcategoria._id)
                             );
 
                             // Si existe, actualiza el detalle sumando el itemId a itemCatalogoIds y ajustando los contadores
@@ -397,7 +396,7 @@ export default function JefaturaDespacho({ session }) {
                                 // Si no existe, crea un nuevo detalle para esta subcategoría
                                 detalles.push({
                                     ...item,
-                                    subcategoriaId: item.subcategoria._id,
+                                    subcategoriaCategoriaId: item.subcategoria._id,
                                     itemCatalogoIds: [item.itemId],
                                     restantes: 0,
                                     multiplicador: 1,
@@ -436,7 +435,7 @@ export default function JefaturaDespacho({ session }) {
             cargamentoActual.ventas.forEach((venta, vIdx) => {
                 venta.detalles.forEach((detalle, dIdx) => {
                     if (
-                        detalle.subcategoriaId === item.subcategoria._id &&
+                        detalle.subcategoriaCatalogoId._id === item.subcategoriaCatalogoId._id &&
                         detalle.restantes > 0
                     ) {
                         ventaIndex = vIdx;
@@ -449,23 +448,25 @@ export default function JefaturaDespacho({ session }) {
                 setScanMode(false);
                 setShowModalCilindroErroneo(true);
                 toast.warn(
-                    `CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} no corresponde a este pedido`
+                    `CODIGO ${codigo} ${item.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${item.subcategoriaCatalogoId.nombre} no corresponde a este pedido`
                 );
                 reproducirSonido('/sounds/error_01.mp3');
                 return;
             }
 
-            if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio && item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
+            if (item.estado === TIPO_ESTADO_ITEM_CATALOGO.vacio 
+                && item.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro) {
                 setScanMode(false);
                 setShowModalCilindroErroneo(true);
                 toast.warn(
-                    `CODIGO ${codigo} ${item.categoria.nombre} ${item.subcategoria.nombre} cilindro vacío`
+                    `CODIGO ${codigo} ${item.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${item.subcategoriaCatalogoId.nombre} cilindro vacío`
                 );
                 reproducirSonido('/sounds/error_02.mp3');
                 return;
             }
 
-            if(item.direccionInvalida && item.tipo === TIPO_ITEM_CATALOGO.cilindro) {
+            if(item.direccionInvalida 
+                && item.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro) {
                 setScanMode(false);
                 setEditMode(false);
                 setShowModalCilindroErroneo(true);
@@ -473,7 +474,7 @@ export default function JefaturaDespacho({ session }) {
                 return;
             }
 
-            const response = await fetch(`/api/${item.tipo === TIPO_ITEM_CATALOGO.cilindro ? 'cilindros' : 'insumos'}/cargar`, {
+            const response = await fetch(`/api/${item.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro ? 'cilindros' : 'insumos'}/cargar`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -525,7 +526,7 @@ export default function JefaturaDespacho({ session }) {
                 });
                 reproducirSonido('/sounds/accept_01.mp3');                
                 toast.success(
-                    `Cilindro ${item.codigo} ${item.categoria.nombre} ${item.subcategoria.nombre.toLowerCase()} cargado`
+                    `Cilindro ${item.codigo} ${item.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${item.subcategoriaCatalogoId.nombre.toLowerCase()} cargado`
                 );
             } else {
                 reproducirSonido('/sounds/error_01.mp3');
@@ -683,26 +684,27 @@ export default function JefaturaDespacho({ session }) {
     }
 
     const getDetailTitle = (detalle) => {
-        if(detalle.nombre.substring(0,4).toLowerCase() === "rack") {
+        
+        if(detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.substring(0,4).toLowerCase() === "rack") {
             return "Rack";
         }
-        return detalle.nombre.split(" ")[0];
+        return detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.split(" ")[0];
     }
 
     const getDetailSubtitle = (detalle) => {
-        if(detalle.nombre.substring(0,4).toLowerCase() === "rack") {
-            const partes = detalle.nombre.toLowerCase().split(" ");
+        if(detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.substring(0,4).toLowerCase() === "rack") {
+            const partes = detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.toLowerCase().split(" ");
             const index = partes.findIndex(p => p === "cilindros") - 1;
             return `${partes[index] || "??"}`;
-        } else if(detalle.nombre.includes("Insumos")) {
-            return detalle.nombre.split("-")[1] || "??";
+        } else if(detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Insumos")) {
+            return detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.split("-")[1] || "??";
         }
-        return detalle.nombre;
+        return detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre;
     }
 
     const getAditionalInfo = (detalle) => {
-        if(detalle.nombre.toLowerCase().includes("insumos")) {
-            return detalle.nombre.split("-")[2] || "??";
+        if(detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.toLowerCase().includes("insumos")) {
+            return detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.split("-")[2] || "??";
         }
         return "";
     }
@@ -770,15 +772,15 @@ export default function JefaturaDespacho({ session }) {
         setShowModalNombreRetira(false);
     };
 
-    // Devuelve un resumen agrupado por subcategoriaId, combinando items y detalles para mostrar el conteo correcto
+    // Devuelve un resumen agrupado por subcategoriaCategoriaId, combinando items y detalles para mostrar el conteo correcto
     const getResumenCarga = (cargamento) => {
         if (!cargamento) return [];
 
-        // Paso 1: Agrupa los items por subcategoriaId (puede venir como string o como objeto)
+        // Paso 1: Agrupa los items por subcategoriaCategoriaId (puede venir como string o como objeto)
         const itemsPorSubcat = {};
         if (Array.isArray(cargamento.items)) {
             cargamento.items.forEach(item => {
-                const key = item.subcategoriaId?._id || item.subcategoriaId;
+                const key = item.subcategoriaCategoriaId?._id;
                 if (!key) return;
                 if (!itemsPorSubcat[key]) {
                     itemsPorSubcat[key] = [];
@@ -787,13 +789,13 @@ export default function JefaturaDespacho({ session }) {
             });
         }
 
-        // Paso 2: Agrupa los detalles de venta por subcategoriaId
+        // Paso 2: Agrupa los detalles de venta por subcategoriaCategoriaId
         const detallesPorSubcat = {};
         if (Array.isArray(cargamento.ventas)) {
             cargamento.ventas.forEach(venta => {
                 if (Array.isArray(venta.detalles)) {
                     venta.detalles.forEach(detalle => {
-                        const key = detalle.subcategoriaId?._id || detalle.subcategoriaId;
+                        const key = detalle.subcategoriaCategoriaId?._id;
                         if (!key) return;
                         if (!detallesPorSubcat[key]) {
                             detallesPorSubcat[key] = [];
@@ -811,6 +813,10 @@ export default function JefaturaDespacho({ session }) {
                 ...Object.keys(detallesPorSubcat)
             ])
         );
+
+        console.log("Items por subcat:", itemsPorSubcat);
+        console.log("Detalles por subcat:", detallesPorSubcat);
+        console.log("Todas las subcats:", todasLasSubcats);
 
         // Paso 4: Para cada subcategoria, calcula los contadores correctamente
         const mapaFinal = todasLasSubcats.map(key => {
@@ -853,56 +859,46 @@ export default function JefaturaDespacho({ session }) {
             }
 
             // --- AJUSTE: Si el elemento es nulo, intenta obtenerlo desde el detalle ---
-            let subcategoriaId = itemEjemplo?.subcategoriaId || detalle?.subcategoriaId || key;
-            // Si subcategoriaId es un string, intenta buscar el objeto en detalle o itemEjemplo
-            if (typeof subcategoriaId === "string") {
-                if (detalle && typeof detalle.subcategoriaId === "object") {
-                    subcategoriaId = detalle.subcategoriaId;
-                } else if (itemEjemplo && typeof itemEjemplo.subcategoriaId === "object") {
-                    subcategoriaId = itemEjemplo.subcategoriaId;
+            let subcategoriaCategoriaId = itemEjemplo?.subcategoriaCategoriaId || detalle?.subcategoriaCategoriaId || key;
+            // Si subcategoriaCategoriaId es un string, intenta buscar el objeto en detalle o itemEjemplo
+            if (typeof subcategoriaCategoriaId === "string") {
+                if (detalle && typeof detalle.subcategoriaCategoriaId === "object") {
+                    subcategoriaCategoriaId = detalle.subcategoriaCategoriaId;
+                } else if (itemEjemplo && typeof itemEjemplo.subcategoriaCategoriaId === "object") {
+                    subcategoriaCategoriaId = itemEjemplo.subcategoriaCategoriaId;
                 }
             }
             // Si sigue sin tener categoriaCatalogoId o elemento, intenta buscar en detalle
             if (
-                subcategoriaId &&
-                (!subcategoriaId.categoriaCatalogoId || !subcategoriaId.categoriaCatalogoId.elemento)
+                subcategoriaCategoriaId &&
+                (!subcategoriaCategoriaId.categoriaCatalogoId || !subcategoriaCategoriaId.categoriaCatalogoId.elemento)
             ) {
                 if (
                     detalle &&
-                    detalle.subcategoriaId &&
-                    detalle.subcategoriaId.categoriaCatalogoId &&
-                    detalle.subcategoriaId.categoriaCatalogoId.elemento
+                    detalle.subcategoriaCategoriaId &&
+                    detalle.subcategoriaCategoriaId.categoriaCatalogoId &&
+                    detalle.subcategoriaCategoriaId.categoriaCatalogoId.elemento
                 ) {
-                    subcategoriaId.categoriaCatalogoId = detalle.subcategoriaId.categoriaCatalogoId;
+                    subcategoriaCategoriaId.categoriaCatalogoId = detalle.subcategoriaCategoriaId.categoriaCatalogoId;
                 } else if (
                     itemEjemplo &&
-                    itemEjemplo.subcategoriaId &&
-                    itemEjemplo.subcategoriaId.categoriaCatalogoId &&
-                    itemEjemplo.subcategoriaId.categoriaCatalogoId.elemento
+                    itemEjemplo.subcategoriaCategoriaId &&
+                    itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId &&
+                    itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId.elemento
                 ) {
-                    subcategoriaId.categoriaCatalogoId = itemEjemplo.subcategoriaId.categoriaCatalogoId;
+                    subcategoriaCategoriaId.categoriaCatalogoId = itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId;
                 }
             }
 
             // Devuelve un objeto resumen, usando la estructura de los items para mostrar info visual
             // Priorizar datos del detalle sobre los del item
             const baseData = detalle || itemEjemplo || {};
-            
+
             return {
                 ...baseData,
-                subcategoriaId,
+                subcategoriaCategoriaId,
                 multiplicador,
                 restantes,
-                // Asegurar que tenemos los campos necesarios del detalle si existen
-                ...(detalle && {
-                    elemento: detalle.elemento,
-                    nombre: detalle.nombre,
-                    cantidad: detalle.cantidad,
-                    unidad: detalle.unidad,
-                    nuCode: detalle.nuCode,
-                    esIndustrial: detalle.esIndustrial,
-                    sinSifon: detalle.sinSifon
-                })
             };
         });
         
@@ -910,13 +906,18 @@ export default function JefaturaDespacho({ session }) {
         return mapaFinal;
     }
 
+    const formatElemento = (elemento) => {
+        if (!elemento) return "";
+        return elemento.charAt(0).toUpperCase() + elemento.slice(1).toLowerCase();
+    }
+
     return (
-        <div className="w-full h-screen" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
-            <div className="w-full">
+        <div className="w-full h-screen text-center" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
+            <div className="w-11/12 md:w-1/2 mx-auto">
 
                 {!loadingCargamentos && cargamentos && cargamentos.map((cargamento, index) => (
                     <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
-                        <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1 ${animating ? "transition-all duration-500" : ""}`}
+                        <div className={`absolute w-11/12 md:w-1/2 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1 ${animating ? "transition-all duration-500" : ""}`}
                             style={{
                                 top: `${index * 10 + 52}px`,
                                 left: `${index * 10 + 16}px`,
@@ -980,38 +981,38 @@ export default function JefaturaDespacho({ session }) {
                                     </div>
 
                                     {venta.detalles && <ul key={`detalles_${ventaIndex}`} className="flex-1 flex flex-wrap items-center justify-center mt-1">
-                                        {venta.tipo === TIPO_ESTADO_VENTA.venta && venta.detalles.map((detalle, idx) => (
+                                        {venta.tipo === TIPO_ORDEN.venta && venta.detalles.map((detalle, idx) => (
                                             <li
                                                 key={`detalle_${ventaIndex}_${idx}`}
                                                 className={`w-full flex text-sm border border-gray-300 px-0 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1) ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                             >
-                                                {detalle.elemento && <div className="w-full flex items-left pt-1.5">
+                                                {detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left pt-1.5">
                                                     <div className="w-14">
                                                         <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
-                                                            <div className="bg-orange-200 border text-orange-500 border-orange-400 px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
-                                                                <p className="relative -top-0.5">{detalle.nuCode}</p>
+                                                            <div className="bg-orange-500 border text-orange-200 border-orange-500 px-2 py-0 rounded-sm ml-0.5 -my-1 h-[14px]">
+                                                                <p className="relative -top-0.5">{getNUCode(detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</p>
                                                             </div>
-                                                            {detalle.esIndustrial && <div className="bg-blue-200 text-blue-700 border border-blue-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
+                                                            {detalle.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="bg-blue-500 text-blue-200 border border-blue-500 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
                                                                 <span className="relative -top-0.5">Industrial</span>
                                                             </div>}
-                                                            {detalle.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
+                                                            {detalle.subcategoriaCatalogoId.categoriaCatalogoId.sinSifon && <div className="bg-gray-500 text-gray-100 border border-gray-600 px-2 py-0 rounded-sm ml-0.5 h-[14px] mt-1.5">
                                                                 <span className="relative -top-0.5">Sin Sifón</span>
                                                             </div>}
                                                         </div>                                                        
                                                     </div>
-                                                    <div className="font-bold text-xl ml-2 -mt-0.5">{detalle.elemento}</div>
+                                                    <div className="font-bold text-xl ml-2 -mt-0.5">{formatElemento(detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
                                                     <div className="flex text-nowrap">
-                                                        <p className="text-xl orbitron ml-2">{detalle.cantidad}</p>
-                                                        <p>{detalle.unidad}</p>
+                                                        <p className="text-xl orbitron ml-2">{detalle.subcategoriaCatalogoId.cantidad}</p>
+                                                        <p className="ml-0.5 mt-1.5">{detalle.subcategoriaCatalogoId.unidad}</p>
                                                     </div>
                                                 </div>}
-                                                {!detalle.elemento && <div className="w-full flex items-left ml-2">
-                                                    {detalle.nombre.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(detalle)}</div>}
+                                                {!detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left ml-2">
+                                                    {detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(detalle)}</div>}
                                                     <div className="pl-3">
-                                                        {detalle.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
+                                                        {detalle.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
                                                         <p className="font-bold text-lg text-nowrap mt-0">
                                                             {getDetailSubtitle(detalle)}
-                                                            {detalle.nombre.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
+                                                            {detalle.subcategoriaCatalogoId.categoriaCatalogoId.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
                                                         </p>
                                                         {getAditionalInfo(detalle) && <p className="text-xs text-gray-600 -mt-2">{getAditionalInfo(detalle)} </p>}
                                                     </div>
@@ -1032,35 +1033,35 @@ export default function JefaturaDespacho({ session }) {
                                             key={`item${ventaIndex}_${itemIndex}`}
                                             className={`w-full flex text-sm border border-gray-300 px-0 ${(itemIndex === 0 && cargamento.items?.length != 1) ? 'rounded-t-lg' : (itemIndex === cargamento.items?.length - 1 && cargamento.items?.length != 1) ? 'rounded-b-lg' : cargamento.items?.length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
                                         >                                                    
-                                            {item.elemento && <div className="w-full flex items-left pt-1.5">
+                                            {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left pt-1.5">
                                                 <div className="w-14">
                                                     <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
                                                         <div className="bg-orange-500 border text-orange-50 border-orange-400 px-2 py-0 rounded ml-0.5 -my-1 h-[14px]">
-                                                            <p className="relative -top-0.5">{getNUCode(item.elemento)}</p>
+                                                            <p className="relative -top-0.5">{getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</p>
                                                         </div>
-                                                        {item.esIndustrial && <div className="bg-blue-500 text-blue-50 border border-blue-400 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
+                                                        {item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="bg-blue-500 text-blue-50 border border-blue-400 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
                                                             <span className="relative -top-0.5">Industrial</span>
                                                         </div>}
-                                                        {item.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
+                                                        {item.subcategoriaCatalogoId.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
                                                             <span className="relative -top-0.5">Sin Sifón</span>
                                                         </div>}
                                                     </div>                                                        
                                                 </div>
-                                                <div className="font-bold text-xl ml-2 -mt-0.5">{item.elemento}</div>
+                                                <div className="font-bold text-xl ml-2 -mt-0.5">{item.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</div>
                                                 <div className="flex text-nowrap">
-                                                    <p className="text-xl orbitron ml-2 -mt-0.5">{item.cantidad}</p>
-                                                    <p className="mt-1 ml-0.5">{item.unidad}</p>
+                                                    <p className="text-xl orbitron ml-2 -mt-0.5">{item.subcategoriaCatalogoId.cantidad}</p>
+                                                    <p className="mt-1 ml-0.5">{item.subcategoriaCatalogoId.unidad}</p>
                                                 </div>
                                             </div>}
-                                            {!item.elemento && <div className="w-full flex items-left ml-2">
-                                                {item.nombre.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(item.subcategoriaId)}</div>}
+                                            {!item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left ml-2">
+                                                {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre?.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(item)}</div>}
                                                 <div className="pl-3">
-                                                    {item.subcategoriaId.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
+                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
                                                     <p className="font-bold text-lg text-nowrap mt-0">
-                                                        {getDetailSubtitle(item.subcategoriaId)}
-                                                        {item.nombre.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
+                                                        {getDetailSubtitle(item)}
+                                                        {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
                                                     </p>
-                                                    {getAditionalInfo(item.subcategoriaId) && <p className="text-xs text-gray-600 -mt-2">{getAditionalInfo(item.subcategoriaId)} </p>}
+                                                    {getAditionalInfo(item) && <p className="text-xs text-gray-600 -mt-2">{getAditionalInfo(item)} </p>}
                                                 </div>
                                             </div>}
                                             <div className="w-full flex justify-end items-center">
@@ -1169,20 +1170,22 @@ export default function JefaturaDespacho({ session }) {
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Información de Cilindro</h3>
                         <div className="mt-2">
                             <div className="flex items-center justify-center">
-                                {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.categoria.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />}
+                                {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro && <Image width={20} height={64} src={`/ui/tanque_biox${getColorEstanque(itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}.png`} style={{ width: "43px", height: "236px" }} alt="tanque_biox" />}
                                 <div className="text-left ml-6">
                                     <div className="-mb-2">
                                         <div className="flex">
-                                            {itemCatalogoEscaneado.categoria.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
-                                            {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.categoria.elemento)}</div>}
-                                            {itemCatalogoEscaneado.subcategoria.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
+                                            {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 mt-0 font-bold">INDUSTRIAL</span>}
+                                            {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro && <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs ml-1 h-5 mt-0 font-bold tracking-widest">{getNUCode(itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>}
+                                            {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.sinSifon && <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs ml-2 h-5 mt-0 font-bold tracking-widest">sin SIFÓN</div>}
                                         </div>
                                         <div className="flex font-bold text-4xl mt-1">
                                             <span className="pb-0 mt-4">                                                
-                                                {(itemCatalogoEscaneado.elemento || itemCatalogoEscaneado.categoria.gas) ? (() => {
-                                                    let match = itemCatalogoEscaneado.categoria.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
+                                                {(itemCatalogoEscaneado.subcategoriaCatalogoId.elemento 
+                                                || itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.gas) ? (() => {
+                                                    let match = itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.elemento?.match(/^([a-zA-Z]*)(\d*)$/);
                                                     if (!match) {
-                                                        match = [null, (itemCatalogoEscaneado.categoria.elemento ?? itemCatalogoEscaneado.categoria.gas), ''];
+                                                        match = [null, (itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.elemento 
+                                                            ?? itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.gas), ''];
                                                     };
                                                     const [, p1, p2] = match;
                                                     return (
@@ -1191,9 +1194,9 @@ export default function JefaturaDespacho({ session }) {
                                                             {p2 ? <small>{p2}</small> : ''}
                                                         </>
                                                     );
-                                                })() : itemCatalogoEscaneado.categoria.nombre}
+                                                })() : itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.nombre.concat[" ", itemCatalogoEscaneado.subcategoriaCatalogoId.nombre] }
                                             </span>
-                                            {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <div className="ml-3 mt-1">
+                                            {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro && <div className="ml-3 mt-1">
                                                 {editMode && <><p className="text-xs text-gray-600">Estado</p>
                                                     <select
                                                         className="border border-gray-300 rounded px-2 py-1 text-sm w-24 relative -top-3 mb-0"
@@ -1219,13 +1222,13 @@ export default function JefaturaDespacho({ session }) {
                                             </div>}
                                         </div>
                                     </div>
-                                    <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoria.cantidad} <small>{itemCatalogoEscaneado.subcategoria.unidad}</small> </p>
+                                    <p className="text-4xl font-bold orbitron">{itemCatalogoEscaneado.subcategoriaCatalogoId.cantidad} <small>{itemCatalogoEscaneado.subcategoriaCatalogoId.unidad}</small> </p>
                                     <p className="text-sm text-gray-600"><small>Código:</small> <b>{itemCatalogoEscaneado.codigo}</b></p>
-                                    {itemCatalogoEscaneado.tipo === TIPO_ITEM_CATALOGO.cilindro && <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>}
+                                    {itemCatalogoEscaneado.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro && <p className="text-sm text-gray-600"><small>Vence:</small> <b>{dayjs(itemCatalogoEscaneado.updatedAt).add(2, 'year').format("DD/MM/YYYY")}</b></p>}
                                     {!editMode && itemCatalogoEscaneado.direccionInvalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
                                         <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
                                         <p className="flex text-red-600 -mt-6">
-                                            <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{itemCatalogoEscaneado.direccion.nombre}</span>
+                                            <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{itemCatalogoEscaneado.direccionActual.direccion.nombre}</span>
                                         </p>
                                     </div>}
                                     {editMode &&  (
@@ -1294,7 +1297,6 @@ export default function JefaturaDespacho({ session }) {
                     </div>
                 </div>
             </div>}
-            <ToastContainer />
             <input
                 ref={hiddenInputRef}
                 type="text"
@@ -1424,6 +1426,7 @@ export default function JefaturaDespacho({ session }) {
                     </div>
                 </div>
             )}
+
         </div>
     );
 }

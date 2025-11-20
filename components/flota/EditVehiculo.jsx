@@ -6,10 +6,7 @@ import { useForm } from "react-hook-form";
 import Loader from "@/components/Loader";
 import { FaRegSave } from "react-icons/fa";
 import { IoChevronBack } from "react-icons/io5";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function EditVehiculo({ vehiculoId }) {
     const [vehiculo, setVehiculo] = useState(null);
@@ -162,7 +159,7 @@ export default function EditVehiculo({ vehiculoId }) {
                     </div>
                 )}
             </form>
-            <ToastContainer />
+            <Toaster />
         </div>
     );
 }

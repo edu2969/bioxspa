@@ -193,7 +193,7 @@ export async function GET() {
                                 multiplicador: detalle.cantidad,
                                 restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length ?? 0),
                                 itemCatalogoIds: detalle.itemCatalogoIds || [],
-                                subcategoriaId: subcategoria, 
+                                subcategoriaCatalogoId: subcategoria, 
                             };                    
 
                             if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
@@ -226,7 +226,7 @@ export async function GET() {
                     unidad: item.subcategoriaCatalogoId?.unidad || null,
                     restantes: null, // Se calcula más arriba
                     itemCatalogoIds: [item._id],
-                    subcategoriaId: item.subcategoriaCatalogoId                    
+                    subcategoriaCatalogoId: item.subcategoriaCatalogoId                    
                 })) || [],
                 estado: ruta.estado,
             };
@@ -250,7 +250,7 @@ export async function GET() {
                         return {
                             multiplicador: detalle.cantidad,
                             restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length || 0), 
-                            subcategoriaId: subcategoria?._id || null,
+                            subcategoriaCatalogoId: subcategoria?._id || null,
                             itemCatalogoIds: detalle.itemCatalogoIds || [],
                         };
                     }),
