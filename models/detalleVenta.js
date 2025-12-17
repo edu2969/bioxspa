@@ -15,7 +15,7 @@ const DetalleVentaSchema = new mongoose.Schema({
     itemCatalogoIds: { 
         type: [mongoose.Schema.Types.ObjectId], 
         ref: 'ItemCatalogo', 
-        default: null
+        default: []
     },
     tipo: { type: Number }, // 1: pedido, 2: retiro
     cantidad: { type: Number, required: true },

@@ -60,7 +60,7 @@ export async function POST(request) {
     // Verifica que el item pertenezca a la venta de la última dirección arribada
     const ultimaDireccion = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
     const venta = await Venta.findOne({ _id: { $in: rutaDespacho.ventaIds } }).select("_id tipo direccionDespachoId").lean();
-    const detalles = await DetalleVenta.find({ ventaId: venta._id }).select("itemCatalogoIds").lean();
+    const detalles = await DetalleVenta.find({ ventaId: venta._id }).select("itemCatalogoIds cantidad subcategoriaCatalogoId").lean();
 
     if (venta.tipo === TIPO_ORDEN.traslado) {
         if (!mongoose.models.Sucursal) {
@@ -171,16 +171,31 @@ export async function POST(request) {
             ...item
         });
     }
-
+    
     // Resto de tipos de orden
     const perteneceAlCliente = detalles.some(detalle =>
-        Array.isArray(detalle.itemCatalogoIds) &&
-        detalle.itemCatalogoIds.some(id => String(id) === String(item._id))
+        String(detalle.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
     );
 
     if (!perteneceAlCliente) {
         return NextResponse.json({ ok: false, error: "El item no pertenece al cliente" }, { status: 403 });
     }
+
+    console.log("Detalles", detalles);
+    const detalleDisponible = detalles.find(detalle =>
+        String(detalle.subcategoriaCatalogoId) === String(item.subcategoriaCatalogoId._id) &&
+        (!Array.isArray(detalle.itemCatalogoIds) ||
+        detalle.itemCatalogoIds.length < detalle.cantidad)
+    );
+
+    if (!detalleDisponible) {
+        return NextResponse.json({ ok: false, error: "No hay espacio en los detalles de la venta para este item" }, { status: 400 });
+    }
+
+    await DetalleVenta.updateOne(
+        { _id: detalleDisponible._id },
+        { $addToSet: { itemCatalogoIds: item._id } }
+    );
 
     rutaDespacho.cargaItemIds = rutaDespacho.cargaItemIds.filter(id => !id.equals(item._id));
 
@@ -204,7 +219,7 @@ export async function POST(request) {
         });
     }
 
-    await rutaDespacho.save();
+    await rutaDespacho.save();   
 
     return NextResponse.json({
         ok: true,

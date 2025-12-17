@@ -10,7 +10,6 @@ const SubcategoriaCatalogoSchema = new mongoose.Schema({
     },
     cantidad: { type: Number },
     unidad: { type: String },
-    nombreGas: { type: String },
     sinSifon: { type: Boolean, default: false },    
     urlImagen: { type: String, default: null },
 }, {

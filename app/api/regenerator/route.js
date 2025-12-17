@@ -18,6 +18,9 @@ import Comuna from "@/models/comuna";
 import Regione from "@/models/regione";
 import DocumentoTributario from "@/models/documentoTributario";
 import mongoose from 'mongoose';
+import XistorialAumentoPrecio from "@/models/xistorialAumentoPrecio";
+import { GasToNuMap } from "@/lib/nuConverter";
+import { TIPO_CATEGORIA_CATALOGO } from "@/app/utils/constants";
 
 export async function GET(request) {
     console.log("Connecting to MongoDB...");
@@ -86,6 +89,12 @@ export async function GET(request) {
         await encontrarCilindros();
         console.log("Cylinder address assignment completed successfully");
     }
+
+    if(q === "migrarCatalogo") {
+        console.log("Starting catalog migration...");
+        await migrarCatalogo();
+        console.log("Catalog migration completed successfully");
+    }
     
     return NextResponse.json({ message: "Success migrate and improve" });
 }
@@ -96,72 +105,159 @@ const resetVentas = async () => {
     await DetalleVenta.deleteMany({});
 }
 
-const mejorarSubcategorias = async () => {
-    const items = await ItemCatalogo.find({});
-        
-        for (const item of items) {
-            try {
-                // Get the subcategoria from the item
-                const subcategoria = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId);
-                
-                if (subcategoria && subcategoria.temporalId) {
-                    // Find the corresponding xubcategoriaProducto using temporalId
-                    const xubcategoria = await XubcategoriaProducto.findOne({ id: subcategoria.temporalId });
-                    
-                    if (xubcategoria && xubcategoria.categoria_id) {
-                        // Find the categoria using the categoria_id as temporalId
-                        const categoria = await CategoriaCatalogo.findOne({ temporalId: xubcategoria.categoria_id });
-                        
-                        if (categoria) {
-                            // Update the subcategoria with the categoriaCatalogoId
-                            await SubcategoriaCatalogo.findByIdAndUpdate(
-                                subcategoria._id,
-                                { categoriaCatalogoId: categoria._id }
-                            );
-                            
-                            console.log(`Updated subcategoria ${subcategoria._id} with categoria ${categoria._id}`);
-                        } else {
-                            console.warn(`Categoria not found for temporalId: ${xubcategoria.categoria_id}`);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing item ${item._id}:`, error);
-            }
-        }
-}
+const migrarCatalogo = async () => {
+    console.log('Iniciando migración del catálogo...');
 
-const completarCategorias = async () => {
-    const categorias = await CategoriaCatalogo.find({});
+    // Obtener datos de las tablas legacy
+    const xategorias = await XategoriaProducto.find({ deleted_at: null });
+    const xubcategorias = await XubcategoriaProducto.find({ deleted_at: null });
 
-    for (const categoria of categorias) {
+    console.log(`Encontradas ${xategorias.length} categorías y ${xubcategorias.length} subcategorías para migrar`);
+
+    // Crear un mapa de elementos desde GasToNuMap
+    const elementosMap = new Map();
+    Object.keys(GasToNuMap).sort((a, b) => b.length - a.length).forEach(key => {
+        elementosMap.set(key.toLowerCase(), GasToNuMap[key]);
+    }); // Ordenar por longitud descendente
+
+    // Mapa para relacionar temporalId de categorías
+    const categoriaMap = new Map();
+
+    // Migrar categorías
+    for (const xategoria of xategorias) {
         try {
-            // Find the corresponding XategoriaProducto by name
-            const xategoria = await XategoriaProducto.findOne({ nombre: categoria.nombre });
-            
-            if (xategoria) {
-                // Update the categoria with the temporalId from XategoriaProducto
-                await CategoriaCatalogo.findByIdAndUpdate(
-                    categoria._id,
-                    { temporalId: xategoria.id }
-                );
-                
-                console.log(`Updated categoria ${categoria._id} with temporalId ${xategoria.id}`);
-            } else {
-                console.warn(`XategoriaProducto not found for categoria: ${categoria.nombre}`);
+            const nombreLower = xategoria.nombre.toLowerCase();
+
+            // Buscar si alguna clave de elementosMap está en el nombre
+            let elemento = null;
+            let gas = null;
+            let nuCode = null;
+            for (const [clave, nu] of elementosMap.entries()) {
+                if (nombreLower.includes(clave)) {
+                    elemento = clave;
+                    nuCode = nu;
+                    gas = clave;
+                    break;
+                }
             }
+
+            const esCilindro = elemento !== null;
+
+            let tipo = TIPO_CATEGORIA_CATALOGO.sinCategoria;
+            let esIndustrial = false;
+            let esMedicinal = false;
+
+            if (esCilindro) {
+                tipo = TIPO_CATEGORIA_CATALOGO.cilindro;
+                esIndustrial = nombreLower.includes('industrial') || nombreLower.includes(' ind');
+                esMedicinal = nombreLower.includes('medicinal') || nombreLower.includes(' med');
+            }
+
+            if(nombreLower.includes('arriendo')) {
+                tipo = TIPO_CATEGORIA_CATALOGO.arriendo;
+            }
+
+            if(nombreLower.includes('flete')) {
+                tipo = TIPO_CATEGORIA_CATALOGO.flete;
+            }
+
+            if(nombreLower.includes('servicio')) {
+                tipo = TIPO_CATEGORIA_CATALOGO.servicio;
+            }
+
+            const updateData = {
+                nombre: xategoria.nombre,
+                descripcion: null,
+                seguir: xategoria.seguir.toLowerCase() === 'si' || xategoria.seguir === '1',
+                urlImagen: xategoria.url,
+                tipo: tipo,
+                gas: gas,
+                elemento: elemento,
+                nuCode: nuCode,
+                esIndustrial: esIndustrial,
+                esMedicinal: esMedicinal
+            };
+
+            const categoriaGuardada = await CategoriaCatalogo.findOneAndUpdate(
+                { temporalId: xategoria.id },
+                updateData,
+                { upsert: true, new: true }
+            );
+
+            categoriaMap.set(xategoria.id, categoriaGuardada._id);
+
+            console.log(`Categoría migrada/actualizada: ${xategoria.nombre} (ID: ${categoriaGuardada._id})`);
         } catch (error) {
-            console.error(`Error processing categoria ${categoria._id}:`, error);
+            console.error(`Error migrando categoría ${xategoria.id}:`, error);
         }
     }
+
+    // Migrar subcategorías
+    for (const xubcategoria of xubcategorias) {
+        try {
+            const categoriaId = categoriaMap.get(xubcategoria.categoria_id);
+            if (!categoriaId) {
+                console.warn(`Categoría no encontrada para subcategoría ${xubcategoria.id} (categoria_id: ${xubcategoria.categoria_id})`);
+                continue;
+            }
+
+            const nombreLower = xubcategoria.nombre.toLowerCase();
+
+            // Determinar unidad de medida
+            let unidad = null;
+            if (nombreLower.includes('m3')) {
+                unidad = 'm3';
+            } else if (nombreLower.includes('kilos') || nombreLower.includes('kgs')) {
+                unidad = 'kg';
+            } else if (nombreLower.includes('kg')) {
+                unidad = 'kg';
+            }
+
+            // Extraer cantidad (asumiendo formato como "5 kg" o "10 m3")
+            let cantidad = null;
+            const match = xubcategoria.nombre.match(/(\d+)/);
+            if (match) {
+                cantidad = parseInt(match[1]);
+            }
+
+            // Determinar sinSifon
+            const sinSifon = nombreLower.includes('sin sifón') || nombreLower.includes('sin sifon');
+
+            const updateData = {
+                nombre: xubcategoria.nombre,
+                categoriaCatalogoId: categoriaId,
+                cantidad: cantidad,
+                unidad: unidad,
+                sinSifon: sinSifon,
+                urlImagen: xubcategoria.url
+            };
+
+            const subcategoriaGuardada = await SubcategoriaCatalogo.findOneAndUpdate(
+                { temporalId: xubcategoria.id },
+                updateData,
+
+                { upsert: true, new: true }
+            );
+
+            console.log(`Subcategoría migrada/actualizada: ${xubcategoria.nombre} (ID: ${subcategoriaGuardada._id})`);
+        } catch (error) {
+            console.error(`Error migrando subcategoría ${xubcategoria.id}:`, error);
+        }
+    }
+
+    console.log('Migración del catálogo completada.');
 }
 
 const actualizarPrecios = async () => {
-    const xproductos = await XroductosCliente.find({});
+    const xproductos = await XroductosCliente.find();
+    let preciosCreados = 0;
+    let historialesAgregados = 0;
+    let registrosNoProcesados = 0;
 
     for (const xproducto of xproductos) {
         try {
             if (!xproducto.clientes_id || !xproducto.subcategoria_id) {
+                registrosNoProcesados++;
                 continue;
             }
 
@@ -176,14 +272,14 @@ const actualizarPrecios = async () => {
                     subcategoriaCatalogoId: subcategoria._id,
                     clienteId: cliente._id,
                     valorBruto: parseFloat(xproducto.precio1) || 0,
-                    impuesto: 0,
+                    impuesto: 0.19,
                     moneda: 'CLP',
-                    valor: parseFloat(xproducto.precio1) || 0,
+                    valor: parseFloat(xproducto.precio1) * 1.19 || 0,
                     historial: []
                 };
 
                 // Update or create precio
-                await Precio.findOneAndUpdate(
+                const precio = await Precio.findOneAndUpdate(
                     {
                         subcategoriaCatalogoId: subcategoria._id,
                         clienteId: cliente._id
@@ -192,18 +288,63 @@ const actualizarPrecios = async () => {
                     { upsert: true, new: true }
                 );
 
-                console.log(`Updated/Created precio for cliente ${cliente._id} and subcategoria ${subcategoria._id}`);
+                if (precio.isNew || precio.wasNew) preciosCreados++;
+
+                // Buscar historial de aumentos por producto y cliente (temporalId)
+                const historialAumentos = await XistorialAumentoPrecio.find({
+                    productos_clientes_id: xproducto.id
+                });
+
+                if (historialAumentos && historialAumentos.length > 0) {
+                    // Ordenar por fecha de creación si existe
+                    historialAumentos.sort((a, b) => {
+                        const fa = a.created_at ? new Date(a.created_at) : new Date(0);
+                        const fb = b.created_at ? new Date(b.created_at) : new Date(0);
+                        return fa - fb;
+                    });
+
+                    const historial = historialAumentos.map(h => {
+                        const valorAnterior = parseFloat(h.valor_anterior) || 0;
+                        const valorNuevo = parseFloat(h.valor_nuevo) || 0;
+                        const varianza = valorAnterior !== 0 ? ((valorNuevo - valorAnterior) / valorAnterior) * 100 : 0;
+                        return {
+                            valor: valorNuevo,
+                            fecha: h.created_at || new Date(),
+                            varianza
+                        };
+                    });
+
+                    // Actualizar el historial en el precio
+                    await Precio.findOneAndUpdate(
+                        {
+                            subcategoriaCatalogoId: subcategoria._id,
+                            clienteId: cliente._id
+                        },
+                        { $set: { historial } }
+                    );
+                    historialesAgregados += historial.length;
+                }                
             } else {
+                registrosNoProcesados++;
                 console.warn(`Cliente or subcategoria not found for ids: ${xproducto.clientes_id}, ${xproducto.subcategoria_id}`);
             }
         } catch (error) {
+            registrosNoProcesados++;
             console.error(`Error processing xproducto ${xproducto.id}:`, error);
         }
     }
+
+    console.log('\n=== RESUMEN DE ACTUALIZACIÓN DE PRECIOS ===');
+    console.log(`Precios creados/actualizados: ${preciosCreados}`);
+    console.log(`Historiales agregados: ${historialesAgregados}`);
+    console.log(`Registros no procesados: ${registrosNoProcesados}`);
+    console.log('==========================================\n');
 }
 
 const geoCompletition = async () => {
-    const clientes = await Cliente.find({}).limit(1000);
+    const clientes = await Cliente.find({
+        direccionesDespacho: []
+    }).limit(1000);
     let direccionesDetectadas = 0;
     let direccionesReparadas = 0;
     let direccionesSinReparar = 0;
@@ -460,20 +601,21 @@ const migrarClientes = async () => {
             if (cliente) {
                 // Map all xliente fields to cliente fields (xliente data takes precedence)
                 const updateData = {
+                    temporalId: xliente.id,
                     nombre: xliente.nombre || cliente.nombre,
                     rut: xliente.rut || cliente.rut,
                     giro: xliente.giro,
                     telefono: xliente.telefono || cliente.telefono,
                     email: xliente.email || cliente.email,
                     emailIntercambio: xliente.email_intercambio || cliente.emailIntercambio,
-                    envioFactura: xliente.envio_factura === 'Si' || xliente.envio_factura === '1' || cliente.envioFactura,
-                    envioReporte: xliente.envio_reporte === 'Si' || xliente.envio_reporte === '1' || cliente.envioReporte,
-                    seguimiento: xliente.seguimiento === 'Si' || xliente.seguimiento === '1' || cliente.seguimiento,
-                    ordenCompra: xliente.orden_compra === 'Si' || xliente.orden_compra === '1' || cliente.ordenCompra,
-                    reporteDeuda: xliente.reporte_deuda === 'Si' || xliente.reporte_deuda === '1' || cliente.reporteDeuda,
-                    arriendo: xliente.arriendo === 'Si' || xliente.arriendo === '1' || cliente.arriendo,
+                    envioFactura: xliente.envio_factura?.toLowerCase() === 'si' || xliente.envio_factura === '1' || cliente.envioFactura,
+                    envioReporte: xliente.envio_reporte?.toLowerCase() === 'si' || xliente.envio_reporte === '1' || cliente.envioReporte,
+                    seguimiento: xliente.seguimiento?.toLowerCase() === 'si' || xliente.seguimiento === '1' || cliente.seguimiento,
+                    ordenCompra: xliente.orden_compra?.toLowerCase() === 'si' || xliente.orden_compra === '1' || cliente.ordenCompra,
+                    reporteDeuda: xliente.reporte_deuda?.toLowerCase() === 'si' || xliente.reporte_deuda === '1' || cliente.reporteDeuda,
+                    arriendo: xliente.arriendo?.toLowerCase() === 'si' || xliente.arriendo === '1' || cliente.arriendo,
                     dias_de_pago: xliente.dias_de_pago ? parseInt(xliente.dias_de_pago) : cliente.dias_de_pago,
-                    notificacion: xliente.notificacion === 'Si' || xliente.notificacion === '1' || cliente.notificacion,
+                    notificacion: xliente.notificacion?.toLowerCase() === 'si' || xliente.notificacion === '1' || cliente.notificacion,
                     credito: xliente.credito ? parseFloat(xliente.credito) : cliente.credito,
                     urlWeb: xliente.web || cliente.urlWeb,
                     comentario: xliente.comentario || cliente.comentario,
@@ -496,8 +638,8 @@ const migrarClientes = async () => {
                 }
 
                 // Find documento tributario by temporalId
-                if (xliente.documentoTributarioId) {
-                    const docTributario = await DocumentoTributario.findOne({ temporalId: xliente.documentoTributarioId });
+                if (xliente.tipodoc) {
+                    const docTributario = await DocumentoTributario.findOne({ temporalId: xliente.tipodoc });
                     if (docTributario) {
                         updateData.documentoTributarioId = docTributario._id;
                     }
@@ -511,6 +653,56 @@ const migrarClientes = async () => {
             } else {
                 clientesNoEncontrados++;
                 console.warn(`Cliente no encontrado para temporalId: ${xliente.id}`);
+                const nuevoCliente = new Cliente({
+                    temporalId: xliente.id,
+                    nombre: xliente.nombre,
+                    rut: xliente.rut,
+                    giro: xliente.giro,
+                    telefono: xliente.telefono,
+                    email: xliente.email,
+                    emailIntercambio: xliente.email_intercambio,
+                    envioFactura: xliente.envio_factura === 'Si' || xliente.envio_factura === '1',
+                    envioReporte: xliente.envio_reporte === 'Si' || xliente.envio_reporte === '1',
+                    seguimiento: xliente.seguimiento === 'Si' || xliente.seguimiento === '1',
+                    ordenCompra: xliente.orden_compra === 'Si' || xliente.orden_compra === '1',
+                    reporteDeuda: xliente.reporte_deuda === 'Si' || xliente.reporte_deuda === '1',
+                    arriendo: xliente.arriendo === 'Si' || xliente.arriendo === '1',
+                    dias_de_pago: xliente.dias_de_pago ? parseInt(xliente.dias_de_pago) : 1,
+                    notificacion: xliente.notificacion === 'Si' || xliente.notificacion === '1',
+                    credito: xliente.credito ? parseFloat(xliente.credito) : 300000,
+                    urlWeb: xliente.web,
+                    comentario: xliente.comentario,
+                    contacto: xliente.contacto,
+                    activo: xliente.activo ? (xliente.activo === 'Si' || xliente.activo === '1' || xliente.activo === 'activo') : true,
+                    cilindrosMin: xliente.cilindrosminimo || '0',
+                    cilindrosMax: xliente.limite_cilindros ? parseInt(xliente.limite_cilindros) : 9999,
+                    enQuiebra: xliente.quiebra === 'Si' || xliente.quiebra === '1',
+                    mesesAumento: xliente.mesesaumento ?
+                        xliente.mesesaumento.split(',').map(m => parseInt(m.trim())).filter(m => !isNaN(m)) :
+                        [],
+                    creadorId: null,
+                    documentoTributarioId: null,
+                    direccionesDespacho: []
+                });
+
+                // Buscar creador
+                if (xliente.creado_por) {
+                    const creador = await User.findOne({ temporalId: xliente.creado_por });
+                    if (creador) {
+                        nuevoCliente.creadorId = creador._id;
+                    }
+                }
+
+                // Buscar documento tributario
+                if (xliente.documentoTributarioId) {
+                    const docTributario = await DocumentoTributario.findOne({ temporalId: xliente.documentoTributarioId });
+                    if (docTributario) {
+                        nuevoCliente.documentoTributarioId = docTributario._id;
+                    }
+                }
+
+                await nuevoCliente.save();
+                console.log(`Cliente creado desde xliente ${xliente.id}`);
             }
         } catch (error) {
             console.error(`Error procesando xliente ${xliente.id}:`, error);
@@ -518,128 +710,7 @@ const migrarClientes = async () => {
     }
 
     console.log(`\nClientes actualizados: ${clientesActualizados}`);
-    console.log(`Clientes no encontrados: ${clientesNoEncontrados}`);
-}
-
-const repararCategoriasRepetidas = async () => {
-    // Get all CategoriaCatalogo grouped by temporalId to find duplicates
-    const categoriaGroups = await CategoriaCatalogo.aggregate([
-        {
-            $match: { temporalId: { $ne: null } }
-        },
-        {
-            $group: {
-                _id: "$temporalId",
-                categorias: { $push: "$$ROOT" },
-                count: { $sum: 1 }
-            }
-        },
-        {
-            $match: { count: { $gt: 1 } }
-        }
-    ]);
-
-    console.log(`Found ${categoriaGroups.length} categoria groups with duplicates`);
-
-    for (const group of categoriaGroups) {
-        const categorias = group.categorias;
-        const categoriaToKeep = categorias[0]; // Keep the first one
-        const categoriasToRemove = categorias.slice(1); // Remove the rest
-        
-        console.log(`Processing categoria group with temporalId: ${group._id}`);
-        console.log(`Keeping categoria: ${categoriaToKeep._id}, removing: ${categoriasToRemove.map(c => c._id).join(', ')}`);
-        
-        // Get all subcategorias that reference any of these categorias
-        const subcategoriasToUpdate = await SubcategoriaCatalogo.find({
-            categoriaCatalogoId: { $in: categoriasToRemove.map(c => c._id) }
-        });
-        
-        // Update subcategorias to reference the categoria to keep
-        if (subcategoriasToUpdate.length > 0) {
-            await SubcategoriaCatalogo.updateMany(
-                { categoriaCatalogoId: { $in: categoriasToRemove.map(c => c._id) } },
-                { $set: { categoriaCatalogoId: categoriaToKeep._id } }
-            );
-            console.log(`Updated ${subcategoriasToUpdate.length} subcategorias`);
-        }
-        
-        // Remove duplicate categorias
-        await CategoriaCatalogo.deleteMany({
-            _id: { $in: categoriasToRemove.map(c => c._id) }
-        });
-        console.log(`Removed ${categoriasToRemove.length} duplicate categorias`);
-    }
-
-    // Now handle subcategoria duplicates
-    const subcategoriaGroups = await SubcategoriaCatalogo.aggregate([
-        {
-            $match: { temporalId: { $ne: null } }
-        },
-        {
-            $group: {
-                _id: "$temporalId",
-                subcategorias: { $push: "$$ROOT" },
-                count: { $sum: 1 }
-            }
-        },
-        {
-            $match: { count: { $gt: 1 } }
-        }
-    ]);
-
-    console.log(`Found ${subcategoriaGroups.length} subcategoria groups with duplicates`);
-
-    for (const group of subcategoriaGroups) {
-        const subcategorias = group.subcategorias;
-        const subcategoriaToKeep = subcategorias[0]; // Keep the first one
-        const subcategoriasToRemove = subcategorias.slice(1); // Remove the rest
-        
-        console.log(`Processing subcategoria group with temporalId: ${group._id}`);
-        console.log(`Keeping subcategoria: ${subcategoriaToKeep._id}, removing: ${subcategoriasToRemove.map(s => s._id).join(', ')}`);
-        
-        // Update ItemCatalogo references
-        const itemsToUpdate = await ItemCatalogo.find({
-            subcategoriaCatalogoId: { $in: subcategoriasToRemove.map(s => s._id) }
-        });
-        
-        if (itemsToUpdate.length > 0) {
-            await ItemCatalogo.updateMany(
-                { subcategoriaCatalogoId: { $in: subcategoriasToRemove.map(s => s._id) } },
-                { $set: { subcategoriaCatalogoId: subcategoriaToKeep._id } }
-            );
-            console.log(`Updated ${itemsToUpdate.length} items' subcategoriaCatalogoId`);
-        }
-        
-        // Update ItemCatalogo subcategoriaCatalogoIds arrays
-        await ItemCatalogo.updateMany(
-            { subcategoriaCatalogoIds: { $in: subcategoriasToRemove.map(s => s._id) } },
-            { 
-                $pullAll: { subcategoriaCatalogoIds: subcategoriasToRemove.map(s => s._id) },
-                $addToSet: { subcategoriaCatalogoIds: subcategoriaToKeep._id }
-            }
-        );
-        
-        // Update Precio references
-        const preciosToUpdate = await Precio.find({
-            subcategoriaCatalogoId: { $in: subcategoriasToRemove.map(s => s._id) }
-        });
-        
-        if (preciosToUpdate.length > 0) {
-            await Precio.updateMany(
-                { subcategoriaCatalogoId: { $in: subcategoriasToRemove.map(s => s._id) } },
-                { $set: { subcategoriaCatalogoId: subcategoriaToKeep._id } }
-            );
-            console.log(`Updated ${preciosToUpdate.length} precios`);
-        }
-        
-        // Remove duplicate subcategorias
-        await SubcategoriaCatalogo.deleteMany({
-            _id: { $in: subcategoriasToRemove.map(s => s._id) }
-        });
-        console.log(`Removed ${subcategoriasToRemove.length} duplicate subcategorias`);
-    }
-
-    console.log('Catalog repair completed successfully');
+    console.log(`Clientes creados: ${clientesNoEncontrados}`);
 }
 
 const repararDirecciones = async () => {

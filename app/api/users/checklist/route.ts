@@ -1,0 +1,119 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/utils/authOptions";
+import { connectMongoDB } from "@/lib/mongodb";
+import Checklist from "@/models/checklist";
+import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/constants";
+import CheckList from "@/models/checklist";
+import { IChecklist, IItemChecklist } from "@/types/checklist";
+import { IChecklistlistResult } from "./types";
+import { NextRequest } from "next/server";
+
+export async function GET() {
+    try {
+        await connectMongoDB();
+        const session = await getServerSession(authOptions);
+
+        if (!session || !session.user || !session.user.id) {
+            return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401 });
+        }
+
+        const userId = session.user.id;
+        console.log("Fetching checklists for user:", userId);
+
+        const ahora = new Date();
+        // Buscar ambos tipos de checklist del día actual
+        const tiposChecklist = [];
+        
+        const role = session.user.role;
+        if (role === USER_ROLE.conductor || role === USER_ROLE.encargado 
+            || role === USER_ROLE.responsable || role === USER_ROLE.despacho) {
+            tiposChecklist.push(TIPO_CHECKLIST.personal);
+        } else if(role === USER_ROLE.conductor) {
+            tiposChecklist.push(TIPO_CHECKLIST.vehiculo);
+        }
+
+        if(tiposChecklist.length === 0) {
+            return new Response(JSON.stringify({ ok: true, passed: true, checklists: [] }));
+        }
+
+        const checklists = await CheckList.find({
+            userId,
+            tipo: { $in: tiposChecklist },
+            passed: true, // Solo checklists aprobados
+            fecha: {
+                $gte: new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()), // Desde el inicio del día de hoy
+            }
+        }).select("tipo passed fecha").lean();
+
+        // Formatear la salida como arreglo de objetos con tipo, aprobado y fecha
+        const checklistResults: IChecklistlistResult[] = checklists.map(cl => ({
+            tipo: cl.tipo,
+            aprobado: cl.passed,
+            fecha: cl.fecha
+        }));
+        const passed = checklistResults.length === tiposChecklist.length 
+            && checklistResults.every(cl => cl.aprobado);
+        return new Response(JSON.stringify({ ok: true, passed, checklists: checklistResults }));
+    } catch (error) {
+        console.error("Error fetching checklists:", error);
+        return new Response(JSON.stringify({ ok: false, error: "Internal Server Error" }), { status: 500 });
+    }
+}
+
+export async function POST(req: NextRequest) {
+    try {
+        await connectMongoDB();
+        console.log("MongoDB connected");
+
+        const session = await getServerSession(authOptions);
+        console.log("Session:", session);
+
+        if (!session || !session.user || !session.user.id) {
+            console.log("Unauthorized access attempt");
+            return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401 });
+        }
+
+        const userId = session.user.id;
+        const body = await req.json();
+        console.log("Request body:", body);
+
+        const { tipo, vehiculoId, kilometraje } = body;
+        let passed = true;
+        const items: IItemChecklist[] = [];
+        
+        // Recorre las claves de TIPO_CHECKLIST_ITEM con valor < 128
+        Object.entries(TIPO_CHECKLIST_ITEM)
+        .filter(([, value]) => tipo === TIPO_CHECKLIST.vehiculo ? value < 128 : value >= 128)  
+        .forEach(([key, value]) => {
+            const itemValue = body[key];
+            items.push({ 
+                tipo, 
+                valor: isNaN(itemValue) ? itemValue : (itemValue === true ? 1 : 0) 
+            });
+            if (value % 2 === 1 && (itemValue === 0 || itemValue === false)) {
+                passed = false;
+            }
+        });
+
+        // Crear un nuevo checklist
+        const checklistPayload: IChecklist = {
+            userId,
+            tipo,
+            vehiculoId: tipo === TIPO_CHECKLIST.vehiculo ? vehiculoId : null,
+            kilometraje: tipo === TIPO_CHECKLIST.vehiculo ? kilometraje : null,
+            passed,
+            items,
+            fecha: new Date(),
+        };
+        const newChecklist = new Checklist(checklistPayload);
+        await newChecklist.save();
+        console.log("Checklist saved:", newChecklist);
+
+        return new Response(JSON.stringify({ ok: true, passed, message: "Checklist saved successfully" }), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (error) {
+        console.error("Error saving checklist:", error);
+        return new Response(JSON.stringify({ ok: false, error: "Internal Server Error" }), { status: 500 });
+    }
+}

@@ -310,52 +310,55 @@ export async function POST(request) {
             ventaId: { $in: ventaIds } 
         });
 
-        // Obtener todos los itemCatalogoIds escaneados de los detalles
-        const todosLosItemsEscaneados = [];
-        detallesVentas.forEach(detalle => {
-            if (Array.isArray(detalle.itemCatalogoIds)) {
-                todosLosItemsEscaneados.push(...detalle.itemCatalogoIds);
+        // Paso 2: Ajustar los "restantes" de cada detalle según la carga actual
+        // Basado en la lógica de consolidadorDeCargamento de JefaturaDespacho.jsx
+        // Primero, contar cuántos items hay por subcategoría en la carga actual
+        const contadoresPorSubcat = {};
+        if (Array.isArray(ruta.cargaItemIds)) {
+            ruta.cargaItemIds.forEach(item => {
+            // item puede ser ObjectId o documento, obtener subcategoriaCatalogoId
+            let subcatId;
+            if (item.subcategoriaCatalogoId) {
+                // Si es documento
+                subcatId = item.subcategoriaCatalogoId._id?.toString?.() || item.subcategoriaCatalogoId?.toString?.();
+            } else if (item.subcategoriaCatalogoId) {
+                // Si es ObjectId
+                subcatId = item.subcategoriaCatalogoId.toString();
             }
-        });
-
-        // Obtener items ya movidos en rutas anteriores de las mismas ventas
-        const rutasAnteriores = await RutaDespacho.find({
-            ventaIds: { $in: ventaIds },
-            _id: { $ne: rutaId }, // Excluir la ruta actual
-            estado: { $in: [
-                TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
-                TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
-                TIPO_ESTADO_RUTA_DESPACHO.entregado,
-                TIPO_ESTADO_RUTA_DESPACHO.descarga
-            ]}
-        });
-
-        // Recopilar items ya movidos en rutas anteriores
-        const itemsYaMovidos = new Set();
-        rutasAnteriores.forEach(rutaAnterior => {
-            rutaAnterior.historialCarga?.forEach(carga => {
-                if (carga.esCarga && Array.isArray(carga.itemMovidoIds)) {
-                    carga.itemMovidoIds.forEach(itemId => {
-                        itemsYaMovidos.add(itemId.toString());
-                    });
-                }
+            if (!subcatId) return;
+            contadoresPorSubcat[subcatId] = (contadoresPorSubcat[subcatId] || 0) + 1;
             });
+        }
+
+        // Ahora, para cada detalle, calcular los restantes como en consolidadorDeCargamento
+        // Mejor lógica: recorre los detalles y descuenta del contador por subcategoría
+        // Si todos los detalles quedan con restantes === 0, la carga está completa
+
+        // Calcular la cantidad de items por subcategoría en la carga actual
+        const cantidadPorSubcat = {};
+        if (Array.isArray(ruta.cargaItemIds)) {
+            // Los items pueden ser ObjectId, así que necesitamos poblarlos para obtener subcategoriaCatalogoId
+            // Usamos el modelo ItemCatalogo para obtener la subcategoría de cada item
+            const itemsCargados = await ItemCatalogo.find({ _id: { $in: ruta.cargaItemIds } }).select("_id subcategoriaCatalogoId").lean();
+            itemsCargados.forEach(item => {
+            const subcatId = item.subcategoriaCatalogoId?.toString();
+            if (!subcatId) return;
+            cantidadPorSubcat[subcatId] = (cantidadPorSubcat[subcatId] || 0) + 1;
+            });
+        }
+
+        // Para cada detalle, verificar si la cantidad requerida está cubierta por la carga actual
+        const cargaCompleta = detallesVentas.every(detalle => {
+            const key = detalle.subcategoriaCatalogoId?._id?.toString?.() || detalle.subcategoriaCatalogoId?.toString?.();
+            const cantidadRequerida = detalle.cantidad || 0;
+            const cantidadDisponible = cantidadPorSubcat[key] || 0;
+            return cantidadDisponible >= cantidadRequerida;
         });
 
-        // Filtrar items que no han sido movidos en rutas anteriores
-        const itemsParaMover = todosLosItemsEscaneados.filter(itemId => 
-            !itemsYaMovidos.has(itemId.toString())
-        );
-
-        // Convertir a ObjectId para MongoDB
-        const itemsParaMoverObjectId = itemsParaMover.map(itemId => 
-            new mongoose.Types.ObjectId(itemId)
-        );
-
-        if (itemsParaMoverObjectId.length === 0) {
-            return NextResponse.json({ 
-                error: "No hay items nuevos para mover en esta ruta",
-                message: "Todos los items ya fueron movidos en rutas anteriores"
+        if (!cargaCompleta) {
+            return NextResponse.json({
+                error: "La carga no está completa. Faltan elementos por cargar.",
+                message: "No se puede confirmar la carga hasta que todos los pedidos estén cubiertos."
             }, { status: 400 });
         }
 
@@ -363,16 +366,8 @@ export async function POST(request) {
         ruta.historialCarga.push({
             esCarga: true,
             fecha: new Date(),
-            itemMovidoIds: itemsParaMoverObjectId
+            itemMovidoIds: ruta.cargaItemIds
         });
-
-        // Agregar items a la carga de la ruta (evitar duplicados)
-        const cargaActualSet = new Set(ruta.cargaItemIds.map(id => id.toString()));
-        const itemsNuevosParaCarga = itemsParaMoverObjectId.filter(itemId => 
-            !cargaActualSet.has(itemId.toString())
-        );
-        
-        ruta.cargaItemIds.push(...itemsNuevosParaCarga);
 
         // Determinar el tipo de orden de las ventas asociadas
         const ventasRuta = await Venta.find({ _id: { $in: ventaIds } }).select("tipo estado").lean();
@@ -395,18 +390,11 @@ export async function POST(request) {
                 estado: TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
                 fecha: new Date()
             });            
-        }
-        
-        console.log(`Moviendo ${itemsParaMoverObjectId.length} items nuevos en ruta ${rutaId}`);
-        console.log(`Items ya movidos en rutas anteriores: ${itemsYaMovidos.size}`);
-
+        }        
         await ruta.save();
 
         return NextResponse.json({ 
-            ok: true,
-            itemsMovidos: itemsParaMoverObjectId.length,
-            itemsYaMovidosAnteriormente: itemsYaMovidos.size,
-            totalItemsEscaneados: todosLosItemsEscaneados.length
+            ok: true
         });
         
     } catch (error) {

@@ -6,7 +6,7 @@ import { FaRoadCircleCheck } from "react-icons/fa6";
 import Loader from "./Loader";
 import { socket } from "@/lib/socket-client";
 import { FaClipboardCheck, FaPhoneAlt } from "react-icons/fa";
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { useRef } from "react";
 import dayjs from "dayjs";
 import 'dayjs/locale/es';
@@ -185,12 +185,11 @@ export default function JefaturaDespacho({ session }) {
         }
 
         // Para ventas normales: diferenciar entre carga y descarga
-        const detallesCompletos = cargamento.ventas.every(venta =>
+        const detallesCompletos = consolidadorDeCargamento(cargamento.ventas).every(venta =>
             venta.detalles.every(detalle => detalle.restantes === 0)
         );
-        const itemsRetirados = !Array.isArray(cargamento.items) || cargamento.items.length === 0;
-
-        if (detallesCompletos && itemsRetirados && requiereQuienRecibe) {
+        
+        if (detallesCompletos && requiereQuienRecibe) {
             return { complete: true };
         }
 
@@ -297,7 +296,6 @@ export default function JefaturaDespacho({ session }) {
             }
 
             setAlMenosUnEscaneado(hayEscaneadosNoEntregados);
-            console.log("Hay elementos escaneados no entregados?", hayEscaneadosNoEntregados);
         }
 
         setLoadingCargamentos(false);
@@ -317,7 +315,7 @@ export default function JefaturaDespacho({ session }) {
                     )
                 );
                 if (codigoYaEscaneado) {
-                    toast.warn(`CODIGO ${codigo} ya escaneado`);
+                    toast.error(`CODIGO ${codigo} ya escaneado`);
                     setScanMode(false);
                     reproducirSonido('/sounds/error_01.mp3');
                     return;
@@ -331,7 +329,7 @@ export default function JefaturaDespacho({ session }) {
                 // El item debe estar en cargamentoActual.items
                 const idxItem = cargamentoActual.items.findIndex(i => i._id === item.itemId);
                 if (idxItem === -1) {
-                    toast.warn(`CODIGO ${codigo} no corresponde a este traslado`);
+                    toast.error(`CODIGO ${codigo} no corresponde a este traslado`);
                     setScanMode(false);
                     setShowModalCilindroErroneo(true);
                     reproducirSonido('/sounds/error_01.mp3');
@@ -447,7 +445,7 @@ export default function JefaturaDespacho({ session }) {
             if (ventaIndex === -1 || detalleIndex === -1) {
                 setScanMode(false);
                 setShowModalCilindroErroneo(true);
-                toast.warn(
+                toast.error(
                     `CODIGO ${codigo} ${item.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${item.subcategoriaCatalogoId.nombre} no corresponde a este pedido`
                 );
                 reproducirSonido('/sounds/error_01.mp3');
@@ -458,7 +456,7 @@ export default function JefaturaDespacho({ session }) {
                 && item.subcategoriaCatalogoId.categoriaCatalogoId.tipo === TIPO_CATEGORIA_CATALOGO.cilindro) {
                 setScanMode(false);
                 setShowModalCilindroErroneo(true);
-                toast.warn(
+                toast.error(
                     `CODIGO ${codigo} ${item.subcategoriaCatalogoId.categoriaCatalogoId.nombre} ${item.subcategoriaCatalogoId.nombre} cilindro vacío`
                 );
                 reproducirSonido('/sounds/error_02.mp3');
@@ -551,9 +549,18 @@ export default function JefaturaDespacho({ session }) {
             const response = await fetch(`/api/pedidos/despacho/scanItemCatalogo?codigo=${codigo}`);
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || "Error al escanear el código");
-            }
+                toast.error(`Cilindro ${codigo} ${errorData.error || 'no existe'}`);
+                reproducirSonido('/sounds/error_02.mp3');
+                return;
+            }            
             const data = await response.json();
+            console.log("Item escaneado:", data);
+            if(data.direccionInvalida) {
+                setEditMode(false);
+                setShowModalCilindroErroneo(true);
+                reproducirSonido('/sounds/error_02.mp3');
+                return;
+            }
             setItemCatalogoEscaneado(data);
             moverItem(data, codigo);
         } catch {
@@ -772,143 +779,48 @@ export default function JefaturaDespacho({ session }) {
         setShowModalNombreRetira(false);
     };
 
-    // Devuelve un resumen agrupado por subcategoriaCategoriaId, combinando items y detalles para mostrar el conteo correcto
-    const getResumenCarga = (cargamento) => {
-        if (!cargamento) return [];
-
-        // Paso 1: Agrupa los items por subcategoriaCategoriaId (puede venir como string o como objeto)
-        const itemsPorSubcat = {};
-        if (Array.isArray(cargamento.items)) {
-            cargamento.items.forEach(item => {
-                const key = item.subcategoriaCategoriaId?._id;
-                if (!key) return;
-                if (!itemsPorSubcat[key]) {
-                    itemsPorSubcat[key] = [];
-                }
-                itemsPorSubcat[key].push(item);
-            });
-        }
-
-        // Paso 2: Agrupa los detalles de venta por subcategoriaCategoriaId
-        const detallesPorSubcat = {};
-        if (Array.isArray(cargamento.ventas)) {
-            cargamento.ventas.forEach(venta => {
-                if (Array.isArray(venta.detalles)) {
-                    venta.detalles.forEach(detalle => {
-                        const key = detalle.subcategoriaCategoriaId?._id;
-                        if (!key) return;
-                        if (!detallesPorSubcat[key]) {
-                            detallesPorSubcat[key] = [];
-                        }
-                        detallesPorSubcat[key].push(detalle);
-                    });
-                }
-            });
-        }
-
-        // Paso 3: Unifica todas las subcategorías presentes en items o detalles
-        const todasLasSubcats = Array.from(
-            new Set([
-                ...Object.keys(itemsPorSubcat),
-                ...Object.keys(detallesPorSubcat)
-            ])
-        );
-
-        console.log("Items por subcat:", itemsPorSubcat);
-        console.log("Detalles por subcat:", detallesPorSubcat);
-        console.log("Todas las subcats:", todasLasSubcats);
-
-        // Paso 4: Para cada subcategoria, calcula los contadores correctamente
-        const mapaFinal = todasLasSubcats.map(key => {
-            // Preferir info de detalle si existe, si no, usar el primer item
-            const detalle = detallesPorSubcat[key]?.[0];
-            const itemEjemplo = itemsPorSubcat[key]?.[0];
-
-            // Cantidad de items disponibles en el camión para esta subcategoría
-            const itemsDisponibles = itemsPorSubcat[key]?.length || 0;
-
-            // Cantidad ya cargada: contar itemCatalogoIds en todos los detalles de esa subcat
-            let cargados = 0;
-            if (detallesPorSubcat[key]) {
-                cargados = detallesPorSubcat[key].reduce((acc, d) => {
-                    if (Array.isArray(d.itemCatalogoIds)) {
-                        return acc + d.itemCatalogoIds.length;
-                    }
-                    return acc;
-                }, 0);
-            }
-
-            // MULTIPLICADOR: Usar el multiplicador del detalle si existe, si no calcular
-            let multiplicador = 0;
-            if (detalle && typeof detalle.multiplicador === 'number') {
-                // Si el detalle tiene multiplicador, usarlo directamente
-                multiplicador = detalle.multiplicador;
-            } else {
-                // Si no, calcular como items disponibles + ya cargados
-                multiplicador = itemsDisponibles + cargados;
-            }
-
-            // RESTANTES: Usar restantes del detalle si existe, si no usar items disponibles
-            let restantes = 0;
-            if (detalle && typeof detalle.restantes === 'number') {
-                // Si el detalle tiene restantes, usarlo directamente
-                restantes = detalle.restantes;
-            } else {
-                // Si no, usar items disponibles en el camión
-                restantes = itemsDisponibles;
-            }
-
-            // --- AJUSTE: Si el elemento es nulo, intenta obtenerlo desde el detalle ---
-            let subcategoriaCategoriaId = itemEjemplo?.subcategoriaCategoriaId || detalle?.subcategoriaCategoriaId || key;
-            // Si subcategoriaCategoriaId es un string, intenta buscar el objeto en detalle o itemEjemplo
-            if (typeof subcategoriaCategoriaId === "string") {
-                if (detalle && typeof detalle.subcategoriaCategoriaId === "object") {
-                    subcategoriaCategoriaId = detalle.subcategoriaCategoriaId;
-                } else if (itemEjemplo && typeof itemEjemplo.subcategoriaCategoriaId === "object") {
-                    subcategoriaCategoriaId = itemEjemplo.subcategoriaCategoriaId;
-                }
-            }
-            // Si sigue sin tener categoriaCatalogoId o elemento, intenta buscar en detalle
-            if (
-                subcategoriaCategoriaId &&
-                (!subcategoriaCategoriaId.categoriaCatalogoId || !subcategoriaCategoriaId.categoriaCatalogoId.elemento)
-            ) {
-                if (
-                    detalle &&
-                    detalle.subcategoriaCategoriaId &&
-                    detalle.subcategoriaCategoriaId.categoriaCatalogoId &&
-                    detalle.subcategoriaCategoriaId.categoriaCatalogoId.elemento
-                ) {
-                    subcategoriaCategoriaId.categoriaCatalogoId = detalle.subcategoriaCategoriaId.categoriaCatalogoId;
-                } else if (
-                    itemEjemplo &&
-                    itemEjemplo.subcategoriaCategoriaId &&
-                    itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId &&
-                    itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId.elemento
-                ) {
-                    subcategoriaCategoriaId.categoriaCatalogoId = itemEjemplo.subcategoriaCategoriaId.categoriaCatalogoId;
-                }
-            }
-
-            // Devuelve un objeto resumen, usando la estructura de los items para mostrar info visual
-            // Priorizar datos del detalle sobre los del item
-            const baseData = detalle || itemEjemplo || {};
-
-            return {
-                ...baseData,
-                subcategoriaCategoriaId,
-                multiplicador,
-                restantes,
-            };
-        });
-        
-        console.log("Resumen de carga calculado:", mapaFinal);
-        return mapaFinal;
-    }
-
     const formatElemento = (elemento) => {
         if (!elemento) return "";
         return elemento.charAt(0).toUpperCase() + elemento.slice(1).toLowerCase();
+    }
+
+    const consolidadorDeCargamento = (ventas) => {
+        const cargamento = cargamentos[0];
+        if (!cargamento) return [];
+        if (cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion) {
+            // Paso 1: Crear contadores por subcategoría presentes en cargamento.items
+            const contadoresPorSubcat = {};
+            if (Array.isArray(cargamento.items)) {
+                cargamento.items.forEach(item => {
+                    const key = item.subcategoriaCatalogoId?._id;
+                    if (!key) return;
+                    contadoresPorSubcat[key] = (contadoresPorSubcat[key] || 0) + 1;
+                });
+            }
+
+            // Paso 2: Ajustar los "restantes" de cada detalle según la carga actual
+            const ventasAjustadas = ventas.map(venta => {
+                if (!Array.isArray(venta.detalles)) return venta;
+                const detallesAjustados = venta.detalles.map(detalle => {
+                    const key = detalle.subcategoriaCatalogoId?._id;
+                    const cantidadCargada = contadoresPorSubcat[key] || 0;
+                    // Los restantes son el multiplicador menos la cantidad cargada, mínimo 0
+                    const nuevosRestantes = Math.max((detalle.multiplicador || 0) - cantidadCargada, 0);
+                    return {
+                        ...detalle,
+                        restantes: nuevosRestantes
+                    };
+                });
+                return {
+                    ...venta,
+                    detalles: detallesAjustados
+                };
+            });
+
+            return ventasAjustadas;
+        } else {
+            return ventas;
+        }
     }
 
     return (
@@ -962,7 +874,7 @@ export default function JefaturaDespacho({ session }) {
                             </div>}
 
                             <div className="w-full h-[calc(100dvh-264px)] overflow-y-scroll">
-                                {cargamento.ventas.map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-lg border-gray-300 mb-1 mr-1 bg-neutral-200">
+                                {consolidadorDeCargamento(cargamento.ventas).map((venta, ventaIndex) => <div key={`venta_${ventaIndex}`} className="px-2 py-1 border-2 rounded-lg border-gray-300 mb-1 mr-1 bg-neutral-200">
                                     <div className="flex">
                                         <div className="w-10/12 pl-1">
                                             <p className="text-xs font-bold text-gray-600 truncate">{venta.cliente?.nombre || "Sin cliente"}</p>
@@ -1028,51 +940,6 @@ export default function JefaturaDespacho({ session }) {
                                         ))}                                        
                                     </ul>}
 
-                                    {getResumenCarga(cargamento).map((item, itemIndex) => (
-                                        <li
-                                            key={`item${ventaIndex}_${itemIndex}`}
-                                            className={`w-full flex text-sm border border-gray-300 px-0 ${(itemIndex === 0 && cargamento.items?.length != 1) ? 'rounded-t-lg' : (itemIndex === cargamento.items?.length - 1 && cargamento.items?.length != 1) ? 'rounded-b-lg' : cargamento.items?.length === 1 ? 'rounded-lg' : ''} ${item.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : item.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
-                                        >                                                    
-                                            {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left pt-1.5">
-                                                <div className="w-14">
-                                                    <div className="flex flex-wrap items-end justify-end text-xs font-bold -ml-3">
-                                                        <div className="bg-orange-500 border text-orange-50 border-orange-400 px-2 py-0 rounded ml-0.5 -my-1 h-[14px]">
-                                                            <p className="relative -top-0.5">{getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</p>
-                                                        </div>
-                                                        {item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="bg-blue-500 text-blue-50 border border-blue-400 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
-                                                            <span className="relative -top-0.5">Industrial</span>
-                                                        </div>}
-                                                        {item.subcategoriaCatalogoId.sinSifon && <div className="bg-gray-100 text-gray-500 border border-gray-600 px-2 py-0 rounded ml-0.5 h-[14px] mt-1.5">
-                                                            <span className="relative -top-0.5">Sin Sifón</span>
-                                                        </div>}
-                                                    </div>                                                        
-                                                </div>
-                                                <div className="font-bold text-xl ml-2 -mt-0.5">{item.subcategoriaCatalogoId.categoriaCatalogoId.elemento}</div>
-                                                <div className="flex text-nowrap">
-                                                    <p className="text-xl orbitron ml-2 -mt-0.5">{item.subcategoriaCatalogoId.cantidad}</p>
-                                                    <p className="mt-1 ml-0.5">{item.subcategoriaCatalogoId.unidad}</p>
-                                                </div>
-                                            </div>}
-                                            {!item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <div className="w-full flex items-left ml-2">
-                                                {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre?.includes("Rack") && <div className="font-bold text-lg">{getDetailTitle(item)}</div>}
-                                                <div className="pl-3">
-                                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <p className="text-xs text-gray-600">Capacidad</p>}
-                                                    <p className="font-bold text-lg text-nowrap mt-0">
-                                                        {getDetailSubtitle(item)}
-                                                        {item.subcategoriaCatalogoId.categoriaCatalogoId.nombre.includes("Rack") && <span className="font-normal text-xs scale-75 ml-1">cilindros</span>}
-                                                    </p>
-                                                    {getAditionalInfo(item) && <p className="text-xs text-gray-600 -mt-2">{getAditionalInfo(item)} </p>}
-                                                </div>
-                                            </div>}
-                                            <div className="w-full flex justify-end items-center">
-                                                <div className="w-24 flex flex-end font-bold orbitron border-l-gray-300 justify-end mr-2 mt-2">
-                                                    <p className="text-lg -mt-2 pl-2">{item.multiplicador - item.restantes}</p>
-                                                    <p className="mt-1">/</p> 
-                                                    <p className="text-md mt-2">{item.multiplicador}</p>
-                                                </div>
-                                            </div>                                                
-                                        </li>
-                                    ))}
                                 </div>)}
 
                                 
@@ -1426,7 +1293,9 @@ export default function JefaturaDespacho({ session }) {
                     </div>
                 </div>
             )}
-
+            <Toaster />
         </div>
     );
 }
+
+

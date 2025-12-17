@@ -49,6 +49,8 @@ const ventaSchema = new Schema({
     direccionDespachoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
     tasaImpuesto: { type: Number },
     tieneOT: { type: Boolean, default: false },
+    numeroOrden: { type: String },
+    codigoHES: { type: String },
     tieneArriendo: { type: Boolean, default: false },
     controlEnvase: { type: String, default: null },
     medioDespacho: { type: String },

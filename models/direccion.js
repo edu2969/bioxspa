@@ -11,7 +11,8 @@ const DireccionSchema = new mongoose.Schema({
     region: { type: String },
     isoPais: { type: String, default: 'CL' },
     codigoPostal: { type: String },
-    categoria: { type: String }
+    categoria: { type: String },
+    comentario: { type: String },
 });
 
 const Direccion = mongoose.models.Direccion || mongoose.model('Direccion', DireccionSchema);

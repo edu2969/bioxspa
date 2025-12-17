@@ -5,7 +5,7 @@ declare module 'next-auth' {
     user: {
       _id: string;
       name: string;
-      role?: number;
+      role: number;
       avatarImg?: string;
     } & Session['user'];
   }
