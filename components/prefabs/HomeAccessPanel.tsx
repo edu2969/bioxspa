@@ -17,7 +17,7 @@ const modules = (contadores: number[], session: Session): IAccessButtonProps[] =
     return [USER_ROLE.encargado, USER_ROLE.responsable, USER_ROLE.cobranza].includes(role) ?
     [{
         key: "button_01",        
-        href: "/modulos/pedidos",
+        href: "/pages/pedidos",
         icon: <FaFileContract className="mx-auto mb-1" size="6rem" />,
         label: "PEDIDOS",
         index: 0,
@@ -29,7 +29,7 @@ const modules = (contadores: number[], session: Session): IAccessButtonProps[] =
     },
     {
         key: "button_02",
-        href: "/modulos/asignacion",
+        href: "/pages/asignacion",
         icon: <FaSignInAlt className="mx-auto mb-1" size="6rem" />,
         label: "ASIGNACION",
         index: 1,
@@ -48,13 +48,13 @@ const modules = (contadores: number[], session: Session): IAccessButtonProps[] =
         }]
     }, {
         key: "button_03",
-        href: "/modulos/cobros",
+        href: "/pages/cobros",
         icon: <TbReportMoney className="mx-auto mb-1" size="6rem" />,
         label: "COBROS",
         index: 2
     }, {
         key: "button_04",
-        href: "/modulos/configuraciones/clientes",
+        href: "/pages/configuraciones/clientes",
         icon: <HiUserGroup className="mx-auto mb-1" size="6rem" />,
         label: "CLIENTES",
         index: 3,
@@ -71,7 +71,7 @@ const modules = (contadores: number[], session: Session): IAccessButtonProps[] =
         ]
     }] : [{
         key: "button_05",
-        href: "/modulos/homeConductor/pedidos",
+        href: "/pages/homeConductor/pedidos",
         icon: <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
         label: "PEDIDOS",
         index: 0,

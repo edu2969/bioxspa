@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/types/app/modulos/personal/page.tsx", "app/api/auth/[...nextauth]/route.js", "server.mts", "scripts/ejecutar-tests-sii.ts", "app/api/ventas/route.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/types/app/modulos/personal/page.tsx", "app/api/auth/[...nextauth]/route.ts", "server.mts", "scripts/ejecutar-tests-sii.ts", "app/api/ventas/route.ts"],
   "exclude": ["node_modules", ".next/**/*"]
 }

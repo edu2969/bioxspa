@@ -3,18 +3,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import ChecklistModal from "../prefabs/ChecklistModal";
-
-// Ajusta estos tipos según tus constantes y modelos
-type ChecklistTipo = "vehiculo" | "personal";
-interface ChecklistItem {
-    [key: string]: number | boolean | string;
-}
+import { IChecklistAnswer } from "../prefabs/types";
 
 interface ChecklistData {
-    tipo: ChecklistTipo;
+    tipo: 'personal' | 'vehiculo';
     vehiculoId?: string;
     kilometraje?: number;
-    items: ChecklistItem;
+    items: IChecklistAnswer[];
 }
 
 interface ChecklistContextType {
@@ -35,10 +30,10 @@ export function ChecklistProvider({ tipo, children }: {
 }) {
     const [showModal, setShowModal] = useState(false);
     const [data, setData] = useState<ChecklistData>({
-        tipo: "vehiculo",
+        tipo: tipo,
         vehiculoId: "",
         kilometraje: undefined,
-        items: {},
+        items: []
     });
 
     const { data: checklist, isLoading: isLoadingChecklist } = useQuery({
@@ -87,11 +82,22 @@ export function ChecklistProvider({ tipo, children }: {
                 isSubmitting: mutation.isPending,
             }}
         >
-            {children}            
-            {showModal === true && <ChecklistModal
-                onFinish={() => setShowModal(false)}
-                tipo={tipo}
-            />}
+            {children}
+            {showModal === true && (
+                <ChecklistModal
+                    onFinish={(kilometros, items) => {
+                        // Actualiza el estado data antes de enviar
+                        setData(prev => ({
+                            ...prev,
+                            kilometraje: kilometros,
+                            items: items
+                        }));
+                        setShowModal(false);
+                        submitData();
+                    }}
+                    tipo={tipo}
+                />
+            )}
         </ChecklistContext.Provider>
     );
 }

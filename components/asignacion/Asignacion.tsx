@@ -12,6 +12,8 @@ import { useForm, useWatch } from 'react-hook-form';
 import toast, { Toaster } from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
 import { INuevaVentaSubmit } from '../pedidos/types';
+import Nav from '../Nav';
+import { SessionProvider } from 'next-auth/react';
 
 interface ISucursalSelectable {
     _id: string;
@@ -97,7 +99,7 @@ export default function Asignacion() {
         name: 'sucursalId'
     });
 
-    return (  
+    return (<SessionProvider>
         <main className="w-full mt-2 h-screen overflow-hidden">
             {!isLoading && sucursales && sucursales.length > 0 && (
                 <div className="flex justify-center mb-2">
@@ -308,7 +310,8 @@ export default function Asignacion() {
                 loading={isSaving}
             />}
 
-            <Toaster />
+            <Toaster />            
         </main>
-    );
+        <Nav />
+        </SessionProvider>);
 }

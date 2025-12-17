@@ -79,9 +79,7 @@ export default function Nav() {
                     <button className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md p-2"
                         onClick={async () => {
                             setMenuActivo(false);
-                            signOut({ redirect: false }).then(() => {
-                                router.push('/modulos/logingOut');
-                            });
+                            signOut();
                         }}>
                         <AiOutlineLogout size="4rem" />
                         <p className="text-2xl mx-6 mt-4">Cerrar sesión</p>

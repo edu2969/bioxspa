@@ -1,7 +1,7 @@
-import { TIPO_CHECKLIST } from '@/app/utils/constants';
+import { TIPO_CHECKLIST_ITEM } from '@/app/utils/constants';
 
 export interface IItemChecklist {
-    tipo: keyof typeof TIPO_CHECKLIST;
+    tipo: number;
     valor?: number; 
 }
 

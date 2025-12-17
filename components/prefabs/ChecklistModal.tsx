@@ -20,7 +20,6 @@ const itemEmployeeLabels: { [key: string]: string } = {
     impresora: "¿Impresora portátil presente?",
 };
 
-
 const itemDriverLabels: { [key: string]: string } = {
     tarjeta_combustible: "¿Tarjeta de combustible presente?",
     hoja_seguridad_transporte: "¿Hoja de seguridad de transporte disponible?",
@@ -80,7 +79,7 @@ function getChecklistItems(tipo: 'personal' | 'vehiculo'): IChecklistAnswer[] {
     return Object.entries(TIPO_CHECKLIST_ITEM)
         .filter(([, v]) => tipo === 'vehiculo' ? v < 128 : v >= 128)
         .sort((a, b) => a[1] - b[1])
-        .map(([key,]): IChecklistAnswer => ({
+        .map(([key]): IChecklistAnswer => ({
             tipo: key as keyof typeof TIPO_CHECKLIST_ITEM,
             valor: TIPO_CHECKLIST_ITEM[key as keyof typeof TIPO_CHECKLIST_ITEM]
         }));
@@ -107,6 +106,7 @@ export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklist
     };
 
     const handleAnswer = (answer: IChecklistAnswer) => {
+        console.log("RESPUESTA", answer);
         setAnswers(prev => [...prev, answer]);
         handleNext();
     };
@@ -273,7 +273,7 @@ export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklist
                                 <h2 className="text-xl font-bold mb-6">{label}</h2>
                                 <div className="flex space-x-6 mb-6">
                                     <button
-                                        className={`px-8 py-2 rounded border font-bold ${value !== 0 ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+                                        className={`px-8 py-2 rounded border font-bold ${value !== 1 ? "bg-blue-600 text-white" : "bg-gray-100"}`}
                                         onClick={() => handleAnswer({ tipo: key.tipo, valor: 1 })}
                                     >
                                         Sí

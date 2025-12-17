@@ -18,19 +18,23 @@ export const authOptions: NextAuthOptions = {
           await connectMongoDB();
           const user = await User.findOne({ email });
           if (!user) {
-            throw new Error("No user found with the given email");
+            return null;
           }
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) {
-            throw new Error("Invalid password");
+            return null;
           }
-          return user;
+          // Return all required User properties
+          return { 
+            id: user._id.toString(), 
+            email: user.email, 
+            name: user.email, // Using email as name since it's required
+            createdAt: user.createdAt || new Date(), // Include required createdAt property
+            role: user.role 
+          };
         } catch (error: unknown) {
-          if (error instanceof Error) {
-            throw new Error(error.message);
-          } else {
-            throw new Error('An unknown error occurred');
-          }
+          console.error('Auth error:', error);
+          return null;
         }
       }
     })
@@ -51,8 +55,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.role = token.role;
+      }
       return session;
     }
   }

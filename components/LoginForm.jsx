@@ -76,7 +76,7 @@ export default function LoginForm() {
         retries++;
       }
       setRedirecting(true);
-      router.replace("modulos");
+      router.replace("pages");
     } catch (error) {
       console.log(error);
       setError(error);      
