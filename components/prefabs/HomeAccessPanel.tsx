@@ -1,6 +1,6 @@
 "use client";
 
-import { FaFileContract, FaSignInAlt } from "react-icons/fa";
+import { FaFileContract, FaRoute, FaSignInAlt } from "react-icons/fa";
 import { HiUserGroup } from "react-icons/hi";
 import { TbReportMoney, TbTruckLoading } from "react-icons/tb";
 import AccessButton from "./homeAccessPanel/AccessButton";
@@ -71,8 +71,10 @@ const modules = (contadores: number[], session: Session): IAccessButtonProps[] =
         ]
     }] : [{
         key: "button_05",
-        href: "/pages/homeConductor/pedidos",
-        icon: <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
+        href: `/pages/home${session?.user?.role === USER_ROLE.conductor ? "Conductor" : "Despacho"}/pedidos`,
+        icon: session?.user?.role === USER_ROLE.conductor 
+            ? <FaRoute className="mx-auto mb-1" size="6rem" />
+            : <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
         label: "PEDIDOS",
         index: 0,
         badges: [{

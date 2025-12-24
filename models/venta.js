@@ -19,8 +19,7 @@ const historialEstadoSchema = new Schema({
 
 const entregaEnLocalSchema = new Schema({
     nombreRecibe: { type: String, required: true },
-    rutRecibe: { type: String, required: true },
-    itemCargadoIds: { type: [mongoose.Schema.Types.ObjectId], ref: "ItemCatalogo", default: [] }, // Referencia a los items cargados en esta entrega
+    rutRecibe: { type: String, required: true }    
 }, {
     _id: false,
     timestamps: true

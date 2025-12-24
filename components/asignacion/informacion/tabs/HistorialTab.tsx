@@ -6,17 +6,17 @@ import { BsGeoAltFill } from 'react-icons/bs';
 import { useQuery } from '@tanstack/react-query';
 import { IHistorialVentaView } from '@/types/types';
 
-export default function HistorialTab({ rutaDespachoId } : {
-    rutaDespachoId: string | null;
+export default function HistorialTab({ ventaId } : {
+    ventaId: string | null;
 }) {
     const { data: historial, isLoading } = useQuery<IHistorialVentaView[]>({
-        queryKey: ['historial-venta', rutaDespachoId],
+        queryKey: ['historial-venta', ventaId],
         queryFn: async () => {
-            const response = await fetch(`/api/ventas/historialEstados?rutaDespachoId=${rutaDespachoId}`);
+            const response = await fetch(`/api/ventas/historialEstados?ventaId=${ventaId}`);
             const data = await response.json();
             return data.historial;
         },
-        enabled: rutaDespachoId !== null
+        enabled: ventaId !== null
     });
     return (
         <div className="flex flex-row items-start justify-center gap-3 mb-6 h-64 overflow-y-auto">

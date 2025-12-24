@@ -1,3 +1,4 @@
+import mongoose, { Types } from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import User from "@/models/user";
 import Cliente from "@/models/cliente";
@@ -18,8 +19,8 @@ import { IDetalleVenta } from "@/types/detalleVenta";
 import Precio from "@/models/precio";
 import { IPrecio } from "@/types/precio";
 import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
-import { ICategoriaCatalogo } from "@/types/categoriaCatalogo";
-import { Types } from "mongoose";
+import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import CategoriaCatalogo from "@/models/categoriaCatalogo";
 
 interface IConductoresResponse {
     _id: string;
@@ -48,6 +49,13 @@ export async function GET(request: Request) {
     console.log("Connecting to MongoDB...");
     await connectMongoDB();
     console.log("Connected to MongoDB");
+    
+    if (!mongoose.models.SubcategoriaCatalogo) {
+        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
+    }
+    if (!mongoose.models.CategoriaCatalogo) {
+        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
+    }
 
     const { searchParams } = new URL(request.url);
     const sucursalId = searchParams.get("sucursalId");
@@ -128,26 +136,9 @@ export async function GET(request: Request) {
                         const items = await Promise.all(
                             detalleItems.map(async (item: IDetalleVenta) => {
                                 const precioDoc = await Precio.findOne({
-                                    subcategoriaCatalogoId: (item.subcategoriaCatalogoId 
-                                        && typeof item.subcategoriaCatalogoId === "object" && "_id" in item.subcategoriaCatalogoId)
-                                        ? item.subcategoriaCatalogoId?.toString()
-                                        : item.subcategoriaCatalogoId?.toString(),
-                                    clienteId: venta.clienteId
-                                }).lean<IPrecio>();
-                                let nombre = "Desconocido";
-                                if (
-                                    item.subcategoriaCatalogoId &&
-                                    typeof item.subcategoriaCatalogoId === "object" &&
-                                    "nombre" in item.subcategoriaCatalogoId &&
-                                    "categoriaCatalogoId" in item.subcategoriaCatalogoId &&
-                                    item.subcategoriaCatalogoId.categoriaCatalogoId &&
-                                    typeof item.subcategoriaCatalogoId.categoriaCatalogoId === "object" &&
-                                    "nombre" in item.subcategoriaCatalogoId.categoriaCatalogoId
-                                ) {
-                                    nombre =
-                                        item.subcategoriaCatalogoId.nombre +
-                                        (item.subcategoriaCatalogoId.categoriaCatalogoId as ICategoriaCatalogo).nombre;
-                                }
+                                    subcategoriaCatalogoId: item.subcategoriaCatalogoId?._id,
+                                    clienteId: venta.clienteId?._id
+                                }).lean<IPrecio>();                                
                                 return {
                                     _id: item._id?.toString() ?? "",
                                     ventaId: item.ventaId?.toString() ?? "",
@@ -158,7 +149,8 @@ export async function GET(request: Request) {
                                         : item.subcategoriaCatalogoId?.toString() ?? "",
                                     cantidad: item.cantidad,
                                     precio: precioDoc ? precioDoc.valor : 0,
-                                    nombre
+                                    nombre: (item.subcategoriaCatalogoId?.nombre ?? "") +
+                                        (item.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre ?? "")
                                 };
                             })
                         );

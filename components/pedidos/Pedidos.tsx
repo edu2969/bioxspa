@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 
 export default function Pedidos() {
     const router = useRouter();
-    const { register, handleSubmit, setValue, getValues, control , formState } = useForm<INuevaVentaSubmit>({
+    const { register, handleSubmit, setValue, getValues, control , formState, watch } = useForm<INuevaVentaSubmit>({
         mode: "onChange"
     });
     const [creandoOrden, setCreandoOrden] = useState(false);
@@ -136,8 +136,32 @@ export default function Pedidos() {
         }
     };
 
-    const formInvalid = () => {        
-        return !formState.isValid || formState.isSubmitting || redirecting;
+    const formInvalid = () => {
+        // Validación adicional para precios seleccionados
+        const precios = getValues('precios');
+
+        console.log("PRECIOS", precios);
+        console.log("FORM isValid", formState.isValid);
+
+        if(!precios || precios.length == 0) {
+            return true;
+        }
+
+        const noSeleccionados = precios.every(precio => !precio.seleccionado);
+        if(noSeleccionados) {
+            return true;
+        }
+        if (precios && Array.isArray(precios)) {
+            const hasSelectedWithoutQuantity = precios.some(precio => 
+                precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
+            );
+            if (hasSelectedWithoutQuantity) {
+                return true;
+            }
+        }
+
+        // Validación básica del formulario
+        return (!formState.isValid || formState.isSubmitting || redirecting);
     }
 
     useEffect(() => {
@@ -198,7 +222,9 @@ export default function Pedidos() {
                             && <ListadoDePrecios register={register} 
                                 setValue={setValue}
                                 getValues={getValues}
-                                clienteId={clienteId} noCredit={true}/>}
+                                clienteId={clienteId}
+                                watch={watch} 
+                                noCredit={true}/>}
 
                         {/* SELECTOR DE ITEMS */}
                         {(tipoOrden == 2 || tipoOrden == 3) && <div className="mt-6">
@@ -268,7 +294,7 @@ export default function Pedidos() {
                                     router.back()
                                 }}>CANCELAR</button>
                             <button
-                                className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!formInvalid() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`px-4 h-10 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${formInvalid() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                 type="submit"
                                 disabled={formInvalid()}
                             >

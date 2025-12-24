@@ -7,18 +7,18 @@ import { getColorEstanque } from '@/lib/uix';
 import type { IDetalleVentaView } from '@/types/venta';
 import { useQuery } from '@tanstack/react-query';
 
-export default function OperacionesTab({ rutaDespachoId } : {
-    rutaDespachoId: string | null;
+export default function OperacionesTab({ ventaId } : {
+    ventaId: string | null;
 }) {
     const { data: ventaDetalle } = useQuery<IDetalleVentaView | null>({
-        queryKey: ['venta-detalle', rutaDespachoId],
+        queryKey: ['venta-detalle', ventaId],
         queryFn: async () => {
-            if (!rutaDespachoId) return null;
-            const response = await fetch(`/api/ventas/masDetalles/${rutaDespachoId}`);
+            if (!ventaId) return null;
+            const response = await fetch(`/api/ventas/masDetalles/${ventaId}`);
             const data = await response.json();
             return data.venta;
         },
-        enabled: rutaDespachoId !== null
+        enabled: ventaId !== null
     });
 
     return (

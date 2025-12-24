@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Loader from "../../Loader";
+import Loader from "@/components/Loader";
 import Image from "next/image";
 import dayjs from "dayjs";
 import { getColorEstanque } from "@/lib/uix";
 import { useForm } from "react-hook-form";
-import ClientAddressManagerView from "../ClientAddressManagerView";
-import { IClienteSeachResult, IItemCatalogoPowerScanView } from "../types";
+import ClientAddressManagerView from "@/components/prefabs/ClientAddressManagerView";
+import ClienteSearchView from "@/components/prefabs/ClienteSearchView";
+import type { IClienteSeachResult, IItemCatalogoPowerScanView } from "@/components/prefabs/types";
 import toast from "react-hot-toast";
-import ClienteSearchView from "../ClienteSearchView";
 
 export function PowerScanOptionsModal({
     visible,

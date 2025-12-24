@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/constants";
+import { useState, useMemo, useEffect } from "react";
+import { TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/constants";
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "../Loader";
 import { IoIosArrowBack } from "react-icons/io";
-import type { IChecklistModalProps, IChecklistAnswer, IChecklistlistResult } from "./types";
+import type { IChecklistAnswer } from "../prefabs/types";
 import { useSession } from "next-auth/react";
+import { useForm, useWatch } from "react-hook-form";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { IVehiculo } from "@/types/vehiculo";
 
 const itemEmployeeLabels: { [key: string]: string } = {
     zapatos_seguridad: "¿Zapatos de seguridad presentes?",
@@ -85,17 +88,73 @@ function getChecklistItems(tipo: 'personal' | 'vehiculo'): IChecklistAnswer[] {
         }));
 }
 
-export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklistModalProps) {
+interface IChecklistForm {
+    vehiculoId?: string;
+    kilometros?: number;
+    [key: string]: any; // Para permitir claves dinámicas de items del checklist
+}
+
+export default function ChecklistModal({ tipo, onFinish }: { 
+    tipo: 'personal' | 'vehiculo',
+    onFinish: () => void
+}) {
     const checklistItems = useMemo(() => getChecklistItems(tipo), [tipo]);
     const [step, setStep] = useState(0);
-    const [answers, setAnswers] = useState<IChecklistAnswer[]>([]);
-    const [kilometros, setKilometros] = useState(0);
-    const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
-    const [loading, setLoading] = useState(false);
-    
+    const { register, getValues, setValue, watch, handleSubmit, control } = useForm<IChecklistForm>({
+        defaultValues: {
+            vehiculoId: undefined,
+            kilometros: undefined,
+            // Inicializar todos los items del checklist en 0
+            ...checklistItems.reduce((acc, item) => {
+                acc[item.tipo as string] = 0;
+                return acc;
+            }, {} as Record<string, number>)
+        }
+    });    
     const { data: session } = useSession();
-
+    const kilometros = useWatch({
+        control,
+        name: "kilometros"
+    });
     const totalSteps = checklistItems.length + 1;
+
+    useEffect(() => {
+        console.log("Kilometros changed:", kilometros);
+    }, [kilometros]);
+    
+    const { data: vehiculos, isLoading } = useQuery<IVehiculo[]>({
+        queryKey: ["vehiculos-conductor"],
+        queryFn: async () => {
+            const r = await fetch("/api/flota/porConductor");
+            const data = await r.json();
+            return data.vehiculos;
+        },        
+        enabled: tipo === 'vehiculo',
+    });
+
+    const mutation = useMutation({
+        mutationFn: async () => {
+            const formValues = getValues();
+            const items: IChecklistAnswer[] = checklistItems.map((item) => ({
+                tipo: item.tipo,
+                valor: formValues[item.tipo as string] || 0,
+            }));
+            const data: any = {
+                tipo,
+                items,
+            };
+            if (tipo === 'vehiculo') {
+                data.vehiculoId = formValues.vehiculoId;
+                data.kilometraje = formValues.kilometros;
+            }            
+            console.log("DATA", data);
+            await fetch("/api/users/checklist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+        }
+    });
 
     const handleNext = () => {
         if (step < totalSteps) setStep(step + 1);
@@ -103,21 +162,6 @@ export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklist
 
     const handlePrev = () => {
         if (step > 0) setStep(step - 1);
-    };
-
-    const handleAnswer = (answer: IChecklistAnswer) => {
-        console.log("RESPUESTA", answer);
-        setAnswers(prev => [...prev, answer]);
-        handleNext();
-    };
-
-    const handleKilometros = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setKilometros(Number(e.target.value));
-    };
-
-    const handleKilometrosNext = () => {
-        if ((tipo === 'vehiculo' && kilometros) || tipo === 'personal') 
-            handleNext();
     };
 
     // Animación simple de carrousel
@@ -130,10 +174,205 @@ export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklist
         left: 0,
     });
 
-    // Imprime el checklist usando una ventana nueva (desktop) o descarga PDF/HTML (mobile)
+    const onSubmit = async () => {
+        await mutation.mutateAsync();
+        onFinish();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
+            {(!isLoading && !mutation.isPending) && <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
+                {/* Botón de cerrar */}
+                {tipo === 'vehiculo' && <button
+                    aria-label="Cerrar"
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl z-10"
+                    onClick={() => window.history.back()}
+                    style={{ background: "none", border: "none", cursor: "pointer" }}
+                >
+                    <AiOutlineClose />
+                </button>}
+                {/* Slides */}
+                <div className="relative w-full h-full">
+                    {/* Paso 0: Título */}
+                    <div style={getSlideStyle(0)} className="flex flex-col items-center justify-center h-full px-8">
+                        <h1 className="text-3xl mb-4">Checklist {tipo}</h1>
+                        {tipo === 'vehiculo' && <>
+                            <h2 className="text-md mb-4 -mt-4">Vehiculo y kilometros</h2>
+                            {vehiculos && vehiculos.length > 1 && <div className="text-left">
+                                <span>Patente</span>
+                                <select
+                                    {...register("vehiculoId")}
+                                    className="border rounded px-4 py-2 text-lg w-64 mb-4"                                    
+                                >
+                                    <option>Selecciona un vehículo</option>
+                                    {vehiculos?.map((vehiculo) => (
+                                        <option key={vehiculo._id} value={vehiculo._id}>
+                                            {vehiculo.patente} - {vehiculo.marca}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>}
+                            <div className="text-left">
+                                <span>Kilometros</span>
+                                <input
+                                    {...register("kilometros", { valueAsNumber: true })}
+                                    type="number"
+                                    className="border rounded px-4 py-2 text-lg w-64 mb-4"
+                                    placeholder="Ej: 123456"
+                                    min={0}
+                                />
+                            </div>
+                        </>}
+                        <button
+                            className="bg-blue-600 text-white px-6 py-2 rounded font-bold disabled:opacity-50"
+                            onClick={handleNext}
+                            type="button"
+                            disabled={tipo === 'vehiculo' && Number(kilometros) == 0}
+                        >
+                            {step == 0 ? 'Iniciar' : 'Siguiente'}
+                        </button>
+                    </div>
+                    {/* Items del checklist */}
+                    {checklistItems.map((key, idx) => {
+                        const label = (session?.user.role == USER_ROLE.conductor ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
+                            || `¿${String(key.tipo).replace(/_/g, " ")}?`;
+                        const value = watch(key.tipo as string) || 0;
+                        
+                        const handleAnswer = (valor: number) => {
+                            setValue(key.tipo as string, valor);
+                            handleNext();
+                        };
+                        
+                        // Selector especial
+                        if (specialSelectorItems.includes(key.tipo as string)) {
+                            return (
+                                <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
+                                    <h2 className="text-xl font-bold mb-6">{label}</h2>
+                                    <div className="flex space-x-3 mb-6">
+                                        {selectorOptions.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                className={`px-4 py-2 rounded border font-bold ${value === opt.value ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+                                                onClick={() => handleAnswer(opt.value)}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button className="text-gray-500 underline" onClick={handlePrev} disabled={step === 0}>Atrás</button>
+                                </div>
+                            );
+                        }
+                        // Limpieza
+                        if (limpiezaItems.includes(key.tipo as string)) {
+                            return (
+                                <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
+                                    <h2 className="text-xl font-bold mb-6">{label}</h2>
+                                    <div className="flex space-x-3 mb-6">
+                                        {limpiezaOptions.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                className={`px-6 py-2 rounded border font-bold ${value === opt.value ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+                                                onClick={() => handleAnswer(opt.value)}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button className="text-gray-500 underline" onClick={handlePrev} disabled={step === 0}>Atrás</button>
+                                </div>
+                            );
+                        }
+                        // Check SI/NO
+                        return (
+                            <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
+                                <h2 className="text-xl font-bold mb-6">{label}</h2>
+                                <div className="flex space-x-6 mb-6">
+                                    <button
+                                        className={`px-8 py-2 rounded border font-bold ${value === 1 ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+                                        onClick={() => handleAnswer(1)}
+                                        type="button"
+                                    >
+                                        Sí
+                                    </button>
+                                    <button
+                                        className={`px-8 py-2 rounded border font-bold ${value === 0 ? "bg-red-600 text-white" : "bg-gray-100"}`}
+                                        onClick={() => handleAnswer(0)}
+                                        type="button"
+                                    >
+                                        No
+                                    </button>
+                                </div>
+                                <button type="button" className="flex text-gray-500 underline" onClick={handlePrev} 
+                                    disabled={step === (tipo === 'vehiculo' ? 0 : 1)}>
+                                    <IoIosArrowBack className="mt-0.5 -ml-6" size="1.25rem" />ATRÁS
+                                </button>
+                            </div>
+                        );
+                    })}
+                    {/* Finalizar */}
+                    <div style={getSlideStyle(totalSteps)} className="flex flex-col items-center justify-center h-full px-8">
+                        <h2 className="text-2xl font-bold mb-8">Checklist completado</h2>
+                        {(() => {
+                            // Determina si el checklist está aprobado o rechazado
+                            function resultadoChecklist(checklistItems: IChecklistAnswer[], formValues: Record<string, any>): boolean {
+                                return checklistItems.every((item) => {
+                                    const key = item.tipo as string;
+                                    const value = item.valor;
+                                    // If value is odd, check if answer is truthy (approved)
+                                    if (value % 2 === 1) {
+                                        const answer = formValues[key];
+                                        return answer !== undefined && answer !== 0;
+                                    }
+                                    return true;
+                                });
+                            }
+                            const formValues = getValues();
+                            const aprobado = resultadoChecklist(checklistItems, formValues);
+                            return aprobado ? (
+                                <div className="inline-block border-4 border-green-600 text-green-600 font-bold text-xl px-8 py-2 rounded-xl bg-green-50 shadow-md uppercase tracking-wider mb-6" style={{ transform: "rotate(-8deg)" }}>
+                                    <span className="mr-2 text-2xl align-middle">✅</span> APROBADO
+                                </div>
+                            ) : (
+                                <div className="inline-block border-4 border-red-600 text-red-600 font-bold text-xl px-8 py-2 rounded-xl bg-red-50 shadow-md uppercase tracking-wider mb-6" style={{ transform: "rotate(-8deg)" }}>
+                                    <span className="mr-2 text-2xl align-middle">❌</span> RECHAZADO
+                                </div>
+                            );
+                        })()}
+                        <button
+                            className={`w-full bg-green-500 text-white px-8 h-12 rounded-md font-bold text-lg mt-4 ${mutation.isPending ? "opacity-50 cursor-not-allowed" : ""}`}
+                            type="button"
+                            disabled={mutation.isPending}
+                            onClick={handleSubmit(onSubmit)}>
+                            {mutation.isPending ? <div className="relative"><Loader texto="FINALIZANDO" /></div> : "FINALIZAR CHECKLIST"}
+                        </button>
+                    </div>
+                </div>
+                {/* Barra de progreso */}
+                <div className="absolute bottom-4 left-0 right-0 px-8">
+                    <p className="ml-1 text-xs text-right font-bold mb-1 mr-2">{`${step} / ${totalSteps}`}</p>
+                    <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                            className="h-4 bg-blue-600 transition-all duration-300"
+                            style={{
+                                width: `${Math.round((step / totalSteps) * 100)}%`
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>}
+            {mutation.isPending && <h1 className="text-white text-xl"><Loader texto="Informando..." /></h1>}
+        </div>
+    );
+}
+
+
+// Imprime el checklist usando una ventana nueva (desktop) o descarga PDF/HTML (mobile)
     // Genera y descarga el PDF del checklist usando la API del backend
     // Permite descargar el PDF del checklist después de finalizarlo
-    const downloadChecklistPDF = async (kilometraje: number, result: IChecklistlistResult, answers: IChecklistAnswer[], vehiculoId: string) => {
+    /*const downloadChecklistPDF = async (kilometraje: number, result: IChecklistlistResult, answers: IChecklistAnswer[], vehiculoId: string) => {
         result.tipo = tipo === 'vehiculo' ? TIPO_CHECKLIST.vehiculo : TIPO_CHECKLIST.personal;        
         try {
             const res = await fetch("/api/reportes/checklist", {
@@ -164,216 +403,4 @@ export default function ChecklistModal({ onFinish, tipo, vehiculos }: IChecklist
             alert("Error al descargar el PDF del checklist.");
             console.error("Error al descargar el PDF del checklist:", err);
         }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
-            {!loading && <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
-                {/* Botón de cerrar */}
-                {tipo === 'vehiculo' && <button
-                    aria-label="Cerrar"
-                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl z-10"
-                    onClick={() => window.history.back()}
-                    style={{ background: "none", border: "none", cursor: "pointer" }}
-                >
-                    <AiOutlineClose />
-                </button>}
-                {/* Slides */}
-                <div className="relative w-full h-full">
-                    {/* Paso 0: Título */}
-                    <div style={getSlideStyle(0)} className="flex flex-col items-center justify-center h-full px-8">
-                        <h1 className="text-3xl mb-4">Checklist {tipo}</h1>
-                        {tipo === 'vehiculo' && <>
-                            <h2 className="text-md mb-4 -mt-4">Vehiculo y kilometros</h2>
-                            {vehiculos && vehiculos.length > 1 && <div className="text-left">
-                                <span>Patente</span>
-                                <select
-                                    className="border rounded px-4 py-2 text-lg w-64 mb-4"
-                                    value={selectedVehicleId}
-                                    onChange={(e) => {
-                                        setSelectedVehicleId(e.currentTarget.value);
-                                    }}
-                                >
-                                    <option>Selecciona un vehículo</option>
-                                    {vehiculos?.map((vehiculo) => (
-                                        <option key={vehiculo._id} value={vehiculo._id}>
-                                            {vehiculo.patente} - {vehiculo.marca}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>}
-                            <div className="text-left">
-                                <span>Kilometros</span>
-                                <input
-                                    type="number"
-                                    className="border rounded px-4 py-2 text-lg w-64 mb-4"
-                                    value={kilometros}
-                                    onChange={handleKilometros}
-                                    placeholder="Ej: 123456"
-                                    min={0}
-                                />
-                            </div>
-                        </>}
-                        <button
-                            className="bg-blue-600 text-white px-6 py-2 rounded font-bold disabled:opacity-50"
-                            onClick={handleKilometrosNext}
-                            disabled={tipo === 'vehiculo' && !kilometros}
-                        >
-                            {step == 0 ? 'Iniciar' : 'Siguiente'}
-                        </button>
-                    </div>
-                    {/* Items del checklist */}
-                    {checklistItems.map((key, idx) => {
-                        const label = (session?.user.role == USER_ROLE.conductor ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
-                            || `¿${String(key.tipo).replace(/_/g, " ")}?`;
-                        const value = answers.find(a => a.tipo === key.tipo)?.valor || 0;
-                        // Selector especial
-                        if (specialSelectorItems.includes(key.tipo as string)) {
-                            return (
-                                <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
-                                    <h2 className="text-xl font-bold mb-6">{label}</h2>
-                                    <div className="flex space-x-3 mb-6">
-                                        {selectorOptions.map(opt => (
-                                            <button
-                                                key={opt.value}
-                                                className={`px-4 py-2 rounded border font-bold ${value === opt.value ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-                                                onClick={() => handleAnswer({ tipo: key.tipo, valor: opt.value })}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <button className="text-gray-500 underline" onClick={handlePrev} disabled={step === 0}>Atrás</button>
-                                </div>
-                            );
-                        }
-                        // Limpieza
-                        if (limpiezaItems.includes(key.tipo as string)) {
-                            return (
-                                <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
-                                    <h2 className="text-xl font-bold mb-6">{label}</h2>
-                                    <div className="flex space-x-3 mb-6">
-                                        {limpiezaOptions.map(opt => (
-                                            <button
-                                                key={opt.value}
-                                                className={`px-6 py-2 rounded border font-bold ${value === opt.value ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-                                                onClick={() => handleAnswer({ tipo: key.tipo, valor: opt.value })}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <button className="text-gray-500 underline" onClick={handlePrev} disabled={step === 0}>Atrás</button>
-                                </div>
-                            );
-                        }
-                        // Check SI/NO
-                        return (
-                            <div key={String(key.tipo)} style={getSlideStyle(idx + 1)} className="flex flex-col items-center justify-center h-full px-8">
-                                <h2 className="text-xl font-bold mb-6">{label}</h2>
-                                <div className="flex space-x-6 mb-6">
-                                    <button
-                                        className={`px-8 py-2 rounded border font-bold ${value !== 1 ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-                                        onClick={() => handleAnswer({ tipo: key.tipo, valor: 1 })}
-                                    >
-                                        Sí
-                                    </button>
-                                    <button
-                                        className={`px-8 py-2 rounded border font-bold ${value !== 0 ? "bg-red-600 text-white" : "bg-gray-100"}`}
-                                        onClick={() => handleAnswer({ tipo: key.tipo, valor: 0 })}
-                                    >
-                                        No
-                                    </button>
-                                </div>
-                                <button className="flex text-gray-500 underline" onClick={handlePrev} 
-                                    disabled={step === (tipo === 'vehiculo' ? 0 : 1)}>
-                                    <IoIosArrowBack className="mt-0.5 -ml-6" size="1.25rem" />ATRÁS
-                                </button>
-                            </div>
-                        );
-                    })}
-                    {/* Finalizar */}
-                    <div style={getSlideStyle(totalSteps)} className="flex flex-col items-center justify-center h-full px-8">
-                        <h2 className="text-2xl font-bold mb-8">Checklist completado</h2>
-                        {(() => {
-                            // Determina si el checklist está aprobado o rechazado
-                            function resultadoChecklist(checklistItems: IChecklistAnswer[], answers: IChecklistAnswer[]): boolean {
-                                return checklistItems.every((item) => {
-                                    const key = item.tipo;
-                                    const value = item.valor;
-                                    // If value is odd, check if answer is truthy (approved)
-                                    if (value % 2 === 1) {
-                                        const answer = answers.find(a => a.tipo === key);
-                                        return !!answer && !!answer.valor;
-                                    }
-                                    return true;
-                                });
-                            }
-                            const aprobado = resultadoChecklist(checklistItems, answers);
-                            return aprobado ? (
-                                <div className="inline-block border-4 border-green-600 text-green-600 font-bold text-xl px-8 py-2 rounded-xl bg-green-50 shadow-md uppercase tracking-wider mb-6" style={{ transform: "rotate(-8deg)" }}>
-                                    <span className="mr-2 text-2xl align-middle">✅</span> APROBADO
-                                </div>
-                            ) : (
-                                <div className="inline-block border-4 border-red-600 text-red-600 font-bold text-xl px-8 py-2 rounded-xl bg-red-50 shadow-md uppercase tracking-wider mb-6" style={{ transform: "rotate(-8deg)" }}>
-                                    <span className="mr-2 text-2xl align-middle">❌</span> RECHAZADO
-                                </div>
-                            );
-                        })()}
-                        <button
-                            className={`w-full bg-green-500 text-white px-8 h-12 rounded-md font-bold text-lg mt-4 ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-                            disabled={loading}
-                            onClick={() => {
-                                setLoading(true);
-                                function resultadoChecklist(
-                                    checklistItems: { tipo: string; valor: number }[],
-                                    answers: IChecklistAnswer[]
-                                ): boolean {
-                                    return checklistItems.every(({ tipo, valor }: { tipo: string; valor: number }) => {
-                                        if (valor % 2 === 1) {
-                                            const respuesta = answers.find(a => a.tipo === tipo)?.valor;
-                                            return respuesta !== 0;
-                                        }
-                                        return true;
-                                    });
-                                }
-                                onFinish(kilometros, answers);                                
-                                downloadChecklistPDF(
-                                    kilometros,
-                                    {
-                                        tipo: tipo === 'vehiculo' ? TIPO_CHECKLIST.vehiculo : TIPO_CHECKLIST.personal,
-                                        aprobado: resultadoChecklist(
-                                            checklistItems.map(item => ({
-                                                tipo: String(item.tipo),
-                                                valor: item.valor
-                                            })),
-                                            answers
-                                        )
-                                    },
-                                    answers, // answers array
-                                    selectedVehicleId // vehiculoId string
-                                );
-                                setStep(0);
-                                setAnswers([]);
-                            }}>
-                            {loading ? <div className="relative"><Loader texto="FINALIZANDO" /></div> : "FINALIZAR CHECKLIST"}
-                        </button>
-                    </div>
-                </div>
-                {/* Barra de progreso */}
-                <div className="absolute bottom-4 left-0 right-0 px-8">
-                    <p className="ml-1 text-xs text-right font-bold mb-1 mr-2">{`${step} / ${totalSteps}`}</p>
-                    <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                            className="h-4 bg-blue-600 transition-all duration-300"
-                            style={{
-                                width: `${Math.round((step / totalSteps) * 100)}%`
-                            }}
-                        />
-                    </div>
-                </div>
-            </div>}
-            {loading && <h1 className="text-white text-xl"><Loader texto="Informando..." /></h1>}
-        </div>
-    );
-}
+    };*/

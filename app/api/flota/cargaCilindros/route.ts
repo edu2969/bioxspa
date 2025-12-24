@@ -64,7 +64,7 @@ export async function GET(req: Request) {
         });
 
         if (!rutaDespacho) {
-            return NextResponse.json({ error: "No hay ruta de despacho activa para este vehiculo" }, { status: 404 });
+            return NextResponse.json({ ok: true, cilindros: [] });
         }
 
         // Mapear los items a cilindros

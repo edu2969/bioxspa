@@ -28,14 +28,16 @@ export async function GET() {
         if (role === USER_ROLE.conductor || role === USER_ROLE.encargado
             || role === USER_ROLE.responsable || role === USER_ROLE.despacho) {
             tiposChecklist.push(TIPO_CHECKLIST.personal);
-        } else if (role === USER_ROLE.conductor) {
+        } 
+
+        if (role === USER_ROLE.conductor) {
             tiposChecklist.push(TIPO_CHECKLIST.vehiculo);
         }
 
         if (tiposChecklist.length === 0) {
             return new Response(JSON.stringify({ ok: true, passed: true, checklists: [] }));
         }
-
+        
         const checklists = await CheckList.find({
             userId,
             tipo: { $in: tiposChecklist },
@@ -53,7 +55,14 @@ export async function GET() {
         }));
         const passed = checklistResults.length === tiposChecklist.length
             && checklistResults.every(cl => cl.aprobado);
-        return new Response(JSON.stringify({ ok: true, passed, checklists: checklistResults }));
+
+        console.log("Checklist results:", checklistResults.length, "tests:", tiposChecklist.length);
+
+        return new Response(JSON.stringify({ 
+            ok: true, 
+            passed, 
+            checklists: checklistResults 
+        }));
     } catch (error) {
         console.error("Error fetching checklists:", error);
         return new Response(JSON.stringify({ ok: false, error: "Internal Server Error" }), { status: 500 });
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
             .filter(([, value]) => tipo === 'vehiculo' ? value < 128 : value >= 128)
             .forEach(([key, value]) => {
                 // Buscar el valor real del item en el array recibido
-                const found = body.items.find((item: IItemChecklist) => item.tipo === TIPO_CHECKLIST_ITEM[key as keyof typeof TIPO_CHECKLIST_ITEM]);
+                const found = body.items.find((item: IItemChecklist) => String(item.tipo) === String(key));
                 const itemValue = found?.valor;
                 items.push({
                     tipo: TIPO_CHECKLIST_ITEM[key as keyof typeof TIPO_CHECKLIST_ITEM], // Guardar como número
@@ -105,8 +114,8 @@ export async function POST(req: NextRequest) {
         const checklistPayload: IChecklist = {
             userId,
             tipo: tipo === 'personal' ? TIPO_CHECKLIST.personal : TIPO_CHECKLIST.vehiculo,
-            vehiculoId: tipo === TIPO_CHECKLIST.vehiculo ? vehiculoId : null,
-            kilometraje: tipo === TIPO_CHECKLIST.vehiculo ? kilometraje : null,
+            vehiculoId: tipo === 'vehiculo' ? vehiculoId : null,
+            kilometraje: tipo === 'vehiculo' ? kilometraje : null,
             passed,
             items,
             fecha: new Date(),

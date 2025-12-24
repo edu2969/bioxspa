@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import InputManualCodeView from "./InputManualCodeView";
-import { PowerScanOptionsModal } from "./PowerScanOptionsModal";
+import { PowerScanOptionsModal } from "@/components/modals/PowerScanOptionsModal";
 import toast from "react-hot-toast";
 import type { IItemCatalogoPowerScanView } from "../types";
 
@@ -18,7 +18,7 @@ export default function PowerScanView({
     const [powerScanModalVisible, setPowerScanModalVisible] = useState(false);
     const [itemEscaneado, setItemEscaneado] = useState<IItemCatalogoPowerScanView | null>(null);
 
-    const gestionarItem = useCallback(async (codigo: string) => {
+    const gestionarItem = async (codigo: string) => {
         // Lógica para gestionar el item escaneado
         try {
             const response = await fetch(`/api/cilindros/gestionar/${codigo}`);
@@ -40,7 +40,7 @@ export default function PowerScanView({
             toast.error('Error al buscar el cilindro');
             setScanMode(false);
         }
-    }, [setSelectedItem, setScanMode]);    
+    };    
 
     return (<>
         <PowerScanOptionsModal item={itemEscaneado} 

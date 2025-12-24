@@ -115,3 +115,65 @@ export interface IHistorialVentaView {
     subtitulo?: string;
     descripcion?: string;
 }
+
+export interface ISubcategoriaCatalogoPoblado {
+    _id?: string;
+    nombre: string;
+    unidad?: string;
+    cantidad?: number;
+    sinSifon?: boolean;
+    categoriaCatalogoId: {
+        _id?: string;
+        nombre: string;
+        tipo?: number;
+        gas?: string;
+        elemento?: string;
+        esIndustrial?: boolean;
+    };
+}
+
+export interface ICargaDespachoView {
+    rutaId: string | null;
+    ventas: Array<{
+        ventaId: string;
+        tipo: number;
+        fecha: Date;
+        detalles: Array<{
+            multiplicador: number;
+            restantes: number;
+            itemCatalogoIds: string[];
+            subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
+        }>;
+        comentario: string | null;
+        cliente: {
+            nombre: string | null;
+            rut?: string | null;
+            direccion?: string | null;
+            telefono?: string | null;
+            direccionesDespacho: Array<{
+                nombre: string | null;
+                direccionId: string | null;
+                latitud: number | null;
+                longitud: number | null;
+            }>;
+        };
+        entregasEnLocal: Array<{
+            nombreRecibe: string | null;
+            rutRecibe: string | null;
+            createdAt: Date;
+        }>
+    }>;
+    nombreChofer: string | null;
+    patenteVehiculo: string | null;
+    fechaVentaMasReciente: Date | null;
+    items: Array<{
+        multiplicador: number;
+        cantidad: number | string;
+        unidad: string | null;
+        restantes: number | null;
+        itemCatalogoIds: string[];
+        subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
+    }>;
+    estado: number | null;
+    retiroEnLocal?: boolean;
+}

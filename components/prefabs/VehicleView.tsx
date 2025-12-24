@@ -16,8 +16,6 @@ const sizeByModel = (vehiculo: IVehicleView): { width: number; height: number } 
     return { width: size[0], height: size[1] };
 };
 
-
-
 const calculateUploadTubePosition = (index: number) => {
     const baseTop = 146;
     const baseLeft = 176;

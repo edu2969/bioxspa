@@ -1,25 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import ChecklistModal from "../prefabs/ChecklistModal";
-import { IChecklistAnswer } from "../prefabs/types";
-
-interface ChecklistData {
-    tipo: 'personal' | 'vehiculo';
-    vehiculoId?: string;
-    kilometraje?: number;
-    items: IChecklistAnswer[];
-}
+import { useQuery } from "@tanstack/react-query";
+import ChecklistModal from "../modals/ChecklistModal";
 
 interface ChecklistContextType {
     tipo: 'personal' | 'vehiculo';
-    passed: boolean | null;
-    showModal: boolean;
-    data: ChecklistData;
-    setData: (d: ChecklistData) => void;
-    submitData: () => Promise<void>;
-    isSubmitting: boolean;
 }
 
 const ChecklistContext = createContext<ChecklistContextType | null>(null);
@@ -29,74 +15,34 @@ export function ChecklistProvider({ tipo, children }: {
     children: React.ReactNode 
 }) {
     const [showModal, setShowModal] = useState(false);
-    const [data, setData] = useState<ChecklistData>({
-        tipo: tipo,
-        vehiculoId: "",
-        kilometraje: undefined,
-        items: []
-    });
 
     const { data: checklist, isLoading: isLoadingChecklist } = useQuery({
         queryKey: ["checklist"],
         queryFn: async () => {
             const r = await fetch("/api/users/checklist");
             const data = await r.json();
-            console.log("Data", data);
             return data;
         },
         staleTime: 1000 * 60,
     });
 
-    const mutation = useMutation({
-        mutationFn: async () => {
-            console.log("DATA", data);
-            await fetch("/api/users/checklist", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            setShowModal(false);
-        }
-    });
-
-    const submitData = async () => {
-        await mutation.mutateAsync();
-    };
-
     useEffect(() => {
         console.log("Checklist data:", isLoadingChecklist, checklist);
-        if (!isLoadingChecklist && checklist && !checklist.passed) {
+        if (!isLoadingChecklist 
+            && !checklist.passed 
+            && checklist.checklists.every((cl: {
+                tipo: string;
+                aprobado: boolean;
+            }) => cl.tipo !== tipo)) {
             setShowModal(true);
         }
     }, [isLoadingChecklist, checklist]);
 
     return (
-        <ChecklistContext.Provider
-            value={{
-                passed: checklist?.passed ?? null,
-                tipo,
-                showModal,
-                data,
-                setData,
-                submitData,
-                isSubmitting: mutation.isPending,
-            }}
-        >
+        <ChecklistContext.Provider value={{ tipo }}>
             {children}
             {showModal === true && (
-                <ChecklistModal
-                    onFinish={(kilometros, items) => {
-                        // Actualiza el estado data antes de enviar
-                        setData(prev => ({
-                            ...prev,
-                            kilometraje: kilometros,
-                            items: items
-                        }));
-                        setShowModal(false);
-                        submitData();
-                    }}
-                    tipo={tipo}
-                />
+                <ChecklistModal tipo={tipo} onFinish={() => setShowModal(false)} />
             )}
         </ChecklistContext.Provider>
     );

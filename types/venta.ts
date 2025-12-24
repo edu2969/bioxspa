@@ -60,8 +60,8 @@ export interface IVenta {
         updatedAt?: Date;
     }[];
     detalles?: IDetalleVenta[];
-    createdAt?: Date;
-    updatedAt?: Date;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface IDetalleVentaView {

@@ -11,7 +11,8 @@ export default function AccessButton({ props, routingIndex, setRoutingIndex }
                 <span>{props.label}</span>
             </div>
             {props.badges && props.badges.map((badged, index) => (<div key={`badged_${index}`} className={`absolute top-8 right-24 ${badged.value !== 0 ? 'bg-blue-500' : 'bg-green-500'} text-white text-xs font-bold rounded-full pl-2 pr-1.5 h-8 w-8 flex items-center justify-center`}>
-                    <span className="text-lg mr-1">{badged.value} {badged.text}</span>
+                    <span className="text-lg mr-1">{badged.value}</span>
+                    {badged.text && <span className="sr-only">{badged.text}</span>}
                 </div>))}
             {props.warningMessage}
         </Link>

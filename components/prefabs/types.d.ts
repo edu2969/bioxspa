@@ -86,17 +86,6 @@ export interface IClienteSeachResult {
     direccionesDespacho: Array<IDireccion>;
 }
 
-export interface IChecklistModalProps {
-    onFinish: (kilometros?: number, data: IChecklistAnswer[]) => void;
-    tipo: 'personal' | 'vehiculo';
-    vehiculos?: {
-        _id: string;
-        patente: string;
-        marca: string;
-        modelo: string;
-    }[];
-}
-
 export interface IChecklistAnswer {
     tipo: keyof typeof TIPO_CHECKLIST_ITEM;
     valor: number;

@@ -2,85 +2,67 @@ import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
-import Vehiculo from "@/models/vehiculo";
 import Venta from "@/models/venta";
 import DetalleVenta from "@/models/detalleVenta";
-import ItemCatalogo from "@/models/itemCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
 import Cliente from "@/models/cliente";
 import { IGestorDeCargaView, IVentaActual, IDetalleVentaActual, ICilindro } from "@/components/prefabs/types";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_CATEGORIA_CATALOGO, TIPO_ESTADO_RUTA_DESPACHO, USER_ROLE } from "@/app/utils/constants";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/utils/authOptions";
+import Cargo from "@/models/cargo";
+import User from "@/models/user";
+import { IUser } from "@/types/user";
+import { IRutaDespacho } from "@/types/rutaDespacho";
 
-export async function GET(req: Request) {
+export async function GET() {
     try {
+        console.log("GET /api/flota/gestorCarga called...");
         await connectMongoDB();
         if (!mongoose.models.Cliente) {
             mongoose.model("Cliente", Cliente.schema);
         }
-        const { searchParams } = new URL(req.url);
-        const vehiculoId = searchParams.get("vehiculoId");
-        
-        if (vehiculoId == null) {
-            return NextResponse.json({ error: "Missing vehiculoId parameter" }, { status: 400 });
+
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user || !session.user.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Buscar el vehículo y verificar que tenga chofer asignado
-        const vehiculo = await Vehiculo.findById(vehiculoId);
-        if (!vehiculo) {
-            return NextResponse.json({ error: "Vehiculo not found" }, { status: 404 });
+        const userId = session.user.id;
+        const user = await User.findById(userId).select('role').lean<IUser>();
+        if(!user) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }        
+        const cargo = await Cargo.findOne({ userId });
+        if (!cargo) {
+            return NextResponse.json({ error: "User has no assigned cargo" }, { status: 400 });
         }
-
-        if (!vehiculo.choferIds || vehiculo.choferIds.length === 0) {
-            return NextResponse.json({ error: "No chofer assigned to vehicle" }, { status: 400 });
+        const qry: {
+            dependenciaId?: string;
+            sucursalId?: string;
+            estados?: { $in: number[] };
+        } = cargo.dependenciaId ?
+            { dependenciaId: cargo.dependenciaId } :
+            { sucursalId: cargo.sucursalId };
+        let atencionRecepcion = false;
+        const estados = [TIPO_ESTADO_RUTA_DESPACHO.preparacion];
+        if(user.role = USER_ROLE.conductor) {
+            estados.push(TIPO_ESTADO_RUTA_DESPACHO.en_ruta);
         }
-
-        // Buscar la ruta de despacho activa para el vehículo
-        const rutaDespacho = await RutaDespacho.findOne({ 
-            vehiculoId: vehiculoId,
-            estado: { 
-                $nin: [
-                    TIPO_ESTADO_RUTA_DESPACHO.a_reasignar, 
-                    TIPO_ESTADO_RUTA_DESPACHO.cancelado, TIPO_ESTADO_RUTA_DESPACHO.anulado,
-                    TIPO_ESTADO_RUTA_DESPACHO.terminado
-                ]
+        if(user.role === USER_ROLE.encargado || user.role === USER_ROLE.responsable) {
+            estados.push(TIPO_ESTADO_RUTA_DESPACHO.descarga);
+            atencionRecepcion = true;
+        }
+        qry.estados = { $in: estados };
+        const ventas = await Venta.find(qry).select('_id direccionDespachoId fecha').populate({
+            path: 'clienteId',
+            select: 'nombre rut direccionesDespacho',
+            populate: {
+                path: 'direccionesDespacho',
+                select: 'nombre'
             }
-         });
-        if (!rutaDespacho) {
-            return NextResponse.json({ error: "No active route found for vehicle" }, { status: 404 });
-        }
-
-        // Obtener los cilindros cargados en el vehículo
-        const cilindros: ICilindro[] = [];
-        if (rutaDespacho.cargaItemIds && rutaDespacho.cargaItemIds.length > 0) {
-            const itemsCargados = await ItemCatalogo.find({ 
-                _id: { $in: rutaDespacho.cargaItemIds } 
-            }).populate('subcategoriaCatalogoId');
-
-            for (const item of itemsCargados) {
-                const subcategoria = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId);
-                const categoria = await CategoriaCatalogo.findById(subcategoria?.categoriaCatalogoId);
-                
-                cilindros.push({
-                    elementos: categoria?.elemento || '',
-                    peso: subcategoria?.cantidad || 0,
-                    altura: 0, // No disponible en el schema actual
-                    radio: 0,  // No disponible en el schema actual
-                    sinSifon: subcategoria?.sinSifon || false,
-                    esIndustrial: categoria?.esIndustrial || false,
-                    esMedicinal: categoria?.esMedicinal || false,
-                    estado: item.estado
-                });
-            }
-        }
-
-        // Obtener las ventas de la ruta
-        const ventas = await Venta.find({ 
-            _id: { $in: rutaDespacho.ventaIds } 
-        }).populate('clienteId');
+        }).lean();
 
         const ventasActuales: IVentaActual[] = [];
-
         for (const venta of ventas) {
             const detallesVenta = await DetalleVenta.find({ ventaId: venta._id })
                 .populate('subcategoriaCatalogoId')
@@ -89,36 +71,56 @@ export async function GET(req: Request) {
             const detalles: IDetalleVentaActual[] = [];
             let totalCilindros = 0;
             let itemsCompletados = 0;
+            const estadoVenta = venta.estado;
+            const rutaDespacho = await RutaDespacho.findOne({ 
+                ventaId: venta._id, 
+                estado: { $in: estados } 
+            })
+            .populate({
+                path: 'cargaItemIds.subcategoriaCatalogoId',
+                model: 'SubcategoriaCatalogo',
+                select: '_id'
+            })
+            .lean<IRutaDespacho>();
+
+            const entregaEnLocal = !venta.direccionDespachoId;
+
+            const contadoresSubcategoriasCarga: { [key: string]: number } = {};
+            if(rutaDespacho && rutaDespacho.cargaItemIds) {
+                for (const cargaItem of rutaDespacho.cargaItemIds) {
+                    const subcatId = String(cargaItem.subcategoriaCatalogoId?._id);
+                    contadoresSubcategoriasCarga[subcatId] = (contadoresSubcategoriasCarga[subcatId] || 0) + 1;
+                }
+            }
+            const contadoresSubcategoriasVenta: { [key: string]: number } = {};
+            for (const detalle of detallesVenta) {
+                const subcatId = String(detalle.subcategoriaCatalogoId?._id);
+                contadoresSubcategoriasVenta[subcatId] = (contadoresSubcategoriasVenta[subcatId] || 0) + detalle.cantidad;
+            }
 
             for (const detalle of detallesVenta) {
-                const subcategoria = await SubcategoriaCatalogo.findById(detalle.subcategoriaCatalogoId);
-                const categoria = subcategoria ? await CategoriaCatalogo.findById(subcategoria.categoriaCatalogoId) : null;
+                const tipo = detalle.tipo;
 
-                let tipo: 'cilindro' | 'servicio' | 'insumo' | 'flete' = 'cilindro';
-                if (categoria) {
-                    if (categoria.esIndustrial || categoria.esMedicinal) {
-                        tipo = 'cilindro';
-                    } else {
-                        tipo = 'servicio';
-                    }
-                }
+                const procesados = entregaEnLocal 
+                    ? contadoresSubcategoriasVenta[String(detalle.subcategoriaCatalogoId?._id)] || 0
+                    : contadoresSubcategoriasCarga[String(detalle.subcategoriaCatalogoId?._id)] || 0;
 
-                const restantes = detalle.cantidad - (detalle.itemCatalogoIds?.length || 0);
+                const restantes = detalle.multiplicador - procesados;
                 
                 detalles.push({
                     tipo,
-                    descripcion: detalle.glosa || subcategoria?.nombre || '',
+                    descripcion: detalle.glosa || detalle.subcategoria?.nombre || '',
                     cantidad: detalle.cantidad,
                     restantes,
-                    multiplicador: 1,
-                    unidad: subcategoria?.unidad || 'unidad',
-                    elemento: categoria?.elemento,
-                    esIndustrial: categoria?.esIndustrial,
-                    esMedicinal: categoria?.esMedicinal,
-                    sinSifon: subcategoria?.sinSifon
+                    multiplicador: detalle.multiplicador,
+                    unidad: detalle.subcategoria.unidad || 'unidad',
+                    elemento: detalle.subcategoria.categoria?.elemento,
+                    esIndustrial: detalle.subcategoria.categoria?.esIndustrial,
+                    esMedicinal: detalle.subcategoria.categoria?.esMedicinal,
+                    sinSifon: detalle.subcategoria?.sinSifon
                 });
 
-                if (tipo === 'cilindro') {
+                if (tipo === TIPO_CATEGORIA_CATALOGO.cilindro) {
                     totalCilindros += detalle.cantidad;
                     if (restantes === 0) itemsCompletados += detalle.cantidad;
                 }
@@ -126,19 +128,11 @@ export async function GET(req: Request) {
 
             const porcentajeCompletado = totalCilindros > 0 ? (itemsCompletados / totalCilindros) * 100 : 0;
 
-            let tipoVenta: 'preparacion' | 'retiroEnLocal' | 'ot' | 'traslado' | 'otros' = 'otros';
-            switch (venta.tipo) {
-                case 1: tipoVenta = 'preparacion'; break;
-                case 2: tipoVenta = 'traslado'; break;
-                case 3: tipoVenta = 'ot'; break;
-                default: tipoVenta = 'otros';
-            }
-
             ventasActuales.push({
                 nombreCliente: venta.clienteId?.nombre || '',
                 rutCliente: venta.clienteId?.rut || '',
                 comentario: venta.comentario,
-                tipo: tipoVenta,
+                tipo: venta.tipo,
                 totalCilindros,
                 detalles,
                 porcentajeCompletado
@@ -155,8 +149,6 @@ export async function GET(req: Request) {
         };
 
         return NextResponse.json({ 
-            ok: true, 
-            cilindros,
             gestorCarga 
         });
 

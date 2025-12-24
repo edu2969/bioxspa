@@ -40,7 +40,6 @@ export default function ConductorPanel() {
         <ChecklistProvider tipo="vehiculo">
             <SoundPlayerProvider>
                 <VehicleView vehicle={vehicleViewMap(ruta)} />
-                <GestorDeCargaView vehiculoId={ruta?.vehiculos[0]?._id}></GestorDeCargaView>
             </SoundPlayerProvider>
         </ChecklistProvider>
         <Nav/>

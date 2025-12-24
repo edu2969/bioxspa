@@ -46,7 +46,7 @@ async function verificarAutorizacion() {
 export async function GET(request: Request, { params }: { params: { codigo: string } }) {
     await connectMongoDB();
 
-    const { codigo } = params;
+    const { codigo } = await params;
 
     if (!mongoose.models.SubcategoriaCatalogo) {
         mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);

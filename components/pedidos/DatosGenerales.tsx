@@ -61,14 +61,14 @@ export default function DatosGenerales({
                 label="Seleccione usuario*"
                 getLabel={u => u.name}
                 getValue={u => u._id || ''}
-                register={register("usuarioId")}
+                register={register("usuarioId", { required: true })}
                 isLoading={loadingUsuarios} />}
 
         <Selector options={sucursales || []}
             label="Sucursal"
             getLabel={s => s.nombre}
             getValue={s => s._id}
-            register={register("sucursalId")}
+            register={register("sucursalId", { required: true })}
             onChange={val => {
                 setValue("sucursalId", val);
                 localStorage.setItem("sucursalId", val);
@@ -79,10 +79,10 @@ export default function DatosGenerales({
             <label htmlFor="tipo" className="block text-sm font-medium text-gray-700">Tipo</label>
             <select
                 id="tipo"
-                {...register('tipo', { required: true, valueAsNumber: true })}
+                {...register('tipo', { valueAsNumber: true, required: true })}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
             >
-                <option value={0}>Seleccione tipo</option>
+                <option>Seleccione tipo</option>
                 <option value={1}>Venta</option>
                 <option value={2}>Traslado</option>
                 <option value={3}>Órden de Trabajo</option>

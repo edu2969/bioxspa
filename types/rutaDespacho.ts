@@ -4,9 +4,11 @@ import { IVehiculo } from "./vehiculo";
 import { IUser } from "./user";
 import { IDependencia } from "./dependencia";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { IDireccion } from "./direccion";
+import { IItemCatalogo } from "./itemCatalogo";
 
 export interface IRuta {
-  direccionDestinoId?: Types.ObjectId;
+  direccionDestinoId?: IDireccion;
   fechaArribo?: Date | null;
 }
 
@@ -23,15 +25,15 @@ export interface ICargaHistorial {
 
 export interface IRutaDespacho {
   _id: Types.ObjectId;
-  vehiculoId?: Types.ObjectId | IVehiculo;
-  choferId: Types.ObjectId | IUser;
+  vehiculoId?: IVehiculo;
+  choferId: IUser;
   horaInicio?: Date;
   horaDestino?: Date;
-  dependenciaId?: Types.ObjectId | IDependencia;
+  dependenciaId?: IDependencia;
   ruta: Array<IRuta>;
-  estado: keyof typeof TIPO_ESTADO_RUTA_DESPACHO;
+  estado: number;
   historialEstado: Array<IEstadoHistorial>;
-  ventaIds: Types.ObjectId[] | IVenta[];
-  cargaItemIds: Types.ObjectId[] | ICargaHistorial[];
+  ventaIds: IVenta[];
+  cargaItemIds: IItemCatalogo[];
   historialCarga: Array<ICargaHistorial>;
 }

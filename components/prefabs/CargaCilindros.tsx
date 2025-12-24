@@ -60,18 +60,16 @@ export default function CargaCilindros({
     const memoizedCalculateTubePosition = useMemo(() => calculateTubePosition, []);
 
     const { data: carga } = useQuery<ICilindro[]>({
-        queryKey: ['carga-cilindros', marca, modelo],
+        queryKey: ['carga-cilindros'],
         queryFn: async () => {
+            console.log("Vehiculo ID:", vehiculoId);
+            if(vehiculoId == undefined) return [];
             const response = await fetch(`/api/flota/cargaCilindros?vehiculoId=${vehiculoId}`);
             const data = await response.json();
             console.log("DATA", data);
             return data.cilindros ?? [];
         },
-        throwOnError(error, query) {
-            console.error("Error fetching carga cilindros:", error, query);
-            return true;
-        },
-        enabled: !!vehiculoId
+        enabled: !!vehiculoId,
     });
 
     return <>

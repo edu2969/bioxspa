@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { TIPO_CARGO } from "@/app/utils/constants";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
@@ -17,6 +17,10 @@ import ItemCatalogo from "@/models/itemCatalogo";
 import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
 import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN } from "@/app/utils/constants";
+import { ICargo } from "@/types/cargo";
+import { IVenta } from "@/types/venta";
+import { IRutaDespacho } from "@/types/rutaDespacho";
+import { ICargaDespachoView } from "@/types/types";
 
 export async function GET() {
     try {
@@ -69,14 +73,30 @@ export async function GET() {
                     TIPO_CARGO.responsable
                 ]
             }
-        }).populate("dependenciaId").lean();
+        }).populate([{
+            path: "dependenciaId",
+            model: "Dependencia",
+            select: "_id direccionId",
+        }, {
+            path: "sucursalId",
+            model: "Sucursal",
+            select: "_id direccionId",
+        }]).lean<ICargo>();
 
-        const sucursalId = cargo.sucursalId ?? cargo.dependenciaId.sucursalId;
-        const dependenciaId = cargo.dependenciaId._id;
-        console.log(`Fetching choferes for dependenciaId: ${dependenciaId}`);
-        const choferes = await Cargo.find({ dependenciaId, tipo: TIPO_CARGO.conductor }).populate("userId").lean();
+        if(!cargo) {
+            console.warn(`No cargo found for userId: ${userId}`);
+            return NextResponse.json({ ok: false, error: "User has no assigned cargo" }, { status: 400 });
+        }
 
-        const choferIds = choferes?.map((chofer) => chofer.userId._id) || [];
+        let qry = cargo.dependenciaId ? {
+            dependenciaId: cargo.dependenciaId
+        } : {
+            sucursalId: cargo.sucursalId
+        };        
+
+        const choferes = await Cargo.find({...qry, tipo: TIPO_CARGO.conductor }).populate("userId").lean<ICargo[]>();
+
+        const choferIds = choferes?.map(c => c.userId._id) || [];
         console.log("Fetching rutasDespacho for choferes...");
         
         // Create a query that handles both cases
@@ -88,7 +108,7 @@ export async function GET() {
                 // For routes in descarga state, check that direccionId matches dependenciaId
                 { 
                     estado: TIPO_ESTADO_RUTA_DESPACHO.descarga,
-                    direccionId: dependenciaId 
+                    direccionId: cargo.dependenciaId ? cargo.dependenciaId.direccionId : cargo.sucursalId?.direccionId 
                 },
                 { estado: TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado }
             ]
@@ -119,7 +139,7 @@ export async function GET() {
             .populate({
                 path: "vehiculoId",
                 model: "Vehiculo",
-                select: "marca vehiculo patente"
+                select: "marca modelo patente"
             })
             .populate({
                 path: "ventaIds",
@@ -128,7 +148,7 @@ export async function GET() {
                 populate: {
                     path: "clienteId",
                     model: "Cliente",
-                    select: "_id nombre telefono direccionesDespacho",
+                    select: "_id nombre rut telefono direccionesDespacho",
                     populate: {
                         path: "direccionesDespacho.direccionId",
                         model: "Direccion",
@@ -136,14 +156,14 @@ export async function GET() {
                     }
                 }
             })           
-            .lean();
+            .lean<IRutaDespacho[]>();
 
         console.log("Fetching detalleVentas...");
-        const dependencia = await Dependencia.findOne({ _id: dependenciaId }).lean();
+        const dependencia = await Dependencia.findOne({ _id: cargo.dependenciaId }).lean();
 
         console.log("DEPENDENCIA", dependencia);
         if (!dependencia) {
-            console.warn(`No dependencia found for dependenciaId: ${dependenciaId}`);
+            console.warn(`No dependencia found for dependenciaId: ${cargo.dependenciaId}`);
             return NextResponse.json({ ok: false, error: "No dependencia found for this dependencia" }, { status: 404 });
         }
 
@@ -151,12 +171,13 @@ export async function GET() {
         const ventasDespachoEnLocal = await Venta.find({
             estado: { $in: [TIPO_ESTADO_VENTA.por_asignar, TIPO_ESTADO_VENTA.preparacion] },
             direccionDespachoId: null,
-            sucursalId
-        }).populate("clienteId").lean();
+            sucursalId: cargo.sucursalId?._id
+        }).populate("clienteId").lean<IVenta[]>();
         console.log("Ventas en local", ventasDespachoEnLocal);
 
         // Buscar los detalles de venta que correspondan a esas ventas
-        const ventaIds = rutasDespacho.flatMap(ruta => ruta.ventaIds.map(venta => venta._id)).concat(ventasDespachoEnLocal.map(venta => venta._id));
+        const ventaIds = rutasDespacho.flatMap(ruta => ruta.ventaIds.map(venta => venta._id))
+            .concat(ventasDespachoEnLocal.map(venta => venta._id));
         const detalleVentas = await DetalleVenta.find({ ventaId: { $in: ventaIds } })
             .populate({
                 path: "subcategoriaCatalogoId",
@@ -173,33 +194,36 @@ export async function GET() {
         console.log("Ids de detalles", detalleVentas.map(dv => dv._id));
 
         console.log("Mapping cargamentos...");
-        const cargamentos = rutasDespacho.map((ruta) => {
-            let fechaVentaMasReciente = null;
+        const cargamentos: ICargaDespachoView[] = rutasDespacho.map((ruta) => {
+            let fechaVentaMasReciente: Date | null = null;
             return {
-                rutaId: ruta._id,
+                rutaId: String(ruta._id),
                 ventas: ruta.ventaIds.map((venta) => {
                     const detallesFiltrados = detalleVentas.filter(
                         (detalle) => detalle.ventaId.toString() === venta._id.toString()
                     );     
                     return {
-                        ventaId: venta._id,
+                        ventaId: String(venta._id),
                         tipo: venta.tipo,
                         fecha: venta.createdAt,
+                        entregasEnLocal: (venta.entregasEnLocal || []).map(entrega => ({
+                            nombreRecibe: entrega.nombreRecibe || null,
+                            rutRecibe: entrega.rutRecibe || null,
+                            createdAt: entrega.createdAt || new Date()
+                        })),
                         detalles: detallesFiltrados.map((detalle) => {
-                            let newDetalle = {};
-                            const subcategoria = detalle.subcategoriaCatalogoId;                          
-
-                            newDetalle = {
-                                multiplicador: detalle.cantidad,
+                            const subcategoria = detalle.subcategoriaCatalogoId;
+                            
+                            if (!fechaVentaMasReciente || venta.createdAt > fechaVentaMasReciente) {
+                                fechaVentaMasReciente = venta.createdAt;
+                            }
+                            
+                            return {
+                                multiplicador: Number(detalle.cantidad),
                                 restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length ?? 0),
                                 itemCatalogoIds: detalle.itemCatalogoIds || [],
                                 subcategoriaCatalogoId: subcategoria, 
-                            };                    
-
-                            if (!fechaVentaMasReciente || new Date(venta.createdAt) > new Date(fechaVentaMasReciente)) {
-                                fechaVentaMasReciente = venta.createdAt;
-                            }
-                            return newDetalle;
+                            };
                         }),
                         comentario: venta.comentario || null,
                         cliente: {
@@ -208,8 +232,7 @@ export async function GET() {
                             direccion: venta.clienteId?.direccionId || null,
                             telefono: venta.clienteId?.telefono || null,
                             direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
-                                _id: dir._id,
-                                nombre: dir.nombre,
+                                nombre: dir.direccionId?.nombre || null,
                                 direccionId: dir.direccionId?._id || null,
                                 latitud: dir.direccionId?.latitud || null,
                                 longitud: dir.direccionId?.longitud || null
@@ -225,10 +248,10 @@ export async function GET() {
                     cantidad: item.subcategoriaCatalogoId?.cantidad || "??",
                     unidad: item.subcategoriaCatalogoId?.unidad || null,
                     restantes: null, // Se calcula más arriba
-                    itemCatalogoIds: [item._id],
+                    itemCatalogoIds: [String(item._id)],
                     subcategoriaCatalogoId: item.subcategoriaCatalogoId                    
                 })) || [],
-                estado: ruta.estado,
+                estado: ruta.estado
             };
         });
 
@@ -240,17 +263,17 @@ export async function GET() {
                 rutaId: null,
                 ventas: [
                 {
-                    ventaId: venta._id,
-                    estado: venta.estado,
+                    ventaId: String(venta._id),
+                    tipo: venta.tipo,
                     fecha: venta.createdAt,
                     detalles: detalleVentas
                     .filter(detalle => detalle.ventaId.toString() === venta._id.toString())
                     .map((detalle) => {
                         const subcategoria = detalle.subcategoriaCatalogoId;
                         return {
-                            multiplicador: detalle.cantidad,
-                            restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length || 0), 
-                            subcategoriaCatalogoId: subcategoria?._id || null,
+                            multiplicador: Number(detalle.cantidad),
+                            restantes: Number(detalle.cantidad) - (detalle.itemCatalogoIds?.length || 0), 
+                            subcategoriaCatalogoId: subcategoria,
                             itemCatalogoIds: detalle.itemCatalogoIds || [],
                         };
                     }),
@@ -261,21 +284,26 @@ export async function GET() {
                     direccion: venta.clienteId?.direccionId || null,
                     telefono: venta.clienteId?.telefono || null,
                     direccionesDespacho: venta.clienteId?.direccionesDespacho?.map((dir) => ({
-                        _id: dir._id,
-                        nombre: dir.nombre,
-                        direccionId: dir.direccionId?._id || null,
+                        nombre: dir.direccionId?.nombre || null,
+                        direccionId: String(dir.direccionId?._id) || null,
                         latitud: dir.direccionId?.latitud || null,
                         longitud: dir.direccionId?.longitud || null
                     })) || []
-                    }
+                    },
+                    entregasEnLocal: (venta.entregasEnLocal || []).map(entrega => ({
+                        nombreRecibe: entrega.nombreRecibe || null,
+                        rutRecibe: entrega.rutRecibe || null,
+                        createdAt: entrega.createdAt || new Date()
+                    }))
                 }
                 ],
                 nombreChofer: null,
                 patenteVehiculo: null,
                 fechaVentaMasReciente,
+                items: [],
                 estado: null,
                 retiroEnLocal: true,
-            };
+            }
             })
         );
 
@@ -287,7 +315,7 @@ export async function GET() {
     }
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     try {
         await connectMongoDB();
         const { rutaId } = await request.json();
@@ -303,7 +331,7 @@ export async function POST(request) {
         }
 
         // Obtener todas las ventas de esta ruta
-        const ventaIds = ruta.ventaIds.map(venta => venta._id);
+        const ventaIds = (ruta.ventaIds as IVenta[]).map(venta => venta._id);
 
         // Buscar todos los detalles de estas ventas
         const detallesVentas = await DetalleVenta.find({ 
@@ -313,9 +341,9 @@ export async function POST(request) {
         // Paso 2: Ajustar los "restantes" de cada detalle según la carga actual
         // Basado en la lógica de consolidadorDeCargamento de JefaturaDespacho.jsx
         // Primero, contar cuántos items hay por subcategoría en la carga actual
-        const contadoresPorSubcat = {};
+        const contadoresPorSubcat : { [key: string]: number } = {};
         if (Array.isArray(ruta.cargaItemIds)) {
-            ruta.cargaItemIds.forEach(item => {
+            (ruta as IRutaDespacho).cargaItemIds.forEach(item => {
             // item puede ser ObjectId o documento, obtener subcategoriaCatalogoId
             let subcatId;
             if (item.subcategoriaCatalogoId) {
@@ -323,10 +351,10 @@ export async function POST(request) {
                 subcatId = item.subcategoriaCatalogoId._id?.toString?.() || item.subcategoriaCatalogoId?.toString?.();
             } else if (item.subcategoriaCatalogoId) {
                 // Si es ObjectId
-                subcatId = item.subcategoriaCatalogoId.toString();
+                subcatId = String(item.subcategoriaCatalogoId);
             }
             if (!subcatId) return;
-            contadoresPorSubcat[subcatId] = (contadoresPorSubcat[subcatId] || 0) + 1;
+                contadoresPorSubcat[subcatId] = (contadoresPorSubcat[subcatId] || 0) + 1;
             });
         }
 
@@ -335,7 +363,7 @@ export async function POST(request) {
         // Si todos los detalles quedan con restantes === 0, la carga está completa
 
         // Calcular la cantidad de items por subcategoría en la carga actual
-        const cantidadPorSubcat = {};
+        const cantidadPorSubcat: { [key: string]: number } = {};
         if (Array.isArray(ruta.cargaItemIds)) {
             // Los items pueden ser ObjectId, así que necesitamos poblarlos para obtener subcategoriaCatalogoId
             // Usamos el modelo ItemCatalogo para obtener la subcategoría de cada item
@@ -343,7 +371,7 @@ export async function POST(request) {
             itemsCargados.forEach(item => {
             const subcatId = item.subcategoriaCatalogoId?.toString();
             if (!subcatId) return;
-            cantidadPorSubcat[subcatId] = (cantidadPorSubcat[subcatId] || 0) + 1;
+                cantidadPorSubcat[subcatId] = (cantidadPorSubcat[subcatId] || 0) + 1;
             });
         }
 
@@ -366,7 +394,7 @@ export async function POST(request) {
         ruta.historialCarga.push({
             esCarga: true,
             fecha: new Date(),
-            itemMovidoIds: ruta.cargaItemIds
+            itemMovidoIds: ruta.cargaItemIds || []
         });
 
         // Determinar el tipo de orden de las ventas asociadas
@@ -401,7 +429,7 @@ export async function POST(request) {
         console.error("Error updating item states:", error);
         return NextResponse.json({ 
             error: "Error updating item states.",
-            details: error.message 
+            details: error
         }, { status: 500 });
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { GoCopilot } from 'react-icons/go';
 import { RiZzzFill } from 'react-icons/ri';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
@@ -14,19 +14,19 @@ import { INuevaVentaSubmit } from '../pedidos/types';
 
 export default function Conductores({
     control,
-    selectedPedido,
+    selectedVentaId,
     setSelectedChofer,
     setShowConfirmModal,
-    setSelectedVenta,
+    setSelectedVentaId,
     setShowDetalleOrdenModal,
     setComentario,
     setShowCommentModal
 } : {
     control: Control<INuevaVentaSubmit>;
-    selectedPedido: string | null;
+    selectedVentaId: string | null;
     setSelectedChofer: (choferId: string) => void;
     setShowConfirmModal: (show: boolean) => void;
-    setSelectedVenta: (ventaId: string) => void;
+    setSelectedVentaId: (ventaId: string) => void;
     setShowDetalleOrdenModal: (show: boolean) => void;
     setComentario: (comentario: string) => void;
     setShowCommentModal: (show: boolean) => void;
@@ -46,6 +46,10 @@ export default function Conductores({
         }
     });
 
+    useEffect(() => {
+        console.log("Selected Venta ID changed:", selectedVentaId);
+    }, [selectedVentaId]);
+
     return (<div className="relative w-1/2 border rounded-lg p-4 bg-rose-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto pt-14">
             <div className="absolute -top-0 -left-0 bg-neutral-200 text-gray-700 text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                 CONDUCTORES
@@ -62,11 +66,10 @@ export default function Conductores({
                         if (!chofer.checklist) { 
                             toast.error("El chofer no tiene checklist completo, no se puede asignar."); 
                             return; 
-                        } 
-                        if (selectedPedido) { 
-                            setSelectedChofer(chofer._id); 
-                            setShowConfirmModal(true); 
-                        } }}
+                        }                        
+                        setSelectedChofer(chofer._id);
+                        setShowConfirmModal(true);
+                    }}
                     onTouchMove={(e) => { if (chofer.checklist) e.currentTarget.style.boxShadow = "0 8px 16px rgba(0, 0, 0, 0.2)"; }}
                     onTouchEnd={(e) => e.currentTarget.style.boxShadow = "none"}
                 >
@@ -81,7 +84,7 @@ export default function Conductores({
                     )}
                     {chofer.pedidos.length ? chofer.pedidos.map((pedido, indexPedido) => (
                         <div key={`pedido_chofer_${chofer._id}_${indexPedido}`} className="cursor-pointer bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2"
-                            onDragStart={() => { setSelectedChofer(chofer._id); setSelectedVenta(pedido.tipo === TIPO_ORDEN.traslado ? pedido._id : pedido.items[0].ventaId); }}
+                            onDragStart={() => { setSelectedChofer(chofer._id); setSelectedVentaId(pedido._id); }}
                             onClick={() => { setShowDetalleOrdenModal(true); }}
                             draggable="true">
                             <div className="flex w-full">
@@ -93,7 +96,7 @@ export default function Conductores({
                                     <div className="relative">
                                         <div className="mr-2 cursor-pointer" onClick={(e) => { 
                                             e.stopPropagation(); 
-                                            setSelectedVenta(pedido.items[0].ventaId); 
+                                            setSelectedVentaId(pedido._id); 
                                             setComentario(pedido.comentario); 
                                             setShowCommentModal(true); 
                                         }}>

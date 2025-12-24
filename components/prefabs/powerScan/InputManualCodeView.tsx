@@ -13,33 +13,7 @@ export default function InputManualCodeView(props: {
 
     const { onCodeSubmit, scanMode, setScanMode, setSelectedItem } = props;
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
-    const hiddenInputRef = useRef<HTMLInputElement>(null);
-
-    const gestionarItem = useCallback(async (codigo: string) => {
-        // Lógica para gestionar el item escaneado
-        try {
-            const response = await fetch(`/api/cilindros/gestionar/${codigo}`);
-            const data = await response.json();
-
-            if (data.ok && data.item) {
-                setSelectedItem(data.item);
-                toast.success(`Cilindro encontrado: ${codigo}`);
-                setInputTemporalVisible(false);
-                setScanMode(false);
-
-                // Cargar datos completos y mostrar modal
-                onCodeSubmit(codigo);
-            } else {
-                toast.error(data.error || 'Cilindro no encontrado');
-                setInputTemporalVisible(false);
-                setScanMode(false);
-            }
-        } catch (error) {
-            console.error('Error al buscar cilindro:', error);
-            toast.error('Error al buscar el cilindro');
-            setScanMode(false);
-        }
-    }, [setSelectedItem, setScanMode, onCodeSubmit]);
+    const hiddenInputRef = useRef<HTMLInputElement>(null);    
 
     useEffect(() => {
         const handleTextInput = (e: Event) => {
@@ -54,7 +28,6 @@ export default function InputManualCodeView(props: {
                     }, 0);
                     return;
                 }
-                gestionarItem(codigo);
             }
         }
 
@@ -69,7 +42,7 @@ export default function InputManualCodeView(props: {
                 inputElement.removeEventListener('textInput', handleTextInput as EventListener);
             }
         };
-    }, [scanMode, gestionarItem, hiddenInputRef]);    
+    }, [scanMode, hiddenInputRef]);    
 
     return (<div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 px-4">
         {!inputTemporalVisible ? <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-lg p-8 max-w-xs">
@@ -89,7 +62,7 @@ export default function InputManualCodeView(props: {
                     if (e.key === 'Enter') {
                         console.log("Código temporal ingresado:", e.currentTarget.value);
                         setInputTemporalVisible(false);
-                        gestionarItem(e.currentTarget.value);
+                        onCodeSubmit(e.currentTarget.value);
                         e.currentTarget.value = '';
                     }
                     if (e.key === 'Escape') {

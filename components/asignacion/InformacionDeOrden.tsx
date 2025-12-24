@@ -3,17 +3,18 @@
 import React, { useState } from 'react';
 import OperacionesTab from './informacion/tabs/DetalleVentaTab';
 import HistorialTab from './informacion/tabs/HistorialTab';
+import MensajeriaTab from './informacion/tabs/MensajeriaTab';
 
-export default function InformacionDeOrden({ 
-    rutaDespachoId,
+export default function InformacionDeOrden({
+    ventaId,
     onClose, 
     loading = false 
 } : {
-    rutaDespachoId: string | null;
+    ventaId: string | null;
     onClose: () => void;
     loading?: boolean;
 }) {
-    const [activeTab, setActiveTab] = useState('historial');
+    const [activeTab, setActiveTab] = useState('operaciones');
     const tabs = [
         { id: 'operaciones', label: 'Operaciones' },
         { id: 'historial', label: 'Historial' },
@@ -23,13 +24,13 @@ export default function InformacionDeOrden({
     const renderTabContent = () => {        
         switch (activeTab) {
             case 'operaciones':
-                return <OperacionesTab rutaDespachoId={rutaDespachoId} />;
+                return <OperacionesTab ventaId={ventaId} />;
             case 'historial':
-                return <HistorialTab rutaDespachoId={rutaDespachoId} />;
+                return <HistorialTab ventaId={ventaId} />;
             case 'mensajeria':
-                return <>Hola</>;
+                return <MensajeriaTab ventaId={ventaId} />;
             default:
-                return <HistorialTab rutaDespachoId={rutaDespachoId} />;
+                return <OperacionesTab ventaId={ventaId} />;
         }
     };
 
