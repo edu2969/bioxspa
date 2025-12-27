@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { LiaTimesSolid } from "react-icons/lia";
-import { socket } from "@/lib/socket-client";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
@@ -166,43 +165,6 @@ export default function GestionPedidos({ session }) {
         }
         fetchPedidos(sucursalId);
     }, [fetchPedidos, setValue, fetchSucursales]);
-
-    useEffect(() => {
-        socket.on("update-pedidos", fetchPedidos);
-        return () => {
-            socket.off("update-pedidos", fetchPedidos);
-        };
-    }, [fetchPedidos]);
-
-    // Efecto para unirse a la sala al cargar el componente
-    useEffect(() => {
-        // Verifica si hay sesión y el socket está conectado
-        if (session?.user?.id && socket.connected) {
-            console.log("Re-uniendo a room-pedidos después de posible recarga");
-            socket.emit("join-room", {
-                room: "room-pedidos",
-                userId: session.user.id
-            });
-        }
-
-        // Evento para manejar reconexiones del socket
-        const handleReconnect = () => {
-            if (session?.user?.id) {
-                console.log("Socket reconectado, uniendo a sala nuevamente");
-                socket.emit("join-room", {
-                    room: "room-pedidos",
-                    userId: session.user.id
-                });
-            }
-        };
-
-        // Escucha el evento de reconexión
-        socket.on("connect", handleReconnect);
-
-        return () => {
-            socket.off("connect", handleReconnect);
-        };
-    }, [session]);
 
     const riesgo = (credito) => {
         if (!credito) return { porcentaje: 0, color: "green" };

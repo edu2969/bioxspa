@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,22 +13,23 @@ import { useQuery } from "@tanstack/react-query";
 import GestorDeCargaView from "./prefabs/GestorDeCargaView";
 import PowerScanView from "./prefabs/powerScan/PowerScanView";
 import Nav from "./Nav";
-import { SessionProvider, useSession } from "next-auth/react";
+import { SessionProvider } from "next-auth/react";
 import { ChecklistProvider } from "./context/ChecklistContext";
 import { ICargaDespachoView } from "@/types/types";
-import { IItemCatalogoPowerScanView } from "./prefabs/types";
+import SoundPlayerProvider from "./context/SoundPlayerContext";
 
 export default function JefaturaDespacho() {
   const [animating, setAnimating] = useState(false);
   const [scanMode, setScanMode] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<IItemCatalogoPowerScanView | null>(null);
+  const [rutaId, setRutaId] = useState<string | null>(null);
+  const [ventaId, setVentaId] = useState<string | null>(null);
 
   const { data: cargamentos, isLoading } = useQuery<ICargaDespachoView[]>({
     queryKey: ['cargamentos-despacho'],
     queryFn: async () => {
       const response = await fetch("/api/pedidos/despacho");
       const data = await response.json();
-      console.log("Cargamentos despacho:", data.cargamentos);
+      console.log("Cargamentos de despacho obtenidos:", data.cargamentos);
       return data.cargamentos;
     }
   });
@@ -51,24 +52,40 @@ export default function JefaturaDespacho() {
     }, 1000); // Cambia el tiempo de la animación aquí
   }
 
+  useEffect(() => {
+    if(cargamentos && cargamentos.length > 0) {
+      const firstCarga = cargamentos[0];
+      
+      if(!firstCarga.rutaId) {
+        setVentaId(firstCarga.ventas[0].ventaId);
+      } else {
+        setRutaId(firstCarga.rutaId);
+      }
+    }
+  }, [cargamentos]);
+
   return (
     <SessionProvider>
       <ChecklistProvider tipo="personal">
         <div className="w-full h-screen text-center" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
-          {scanMode && <PowerScanView setScanMode={setScanMode} setSelectedItem={setSelectedItem} scanMode={scanMode} />}
+          {scanMode && 
+          <SoundPlayerProvider>
+            <PowerScanView setScanMode={setScanMode}  
+              scanMode={scanMode}
+              rutaId={rutaId} ventaId={ventaId}/>
+          </SoundPlayerProvider>}
 
           <div className="w-full md:w-1/2 mx-auto">
-            <GestorDeCargaView cargamentos={cargamentos}
+            {!isLoading && <GestorDeCargaView cargamentos={cargamentos}
               setScanMode={setScanMode}
-              handleShowNext={handleShowNext}
               handleRemoveFirst={handleRemoveFirst}
-            />
+            />}
             {isLoading && (
               <div className="absolute w-full h-screen flex items-center justify-center">
                 <Loader texto="Cargando pedidos" />
               </div>
             )}
-            {cargamentos?.length === 0 && !isLoading && (
+            {!isLoading && cargamentos?.length === 0 && (
               <div className="absolute w-full h-screen flex items-center justify-center">
                 <div className="text-center">
                   <FaClipboardCheck className="text-8xl mx-auto mb-4 text-green-500" />
@@ -88,10 +105,6 @@ export default function JefaturaDespacho() {
               PASAR SIGUIENTE &gt;&gt;
             </button>
           </div>}
-
-
-
-
 
           <Toaster />
         </div>

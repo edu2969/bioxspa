@@ -10,7 +10,7 @@ import EnTransito from './EnTransito';
 import InformacionDeOrden from './InformacionDeOrden';
 import { useForm, useWatch } from 'react-hook-form';
 import toast, { Toaster } from 'react-hot-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { INuevaVentaSubmit } from '../pedidos/types';
 import Nav from '../Nav';
 import { SessionProvider } from 'next-auth/react';
@@ -60,6 +60,8 @@ export default function Asignacion() {
         control,
         name: 'sucursalId'
     });
+
+    const qryClient = useQueryClient();
 
     return (
         <SessionProvider>
@@ -170,6 +172,10 @@ export default function Asignacion() {
                                     throw new Error(errorData.error || "Error al asignar el pedido");
                                 }
                                 toast.success("Pedido asignado con éxito");
+                                await Promise.all([
+                                    qryClient.invalidateQueries({ queryKey: ['pedidos-por-asignar', sucursalId] }),
+                                    qryClient.invalidateQueries({ queryKey: ['conductores', sucursalId] })
+                                ]);                                
                                 setIsSaving(true);
                             } catch (error) {
                                 console.error("Error al asignar el pedido:", error);
@@ -220,7 +226,11 @@ export default function Asignacion() {
                                     throw new Error(errorData.error || "Error al deshacer la asignación del pedido");
                                 }
                                 toast.success("Pedido listo para asignar");
-                                setSelectedChofer(null);
+                                await Promise.all([
+                                    qryClient.invalidateQueries({ queryKey: ['conductores', sucursalId] }),
+                                    qryClient.invalidateQueries({ queryKey: ['pedidos-por-asignar', sucursalId] })
+                                ]);                                
+                                setSelectedChofer(null);                                
                             } catch (error) {
                                 if (error instanceof Error) {
                                     toast.error(error.message || "Error al deshacer la asignación del pedido");

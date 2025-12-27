@@ -220,7 +220,7 @@ export async function GET() {
                             
                             return {
                                 multiplicador: Number(detalle.cantidad),
-                                restantes: detalle.cantidad - (detalle.itemCatalogoIds?.length ?? 0),
+                                restantes: detalle.cantidad - ruta.cargaItemIds.filter(item => item.subcategoriaCatalogoId._id?.toString() === subcategoria._id.toString())?.length,
                                 itemCatalogoIds: detalle.itemCatalogoIds || [],
                                 subcategoriaCatalogoId: subcategoria, 
                             };
@@ -243,13 +243,9 @@ export async function GET() {
                 nombreChofer: ruta.choferId.name,
                 patenteVehiculo: ruta.vehiculoId?.patente || null,
                 fechaVentaMasReciente,
-                items: ruta.cargaItemIds?.map((item) => ({
-                    multiplicador: 1,
-                    cantidad: item.subcategoriaCatalogoId?.cantidad || "??",
-                    unidad: item.subcategoriaCatalogoId?.unidad || null,
-                    restantes: null, // Se calcula más arriba
-                    itemCatalogoIds: [String(item._id)],
-                    subcategoriaCatalogoId: item.subcategoriaCatalogoId                    
+                cargaItemIds: ruta.cargaItemIds?.map((item) => ({
+                    _id: String(item._id),
+                    subcategoriaCatalogoId: item.subcategoriaCatalogoId._id ?? "",                   
                 })) || [],
                 estado: ruta.estado
             };
@@ -300,7 +296,7 @@ export async function GET() {
                 nombreChofer: null,
                 patenteVehiculo: null,
                 fechaVentaMasReciente,
-                items: [],
+                cargaItemIds: [],
                 estado: null,
                 retiroEnLocal: true,
             }
@@ -344,16 +340,16 @@ export async function POST(request: NextRequest) {
         const contadoresPorSubcat : { [key: string]: number } = {};
         if (Array.isArray(ruta.cargaItemIds)) {
             (ruta as IRutaDespacho).cargaItemIds.forEach(item => {
-            // item puede ser ObjectId o documento, obtener subcategoriaCatalogoId
-            let subcatId;
-            if (item.subcategoriaCatalogoId) {
-                // Si es documento
-                subcatId = item.subcategoriaCatalogoId._id?.toString?.() || item.subcategoriaCatalogoId?.toString?.();
-            } else if (item.subcategoriaCatalogoId) {
-                // Si es ObjectId
-                subcatId = String(item.subcategoriaCatalogoId);
-            }
-            if (!subcatId) return;
+                // item puede ser ObjectId o documento, obtener subcategoriaCatalogoId
+                let subcatId;
+                if (item.subcategoriaCatalogoId) {
+                    // Si es documento
+                    subcatId = item.subcategoriaCatalogoId._id?.toString?.() || item.subcategoriaCatalogoId?.toString?.();
+                } else if (item.subcategoriaCatalogoId) {
+                    // Si es ObjectId
+                    subcatId = String(item.subcategoriaCatalogoId);
+                }
+                if (!subcatId) return;
                 contadoresPorSubcat[subcatId] = (contadoresPorSubcat[subcatId] || 0) + 1;
             });
         }

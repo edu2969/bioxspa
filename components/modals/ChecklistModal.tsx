@@ -8,7 +8,7 @@ import { IoIosArrowBack } from "react-icons/io";
 import type { IChecklistAnswer } from "../prefabs/types";
 import { useSession } from "next-auth/react";
 import { useForm, useWatch } from "react-hook-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IVehiculo } from "@/types/vehiculo";
 
 const itemEmployeeLabels: { [key: string]: string } = {
@@ -132,6 +132,8 @@ export default function ChecklistModal({ tipo, onFinish }: {
         enabled: tipo === 'vehiculo',
     });
 
+    const queryClient = useQueryClient();
+
     const mutation = useMutation({
         mutationFn: async () => {
             const formValues = getValues();
@@ -144,15 +146,21 @@ export default function ChecklistModal({ tipo, onFinish }: {
                 items,
             };
             if (tipo === 'vehiculo') {
-                data.vehiculoId = formValues.vehiculoId;
+                data.vehiculoId = vehiculos?.length === 1 ? vehiculos[0]._id : formValues.vehiculoId;
                 data.kilometraje = formValues.kilometros;
-            }            
+            }
             console.log("DATA", data);
             await fetch("/api/users/checklist", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
             });
+        },
+        onSuccess: async () => {            
+            if(tipo === 'vehiculo') {
+                console.log("Invalidando query de conductores...");
+                queryClient.invalidateQueries({ queryKey: ["conductores"] });
+            }
         }
     });
 

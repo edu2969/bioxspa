@@ -14,6 +14,9 @@ import { IItemCatalogoPowerScanView } from "@/components/prefabs/types";
 import { IItemCatalogo } from "@/types/itemCatalogo";
 import { ICliente } from "@/types/cliente";
 import { IDireccion } from "@/types/direccion";
+import RutaDespacho from "@/models/rutaDespacho";
+import Venta from "@/models/venta";
+import DetalleVenta from "@/models/detalleVenta";
 
 const ROLES_PERMITIDOS = [
     TIPO_CARGO.encargado,
@@ -128,4 +131,54 @@ export async function GET(request: Request, { params }: { params: { codigo: stri
         console.error("Error fetching item:", error);
         return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
     }
+}
+
+export async function POST(request: Request, { params }: { 
+    params: { 
+        codigo: string,
+        rutaId?: string,
+        ventaId?: string
+    } }) {
+    await connectMongoDB();
+    const { codigo } = await params;
+    const body = await request.json();
+    const { rutaId, ventaId } = body;
+
+    if(!rutaId && !ventaId) {
+        return NextResponse.json({ ok: false, error: "Missing both rutaId/ventaId parameter" }, { status: 400 });
+    }
+
+    console.log("POST /api/cilindros/gestionar/[...codigo] called with codigo:", codigo, "rutaId:", rutaId, "ventaId:", ventaId);
+
+    const item = await ItemCatalogo.findOne({ codigo: codigo[0] }).lean<IItemCatalogo>();
+
+    if(!item) {
+        return NextResponse.json({ ok: false, error: `Item codigo ${codigo[0]} not found` }, { status: 404 });
+    }
+
+    const ruta = rutaId ? await RutaDespacho.findById(rutaId) : null;
+
+    if(ruta) {
+        if(ruta.cargaItemIds.includes(item._id!)) {
+            return NextResponse.json({ ok: false, item, error: `El cilindro con código ${codigo[0]} ya ha sido agregado a la ruta de despacho.` }, { status: 400 });
+        }
+    }
+
+
+    const ventas = await Venta.find(rutaId ? { _id: { $in: ruta!.ventaIds }} : { _id: ventaId });
+    const detalles = await DetalleVenta.countDocuments({ 
+        ventaId: { $in: ventas.map(v => v._id) },
+        subcategoriaCatalogoId: item.subcategoriaCatalogoId
+    });
+
+    if(detalles === 0) {
+        return NextResponse.json({ ok: false, item, error: `El cilindro con código ${codigo[0]} no pertenece a la ruta de despacho.` }, { status: 400 });
+    }
+    
+    await RutaDespacho.updateMany(
+        { _id: rutaId },
+        { $push: { cargaItemIds: item._id } }
+    );
+
+    return NextResponse.json({ ok: true, item, message: `Cilindro con código ${codigo[0]} agregado a la ruta de despacho.` }, { status: 200 });
 }

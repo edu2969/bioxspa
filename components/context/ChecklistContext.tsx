@@ -22,12 +22,10 @@ export function ChecklistProvider({ tipo, children }: {
             const r = await fetch("/api/users/checklist");
             const data = await r.json();
             return data;
-        },
-        staleTime: 1000 * 60,
+        }
     });
 
     useEffect(() => {
-        console.log("Checklist data:", isLoadingChecklist, checklist);
         if (!isLoadingChecklist 
             && !checklist.passed 
             && checklist.checklists.every((cl: {

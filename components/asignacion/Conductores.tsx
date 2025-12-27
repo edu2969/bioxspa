@@ -46,10 +46,6 @@ export default function Conductores({
         }
     });
 
-    useEffect(() => {
-        console.log("Selected Venta ID changed:", selectedVentaId);
-    }, [selectedVentaId]);
-
     return (<div className="relative w-1/2 border rounded-lg p-4 bg-rose-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto pt-14">
             <div className="absolute -top-0 -left-0 bg-neutral-200 text-gray-700 text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                 CONDUCTORES

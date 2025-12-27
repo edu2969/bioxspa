@@ -5,10 +5,8 @@ const nextConfig = {
   typescript: {
     // Ignorar errores de TypeScript durante build (solo para desarrollo)
     ignoreBuildErrors: false,
-  },
-  experimental: {
-    typedRoutes: false, // Deshabilitar rutas tipadas si causan problemas
-  },
+  },  
+  typedRoutes: false,
   output: 'standalone',
 }
 

@@ -166,13 +166,9 @@ export interface ICargaDespachoView {
     nombreChofer: string | null;
     patenteVehiculo: string | null;
     fechaVentaMasReciente: Date | null;
-    items: Array<{
-        multiplicador: number;
-        cantidad: number | string;
-        unidad: string | null;
-        restantes: number | null;
-        itemCatalogoIds: string[];
-        subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
+    cargaItemIds: Array<{
+        _id: string;
+        subcategoriaCatalogoId: string;
     }>;
     estado: number | null;
     retiroEnLocal?: boolean;
