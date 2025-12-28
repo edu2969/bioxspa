@@ -44,6 +44,7 @@ export default function JefaturaDespacho() {
   };
 
   const handleShowNext = () => {
+    console.log("Mostrar siguiente cargamento");
     if (animating) return; // Evita múltiples clics durante la animación
     setAnimating(true);
     setTimeout(() => {
@@ -85,14 +86,6 @@ export default function JefaturaDespacho() {
                 <Loader texto="Cargando pedidos" />
               </div>
             )}
-            {!isLoading && cargamentos?.length === 0 && (
-              <div className="absolute w-full h-screen flex items-center justify-center">
-                <div className="text-center">
-                  <FaClipboardCheck className="text-8xl mx-auto mb-4 text-green-500" />
-                  <div className="text-2xl font-bold text-gray-500">TODO EN ORDEN {cargamentos.length}</div>
-                </div>
-              </div>
-            )}
           </div>
 
           {cargamentos && cargamentos.length > 1 && <div className="fixed bottom-2 right-4 z-40">
@@ -113,39 +106,3 @@ export default function JefaturaDespacho() {
     </SessionProvider>
   );
 }
-
-
-/*
-
-
-    const handleUpdateItem = async (item) => {
-        setCorrigiendo(true);
-        try {
-            const response = await fetch("/api/items/corregir", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    id: item.itemId,
-                    estado: item.estado || TIPO_ESTADO_ITEM_CATALOGO.no_aplica,
-                    reubicar: moverCilindro,
-                }),
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                toast.error(`Error al corregir: ${data.error || "Error desconocido"}`);
-            } else {
-                setShowModalCilindroErroneo(false);
-                setMoverCilindro(false);
-                item.direccionInvalida = false;
-                moverItem(item, item.codigo);
-                setItemCatalogoEscaneado(null);
-            }
-        } catch {
-            toast.error("Error de red al corregir cilindro");
-        } finally {
-            setEditMode(true);
-            setCorrigiendo(false);
-        }
-    }*/

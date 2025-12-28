@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useState, memo } from 'react';
+import React, { useState, memo } from 'react';
 import Link from 'next/link';
 import { BiTask } from 'react-icons/bi';
-import { FaCartPlus, FaChevronDown, FaChevronUp } from 'react-icons/fa6';
+import { FaCartPlus } from 'react-icons/fa6';
 import { TIPO_ESTADO_VENTA, TIPO_ORDEN } from '@/app/utils/constants';
 import Loader from '../Loader';
 import dayjs from 'dayjs';
@@ -14,6 +14,8 @@ import { useQuery } from '@tanstack/react-query';
 import { IPedidoPorAsignar } from '@/types/types';
 import { Control, useWatch } from 'react-hook-form';
 import { INuevaVentaSubmit } from '../pedidos/types';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 dayjs.locale('es');
 dayjs.extend(relativeTime);
@@ -21,20 +23,13 @@ dayjs.extend(relativeTime);
 export default function PorAsignar({
     control,
     onShowDetalle,
-    selectedVentaId,
-    setSelectedVentaId,
-    setShowReasignacionModal,
 }: {
     control: Control<INuevaVentaSubmit>;
-    onShowDetalle: (pedido: IPedidoPorAsignar) => void;
-    selectedVentaId: string | null;
-    setSelectedVentaId: (ventaId: string | null) => void;
-    setShowReasignacionModal: (show: boolean) => void;
+    onShowDetalle: () => void;
 }) {
     
     const [redirecting, setRedirecting] = useState(false);
-    const [isDragOver, setIsDragOver] = useState(false);
-    const [expandido, setExpandido] = useState<{ [key:number]: boolean }>({});
+    // const [expandido] = useState<{ [key:number]: boolean }>({});  // No usado actualmente
 
     const sucursalId = useWatch({
         control,
@@ -54,66 +49,87 @@ export default function PorAsignar({
         enabled: !!sucursalId
     })
     
-    const handleDrop = useCallback(
-        async (e: React.DragEvent<HTMLDivElement>) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            if (!selectedVentaId) return;
-            setShowReasignacionModal(true);
-        },
-        [selectedVentaId, setShowReasignacionModal]
-    );
-
-    const onSelectPedido = (ventaId: string) => {
-        console.log("Pedido seleccionado para reasignar:", ventaId);
-        setSelectedVentaId(ventaId);
-    }
+    // Zona de drop para reasignación
+    const { setNodeRef: setReasignRef, isOver: isReasignOver } = useDroppable({
+        id: 'reasignacion'
+    });
 
     const PedidoItem = memo(function PedidoItem({ pedido, index }: { pedido: IPedidoPorAsignar, index: number }) {
-        const isExpanded = !!expandido[index];
+        // const isExpanded = !!expandido[index];
         const items = pedido.items || [];
-        const mostrarItems = isExpanded ? items : items.slice(0, 1);
-        const itemsCount = items.length;
+        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal;
+        // const isDraggedItem = draggedPedido?.id === pedido._id;
+
+        // Hook de @dnd-kit para hacer el elemento draggable
+        const {
+            attributes,
+            listeners,
+            setNodeRef,
+            transform,
+            isDragging,
+        } = useDraggable({
+            id: pedido._id,
+            disabled: !isArrastrable
+        });
+
+        const style = {
+            // No aplicar transform para que quede anclado
+            opacity: isDragging ? 0.7 : 1,
+        };
+
+        const handleClick = () => {
+            if (!isDragging) {
+                console.log("👆 CLICK EVENT");
+                onShowDetalle();
+            }
+        };
 
         return (
             <div
+                ref={setNodeRef}
+                style={style}
                 key={`pedido_${index}`}
-                className={`pl-2 mr-1 border rounded-lg mb-2 ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} cursor-pointer flex items-start relative`}
-                draggable={pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal}
-                onDragStart={() => onSelectPedido(pedido._id)}
-                onClick={() => onShowDetalle(pedido)}
-                onTouchStart={(e) => { console.log("TOUCH START", e.currentTarget); }}
-                onTouchMove={(e) => { console.log("TOUCH MOVE", e.currentTarget); }}
-                onTouchEnd={(e) => { console.log("TOUCH END", e.currentTarget); }}
+                className={`pl-2 mr-1 border rounded-lg mb-2 
+                    ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} 
+                    ${isDragging ? 'shadow-lg' : ''} 
+                    flex items-start relative transition-all duration-150
+                    ${isArrastrable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+                `}
+                onClick={handleClick}
+                {...(isArrastrable ? listeners : {})}
+                {...(isArrastrable ? attributes : {})}
             >
                 <div className="w-full">
                     <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
                     {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-teal-100 text-xs bg-neutral-900 rounded px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
                     {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
-                    <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>{dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}</p>
-                    <ul className="w-full list-disc pl-4 mt-2">
-                        <div className="w-full relative right-2" style={{
-                            maxHeight: isExpanded ? `${itemsCount * 2.2}em` : "2.2em",
-                            transition: "max-height 0.4s cubic-bezier(.4,0,.2,1)",
-                            overflow: "hidden"
-                        }}>
-                            {mostrarItems.map((item, i) => (
-                                <li key={i} className="w-full flex items-center">
-                                    <div className={`${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-gray-100' : 'bg-gray-800'} rounded-full h-2 w-2 mr-2`}></div>{item.cantidad}x {item.nombre}
-                                </li>
-                            ))}
-                            {itemsCount > 1 && (
-                                <button className="absolute top-0 right-0 text-blue-500 ml-1 text-xs z-10 bg-white px-1" type="button" style={{ borderRadius: 4 }}
-                                    onClick={(e) => { e.stopPropagation(); setExpandido(prev => ({ ...prev, [index]: !prev[index] })); }}>
-                                    {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
-                                </button>
-                            )}
-                        </div>
-                    </ul>
+                    <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>
+                        {dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}
+                    </p>
+                    
+                    <div className="w-full pl-4 mt-2">
+                        {items.slice(0, 1).map((item, i) => (
+                            <div key={i} className="w-full flex items-center">
+                                <div className={`${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-gray-100' : 'bg-gray-800'} rounded-full h-2 w-2 mr-2`}></div>
+                                {item.cantidad}x {item.nombre}
+                            </div>
+                        ))}
+                        {items.length > 1 && (
+                            <div className="text-xs text-gray-300">
+                                +{items.length - 1} items más...
+                            </div>
+                        )}
+                    </div>
                 </div>
-                {(pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal) && (
-                    <div className="absolute top-2 right-2 text-gray-500">
-                        <MdDragIndicator size="1.5rem" />
+                
+                {/* ICONO INDICADOR DE DRAG */}
+                {isArrastrable && (
+                    <div 
+                        className={`absolute top-1 right-1 text-gray-200 transition-all duration-150 ${
+                            isDragging ? 'animate-pulse' : ''
+                        }`}
+                    >
+                        <MdDragIndicator size="1.2rem" />
                     </div>
                 )}
             </div>
@@ -121,10 +137,11 @@ export default function PorAsignar({
     });
 
     return (
-        <div className={`relative w-1/2 border rounded-lg pl-2 pt-4 pr-1 bg-teal-100 shadow-md h-[calc(100vh-64px)] ${isDragOver ? 'border-2 border-dashed border-blue-500 bg-teal-200' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={handleDrop}
+        <div 
+            ref={setReasignRef}
+            className={`relative w-1/2 rounded-lg pl-2 pt-4 pr-1 bg-teal-100 shadow-md h-[calc(100vh-64px)] border-2 ${
+                isReasignOver ? 'border-dashed border-blue-500 bg-teal-200' : 'border-solid border-gray-300'
+            }`}
         >
             <div className="flex items-center mb-4">
                 <div className="absolute -top-0 -left-0 bg-neutral-200 text-black text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
@@ -138,8 +155,17 @@ export default function PorAsignar({
                     </button>
                 </Link>
             </div>
-            <div className="h-[calc(100vh-150px)] overflow-y-scroll">
-                {isLoading ? <Loader texto="Cargando pedidos..." /> : (pedidos && pedidos.length === 0) ? (
+            {/* CONTENEDOR DE SCROLL SIN INTERFERIR CON DRAG */}
+            <div 
+                className="h-[calc(100vh-150px)] overflow-y-auto"
+                style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#94a3b8 #e2e8f0'
+                }}
+            >
+                {isLoading ? <div className="w-full h-3/4 flex flex-col items-center">
+                    <Loader texto="Cargando pedidos..." />
+                </div> : (pedidos && pedidos.length === 0) ? (
                     <div className="flex flex-col items-center justify-center" style={{ height: "calc(100vh - 200px)" }}>
                         <BiTask size="6rem" className="mr-1" />
                         <p className="text-gray-500 text-lg font-semibold">SIN ÓRDENES</p>

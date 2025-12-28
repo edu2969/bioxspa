@@ -48,7 +48,7 @@ export default function InputManualCodeView(props: {
                 inputElement.removeEventListener('textInput', handleTextInput as EventListener);
             }
         };
-    }, [scanMode, inputTemporalVisible]);
+    }, [scanMode, inputTemporalVisible, setScanMode]);
 
     return (<div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 px-4">
         {!inputTemporalVisible ? <>

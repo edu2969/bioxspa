@@ -35,7 +35,6 @@ export default function GestorDeCargaView({
   const [animating, setAnimating] = useState(false);
   const [showModalNombreRetira, setShowModalNombreRetira] = useState(false);
   const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
-  const [alMenosUnEscaneado, setAlMenosUnEscaneado] = useState(false);
   const [modalConfirmarCargaParcial, setModalConfirmarCargaParcial] = useState(false);
   const temporalRef = useRef<HTMLInputElement>(null);
   const { setValue } = useForm<FormData>();
@@ -70,9 +69,9 @@ export default function GestorDeCargaView({
     const esProcesoCarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
     const esProcesoDescarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
     const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
+    const ventaEnLocal = cargamento.ventas.some(v => v.entregasEnLocal);
 
-    let porcentaje = 0;
-
+    
     if (tieneTraslado) {
       const itemsRetirados = Array.isArray(cargamento.cargaItemIds) && cargamento.cargaItemIds.length === 0;
 
@@ -85,13 +84,12 @@ export default function GestorDeCargaView({
     }
 
     if (esProcesoCarga) {
-      const todasLasVentasTienenAlMenosUno = cargamento.ventas.every(venta =>
-        venta.detalles.some(detalle =>
-          Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length > 0
-        )
+      // Crear un Set de los subcategoriaCatalogoId que están en cargaItemIds
+      const cargaItemSubcategoriaIds = new Set(
+        cargamento.cargaItemIds.map(item => item.subcategoriaCatalogoId)
       );
 
-      porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
+      const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
         const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
           const totalItems = detalle.multiplicador;
           const itemsEscaneados = totalItems - (detalle.restantes || 0);
@@ -101,29 +99,57 @@ export default function GestorDeCargaView({
         return accVenta + porcentajeVenta;
       }, 0) / cargamento.ventas.length;
 
-      return {
-        partial: cargamentos.length > 0
-          && todasLasVentasTienenAlMenosUno,
-        porcentaje: Math.round(porcentaje)
-      };
-    } else if (esProcesoDescarga) {
-      const todasLasVentasCompletas = cargamento.ventas.every(venta =>
-        venta.detalles.every(detalle =>
-          detalle.restantes === 0
+      // Verificar si cada venta tiene al menos un detalle con subcategoriaCatalogoId en cargaItemIds
+      const todasLasVentasTienenAlMenosUno = porcentaje < 100 && cargamento.ventas.every(venta =>
+        venta.detalles.some(detalle =>
+          cargaItemSubcategoriaIds.has(String(detalle.subcategoriaCatalogoId._id))
         )
       );
+
       return {
-        partial: cargamentos.length > 0
-          && alMenosUnEscaneado,
+        partial: porcentaje < 100 && todasLasVentasTienenAlMenosUno,
+        complete: porcentaje >= 100,
         porcentaje: Math.round(porcentaje)
       };
     }
 
-    return {
-      partial: cargamentos.length > 0
-        && alMenosUnEscaneado,
-      porcentaje: Math.round(porcentaje)
-    };
+    if (esProcesoDescarga) {
+      return {
+        partial: true,        
+        porcentaje: Math.round(0)
+      };
+    }
+    
+if (ventaEnLocal) {
+      // Calcular porcentaje basado en los restantes
+      const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
+        const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
+          const totalItems = detalle.multiplicador;
+          const itemsEntregados = totalItems - (detalle.restantes || 0);
+          return accDetalle + (itemsEntregados / totalItems) * 100;
+        }, 0) / venta.detalles.length;
+        return accVenta + porcentajeVenta;
+      }, 0) / cargamento.ventas.length;
+
+      // Verificar si todas las entregas están completas (todos los restantes son 0)
+      const todasLasEntregasCompletas = cargamento.ventas.every(venta =>
+        venta.detalles.every(detalle => detalle.restantes === 0)
+      );
+
+      // Verificar si hay al menos una entrega parcial (al menos un restante < multiplicador)
+      const hayEntregasParciales = cargamento.ventas.some(venta =>
+        venta.detalles.some(detalle => detalle.restantes < detalle.multiplicador)
+      );
+
+      return {
+        complete: porcentaje >= 100,
+        partial: !todasLasEntregasCompletas && hayEntregasParciales,
+        porcentaje: Math.round(porcentaje)
+      };
+    }
+    
+    console.log("Estado de carga no reconocido", cargamentos[0]);
+    throw new Error("Estado de carga no reconocido");
   }
 
   return (<div className="flex flex-col w-full">
@@ -247,7 +273,7 @@ export default function GestorDeCargaView({
                 <BsQrCodeScan className="text-4xl" />
               </button>
               <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${loadState().complete ? 'bg-green-500 cursor-pointer' : loadState().partial ? 'bg-yellow-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
-                type="submit" disabled={!loadState().partial && !loadState().complete}>
+                onClick={handleRemoveFirst} disabled={!loadState().partial && !loadState().complete}>
                 <FaRoadCircleCheck className="text-4xl pb-0" />
                 <p className="ml-2 mt-2 text-md font-bold">{loadState().complete ? 'CARGA COMPLETA' : loadState().partial ? 'CARGA PARCIAL' : 'CARGA NO INICIADA'}</p>
                 {mutation.isPending && <div className="absolute w-full top-0">
@@ -288,10 +314,9 @@ export default function GestorDeCargaView({
     )}
 
     {cargamentos && cargamentos?.length === 0 &&
-      <div className="w-full py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
+      <div className="w-full h-screen py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
         <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
         <p className="text-center text-2xl font-bold mb-4">¡TODO EN ORDEN!</p>
-        <p className="text-center uppercase font-xl">No tienes pedidos asignados</p>
       </div>
     }
 

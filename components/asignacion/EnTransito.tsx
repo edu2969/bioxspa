@@ -11,12 +11,17 @@ import { FaRegCheckCircle } from 'react-icons/fa';
 import { FaTruckFast } from 'react-icons/fa6';
 import { VscCommentDraft, VscCommentUnresolved } from 'react-icons/vsc';
 import { IVehicleView } from '../prefabs/types';
+import { useDroppable } from '@dnd-kit/core';
 
 export default function EnTransito({ sucursalId, setShowCommentModal } : {
     sucursalId: string;
     setShowCommentModal: (value: boolean) => void;
-}) {    
+}) {
     const vehicleContainerRef = useRef<HTMLDivElement>(null);
+    const { setNodeRef, isOver } = useDroppable({
+        id: 'en-transito',
+    });
+
     const vehiculoDefecto: IVehicleView = {
         vehicleId: "",
         patente: "XXX000",
@@ -112,7 +117,12 @@ export default function EnTransito({ sucursalId, setShowCommentModal } : {
     }
 
     return (
-        <div className="relative col-span-5 border rounded-lg p-4 bg-blue-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden pt-12">
+        <div 
+            ref={setNodeRef}
+            className={`relative col-span-5 border rounded-lg p-4 bg-blue-50 shadow-md h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden pt-12 transition-colors duration-200 ${
+                isOver ? 'bg-blue-100 border-blue-300' : ''
+            }`}
+        >
             <div className="absolute -top-0 -left-0 bg-neutral-200 text-gray-700 text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                 EN TRÁNSITO ({enTransito?.length || "-"})
             </div>

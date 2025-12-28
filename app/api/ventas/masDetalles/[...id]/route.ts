@@ -19,7 +19,7 @@ import mongoose from "mongoose";
 import { IVenta } from "@/types/venta";
 import { IDetalleVenta } from "@/types/detalleVenta";
 
-export async function GET({ params: { id } }: { params: { id: string[] } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string[] }> }) {
     try {
         console.log("Connecting to MongoDB...");
         await connectMongoDB();
@@ -75,7 +75,8 @@ export async function GET({ params: { id } }: { params: { id: string[] } }) {
         }
 
         // Await params before accessing its properties
-        const ventaId = id[0];
+        const resolvedParams = await params;
+        const ventaId = resolvedParams.id[0];
         console.log(`Fetching venta details for ID: ${ventaId}`);
 
         if (!mongoose.Types.ObjectId.isValid(ventaId)) {

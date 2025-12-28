@@ -1,4 +1,15 @@
-export const ConfirmModal = ({ show, title, confirmationQuestion, onClose, onConfirm, confirmationLabel, loading = false }) => {
+export const ConfirmModal = ({
+    show,
+    title,
+    confirmationQuestion, onClose, onConfirm, confirmationLabel, loading = false }: {
+        show: boolean;
+        title: string;
+        confirmationQuestion: React.ReactNode;
+        onClose: () => void;
+        onConfirm: () => void;
+        confirmationLabel?: string;
+        loading?: boolean;
+    }) => {
     if (!show) return null;
 
     return (
@@ -7,7 +18,7 @@ export const ConfirmModal = ({ show, title, confirmationQuestion, onClose, onCon
                 <div className="mt-3 text-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">{title}</h3>
                     <div className="mt-2">
-                        <p className="text-sm text-gray-500">{confirmationQuestion}</p>
+                        {confirmationQuestion}
                     </div>
                     <div className={`mt-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
                         <button

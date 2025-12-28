@@ -14,7 +14,6 @@ import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './prefabs/powerScan/PowerScanView';
 
 export default function Nav() {
-    const router = useRouter();
     const [menuActivo, setMenuActivo] = useState(false);
     const path = usePathname();
     const { data: session } = useSession();
@@ -103,7 +102,7 @@ export default function Nav() {
                     </div>
                 )}
             </div>
-            {scanMode && <PowerScanView scanMode={scanMode} setScanMode={setScanMode} setSelectedItem={() => { }} />}
+            {scanMode && <PowerScanView scanMode={scanMode} setScanMode={setScanMode} rutaId={null} ventaId={null} />}
         </div>
     )
 }

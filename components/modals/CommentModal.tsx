@@ -42,7 +42,7 @@ export default function CommentModal({
             setShowCommentModal(false);
             setComentario(null);
         }
-    }, [ventaId, comentario, setIsSaving]);
+    }, [ventaId, comentario, setIsSaving, setShowCommentModal]);
 
     const onCloseComment = useCallback(() => {
         setShowCommentModal(false);

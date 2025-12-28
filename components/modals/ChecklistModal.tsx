@@ -91,7 +91,7 @@ function getChecklistItems(tipo: 'personal' | 'vehiculo'): IChecklistAnswer[] {
 interface IChecklistForm {
     vehiculoId?: string;
     kilometros?: number;
-    [key: string]: any; // Para permitir claves dinámicas de items del checklist
+    [key: string]: number | string | undefined; // Para permitir claves dinámicas de items del checklist
 }
 
 export default function ChecklistModal({ tipo, onFinish }: { 
@@ -139,7 +139,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
             const formValues = getValues();
             const items: IChecklistAnswer[] = checklistItems.map((item) => ({
                 tipo: item.tipo,
-                valor: formValues[item.tipo as string] || 0,
+                valor: Number(formValues[String(item.tipo)]) || 0,
             }));
             const data: any = {
                 tipo,

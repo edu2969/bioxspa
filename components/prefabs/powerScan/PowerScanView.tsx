@@ -6,7 +6,7 @@ import { PowerScanOptionsModal } from "@/components/modals/PowerScanOptionsModal
 import toast from "react-hot-toast";
 import type { IItemCatalogoPowerScanView } from "../types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import SoundPlayerProvider, { useSoundPlayer } from "@/components/context/SoundPlayerContext";
+import { useSoundPlayer } from "@/components/context/SoundPlayerContext";
 
 export default function PowerScanView({ 
     scanMode, 
@@ -42,10 +42,16 @@ export default function PowerScanView({
             if (data.ok) {                
                 toast.success(`Cilindro ${data.item.codigo} procesado`);
                 qryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
+                setItemEscaneado(data.item);
                 play('/sounds/accept_02.mp3');
             } else {
                 toast.error(data.error || 'Cilindro no encontrado');
-                play('/sounds/error_01.mp3');
+                if(data.item) {
+                    setPowerScanModalVisible(true);
+                    setItemEscaneado(data.item);
+                    setScanMode(false);
+                }
+                play('/sounds/error_01.mp3');                
             }
         },
         onError: (error) => {
