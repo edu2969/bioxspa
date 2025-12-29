@@ -89,7 +89,7 @@ export default function HomeAccessPanel() {
     const [routingIndex, setRoutingIndex] = useState(-1);
     const { data: session } = useSession();
 
-    const { data: homeCounters } = useQuery<Array<number>>({
+    const { data: homeCounters, isLoading } = useQuery<Array<number>>({
         queryKey: ['homeCounters'],
         queryFn: async () => {
             const response = await fetch('/api/home');
@@ -99,9 +99,10 @@ export default function HomeAccessPanel() {
     });
 
     return (<main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-            {(homeCounters && session) ? modules(homeCounters, session).map((mod, idx) => (
-                <AccessButton key={`access_button_${idx}`} props={mod} routingIndex={routingIndex} setRoutingIndex={setRoutingIndex} />)) : <Loader />}
-        </div>
+        {homeCounters && session &&<div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            {modules(homeCounters, session).map((mod, idx) => (
+                <AccessButton key={`access_button_${idx}`} props={mod} routingIndex={routingIndex} setRoutingIndex={setRoutingIndex} />))}            
+        </div>}
+        {!homeCounters && isLoading && <Loader />}
     </main>);
 }

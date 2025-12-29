@@ -10,6 +10,7 @@ import { IDocumentoTributario } from "@/types/documentoTributario";
 import ClientAddressManagerView from "../prefabs/ClientAddressManagerView";
 import ClienteSearchView from "../prefabs/ClienteSearchView";
 import type { IClienteSeachResult } from "../prefabs/types";
+import Loader from "../Loader";
 
 export default function DatosDelCliente({
     tipoOrden,
@@ -32,7 +33,7 @@ export default function DatosDelCliente({
         }
     }); 
     
-    const { data: cliente } = useQuery<ICliente>({
+    const { data: cliente, isLoading: loadingCliente } = useQuery<ICliente>({
         queryKey: ['cliente-by-id', clienteSelected],
         queryFn: async () => {
             if (!clienteSelected?._id) return null;
@@ -56,7 +57,8 @@ export default function DatosDelCliente({
         {(tipoOrden == 1 || tipoOrden == 4) && <div className="w-full">
             <ClienteSearchView titulo="Seleccione al cliente" 
                 register={register("clienteId", { required: true })}
-                setClienteSelected={setClienteSelected} />
+                setClienteSelected={setClienteSelected}
+                isLoading={loadingCliente} />
         </div>}
 
         {/*EDICIÓN DE DIRECCIÓN DE DESPACHO */}
@@ -73,6 +75,10 @@ export default function DatosDelCliente({
                 label="Documento tributario"
                 getLabel={dt => dt.nombre} getValue={dt => String(dt._id)} 
                 register={register("documentoTributarioId", { required: true })} />}
+
+            {loadingCliente && !cliente && <div className="h-40 flex items-center justify-center">
+                <Loader texto="Cargando cliente..." />
+            </div>}
     </fieldset>;
 }
 

@@ -14,16 +14,19 @@ export default function ClienteSearchView({
     titulo,
     register,
     setClienteSelected,
+    isLoading
 }: {
     titulo?: string;
     register: UseFormRegisterReturn;
     setClienteSelected: (value: IClienteSeachResult | null) => void;
+    isLoading?: boolean;
 }) {
     const { data: session } = useSession();
     const [textoBusqueda, setTextoBusqueda] = useState("");
     const router = useRouter();
     const [debouncedSearch, setDebouncedSearch] = useState("");    
     const [clienteId, setClienteId] = useState<string | null>(null);
+    const [isRedirecting, setIsRedirecting] = useState(false);
     
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -32,7 +35,7 @@ export default function ClienteSearchView({
         return () => clearTimeout(handler);
     }, [textoBusqueda]);
 
-    const { data: clientes, isLoading } = useQuery<IClienteSeachResult[]>({
+    const { data: clientes, isLoading: searchingClientes } = useQuery<IClienteSeachResult[]>({
         queryKey: ['clientes', debouncedSearch],
         queryFn: async () => {
             if (clienteId || debouncedSearch.length < 3) return [];
@@ -40,8 +43,7 @@ export default function ClienteSearchView({
             const data = await response.json();
             return data.clientes;
         },
-        enabled: !clienteId && debouncedSearch.length >= 3,
-        initialData: []
+        enabled: !clienteId && debouncedSearch.length >= 3
     });
 
     const handleSelect = (cliente: IClienteSeachResult) => {
@@ -72,24 +74,35 @@ export default function ClienteSearchView({
                     }}
                 />
                 <input type="hidden" {...register} value={clienteId || ''} />
-                {isLoading && <div className="absolute -right-1.5 -top-1 md:top-1.5">
-                    <div className="absolute -top-1 -left-2 w-11 h-11 bg-white opacity-70 md:bg-transparent md:top-1"></div>
-                    <Loader texto="" />
+                {searchingClientes && <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10">
+                    <div className="flex items-center justify-center w-8 h-8 bg-green-500 bg-opacity-90 rounded-full">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    </div>
                 </div>}
                 {(session?.user?.role === USER_ROLE.gerente || session?.user?.role === USER_ROLE.encargado 
                 || session?.user?.role === USER_ROLE.cobranza)
                     && <button
                         type="button"
-                        className={`ml-2 flex items-center px-2 py-2 bg-gray-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+                        className={`ml-2 flex items-center justify-center px-2 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${
+                            (isRedirecting || searchingClientes) 
+                                ? 'bg-green-500 text-green-500 cursor-not-allowed opacity-80' 
+                                : 'bg-gray-500 text-white hover:bg-green-600'
+                        }`}
                         onClick={() => {
-                            router.push(`/modulos/configuraciones/clientes${clienteId ? `?id=${clienteId}` : ''}`);
+                            if (!isRedirecting && !isLoading) {
+                                setIsRedirecting(true);
+                                router.push(`/pages/configuraciones/clientes${clienteId ? `?id=${clienteId}` : ''}`);
+                            }
                         }}
+                        disabled={isRedirecting || searchingClientes}
                     >
-                        <LiaPencilAltSolid size="1.6rem" />
-                        {isLoading && <div className="absolute -right-1.5 -top-1 md:top-1.5">
-                            <div className="absolute -top-1 -left-2 w-11 h-11 bg-white opacity-70 md:bg-transparent md:top-1"></div>
-                            <Loader texto="" />
-                        </div>}
+                        {(isRedirecting || searchingClientes) ? (
+                            <div className="flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                            </div>
+                        ) : (
+                            <LiaPencilAltSolid size="1.6rem" />
+                        )}
                     </button>}
             </div>
             {!isLoading && !clienteId && clientes && clientes.length > 0 && (

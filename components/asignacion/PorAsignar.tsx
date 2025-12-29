@@ -10,12 +10,12 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MdDragIndicator } from 'react-icons/md';
+import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
 import { useQuery } from '@tanstack/react-query';
 import { IPedidoPorAsignar } from '@/types/types';
 import { Control, useWatch } from 'react-hook-form';
 import { INuevaVentaSubmit } from '../pedidos/types';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 dayjs.locale('es');
 dayjs.extend(relativeTime);
@@ -23,9 +23,11 @@ dayjs.extend(relativeTime);
 export default function PorAsignar({
     control,
     onShowDetalle,
+    onShowCommentModal,
 }: {
     control: Control<INuevaVentaSubmit>;
     onShowDetalle: () => void;
+    onShowCommentModal: () => void;
 }) {
     
     const [redirecting, setRedirecting] = useState(false);
@@ -77,10 +79,19 @@ export default function PorAsignar({
             opacity: isDragging ? 0.7 : 1,
         };
 
-        const handleClick = () => {
+        const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+            console.log("CLICK!");
             if (!isDragging) {
                 console.log("👆 CLICK EVENT");
                 onShowDetalle();
+            }
+        };
+
+        const handleCommentClick = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (!isDragging) {
+                console.log("💬 COMMENT CLICK EVENT");
+                onShowCommentModal();
             }
         };
 
@@ -93,11 +104,9 @@ export default function PorAsignar({
                     ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-teal-500 text-white' : 'bg-teal-50 text-teal-400'} 
                     ${isDragging ? 'shadow-lg' : ''} 
                     flex items-start relative transition-all duration-150
-                    ${isArrastrable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+                    cursor-pointer
                 `}
                 onClick={handleClick}
-                {...(isArrastrable ? listeners : {})}
-                {...(isArrastrable ? attributes : {})}
             >
                 <div className="w-full">
                     <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
@@ -122,12 +131,24 @@ export default function PorAsignar({
                     </div>
                 </div>
                 
+                {/* ÁREA DE COMENTARIO */}
+                <div className={`${pedido.comentario ? 'text-teal-200' : 'text-teal-300'} w-1/12 flex items-start pt-1`}>
+                    <div className="relative right-6">
+                        <div className="cursor-pointer" onClick={handleCommentClick}>
+                            {!pedido.comentario ? <VscCommentDraft size="1.5rem" /> : <VscCommentUnresolved size="1.5rem" />}
+                        </div>
+                        {pedido.comentario && <div className="absolute top-[12px] left-[12px] w-[8px] h-[8px] rounded-full bg-red-600"></div>}
+                    </div>
+                </div>
+                
                 {/* ICONO INDICADOR DE DRAG */}
                 {isArrastrable && (
                     <div 
-                        className={`absolute top-1 right-1 text-gray-200 transition-all duration-150 ${
+                        className={`absolute top-1 right-1 text-gray-200 transition-all duration-150 cursor-grab hover:cursor-grab active:cursor-grabbing ${
                             isDragging ? 'animate-pulse' : ''
                         }`}
+                        {...listeners}
+                        {...attributes}
                     >
                         <MdDragIndicator size="1.2rem" />
                     </div>
@@ -148,8 +169,8 @@ export default function PorAsignar({
                     ÓRDENES
                 </div>
                 <Link href="/pages/pedidos/nuevo" className="relative ml-auto -mt-2" onClick={() => setRedirecting(true)}>
-                    <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3 mr-3"
-                        disabled={redirecting}>
+                    <button className={`flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3 mr-3 ${redirecting ? 'opacity-50 pointer-events-none' : ''}`} 
+                    disabled={redirecting}>
                         <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO
                         {redirecting && <div className="absolute -top-0 -right-0 w-full h-full pt-1 pl-4"><Loader texto="" /></div>}
                     </button>

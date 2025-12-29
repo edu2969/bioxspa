@@ -15,6 +15,7 @@ import DatosDeTraslado from './DatosDeTraslado';
 import DatosOrdenDeTrabajo from './DatosOrdenDeTrabajo';
 import DatosDelCliente from './DatosDelCliente';
 import { useQuery } from '@tanstack/react-query';
+import Nav from '../Nav';
 
 export default function Pedidos() {
     const router = useRouter();
@@ -180,7 +181,10 @@ export default function Pedidos() {
 
                             <DatosGenerales register={register} setValue={setValue} />
 
-                            {tipoOrden == 1 && <DatosDelCliente tipoOrden={tipoOrden} register={register} setValue={setValue} />}
+                            {tipoOrden == 1 && <DatosDelCliente
+                                tipoOrden={tipoOrden}
+                                register={register}
+                                setValue={setValue} />}
 
                             {/* TRASLADO */}
                             {tipoOrden == 2 && <DatosDeTraslado register={register} />}
@@ -306,6 +310,7 @@ export default function Pedidos() {
                 </div>
             </div>
             <Toaster />
+            <Nav />
         </main>
     );
 }

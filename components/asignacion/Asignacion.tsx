@@ -34,6 +34,7 @@ export default function Asignacion() {
     const [showDetalleOrdenModal, setShowDetalleOrdenModal] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [dragOrigin, setDragOrigin] = useState<'pedidos' | 'conductores' | null>(null);
+    const [dragSourceConductor, setDragSourceConductor] = useState<string | null>(null);
     // const [draggedPedido, setDraggedPedido] = useState<{ id: string, cliente: string } | null>(null); // No usado actualmente
     const { control, setValue } = useForm<INuevaVentaSubmit>();
 
@@ -59,7 +60,7 @@ export default function Asignacion() {
 
     const onCloseDetalleVenta = useCallback(() => {
         setShowDetalleOrdenModal(false);
-    }, [setShowDetalleOrdenModal]);
+    }, []);
 
     const sucursalId = useWatch({
         control,
@@ -100,18 +101,26 @@ export default function Asignacion() {
         
         // Detectar origen: si está en pedidos o en conductores
         const enPedidos = pedidos?.some(p => p._id === pedidoId);
-        const enConductores = conductores?.some(c => 
-            c.pedidos?.some(p => p._id === pedidoId)
-        );
+        let conductorOrigen = null;
+        const enConductores = conductores?.some(c => {
+            const tienePedido = c.pedidos?.some(p => p._id === pedidoId);
+            if (tienePedido) {
+                conductorOrigen = c._id;
+            }
+            return tienePedido;
+        });
         
         if (enPedidos && !enConductores) {
             setDragOrigin('pedidos');
+            setDragSourceConductor(null);
             console.log('📋 Arrastrando desde PorAsignar');
         } else if (enConductores) {
             setDragOrigin('conductores');
-            console.log('🚚 Arrastrando desde Conductores');
+            setDragSourceConductor(conductorOrigen);
+            console.log('🚚 Arrastrando desde Conductor:', conductorOrigen);
         } else {
             setDragOrigin('pedidos'); // fallback
+            setDragSourceConductor(null);
         }
         
         // Buscar el pedido para obtener el nombre del cliente
@@ -128,6 +137,7 @@ export default function Asignacion() {
         
         setActiveId(null);
         setDragOrigin(null);
+        setDragSourceConductor(null);
         // setDraggedPedido(null); // No usado actualmente
         
         if (!over) {
@@ -139,6 +149,18 @@ export default function Asignacion() {
         const dropZoneId = over.id as string;
         
         console.log(`🎯 Attempting drop: pedido ${pedidoId} -> ${dropZoneId}`);
+        
+        // Verificar si se está arrastrando a sí mismo
+        if (dropZoneId.startsWith('conductor-')) {
+            const targetConductorId = dropZoneId.replace('conductor-', '');
+            if (dragOrigin === 'conductores' && dragSourceConductor === targetConductorId) {
+                console.log('🚫 Auto-asignación detectada - mismo conductor. No se ejecuta acción.');
+                return; // No hacer nada si es el mismo conductor
+            }
+        } else if (dropZoneId === 'reasignacion' && dragOrigin === 'pedidos') {
+            console.log('🚫 Auto-asignación detectada - pedido ya está en PorAsignar. No se ejecuta acción.');
+            return; // No hacer nada si ya está en por asignar
+        }
         
         // Determinar el tipo de drop basado en el ID
         if (dropZoneId.startsWith('conductor-')) {
@@ -237,6 +259,9 @@ export default function Asignacion() {
                             control={control}
                             onShowDetalle={() => {
                                 setShowDetalleOrdenModal(true);
+                            }}
+                            onShowCommentModal={() => {
+                                setShowCommentModal(true);
                             }}
                         />
                         <Conductores

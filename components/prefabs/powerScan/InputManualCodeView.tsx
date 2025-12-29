@@ -14,6 +14,7 @@ export default function InputManualCodeView(props: {
     
     useEffect(() => {
         const handleTextInput = (e: Event) => {
+            console.log("Input event: scanMode", scanMode, "Data", (e as unknown as InputEvent).data);
             if (scanMode) {
                 const inputEvent = e as unknown as InputEvent;
                 const codigo = inputEvent.data ? inputEvent.data.trim() : '';
@@ -64,13 +65,18 @@ export default function InputManualCodeView(props: {
                 type="text"
                 className="opacity-0 h-0 w-0 absolute"
                 inputMode="none"
+                onKeyDown={(e) => {                    
+                    if (e.key === 'Escape') {
+                        setInputTemporalVisible(false);
+                        setScanMode(false);
+                    }
+                }}
             />
         </> :
         <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-lg p-8 max-w-xs">
             <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
             <input
                 ref={visibleInputRef}
-                type="text"
                 className="border border-gray-300 rounded-lg px-3 py-2 w-64"
                 onKeyDown={(e) => {
                     console.log("event key:", e.key);
