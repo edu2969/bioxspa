@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { ICilindro } from "./types";
 import { useMemo } from "react";
+import { ICilindroView } from "@/types/types";
+import { getColorEstanque } from "@/lib/uix";
+import Image from "next/image";
 
 const offsetByModel = (marca: string, modelo: string) => {
     const marcaSplit = (marca.split(" ")[0] || "").toLowerCase();
@@ -15,7 +16,7 @@ const offsetByModel = (marca: string, modelo: string) => {
     }
     const offsets: Record<
         "hyundai_porter" | "ford_ranger" | "mitsubishi_l200" | "volkswagen_constellation" |
-        "volkswagen_delivery" | "kia_frontier" | "ford_transit" | "desconocido_desconocido",
+        "volkswagen_delivery" | "kia_frontier" | "ford_transit" | "desconocida_desconocido",
         number[]
     > = {
         "hyundai_porter": [-8, 96, 1.5, 4],
@@ -25,10 +26,10 @@ const offsetByModel = (marca: string, modelo: string) => {
         "volkswagen_delivery": [28, 76, 1.5, 4],
         "kia_frontier": [28, 76, 1.5, 4],
         "ford_transit": [-8, 186, 1.5, 4],
-        "desconocido_desconocido": [28, 76, 1.5, 4],
+        "desconocida_desconocido": [28, 76, 1.5, 4],
     };
     const key = (marcaSplit + "_" + modeloSplit) as keyof typeof offsets;
-    const data = offsets[key] ?? offsets["desconocido_desconocido"];
+    const data = offsets[key] ?? offsets["desconocida_desconocido"];
     return {
         baseTop: data[0],
         baseLeft: data[1],
@@ -51,54 +52,30 @@ function calculateTubePosition(index: number, marca: string, modelo: string) {
 }
 
 export default function CargaCilindros({
-    vehiculoId, marca, modelo
+    marca, modelo, cargados
 }: {
-    vehiculoId?: string;
     marca: string;
-    modelo: string
+    modelo: string,
+    cargados: Array<ICilindroView>
 }) {
     const memoizedCalculateTubePosition = useMemo(() => calculateTubePosition, []);
 
-    const { data: carga } = useQuery<ICilindro[]>({
-        queryKey: ['carga-cilindros'],
-        queryFn: async () => {
-            console.log("Vehiculo ID:", vehiculoId);
-            if(vehiculoId == undefined) return [];
-            const response = await fetch(`/api/flota/cargaCilindros?vehiculoId=${vehiculoId}`);
-            const data = await response.json();
-            console.log("DATA", data);
-            return data.cilindros ?? [];
-        },
-        enabled: !!vehiculoId,
-    });
-
-    return <>
-        {carga && carga.map((cilindro, idx) => {
-            const pos = memoizedCalculateTubePosition(idx, marca, modelo);
+    return <>    
+        {cargados.reverse().map((item, index) => {
+            // Deducción de descargado usando historialCarga                                                        
+            const elem = item.elemento;
+            const pos = memoizedCalculateTubePosition(index, marca, modelo);
             return (
-                <div
-                    key={idx}
-                    style={{
-                        position: "absolute",
-                        left: pos.left,
-                        top: pos.top,
-                        zIndex: 2,
-                        width: 32,
-                        height: 64,
-                        background: cilindro.esIndustrial ? "#60A5FA" : "#F59E42",
-                        borderRadius: "8px",
-                        border: "2px solid #333",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#fff",
-                        fontWeight: "bold",
-                        fontSize: "0.8rem",
-                    }}
-                    title={`Elemento: ${cilindro.elementos}, Peso: ${cilindro.peso}kg`}
-                >
-                    {cilindro.elementos}
-                </div>
+                <Image
+                    key={index}
+                    src={`/ui/tanque_biox${getColorEstanque(elem)}.png`}
+                    alt={`tank_${index}`}
+                    width={14 * 4}
+                    height={78 * 4}
+                    className={`absolute`}
+                    style={calculateTubePosition(cargados.length - index - 1, marca, modelo)}
+                    priority={false}
+                />
             );
         })}
     </>;

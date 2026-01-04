@@ -173,3 +173,66 @@ export interface ICargaDespachoView {
     estado: number | null;
     retiroEnLocal?: boolean;
 }
+
+export interface IListadoDescargaView {
+    encargado: string;
+    cilindros: IItemDeCargaView[];
+}
+
+export interface IItemDeCargaView extends ICilindroView {
+    multiplicador: number;
+    restantes: number;
+}
+
+export interface ICilindroView {
+    _id: string;
+    subcategoriaCatalogoId: string;
+    cantidad: number;
+    unidad: string;
+    nombreGas: string;
+    sinSifon: boolean;
+    elemento: string;
+    esIndustrial: boolean;
+    esMedicinal: boolean;
+    vencido: boolean;
+}
+
+export interface IItemCatalogoView extends ICilindroView {
+    codigo: string;
+}
+
+export interface IDireccion {
+    _id: string;
+    nombre: string;
+    latitud: number;
+    longitud: number;
+}
+
+export interface IRutaView {
+    direccionDestinoId: IDireccion | null;
+    fechaArribo: Date | null;
+}
+
+export interface IListadoDescargaView {
+    cilindros: ICilindroView[];
+}
+
+export interface IRutaConductorView {
+    _id: string;
+    cliente: {
+        nombre: string;
+        direccion: string;
+        telefono: string;
+        direccionDespacho: string;
+    },
+    comentario?: string;
+    quienRecibe?: string;
+    rutRecibe?: string;    
+}
+
+export interface IVehiculoView {
+    vehiculoId: string;
+    patente: string;
+    marca: string;
+    modelo: string;
+}

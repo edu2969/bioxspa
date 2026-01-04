@@ -36,4 +36,5 @@ export interface IRutaDespacho {
   ventaIds: IVenta[];
   cargaItemIds: IItemCatalogo[];
   historialCarga: Array<ICargaHistorial>;
+  encargado: string;
 }

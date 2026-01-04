@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import { connectMongoDB } from "@/lib/mongodb";
@@ -7,7 +7,7 @@ import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import Venta from "@/models/venta";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
-export async function POST(req) {
+export async function POST(req: NextRequest) {
     try {
         console.log("POST request received for iniciarViaje.");
         await connectMongoDB();

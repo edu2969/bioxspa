@@ -6,6 +6,7 @@ import { IUser } from "./user";
 import { ISucursal } from "./sucursal";
 import { IDependencia } from "./dependencia";
 import { IDocumentoTributario } from "./documentoTributario";
+import { IDireccion } from "./direccion";
 
 export interface IComentarioCobro {
     fecha: Date;
@@ -35,7 +36,8 @@ export interface IVenta {
     numeroDocumento?: string;
     numeroVale?: string;
     saldo?: number;
-    documentoTributarioId?: IDocumentoTributario;    
+    documentoTributarioId?: IDocumentoTributario;
+    direccionDespachoId: IDireccion;
     tasaImpuesto?: number;
     tieneOT?: boolean;
     numeroOrden?: string;

@@ -61,7 +61,7 @@ export function PowerScanOptionsModal({
         }
     };
 
-    return (<div className="fixed flex inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center justify-center p-2 sm:p-4">
+    return (<div className="absolute flex inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 items-center justify-center p-2 sm:p-4">
         <div className="relative mx-auto p-5 pt-0 border w-full max-w-5xl max-h-[95vh] overflow-y-auto shadow-lg rounded-md bg-white sm:w-11/12 md:w-10/12">
             <div className="mt-3 text-center">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">Información de Cilindro</h3>

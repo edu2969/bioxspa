@@ -97,7 +97,8 @@ export default function JefaturaDespacho() {
                     opacity: animating && index === 0 ? 0 : 1,
                   }}
                 >
-                  {index <= 1 && <GestorDeCargaView 
+                  {index <= 1 && 
+                  <GestorDeCargaView 
                     cargamentos={[cargamento]}
                     setScanMode={setScanMode}
                     index={index}

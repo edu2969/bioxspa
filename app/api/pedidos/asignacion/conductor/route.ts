@@ -91,7 +91,7 @@ export async function GET() {
             populate: {
                 path: "clienteId",
                 model: "Cliente",
-                select: "_id nombre direccionesDespacho",
+                select: "_id nombre rut telefono giro direccionesDespacho",
                 populate: {
                     path: "direccionesDespacho.direccionId",
                     model: "Direccion",

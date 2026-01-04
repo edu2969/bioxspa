@@ -1,4 +1,4 @@
-import ConductorPanel from "@/components/conductor/ConductorPanel";
+import ConductorPanel from "@/components/ConductorPanel";
 
 export default async function ConductorPage() {
     return <ConductorPanel/>;

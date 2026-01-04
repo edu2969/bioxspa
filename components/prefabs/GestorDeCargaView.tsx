@@ -41,7 +41,6 @@ export default function GestorDeCargaView({
   const [modalConfirmarCargaParcial, setModalConfirmarCargaParcial] = useState(false);
   const temporalRef = useRef<HTMLInputElement>(null);
   const { setValue } = useForm<FormData>();
-  const { data: session } = useSession();
   const queryClient = useQueryClient();
 
   const isReady = () => {

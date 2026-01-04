@@ -74,19 +74,17 @@ export default function ClienteSearchView({
                     }}
                 />
                 <input type="hidden" {...register} value={clienteId || ''} />
-                {searchingClientes && <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10">
-                    <div className="flex items-center justify-center w-8 h-8 bg-green-500 bg-opacity-90 rounded-full">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    </div>
+                {searchingClientes && <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 z-10">
+                    <Loader texto="" />
                 </div>}
                 {(session?.user?.role === USER_ROLE.gerente || session?.user?.role === USER_ROLE.encargado 
                 || session?.user?.role === USER_ROLE.cobranza)
                     && <button
                         type="button"
                         className={`ml-2 flex items-center justify-center px-2 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${
-                            (isRedirecting || searchingClientes) 
-                                ? 'bg-green-500 text-green-500 cursor-not-allowed opacity-80' 
-                                : 'bg-gray-500 text-white hover:bg-green-600'
+                            (!isRedirecting && !searchingClientes) 
+                                ? 'bg-green-500 text-white hover:bg-green-600' 
+                                : 'bg-gray-500 text-gray-500 cursor-not-allowed opacity-80'
                         }`}
                         onClick={() => {
                             if (!isRedirecting && !isLoading) {

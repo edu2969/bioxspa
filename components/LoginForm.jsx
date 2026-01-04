@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { socket } from "@/lib/socket-client";
 import { TIPO_CARGO } from "@/app/utils/constants";
 import Loader from "./Loader";
 import { IoAlertCircle } from "react-icons/io5";
@@ -54,17 +53,7 @@ export default function LoginForm() {
           "Content-Type": "application/json",
         },
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.cargo == TIPO_CARGO.conductor || data.cargo == TIPO_CARGO.encargado
-          || data.cargo == TIPO_CARGO.administrador || data.cargo == TIPO_CARGO.despacho) {
-          socket.emit("join-room", { room: "room-pedidos", userId: data.userId });
-        }
-      } else {
-        console.error("Failed to fetch user role:", response.statusText);        
-      }      
-
+            
       let retries = 0;
       while (retries < 10) {
         const sessionRes = await fetch("/api/auth/session"); // API interna de NextAuth

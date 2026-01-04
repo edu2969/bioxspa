@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
 import ItemCatalogo from "@/models/itemCatalogo";
 import DetalleVenta from "@/models/detalleVenta";
@@ -13,12 +13,18 @@ import Sucursal from "@/models/sucursal";
 import Dependencia from "@/models/dependencia";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
+import { IVenta } from "@/types/venta";
+import { IDetalleVenta } from "@/types/detalleVenta";
+import { ICargo } from "@/types/cargo";
+import { ISucursal } from "@/types/sucursal";
+import { IDependencia } from "@/types/dependencia";
+import { IItemCatalogo } from "@/types/itemCatalogo";
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     await connectMongoDB();
 
     const body = await request.json();
-    const { rutaDespachoId, codigo } = body;
+    const { rutaId, codigo } = body;
 
     if (!mongoose.models.SubcategoriaCatalogo) {
         mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
@@ -27,8 +33,8 @@ export async function POST(request) {
         mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
     }
 
-    if (!rutaDespachoId || !codigo) {
-        return NextResponse.json({ ok: false, error: "Missing rutaDespachoId or codigo" }, { status: 400 });
+    if (!rutaId || !codigo) {
+        return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 });
     }
 
     // Busca el item por código
@@ -43,7 +49,7 @@ export async function POST(request) {
                 model: "CategoriaCatalogo",
                 select: "nombre tipo gas elemento esIndustrial"
             }
-        }).lean();
+        }).lean<IItemCatalogo>();
 
     console.log("Item encontrado:", item);
 
@@ -52,17 +58,22 @@ export async function POST(request) {
     }
 
     // Busca la ruta de despacho
-    const rutaDespacho = await RutaDespacho.findById(rutaDespachoId);
+    const rutaDespacho = await RutaDespacho.findById(rutaId);
     if (!rutaDespacho) {
         return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
     }
 
     // Verifica que el item pertenezca a la venta de la última dirección arribada
     const ultimaDireccion = rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId;
-    const venta = await Venta.findOne({ _id: { $in: rutaDespacho.ventaIds } }).select("_id tipo direccionDespachoId").lean();
-    const detalles = await DetalleVenta.find({ ventaId: venta._id }).select("itemCatalogoIds cantidad subcategoriaCatalogoId").lean();
+    const venta = await Venta.findOne({ _id: { $in: rutaDespacho.ventaIds } }).select("_id tipo direccionDespachoId").lean<IVenta>();
 
-    if (venta.tipo === TIPO_ORDEN.traslado) {
+    if(!venta) {
+        return NextResponse.json({ ok: false, error: "Venta not found in rutaDespacho" }, { status: 404 });
+    }
+
+    const detalles = await DetalleVenta.find({ ventaId: venta?._id }).select("itemCatalogoIds cantidad subcategoriaCatalogoId").lean<IDetalleVenta[]>();
+
+    if (venta && venta.tipo === TIPO_ORDEN.traslado) {
         if (!mongoose.models.Sucursal) {
             mongoose.model("Sucursal", Sucursal.schema);
         }
@@ -84,7 +95,7 @@ export async function POST(request) {
                     TIPO_CARGO.responsable
                 ]
             }
-        }).populate(["dependenciaId", "sucursalId"]).lean();
+        }).populate(["dependenciaId", "sucursalId"]).lean<ICargo>();
 
         if (!cargo) {
             return NextResponse.json({ ok: false, error: "Cargo not found" }, { status: 403 });
@@ -93,15 +104,15 @@ export async function POST(request) {
         // Obtener direcciones asociadas al cargo
         let direccionesCargo = [];
         if (cargo.sucursalId) {
-            const sucursal = await Sucursal.findById(cargo.sucursalId).lean();
-            if (sucursal && sucursal.direccionId) {
-                direccionesCargo.push(String(sucursal.direccionId));
+            const sucursal = await Sucursal.findById(cargo.sucursalId._id).lean<ISucursal>();
+            if (sucursal && sucursal.direccionId?._id) {
+                direccionesCargo.push(String(sucursal.direccionId._id));
             }
         }
         if (cargo.dependenciaId) {
-            const dependencia = await Dependencia.findById(cargo.dependenciaId).lean();
-            if (dependencia && dependencia.direccionId) {
-                direccionesCargo.push(String(dependencia.direccionId));
+            const dependencia = await Dependencia.findById(cargo.dependenciaId._id).lean<IDependencia>();
+            if (dependencia && dependencia.direccionId?._id) {
+                direccionesCargo.push(String(dependencia.direccionId._id));
             }
         }
 
@@ -109,12 +120,12 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "No autorizado para descargar en esta dirección" }, { status: 403 });
         }
 
-        if (!rutaDespacho.cargaItemIds.some(id => String(id) === String(item._id))) {
+        if (!rutaDespacho.cargaItemIds.some((i: IItemCatalogo) => String(i._id) === String(item._id))) {
             return NextResponse.json({ ok: false, error: "El item no está en la ruta de despacho" }, { status: 400 });
         }
 
         // Descargar el item: remover de cargaItemIds y crear/actualizar DetalleVenta
-        rutaDespacho.cargaItemIds = rutaDespacho.cargaItemIds.filter(id => String(id) !== String(item._id));
+        rutaDespacho.cargaItemIds = rutaDespacho.cargaItemIds.filter((i: IItemCatalogo) => String(i._id) !== String(item._id));
 
         // Busca el detalle de venta correspondiente donde debería agregarse el item
         let detalleExistente = null;
@@ -130,8 +141,8 @@ export async function POST(request) {
             // Si el detalle es de tipo retiro y corresponde a la subcategoría del item, lo usamos
             if (
                 Array.isArray(detalle.itemCatalogoIds) &&
-                detalle.subcategoriaCatalogoId._id &&
-                String(detalle.subcategoriaCatalogoId) === String(itemCompleto.subcategoriaCatalogoId?._id) &&
+                detalle.subcategoriaCatalogoId?._id &&
+                String(detalle.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId?._id) &&
                 detalle.tipo === 2 // tipo retiro
             ) {
                 detalleExistente = detalle;
@@ -174,7 +185,7 @@ export async function POST(request) {
     
     // Resto de tipos de orden
     const perteneceAlCliente = detalles.some(detalle =>
-        String(detalle.subcategoriaCatalogoId._id) === String(item.subcategoriaCatalogoId._id)
+        String(detalle.subcategoriaCatalogoId?._id) === String(item.subcategoriaCatalogoId._id)
     );
 
     if (!perteneceAlCliente) {
@@ -197,7 +208,7 @@ export async function POST(request) {
         { $addToSet: { itemCatalogoIds: item._id } }
     );
 
-    rutaDespacho.cargaItemIds = rutaDespacho.cargaItemIds.filter(id => !id.equals(item._id));
+    rutaDespacho.cargaItemIds = rutaDespacho.cargaItemIds.filter((i: IItemCatalogo) => String(i._id) !== String(item._id));
 
     const historial = rutaDespacho.historialCarga;
     const now = new Date();
@@ -207,7 +218,7 @@ export async function POST(request) {
         historial[historial.length - 1].esCarga === false
     ) {
         const ultimo = historial[historial.length - 1];
-        if (!ultimo.itemMovidoIds.some(id => id.equals(item._id))) {
+        if (!ultimo.itemMovidoIds.some((id: string) => id  === String(item._id))) {
             ultimo.itemMovidoIds.push(item._id);
             ultimo.fecha = now;
         }

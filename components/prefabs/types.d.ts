@@ -3,52 +3,26 @@ import { IDireccion } from "@/types/direccion";
 import { IRutaDespacho } from "@/types/rutaDespacho";
 import { Types } from "mongoose";
 
-export interface ICilindro {
-    elementos: string;
-    peso: number;
-    altura: number;
-    radio: number;
-    sinSifon: boolean;
-    esIndustrial: boolean;
-    esMedicinal: boolean;
+export interface IVentaView {
+    _id: string;
+    tipo: number;
     estado: number;
-}
-
-interface IRutasConductorResponse {
-    rutaDespacho: IRutaDespacho | null;
-    vehiculos: Array<{
+    comentario?: string;
+    cliente: {
         _id: string;
-        temporalId: string;
-        patente: string;
-        marca: string;
-        modelo: string;
-        nmotor: string;
-        numeroChasis: string;
-        ano: string;
-        empresaId: string;
-        revisionTecnica: string;
-        fechaVencimientoExtintor: string | null;
-        direccionDestinoId: string;
-        choferIds: string[];
-        posicionActual: {
-            latitud: number | null;
-            longitud: number | null;
-        };
-        createdAt: string;
-        updatedAt: string;
-        __v: number;
+        nombre: string;
+        rut: string;
+        direccionesDespacho: Array<IDireccion>;
+        giro: string;
+        telefono: string;
+    },
+    detalles: Array<{
+        _id: string;
+        multiplicador: number;
+        subcategoriaCatalogoId: ICilindroView;
+        itemCatalogoIds: Array<IItemCatalogoView>;
     }>;
-    ok: boolean;
-}
-
-export interface IVehicleView {
-    vehicleId: string;
-    patente: string;
-    marca: string;
-    modelo: string;
-    estado: number;
-    cargados: ICilindro[];
-    descargados: ICilindro[];
+    direccionDespachoId: IDireccionView | null;            
 }
 
 export interface IDetalleVentaActual {
@@ -67,6 +41,7 @@ export interface IDetalleVentaActual {
 export interface IVentaActual {
     nombreCliente: string;
     rutCliente: string;
+    giroCliente: string;
     comentario?: string;
     tipo: 'preparacion' | 'retiroEnLocal' | 'ot' | 'traslado' | 'otros';
     totalCilindros: number;

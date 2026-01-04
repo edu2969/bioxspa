@@ -4,7 +4,7 @@ import { TIPO_ESTADO_VENTA, TIPO_ORDEN } from '@/app/utils/constants';
 import { useQuery } from '@tanstack/react-query';
 import Loader from '../Loader';
 import { IEnTransitoResponse } from '@/types/types';
-import VehicleView from '../prefabs/VehicleView';
+import VehicleView from '../prefabs/VehiculoView';
 import { useRef } from 'react';
 import { BsGeoAltFill } from 'react-icons/bs';
 import { FaRegCheckCircle } from 'react-icons/fa';

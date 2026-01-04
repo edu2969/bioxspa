@@ -137,7 +137,7 @@ export default function PorAsignar({
                         <div className="cursor-pointer" onClick={handleCommentClick}>
                             {!pedido.comentario ? <VscCommentDraft size="1.5rem" /> : <VscCommentUnresolved size="1.5rem" />}
                         </div>
-                        {pedido.comentario && <div className="absolute top-[12px] left-[12px] w-[8px] h-[8px] rounded-full bg-red-600"></div>}
+                        {pedido.comentario && <div className="absolute top-[14px] left-[14px] w-[8px] h-[8px] rounded-full bg-red-600"></div>}
                     </div>
                 </div>
                 
