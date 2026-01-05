@@ -6,17 +6,17 @@ import Loader from "../Loader";
 import { useQuery } from "@tanstack/react-query";
 import { getColorEstanque } from "@/lib/uix";
 
-const sizeByModel = (vehiculo: IVehiculoView): { width: number; height: number } => {
+const sizeByModel = (vehiculo: IVehiculoView): { width: number; height: number, factor: number } => {
     const marca = (vehiculo.marca.split(" ")[0] || "").toLowerCase();
     const modelo = (vehiculo.modelo.split(" ")[0] || "").toLowerCase();
-    if (!marca || !modelo) return { width: 247, height: 191 };
-    const sizes: { [key: string]: [number, number] } = {
-        "hyundai_porter": [247, 173], "ford_ranger": [300, 200], "mitsubishi_l200": [247, 191],
-        "volkswagen_constellation": [300, 200], "volkswagen_delivery": [300, 200], "kia_frontier": [247, 191],
-        "ford_transit": [300, 200], "desconocida_desconocido": [247, 191]
+    if (!marca || !modelo) return { width: 247, height: 191, factor: 1.8 };
+    const sizes: { [key: string]: [number, number, number] } = {
+        "hyundai_porter": [247, 173, 1.8], "ford_ranger": [300, 200, 1.8], "mitsubishi_l200": [247, 191, 1.8],
+        "volkswagen_constellation": [300, 200, 1.8], "volkswagen_delivery": [300, 200, 1.8], "kia_frontier": [247, 191, 1.8],
+        "ford_transit": [300, 200, 1.8], "desconocida_desconocido": [247, 191, 1.8]
     };
     const size = sizes[marca + "_" + modelo] || sizes["desconocida_desconocido"];
-    return { width: size[0], height: size[1] };
+    return { width: size[0], height: size[1], factor: size[2] };
 };
 
 const calculateTubePosition = (index: number) => {
@@ -29,15 +29,6 @@ const calculateTubePosition = (index: number) => {
     const left = baseLeft + Number(!(index % 2)) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
 
     return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
-};
-
-const imagenVehiculo = (vehiculo: IVehiculoView | undefined): { url: string; width: number; height: number } => {
-    const defecto = { url: "desconocida_desconocido", width: 247, height: 191 };
-    if (!vehiculo || vehiculo === undefined) return defecto;
-    const marca = (vehiculo.marca.split(" ")[0] || "").toLowerCase();
-    const modelo = (vehiculo.modelo.split(" ")[0] || "").toLowerCase();
-    const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
-    return { url: imagen, ...sizeByModel(vehiculo) };
 };
 
 export default function VehiculoView({
@@ -64,6 +55,33 @@ export default function VehiculoView({
         enabled: !!rutaId
     });
 
+    
+
+const imagenVehiculo = (vehiculo: IVehiculoView | undefined): { url: string; width: number; height: number } => {
+    const defecto = { url: "desconocida_desconocido", width: 247, height: 191 };
+    if (!vehiculo || vehiculo === undefined) return defecto;
+    const marca = (vehiculo.marca.split(" ")[0] || "").toLowerCase();
+    const modelo = (vehiculo.modelo.split(" ")[0] || "").toLowerCase();
+    const imagen = `${marca}_${modelo}`.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').toLowerCase();
+    return escalar({ url: imagen, ...sizeByModel(vehiculo) });
+};
+    
+    const escalar = (imagen: { 
+        url: string; 
+        width: number; 
+        height: number; 
+        factor: number 
+    }): 
+        { url: string; width: number; height: number, factor: number } => {
+        const factor = 1.8 * imagen.width / parentSize.width;
+        return {
+            url: imagen.url,
+            width: imagen.width * factor,
+            height: imagen.height * factor,
+            factor: imagen.factor
+        };
+    }
+
     useEffect(() => {
         if (parentRef.current) {
             const { width, height } = parentRef.current.getBoundingClientRect();
@@ -85,11 +103,12 @@ export default function VehiculoView({
                 height={imagenVehiculo(vehiculo).height} priority />
 
             {!loadingVehiculo && <>
-                <div className="absolute top-6 mt-2 w-full">
+                <div className="absolute top-10 mt-2 w-full">
                     <CargaCilindros
                         cargados={cargados}
                         marca={vehiculo?.marca || ''}
-                        modelo={vehiculo?.modelo || ''} />
+                        modelo={vehiculo?.modelo || ''}
+                        factor={1.2 * imagenVehiculo(vehiculo).width / parentSize.width} />
                 </div>
 
                 <Image className="absolute" src={`/ui/${imagenVehiculo(vehiculo).url}_front.png`}
@@ -117,7 +136,7 @@ export default function VehiculoView({
             </>}
 
             {vehiculo && vehiculo.patente ? <div className="w-full text-gray-500 mr-0 items-end flex justify-end mb-0 h-full">
-                <div className="w-[76px] text-center bg-white rounded-md p-0.5">
+                <div className="w-[76px] text-center bg-white rounded-md p-0.5 border-2 border-white">
                     <div className="flex justify-start md:justify-start bg-white rounded-sm border-gray-400 border px-0.5 pb-0.5 space-x-0.5 shadow-md">
                         <p className="font-bold text-sm">{vehiculo.patente.substring(0, 2)}</p>
                         <Image width={82} height={78} src="/ui/escudo.png" alt="separador" className="w-[9px] h-[9px]" style={{ "marginTop": "7px" }} />

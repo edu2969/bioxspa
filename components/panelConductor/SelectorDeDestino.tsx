@@ -1,26 +1,32 @@
 import { TbFlagCheck } from "react-icons/tb";
-import { IRutaDespachoView } from "../prefabs/types";
+import { IRutaConductorView } from "@/types/types";
 import { TIPO_ORDEN } from "@/app/utils/constants";
 import { FaMapLocationDot, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
 import { useForm } from "react-hook-form";
 import { Selector } from "../prefabs/Selector";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import getVentaActual from "./utils";
 import Loader from "../Loader";
 import { FaFlagCheckered } from "react-icons/fa";
+
+const getVentaActual = (rutaDespacho: IRutaConductorView) => {
+    if(!rutaDespacho) return null;
+    const tramoActual = rutaDespacho.tramos?.find(tramo => tramo.fechaArribo == null);
+    if (!tramoActual) return null;
+    return tramoActual;
+};
 
 export default function SelectorDeDestino({
     rutaDespacho
 }: {
-    rutaDespacho: IRutaDespachoView;
+    rutaDespacho: IRutaConductorView;
 }) {
     const { register, getValues } = useForm();
     const queryClient = useQueryClient();
 
 const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
         mutationFn: async () => {
-            if (!rutaDespacho?._id || !rutaDespacho.ruta[rutaDespacho.ruta.length - 1]?.direccionDestinoId) {
+            if (!rutaDespacho?._id || !getValues("direccionDestinoId")) {
                 throw new Error('Missing rutaId or direccionId');
             }
 
@@ -51,21 +57,23 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
     });
     
 
-    return (<div className="w-full flex flex-col items-end">
+    return <div className="w-full flex flex-col items-center mb-5">
         {getVentaActual(rutaDespacho)?.tipo === TIPO_ORDEN.traslado &&
             <div className="w-full bg-neutral-100 rounded p-2 mb-4">
                 <p className="text-xs">Misión:</p>
                 <p className="text-xl">RETIRO DE CILINDROS</p>
             </div>}
 
-        <div className="flex flex-row items-start justify-center gap-3 mb-6">
+        <div className="flex flex-row items-start justify-center mb-6 mx-auto space-x-3">
 
             <div className="flex flex-col items-center mt-1 ml-2">
                 <TbFlagCheck className="text-xl mb-4 w-6" />
 
-                {rutaDespacho && rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div className="h-12" key={`ruta_${indexRuta}`}>
+                {rutaDespacho && rutaDespacho.tramos?.length > 0 
+                && rutaDespacho.tramos.map((tramo, indexRuta) => (
+                <div className="h-12" key={`ruta_${indexRuta}`}>
                     <div className="h-4" />
-                    {ruta.fechaArribo
+                    {tramo.fechaArribo
                         ? <TbFlagCheck className="text-xl mt-1" />
                         : <FaTruckFast className="text-xl mt-1 w-6" />}
                 </div>))}
@@ -74,9 +82,11 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
             <div className="flex flex-col items-center justify-start h-full">
                 <div className="flex flex-col items-center mt-1">
                     <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
-                    {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div className="w-6" key={`ruta_${indexRuta}`}>
-                        <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
-                        <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" /></div>))}
+                    {rutaDespacho.tramos?.length > 0 && rutaDespacho.tramos.map((tramo, indexRuta) => (
+                        <div className="w-6" key={`ruta_${indexRuta}`}>
+                            <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
+                            <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
+                        </div>))}
                 </div>
             </div>
 
@@ -84,14 +94,14 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
                 <div className="w-full flex mt-1 h-12 items-center">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" /><span className="text-sm ml-2">Barros Arana</span>
                 </div>
-                {rutaDespacho.ruta.length > 0 && rutaDespacho.ruta.map((ruta, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
+                {rutaDespacho.tramos?.length > 0 && rutaDespacho.tramos.map((tramo, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" />
-                    <span className="text-xs ml-2 w-36">{ruta.direccionDestinoId
-                        && ruta.direccionDestinoId.nombre?.split(",").slice(0, 3).join(",")}</span>
-                    {indexRuta == rutaDespacho.ruta.length - 1 && <button
+                    <span className="text-xs ml-2 w-36">{tramo.direccionDestino
+                        && tramo.direccionDestino.nombre?.split(",").slice(0, 3).join(",")}</span>
+                    {indexRuta == rutaDespacho.tramos?.length - 1 && <button
                         className="bg-blue-400 text-white font-bold rounded-md shadow-md w-10 h-10 pl-2"
                         onClick={() => {
-                            const destino = `${ruta.direccionDestinoId && ruta.direccionDestinoId.latitud},${ruta.direccionDestinoId && ruta.direccionDestinoId.longitud}`;
+                            const destino = `${tramo.direccionDestino && tramo.direccionDestino.latitud},${tramo.direccionDestino && tramo.direccionDestino.longitud}`;
                             // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
                             window.open(
                                 `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`,
@@ -105,36 +115,23 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
             </div>
         </div>
         
-        {getVentaActual(rutaDespacho)?.direccionDespachoId == null && <Selector 
-            options={rutaDespacho ? rutaDespacho.ventaIds
-                .flatMap(venta =>
-                    venta.clienteId.direccionesDespacho
-                        .filter(dir => {
-                            // Excluir direcciones ya entregadas (fechaArribo != null en la ruta)
-                            const entregada = rutaDespacho.ruta.some(
-                                r => r.direccionDestinoId?._id === dir.direccionId._id && r.fechaArribo != null
-                            );
-                            // Excluir si ya está en la ruta pendiente de entrega
-                            const yaEnRutaPendiente = rutaDespacho.ruta.some(
-                                r => r.direccionDestinoId?._id === dir.direccionId._id && r.fechaArribo == null
-                            );
-                            return !entregada && !yaEnRutaPendiente;
-                        })
-                        .map(dir => ({
-                            ventaId: venta._id,
-                            clienteNombre: venta.clienteId.nombre,
-                            direccion: dir
-                        }))
-                ) : []}
+        {getVentaActual(rutaDespacho)?.direccionDestino == null && <Selector 
+            options={rutaDespacho ? rutaDespacho.tramos?.map(tramo => {
+                return {
+                    ventaId: tramo.ventaId,
+                    clienteNombre: tramo.cliente.nombre,
+                    direccion: tramo.direccionDestino ? tramo.direccionDestino.nombre : 'Sin dirección'
+                }}) : []}
             register={register("direccionDestinoId")}
             label="Destino"
-            placeholder={rutaDespacho && rutaDespacho.ruta.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
-            getLabel={(option) => `${option.clienteNombre} | ${option.direccion.direccionId.nombre}`}
+            placeholder={rutaDespacho && rutaDespacho.tramos?.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
+            getLabel={(option) => `${option.clienteNombre} | ${option.direccion}`}
             getValue={(option) => option.ventaId}
         />}
 
-        {rutaDespacho.ruta?.filter(r => r.fechaArribo != null).length < rutaDespacho.ventaIds.length && <div className="flex flex-row items-center justify-center">
-            <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${rutaDespacho.ruta.length == 0 || rutaDespacho.ruta[rutaDespacho.ruta.length - 1].fechaArribo ? 'opacity-50 cursor-not-allowed' : ''}`}
+        {rutaDespacho.tramos?.filter(r => r.fechaArribo != null).length < rutaDespacho.tramos?.length && 
+        <div className="flex flex-row w-full items-center justify-center">
+            <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${rutaDespacho.tramos?.length == 0 || rutaDespacho.tramos[rutaDespacho.tramos.length - 1].fechaArribo ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => iniciarViaje()}
                 disabled={isLoading}>
                 {isLoading ? <div className="mt-1">
@@ -146,5 +143,5 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
                     </div>}
             </button>
         </div>}
-    </div>);
+    </div>;
 }

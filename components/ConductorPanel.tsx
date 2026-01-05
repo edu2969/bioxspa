@@ -14,7 +14,6 @@ import SelectorDeDestino from "./panelConductor/SelectorDeDestino";
 import ConfirmacionLlegadaADestino from "./panelConductor/ConfirmacionLlegadaADestino";
 import GestorDeDescarga from "./panelConductor/GestorDeDescarga";
 import PowerScanView from "./prefabs/powerScan/PowerScanView";
-import getVentaActual from "./panelConductor/utils";
 import VehiculoView from "./prefabs/VehiculoView";
 import { FaClipboardCheck } from "react-icons/fa";
 
@@ -27,6 +26,7 @@ export default function ConductorPanel() {
             const response = await fetch(`/api/conductor/rutaAsignada`);
             const data = await response.json();
             if(!data.ruta) return null;
+            console.log("Ruta de despacho del conductor:", data.ruta);
             return data.ruta;
         }
     });
@@ -68,20 +68,19 @@ export default function ConductorPanel() {
             <ChecklistProvider tipo="vehiculo">                
                 {ruta && <VehiculoView rutaId={ruta._id} cargados={cargados || []} descargados={descarga || []} />}
 
-                <div className="flex flex-col items-end fixed bottom-0">
+                <div className="w-full flex flex-col items-end fixed bottom-0">
 
                     {!loadingRuta && ruta && ruta && scanMode && <PowerScanView
                         setScanMode={setScanMode}
                         scanMode={scanMode}
                         rutaId={String(ruta._id)}
-                        ventaId={getVentaActual(ruta)?._id ?? null} />}
+                        ventaId={ruta._id} />}
 
                     {!loadingEstado && ruta && <div className="w-full h-screen flex flex-col justify-end px-4 -mb-1 space-y-4">
 
                         {(estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion ||
                             estado === TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && ruta &&
-                            <InformacionDeCarga 
-                                rutaDespacho={ruta} 
+                            <InformacionDeCarga rutaDespacho={ruta} 
                                 estado={estado}/>}
 
                         {(estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
@@ -89,15 +88,17 @@ export default function ConductorPanel() {
                             <SelectorDeDestino rutaDespacho={ruta} />}
 
                         {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta &&
-                            <ConfirmacionLlegadaADestino rutaDespacho={ruta} />}
+                            <ConfirmacionLlegadaADestino 
+                                rutaDespacho={ruta}
+                                estado={estado} />}
 
                         {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && <>
                             <SoundPlayerProvider>
                                 {scanMode &&
                                     <PowerScanView setScanMode={setScanMode}
                                         scanMode={scanMode}
-                                        rutaId={String(ruta._id)}
-                                        ventaId={getVentaActual(ruta)?._id ?? null} />}
+                                        rutaId={ruta._id}
+                                        ventaId={null} />}
                             </SoundPlayerProvider>
                             <GestorDeDescarga 
                                 rutaDespacho={ruta} 

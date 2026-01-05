@@ -8,13 +8,13 @@ import { authOptions } from '@/app/utils/authOptions';
 import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
 import { IRutaDespacho } from '@/types/rutaDespacho';
 import { IUser } from '@/types/user';
-import { IRutaConductorView } from '@/types/types';
+import { IRutaConductorView, ITramoView } from '@/types/types';
 import { IDireccion } from '@/types/direccion';
 
 export async function GET() {
     try {
         console.log("GET request received for ruta asignada.");
-        
+
         await connectMongoDB();
         console.log("MongoDB connected.");
 
@@ -28,7 +28,7 @@ export async function GET() {
 
         const userId = session.user.id;
         console.log(`Fetching user with ID: ${userId}`);
-        
+
         // Verificar que el usuario existe y es conductor
         const user = await User.findById(userId).lean<IUser>();
         if (!user) {
@@ -42,47 +42,47 @@ export async function GET() {
         }
 
         console.log(`Fetching active rutaDespacho for conductor: ${userId}`);
-        
+
         // Buscar ruta de despacho activa para el conductor con población de datos
         const rutaDespacho = await RutaDespacho.findOne({
             choferId: userId,
-            estado: { 
-                $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
-                $lte: TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado 
+            estado: {
+                $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                $lte: TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
             }
         })
-        .populate({
-            path: 'ruta.direccionDestinoId',
-            model: 'Direccion'
-        })
-        .populate({
-            path: 'ventaIds',
-            model: 'Venta',
-            populate: {
-                path: 'clienteId',
-                model: 'Cliente',
+            .populate({
+                path: 'ruta.direccionDestinoId',
+                model: 'Direccion'
+            })
+            .populate({
+                path: 'ventaIds',
+                model: 'Venta',
                 populate: {
-                    path: 'direccionId',
-                    model: 'Direccion'
+                    path: 'clienteId',
+                    model: 'Cliente',
+                    populate: {
+                        path: 'direccionId',
+                        model: 'Direccion'
+                    }
                 }
-            }
-        })
-        .lean<IRutaDespacho>();
+            })
+            .lean<IRutaDespacho>();
 
         if (!rutaDespacho) {
             console.log(`No active rutaDespacho found for conductor: ${userId}`);
-            return NextResponse.json({ 
-                ok: true, 
+            return NextResponse.json({
+                ok: true,
                 rutaId: null,
-                message: "No hay ruta activa asignada" 
+                message: "No hay ruta activa asignada"
             });
         }
 
         console.log(`Found active rutaDespacho ID: ${rutaDespacho._id} with estado: ${rutaDespacho.estado}`);
-        
+
         // Determinar la venta actual basada en la última dirección de la ruta
         let ventaActual = null;
-        
+
         if (rutaDespacho.ventaIds && rutaDespacho.ventaIds.length > 0) {
             if (rutaDespacho.ventaIds.length === 1) {
                 // Si solo hay una venta, es la actual
@@ -90,13 +90,13 @@ export async function GET() {
             } else if (rutaDespacho.ruta && rutaDespacho.ruta.length > 0) {
                 // Si hay múltiples ventas, buscar la que corresponde a la última dirección de la ruta
                 const ultimaDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1]?.direccionDestinoId?._id;
-                
+
                 if (ultimaDireccionId) {
-                    ventaActual = rutaDespacho.ventaIds.find(venta => 
+                    ventaActual = rutaDespacho.ventaIds.find(venta =>
                         venta.direccionDespachoId && String(venta.direccionDespachoId._id) === String(ultimaDireccionId)
                     );
                 }
-                
+
                 // Si no se encuentra por dirección de despacho, usar la primera venta como fallback
                 if (!ventaActual) {
                     ventaActual = rutaDespacho.ventaIds[0];
@@ -109,11 +109,11 @@ export async function GET() {
 
         if (!ventaActual) {
             console.log(`No venta found for rutaDespacho: ${rutaDespacho._id}`);
-            return NextResponse.json({ 
-                ok: true, 
+            return NextResponse.json({
+                ok: true,
                 rutaId: String(rutaDespacho._id),
                 estado: rutaDespacho.estado,
-                message: "No hay venta asignada en la ruta" 
+                message: "No hay venta asignada en la ruta"
             });
         }
 
@@ -133,23 +133,40 @@ export async function GET() {
         // Construir la respuesta según IRutaConductorView
         const rutaConductorView: IRutaConductorView = {
             _id: String(rutaDespacho._id),
-            cliente: {
-                nombre: cliente?.nombre || 'Cliente no encontrado',
-                direccion: direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección no disponible',
-                telefono: cliente?.telefono || '',
-                direccionDespacho: direccionDespacho?.nombre || direccionDespacho?.direccionOriginal || direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección de despacho no disponible'
-            },
-            comentario: ventaActual.comentario || undefined,
-            quienRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0 
-                ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].nombreRecibe || undefined
-                : undefined,
-            rutRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0 
-                ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].rutRecibe || undefined
-                : undefined
+            tramos: rutaDespacho.ruta.map((ruta): ITramoView => {
+                const direccion = rutaDespacho.ventaIds.find(venta =>
+                    venta.direccionDespachoId && String(venta.direccionDespachoId) === String(ruta.direccionDestinoId?._id)
+                );
+
+                return {
+                    ventaId: direccion ? String(direccion._id) : '',
+                    cliente: {
+                        nombre: cliente?.nombre || 'Cliente no encontrado',
+                        direccion: direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección no disponible',
+                        telefono: cliente?.telefono || '',
+                        direccionDespacho: direccionDespacho?.nombre || direccionDespacho?.direccionOriginal || direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección de despacho no disponible'
+                    },
+                    comentario: ventaActual.comentario || undefined,
+                    quienRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0
+                        ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].nombreRecibe || undefined
+                        : undefined,
+                    rutRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0
+                        ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].rutRecibe || undefined
+                        : undefined,
+                    tipo: ventaActual.tipo,
+                    fechaArribo: ruta.fechaArribo || null,
+                    direccionDestino: ruta.direccionDestinoId ? {
+                        _id: String(ruta.direccionDestinoId._id),
+                        nombre: ruta.direccionDestinoId.nombre || '',
+                        latitud: ruta.direccionDestinoId.latitud || 0,
+                        longitud: ruta.direccionDestinoId.longitud || 0
+                    } : null,
+                }
+            }),
         };
-        
-        return NextResponse.json({ 
-            ok: true, 
+
+        return NextResponse.json({
+            ok: true,
             ruta: rutaConductorView
         });
 

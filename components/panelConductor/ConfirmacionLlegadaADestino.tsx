@@ -1,20 +1,27 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MdBusAlert } from "react-icons/md"
-import { IRutaDespachoView } from "../prefabs/types";
+import { IRutaConductorView } from "@/types/types";
 import { useState } from "react";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN } from "@/app/utils/constants";
 import { FaBuildingFlag } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
-import getVentaActual from "./utils";
 import Loader from "../Loader";
 import { LuFlagOff } from "react-icons/lu";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
 
+const getVentaActual = (rutaDespacho: IRutaConductorView) => {
+    const tramoActual = rutaDespacho.tramos.find(tramo => tramo.fechaArribo == null);
+    if (!tramoActual) return null;
+    return tramoActual;
+};
+
 export default function ConfirmacionLlegadaADestino({
-    rutaDespacho
+    rutaDespacho,
+    estado
 }: {
-    rutaDespacho: IRutaDespachoView;
+    rutaDespacho: IRutaConductorView;
+    estado: number;
 }) {
     const queryClient = useQueryClient();
     const [esperaConfirmacion, setEsperaConfirmacion] = useState(false);
@@ -92,7 +99,7 @@ export default function ConfirmacionLlegadaADestino({
 
     return (<div className="bg-white/80 rounded-t-lg px-2 py-4 shadow-lg w-full">
         <form>
-            {rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="flex flex-col items-center justify-center space-y-3">
+            {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="flex flex-col items-center justify-center space-y-3">
                 <h1 className="font-bold text-2xl">Conduce con precaución.</h1>
                 <MdBusAlert size="8rem" className="text-yellow-400" />
                 <span className="text-xl">Al llegar, avisas presionando el botón</span>
@@ -103,13 +110,13 @@ export default function ConfirmacionLlegadaADestino({
                 </button>
             </div>}
 
-            {rutaDespacho.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="w-full">
+            {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="w-full">
                 <FaBuildingFlag size="9rem" className="text-yellow-500 mb-4 mx-auto" />
                 <div>
                     <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
                     <div className="flex bg-blue-400 text-white border-lg shadow-md rounded-lg mx-2 p-2">
                         <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
-                        <p className="text-xl text-center">{rutaDespacho.ruta[rutaDespacho.ruta.length - 1].direccionDestinoId?.nombre || "un destino"}</p>
+                        <p className="text-xl text-center">{rutaDespacho.tramos[rutaDespacho.tramos.length - 1].direccionDestinoId?.nombre || "un destino"}</p>
                     </div>
 
                     <div className="w-full px-6 py-4 bg-white mx-auto">

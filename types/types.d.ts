@@ -208,17 +208,11 @@ export interface IDireccion {
     longitud: number;
 }
 
-export interface IRutaView {
-    direccionDestinoId: IDireccion | null;
-    fechaArribo: Date | null;
-}
-
-export interface IListadoDescargaView {
-    cilindros: ICilindroView[];
-}
-
-export interface IRutaConductorView {
-    _id: string;
+export interface ITramoView {
+    ventaId: string;
+    tipo: number; // TIPO_ORDEN
+    direccionDestino: IDireccion | null;
+    fechaArribo: Date | null;    
     cliente: {
         nombre: string;
         direccion: string;
@@ -227,7 +221,16 @@ export interface IRutaConductorView {
     },
     comentario?: string;
     quienRecibe?: string;
-    rutRecibe?: string;    
+    rutRecibe?: string;
+}
+
+export interface IListadoDescargaView {
+    cilindros: ICilindroView[];
+}
+
+export interface IRutaConductorView {
+    _id: string;
+    tramos: ITramoView[];
 }
 
 export interface IVehiculoView {

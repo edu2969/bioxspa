@@ -32,11 +32,11 @@ export function Selector<T>({
           register.onChange(e);
           onChange?.(e.target.value);
         }}
-        disabled={isLoading}        
+        disabled={isLoading}
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
       >
         <option value="">{isLoading ? `Cargando${label ? " " + label : ""}...` : (placeholder || `Seleccione${label ? " " + label : ""}...`)}</option>
-        {options.map((item, idx) => (
+        {options?.map((item, idx) => (
           <option key={idx} value={getValue(item)}>
             {getLabel(item)}
           </option>

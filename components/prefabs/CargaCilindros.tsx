@@ -38,7 +38,7 @@ const offsetByModel = (marca: string, modelo: string) => {
     };
 }
 
-function calculateTubePosition(index: number, marca: string, modelo: string) {
+function calculateTubePosition(index: number, marca: string, modelo: string, factor: number) {
     const offsets = offsetByModel(marca, modelo);
     const baseTop = offsets.baseTop;
     const baseLeft = offsets.baseLeft;
@@ -48,14 +48,15 @@ function calculateTubePosition(index: number, marca: string, modelo: string) {
     const top = baseTop + Number(!(index % 2)) * verticalIncrement - Math.floor(index / 2) * verticalIncrement - Math.floor(index / 4) * verticalIncrement; // Ajuste vertical con perspectiva y separación de grupos
     const left = baseLeft + Number(!(index % 2)) * 14 + Math.floor(index / 2) * 12 + Math.floor(index / 4) * 8; // Ajuste horizontal con perspectiva
 
-    return { top, left, width: (14 * scaleFactor) + 'px', height: (78 * scaleFactor) + 'px' };
+    return { top, left, width: (14 * scaleFactor * factor) + 'px', height: (78 * scaleFactor * factor) + 'px' };
 }
 
 export default function CargaCilindros({
-    marca, modelo, cargados
+    marca, modelo, factor, cargados
 }: {
     marca: string;
     modelo: string,
+    factor: number,
     cargados: Array<ICilindroView>
 }) {
     const memoizedCalculateTubePosition = useMemo(() => calculateTubePosition, []);
@@ -64,16 +65,16 @@ export default function CargaCilindros({
         {cargados.reverse().map((item, index) => {
             // Deducción de descargado usando historialCarga                                                        
             const elem = item.elemento;
-            const pos = memoizedCalculateTubePosition(index, marca, modelo);
+            const pos = memoizedCalculateTubePosition(index, marca, modelo, factor);
             return (
                 <Image
                     key={index}
                     src={`/ui/tanque_biox${getColorEstanque(elem)}.png`}
                     alt={`tank_${index}`}
-                    width={14 * 4}
-                    height={78 * 4}
+                    width={14 * 4 * factor}
+                    height={78 * 4 * factor}
                     className={`absolute`}
-                    style={calculateTubePosition(cargados.length - index - 1, marca, modelo)}
+                    style={calculateTubePosition(cargados.length - index - 1, marca, modelo, factor)}
                     priority={false}
                 />
             );

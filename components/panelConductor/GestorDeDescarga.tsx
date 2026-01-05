@@ -1,6 +1,5 @@
 import { FaRoadCircleCheck } from "react-icons/fa6";
 import { ICilindroView, IItemDeCargaView, IListadoDescargaView, IRutaConductorView } from "@/types/types";
-import getVentaActual from "./utils";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN } from "@/app/utils/constants";
 import { useState, useRef } from "react";
 import toast from "react-hot-toast";
@@ -10,6 +9,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNUCode } from "@/lib/nuConverter";
 import Loader from "../Loader";
 import ConfirmacionLlegadaADestino from "./ConfirmacionLlegadaADestino";
+
+const getVentaActual = (ruta: IRutaConductorView) => {
+    const tramoActual = ruta.tramos.find(tramo => tramo.fechaArribo === null);
+    if (!tramoActual) return null;
+    return tramoActual;
+}
 
 export default function GestorDeDescarga({
     rutaDespacho, estado, carga, descarga
@@ -89,14 +94,16 @@ export default function GestorDeDescarga({
     };
 
     return (<>
-        {!descargando && <ConfirmacionLlegadaADestino rutaDespacho={rutaDespacho} />}
+        {!descargando && <ConfirmacionLlegadaADestino 
+            rutaDespacho={rutaDespacho} 
+            estado={estado} />}
 
         {descargando && estado === TIPO_ESTADO_RUTA_DESPACHO.descarga
             && (<div className="flex flex-col w-full">
 
                 <div className="w-full mb-2">
                     {(() => {
-                        const cliente = rutaDespacho.cliente;
+                        const cliente = getVentaActual(rutaDespacho)?.cliente;
                         const ventaActual = getVentaActual(rutaDespacho);
                         return (
                             <div className="w-full flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
