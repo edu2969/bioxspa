@@ -6,6 +6,23 @@ import { BsGeoAltFill } from 'react-icons/bs';
 import { useQuery } from '@tanstack/react-query';
 import { IHistorialVentaView } from '@/types/types';
 
+// Función para formatear duración de segundos a horas:minutos
+const formatDuration = (seconds: number): string => {
+    if (seconds < 60) {
+        return `${seconds}s`;
+    }
+    
+    const totalMinutes = Math.floor(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours === 0) {
+        return `${minutes}m`;
+    }
+    
+    return `${hours}h ${minutes}m`;
+};
+
 export default function HistorialTab({ ventaId } : {
     ventaId: string | null;
 }) {
@@ -27,12 +44,12 @@ export default function HistorialTab({ ventaId } : {
                         {/* Tiempos a la izquierda */}
                         <div className="flex flex-col items-end mr-2">
                             {historial.map((item, idx) => (
-                                <div key={idx} className="flex flex-col items-end justify-center h-16">
+                                <div key={idx} className="flex flex-col items-end justify-center h-20">
                                     <div className="flex items-center mt-8">
                                         {item.duracion && (
                                             <>
                                                 <FaClock className="mr-1 text-gray-400" />
-                                                <span className="text-xs">{item.duracion}</span>
+                                                <span className="text-xs">{formatDuration(item.duracion)}</span>
                                             </>
                                         )}
                                     </div>
@@ -53,7 +70,7 @@ export default function HistorialTab({ ventaId } : {
                                     </div>
                                     {/* Línea vertical excepto el último */}
                                     {idx < arr.length - 1 && (
-                                        <div className={`w-2 h-[40px] ${idx < historial.length ? 'bg-blue-400' : 'bg-gray-200'} mx-auto`} />
+                                        <div className={`w-2 h-[56px] ${idx < historial.length ? 'bg-blue-400' : 'bg-gray-200'} mx-auto`} />
                                     )}
                                 </Fragment>
                             ))}
@@ -62,18 +79,31 @@ export default function HistorialTab({ ventaId } : {
                     {/* Detalle de cada punto */}
                     <div className="flex flex-col items-start justify-start h-full ml-2 mt-1">
                         {historial.map((item, idx) => (
-                            <div key={idx} className="h-16">
-                                <div className="flex flex-col h-16">
-                                    <div className={`font-bold ${idx < historial.length ? 'text-gray-900' : 'text-gray-400'}`}>
-                                        {item.estado}
+                            <div key={idx} className="h-20">
+                                <div className="flex flex-col h-20 justify-start">
+                                    {/* Nombre del estado */}
+                                    <div className={`font-bold text-sm ${idx < historial.length ? 'text-gray-900' : 'text-gray-400'}`}>
+                                        {item.titulo}
                                     </div>
+                                    {/* Fecha formateada */}
+                                    <div className="text-xs text-gray-600 mt-1">
+                                        {new Date(item.fecha).toLocaleDateString('es-CL', {
+                                            day: '2-digit',
+                                            month: '2-digit', 
+                                            year: 'numeric'
+                                        })} {new Date(item.fecha).toLocaleTimeString('es-CL', {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: false
+                                        })}
+                                    </div>
+                                    {/* Dirección con icono */}
                                     {item.descripcion && (
-                                        <div className="text-xs text-gray-500">{item.descripcion}</div>
+                                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                                            <BsGeoAltFill className="mr-1" />
+                                            {item.descripcion}
+                                        </div>
                                     )}
-                                    <div className="flex items-center text-xs text-gray-500">
-                                        {item.descripcion && <BsGeoAltFill className="mr-1" />}
-                                        {item.fecha.toLocaleString()}
-                                    </div>
                                 </div>
                             </div>
                         ))}

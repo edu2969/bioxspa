@@ -35,6 +35,20 @@ export default function Asignacion() {
     const [selectedChofer, setSelectedChofer] = useState<{ _id: string, nombre: string } | null>(null);
     const [selectedVenta, setSelectedVenta] = useState<{ _id: string, cliente: string, comentario: string | null } | null>(null);
 
+    // Función para manejar la apertura del modal de detalle de orden
+    const handleShowDetalleOrdenModal = (show: boolean, pedido?: { _id: string; clienteNombre?: string; comentario?: string | null }) => {
+        setShowDetalleOrdenModal(show);
+        if (show && pedido) {
+            setSelectedVenta({ 
+                _id: pedido._id, 
+                cliente: pedido.clienteNombre || 'Cliente desconocido', 
+                comentario: pedido.comentario || null 
+            });
+        } else {
+            setSelectedVenta(null);
+        }
+    };
+
     // Función callback unificada para manejo de comentarios
     const handleShowCommentModal = (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => {
         setVentaIdForComment(ventaId);
@@ -271,12 +285,12 @@ export default function Asignacion() {
                         <PorAsignar
                             control={control}
                             onShowCommentModal={handleShowCommentModal}
-                            setShowDetalleOrdenModal={setShowDetalleOrdenModal}
+                            setShowDetalleOrdenModal={handleShowDetalleOrdenModal}
                         />
                         <Conductores
                             control={control}
                             onShowCommentModal={handleShowCommentModal}
-                            setShowDetalleOrdenModal={setShowDetalleOrdenModal}
+                            setShowDetalleOrdenModal={handleShowDetalleOrdenModal}
                         />
                     </div>
 
@@ -407,7 +421,7 @@ export default function Asignacion() {
                     ventaId={selectedVenta?._id || null}
                     show={showDetalleOrdenModal}
                     onClose={() => {
-                        setShowDetalleOrdenModal(false);
+                        handleShowDetalleOrdenModal(false);
                     }}
                     loading={isSaving}
                 />

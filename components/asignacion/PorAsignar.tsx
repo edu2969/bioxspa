@@ -26,7 +26,7 @@ export default function PorAsignar({
     onShowCommentModal,
 }: {
     control: Control<INuevaVentaSubmit>;
-    setShowDetalleOrdenModal: Dispatch<SetStateAction<boolean>>;
+    setShowDetalleOrdenModal: (show: boolean, pedido?: IPedidoPorAsignar) => void;
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const [redirecting, setRedirecting] = useState(false);
@@ -82,7 +82,7 @@ export default function PorAsignar({
             console.log("CLICK!");
             if (!isDragging) {
                 console.log("👆 CLICK EVENT");
-                setShowDetalleOrdenModal(true);
+                setShowDetalleOrdenModal(true, pedido);
             }
         };
 

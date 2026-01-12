@@ -17,7 +17,7 @@ export default function Conductores({
     onShowCommentModal,
 }: {
     control: Control<INuevaVentaSubmit>;
-    setShowDetalleOrdenModal: (show: boolean, pedido?: IPedidoConductor) => void;
+    setShowDetalleOrdenModal: (show: boolean, pedido?: { _id: string; clienteNombre?: string; comentario?: string | null }) => void;
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const sucursalId = useWatch({
@@ -72,7 +72,7 @@ export default function Conductores({
                         pedido={pedido as any} // TODO: tipar correctamente
                         choferId={chofer._id}
                         onSaveComment={onSaveComment}
-                        onShowDetalle={() => setShowDetalleOrdenModal(true)}
+                        onShowDetalle={() => setShowDetalleOrdenModal(true, { _id: (pedido as IPedidoConductor)._id, clienteNombre: (pedido as IPedidoConductor).nombreCliente, comentario: (pedido as IPedidoConductor).comentario })}
                         onShowCommentModal={onShowCommentModal}
                         indexPedido={indexPedido}
                     />
