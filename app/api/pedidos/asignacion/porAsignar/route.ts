@@ -34,17 +34,14 @@ export async function GET(request: NextRequest) {
     console.log("Fetching ventas in 'borrador' state...");
     const ventas = await Venta.find({
         sucursalId,
-        $or: [{
-            estado: TIPO_ESTADO_VENTA.por_asignar,
-        }, {
-            estado: {
-                $in: [
-                    TIPO_ESTADO_VENTA.pagado,
-                    TIPO_ESTADO_VENTA.entregado,
-                    TIPO_ESTADO_VENTA.cerrado,
-                ]
-            }
-        }]
+        estado: {
+            $in: [
+                TIPO_ESTADO_VENTA.por_asignar,
+                TIPO_ESTADO_VENTA.pagado,
+                TIPO_ESTADO_VENTA.entregado,
+                TIPO_ESTADO_VENTA.cerrado,
+            ]
+        }
     })
     .sort({ fecha: -1 }) // Ordenar por fecha descendente (más reciente primero)
     .limit(25)

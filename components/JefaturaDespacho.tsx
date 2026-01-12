@@ -28,6 +28,7 @@ export default function JefaturaDespacho() {
     queryFn: async () => {
       const response = await fetch("/api/pedidos/despacho");
       const data = await response.json();
+      console.log("CARGAMENTOS DE DESPACHO:", data);
       return data.cargamentos;
     }
   });

@@ -11,7 +11,7 @@ import 'dayjs/locale/es';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MdDragIndicator } from 'react-icons/md';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
-import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IPedidoPorAsignar } from '@/types/types';
 import { Control, useWatch } from 'react-hook-form';
 import { INuevaVentaSubmit } from '../pedidos/types';
@@ -30,7 +30,7 @@ export default function PorAsignar({
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const [redirecting, setRedirecting] = useState(false);
-    // const [expandido] = useState<{ [key:number]: boolean }>({});  // No usado actualmente
+    const queryClient = useQueryClient();
 
     const sucursalId = useWatch({
         control,

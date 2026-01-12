@@ -5,7 +5,7 @@ import { useState, useRef } from "react";
 import toast from "react-hot-toast";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 import { BsQrCodeScan } from "react-icons/bs";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNUCode } from "@/lib/nuConverter";
 import Loader from "../Loader";
 import QuienRecibeModal from "../modals/QuienRecibeModal";
@@ -27,6 +27,7 @@ export default function GestorDeDescarga({
     const temporalRef = useRef<HTMLInputElement>(null);
     const [showModalNombreRetira, setShowModalNombreRetira] = useState(false);
     const [listaDescargaLocal, setListaDescargaLocal] = useState<IListadoDescargaView | null>(null);
+    const queryClient = useQueryClient();
 
     // Mutación para descargar cilindros individuales
     const mutation = useMutation({
@@ -56,6 +57,28 @@ export default function GestorDeDescarga({
         },
         onError: (error: any) => {
             toast.error(error.message || 'Error al descargar cilindro');
+        }
+    });
+
+    // Metación para confirmar la descarga completa
+    const confirmarDescargaMutation = useMutation({
+        mutationFn: async () => {
+            const response = await fetch('/api/conductor/confirmarDescarga', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rutaId: rutaDespacho._id
+                })
+            });
+        },
+        onSuccess: () => {
+            toast.success('Descarga confirmada correctamente');
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Error al confirmar descarga');
         }
     });
 
@@ -201,14 +224,14 @@ export default function GestorDeDescarga({
                             toast.error('El cargamento no está listo para confirmar');
                             return;
                         }
-                        
+                        confirmarDescargaMutation.mutate();
                     }}
                     disabled={!isReady()}>
                     <FaRoadCircleCheck className="text-4xl pb-0" />
                     <p className="ml-2 mt-2 text-md font-bold">
                         {!isReady() ? 'No está listo' : loadState().complete ? 'Descarga completa' : 'Descarga no iniciada'}
                     </p>
-                    {mutation.isPending && <div className="absolute w-full top-0">
+                    {confirmarDescargaMutation.isPending && <div className="absolute w-full top-0">
                         <div className="w-full h-12 bg-gray-100 opacity-80"></div>
                         <div className="absolute top-2 w-full"><Loader texto="" /></div>
                     </div>}

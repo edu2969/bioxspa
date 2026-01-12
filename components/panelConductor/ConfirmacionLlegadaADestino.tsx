@@ -26,13 +26,16 @@ export default function ConfirmacionLlegadaADestino({
     const queryClient = useQueryClient();
     const [esperaConfirmacion, setEsperaConfirmacion] = useState(false);
     const [ingresoQuienRecibe, setIngresoQuienRecibe] = useState(false);
-    const { register, formState } = useForm<{
+    const { register, formState, handleSubmit } = useForm<{
         rut: string,
         nombre: string
     }>();
 
     const { mutate: confirmarArribo, isPending: isPendingConfirmarArribo } = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (data: {
+            rut: string,
+            nombre: string
+        }) => {
             if (!rutaDespacho) {
                 throw new Error('No hay ruta de despacho disponible');
             }
@@ -43,7 +46,8 @@ export default function ConfirmacionLlegadaADestino({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id
+                    rutaId: rutaDespacho._id,
+                    ...data               
                 }),
             });
 
@@ -54,12 +58,21 @@ export default function ConfirmacionLlegadaADestino({
             return response.json();
         },
         onSuccess: () => {
+            toast("Arribo confirmado con éxito");
+            queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
             queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
         },
         onError: (error) => {
             console.error('Error reportando llegada:', error);
         }
     });
+
+    const onSubmit = (data: {
+        rut: string,
+        nombre: string
+    }) => {
+        confirmarArribo(data);
+    };
 
     const handleHeLlegado = () => {
         setEsperaConfirmacion(true);
@@ -90,8 +103,9 @@ export default function ConfirmacionLlegadaADestino({
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
             toast.success("Destino corregido, por favor selecciona el nuevo destino");
+            queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
         },
         onError: (error) => {
             console.error('Error corrigiendo destino:', error);
@@ -99,7 +113,7 @@ export default function ConfirmacionLlegadaADestino({
     });
 
     return (<div className="bg-white/80 rounded-t-lg px-4 py-4 shadow-lg w-full">
-        <form>
+        <form onSubmit={handleSubmit(onSubmit)}>
             {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && !ingresoQuienRecibe && <div className="flex flex-col items-center justify-center space-y-3 text-center">
                 <h1 className="font-bold text-2xl">Conduce con precaución.</h1>
                 <MdBusAlert size="8rem" className="text-yellow-400" />
@@ -149,7 +163,7 @@ export default function ConfirmacionLlegadaADestino({
                 <button
                     className={`w-full flex justify-center mt-4 py-3 px-8 bg-green-400 text-white font-bold rounded-lg shadow-md h-12 ${isPendingConfirmarArribo || !formState.isValid ? 'opacity-50' : ''}`}
                     disabled={isPendingConfirmarArribo || !formState.isValid}
-                    onClick={() => confirmarArribo()}>
+                    type="submit">
                     <FaBuildingFlag className="mt-1 mr-2" /><span>CONFIRM{isPendingConfirmarArribo ? "ANDO" : "O"}</span>
                     {isPendingConfirmarArribo &&
                         <div className="absolute -mt-1">

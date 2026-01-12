@@ -39,7 +39,7 @@ export default function InformacionDeOrden({
     if(!show) return null;
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" style={{ zIndex: 103 }}>
             <div className="relative top-16 mx-auto p-5 border w-[480px] max-w-[90vw] shadow-lg rounded-md bg-white">
                 <div className="mt-3 text-left">
                     {/* Tabs */}

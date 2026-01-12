@@ -1,3 +1,5 @@
+import Loader from "../Loader";
+
 export const ConfirmModal = ({
     show,
     title,
@@ -24,9 +26,12 @@ export const ConfirmModal = ({
                         <button
                             onClick={onConfirm}
                             disabled={loading}
-                            className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className={`relative flex flex-col text-center px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 ${loading ? 'opacity-50 pointer-events-none' : ''}`}
                         >
                             {confirmationLabel ?? 'Eliminar'}
+                            {loading && <div className="absolute -mt-1">
+                                <Loader texto="" />
+                            </div>}
                         </button>
                         <button
                             onClick={onClose}

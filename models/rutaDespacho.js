@@ -2,7 +2,9 @@ import mongoose, { Schema, models } from "mongoose";
 
 const rutaSchema = new Schema({
     direccionDestinoId: { type: mongoose.Schema.Types.ObjectId, ref: "Direccion" },
-    fechaArribo: { type: Date, default: null }
+    fechaArribo: { type: Date, default: null },
+    rutQuienRecibe: { type: String, default: null },
+    nombreQuienRecibe: { type: String, default: null }
 }, { _id: false });
 
 const estadoHistorialSchema = new Schema({

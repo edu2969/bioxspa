@@ -188,7 +188,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 px-2" style={{ zIndex: 102 }}>
             {(!isLoading && !mutation.isPending) && <div className="relative w-full max-w-xl mx-auto h-[380px] overflow-hidden bg-white rounded-lg shadow-2xl border border-gray-300 flex flex-col justify-center">
                 {/* Botón de cerrar */}
                 {tipo === 'vehiculo' && <button

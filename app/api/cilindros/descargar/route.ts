@@ -1,4 +1,4 @@
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         })
         .lean<IDetalleVenta[]>();
 
+    // ORDEN DE TRASLADO
     if (venta && venta.tipo === TIPO_ORDEN.traslado) {
         if (!mongoose.models.Sucursal) {
             mongoose.model("Sucursal", Sucursal.schema);
@@ -197,13 +198,19 @@ export async function POST(request: NextRequest) {
         });
     }
     
-    // Resto de tipos de orden
+    // OTRO TIPO DE ORDEN | VENTA
     const perteneceAlCliente = detalles.some(detalle =>
         String(detalle.subcategoriaCatalogoId?._id) === String(item.subcategoriaCatalogoId._id)
     );
 
     if (!perteneceAlCliente) {
         return NextResponse.json({ ok: false, error: "El item no pertenece al cliente" }, { status: 403 });
+    }
+
+    // Identifica que el cilindro esté cargado
+    const estaCargado = rutaDespacho.cargaItemIds.some((i: IItemCatalogo) => String(i._id) === String(item._id));
+    if (!estaCargado) {
+        return NextResponse.json({ ok: false, error: "El item no está cargado en la ruta de despacho" }, { status: 400 });
     }
 
     console.log("Detalles", detalles);

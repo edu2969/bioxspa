@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
         await connectMongoDB();
 
         // Get rutaId from request
-        const { rutaId } = await request.json();
+        const { rutaId, rut, nombre } = await request.json();
         console.log("[confirmarArribo] Received rutaId:", rutaId);
 
         // Validate rutaId
@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
         // Get the last index of ruta array
         const lastIndex = rutaDespacho.ruta.length - 1;
         update.$set[`ruta.${lastIndex}.fechaArribo`] = now;
+        update.$set[`ruta.${lastIndex}.rutQuienRecibe`] = rut;
+        update.$set[`ruta.${lastIndex}.nombreQuienRecibe`] = nombre;
 
         await RutaDespacho.findByIdAndUpdate(rutaId, update);
 
@@ -118,8 +120,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             ok: true,
             message: "Route arrival confirmed successfully" 
-        });
-        
+        });        
     } catch (error) {
         console.error("Error in POST /confirmarArribo:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });

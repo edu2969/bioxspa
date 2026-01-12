@@ -39,13 +39,13 @@ export default function InformacionDeCarga({
                 const errorData = await response.json();
                 throw new Error(errorData.error || "Error al confirmar la carga");
             }
-
             return await response.json();
         },
         onSuccess: (data) => {
             if (data.ok) {
                 toast.success("Carga confirmada correctamente");
-                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+                queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
+                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });                
             } else {
                 toast.error(data.error || "Error al confirmar la carga");
             }
@@ -63,7 +63,7 @@ export default function InformacionDeCarga({
         <MdOutlineKeyboardDoubleArrowUp className="text-gray-400 mx-auto -mt-1 mb-1" style={{ transform: "scaleX(6)" }} />
 
 
-        {rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && <div className="py-4 text-center">
+        {!loadingListaDeCarga && rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.preparacion && <div className="py-4 text-center">
             <div className="flex text-blue-500 flex-row items-center justify-center space-x-4">
                 <FaTruckLoading size="3.2rem"/>
                 <p className="py-4 font-bold">EN PROCESO<br/>DE CARGA</p>
@@ -72,7 +72,7 @@ export default function InformacionDeCarga({
         </div>}
 
 
-        {rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
+        {!loadingListaDeCarga &&rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
             <p className="text-center text-xl font-bold">Confirma{`${mutation.isPending ? 'ndo' : ''}`} la carga</p>
             <div className="flex flex-col md:flex-row px-4 py-2">
                 <div className="w-full md:w-1/3">

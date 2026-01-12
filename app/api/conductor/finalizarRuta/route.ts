@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import { connectMongoDB } from "@/lib/mongodb";
@@ -6,10 +6,11 @@ import RutaDespacho from "@/models/rutaDespacho";
 import User from "@/models/user";
 import Cargo from "@/models/cargo";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO, USER_ROLE, TIPO_ORDEN } from "@/app/utils/constants";
+import { IRutaDespacho } from "@/types/rutaDespacho";
 
 // filepath: d:/git/bioxspa/app/api/pedidos/terminarRuta/route.js
 
-export async function POST(req) {
+export async function POST(req: NextRequest) {
     try {
         console.log("POST request received for terminarRuta.");
         await connectMongoDB();
@@ -84,7 +85,7 @@ export async function POST(req) {
             }, { status: 403 });
         }
 
-        const ventasTraslado = rutaDespacho.ventaIds.filter(venta => venta.tipo === TIPO_ORDEN.traslado);        
+        const ventasTraslado = (rutaDespacho as IRutaDespacho).ventaIds.filter(venta => venta.tipo === TIPO_ORDEN.traslado);        
         rutaDespacho.estado = ventasTraslado.length > 0 ? TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado : TIPO_ESTADO_RUTA_DESPACHO.terminado;
         await rutaDespacho.save();
         return NextResponse.json({ 

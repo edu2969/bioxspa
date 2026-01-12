@@ -94,9 +94,9 @@ export default function ClienteSearchView({
                         }}
                         disabled={isRedirecting || searchingClientes}
                     >
-                        {(isRedirecting || searchingClientes) ? (
+                        {isRedirecting ? (
                             <div className="flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                                <Loader texto="" />
                             </div>
                         ) : (
                             <LiaPencilAltSolid size="1.6rem" />
