@@ -1,10 +1,10 @@
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/utils/authOptions";
 import Venta from "@/models/venta";
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     try {
         await connectMongoDB();
 

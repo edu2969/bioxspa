@@ -9,7 +9,9 @@ import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from '@/app/utils/constants';
 import { IRutaDespacho } from '@/types/rutaDespacho';
 import { IUser } from '@/types/user';
 import { IRutaConductorView, ITramoView } from '@/types/types';
-import { IDireccion } from '@/types/direccion';
+import mongoose from 'mongoose';
+import Venta from '@/models/venta';
+import Cliente from '@/models/cliente';
 
 export async function GET() {
     try {
@@ -17,6 +19,18 @@ export async function GET() {
 
         await connectMongoDB();
         console.log("MongoDB connected.");
+
+        if (!mongoose.models.Direccion) {
+            mongoose.model("Direccion", Direccion.schema);
+        }
+
+        if (!mongoose.models.Venta) {
+            mongoose.model("Venta", Venta.schema);
+        }
+
+        if (!mongoose.models.Cliente) {
+            mongoose.model("Cliente", Cliente.schema);
+        }
 
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
@@ -58,14 +72,16 @@ export async function GET() {
             .populate({
                 path: 'ventaIds',
                 model: 'Venta',
-                populate: {
+                select: 'clienteId direccionDespachoId',
+                populate: [{
                     path: 'clienteId',
                     model: 'Cliente',
-                    populate: {
-                        path: 'direccionId',
-                        model: 'Direccion'
-                    }
-                }
+                    select: 'nombre telefono'
+                }, {
+                    path: 'direccionDespachoId',
+                    model: 'Direccion',
+                    select: 'nombre'
+                }]
             })
             .lean<IRutaDespacho>();
 
@@ -80,87 +96,29 @@ export async function GET() {
 
         console.log(`Found active rutaDespacho ID: ${rutaDespacho._id} with estado: ${rutaDespacho.estado}`);
 
-        // Determinar la venta actual basada en la última dirección de la ruta
-        let ventaActual = null;
-
-        if (rutaDespacho.ventaIds && rutaDespacho.ventaIds.length > 0) {
-            if (rutaDespacho.ventaIds.length === 1) {
-                // Si solo hay una venta, es la actual
-                ventaActual = rutaDespacho.ventaIds[0];
-            } else if (rutaDespacho.ruta && rutaDespacho.ruta.length > 0) {
-                // Si hay múltiples ventas, buscar la que corresponde a la última dirección de la ruta
-                const ultimaDireccionId = rutaDespacho.ruta[rutaDespacho.ruta.length - 1]?.direccionDestinoId?._id;
-
-                if (ultimaDireccionId) {
-                    ventaActual = rutaDespacho.ventaIds.find(venta =>
-                        venta.direccionDespachoId && String(venta.direccionDespachoId._id) === String(ultimaDireccionId)
-                    );
-                }
-
-                // Si no se encuentra por dirección de despacho, usar la primera venta como fallback
-                if (!ventaActual) {
-                    ventaActual = rutaDespacho.ventaIds[0];
-                }
-            } else {
-                // Si no hay ruta definida, usar la primera venta
-                ventaActual = rutaDespacho.ventaIds[0];
-            }
-        }
-
-        if (!ventaActual) {
-            console.log(`No venta found for rutaDespacho: ${rutaDespacho._id}`);
-            return NextResponse.json({
-                ok: true,
-                rutaId: String(rutaDespacho._id),
-                estado: rutaDespacho.estado,
-                message: "No hay venta asignada en la ruta"
-            });
-        }
-
-        // Obtener información de la dirección de despacho
-        let direccionDespacho: IDireccion | null = null;
-        if (ventaActual.direccionDespachoId) {
-            direccionDespacho = await Direccion.findById(ventaActual.direccionDespachoId).lean<IDireccion>();
-        }
-
-        // Si no hay dirección de despacho específica, usar la dirección principal del cliente
-        const cliente = ventaActual.clienteId;
-        let direccionPrincipal = null;
-        if (cliente?.direccionId) {
-            direccionPrincipal = await Direccion.findById(cliente.direccionId).lean<IDireccion>();
-        }
-
         // Construir la respuesta según IRutaConductorView
         const rutaConductorView: IRutaConductorView = {
             _id: String(rutaDespacho._id),
             tramos: rutaDespacho.ruta.map((ruta): ITramoView => {
-                const direccion = rutaDespacho.ventaIds.find(venta =>
-                    venta.direccionDespachoId && String(venta.direccionDespachoId) === String(ruta.direccionDestinoId?._id)
+                const ventaActual = rutaDespacho.ventaIds.find(venta => 
+                    String(venta.direccionDespachoId._id) === String(ruta.direccionDestinoId?._id)
                 );
 
                 return {
-                    ventaId: direccion ? String(direccion._id) : '',
+                    tipo: ventaActual?.tipo || 0,
                     cliente: {
-                        nombre: cliente?.nombre || 'Cliente no encontrado',
-                        direccion: direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección no disponible',
-                        telefono: cliente?.telefono || '',
-                        direccionDespacho: direccionDespacho?.nombre || direccionDespacho?.direccionOriginal || direccionPrincipal?.nombre || direccionPrincipal?.direccionOriginal || 'Dirección de despacho no disponible'
+                        nombre: ventaActual?.clienteId?.nombre || 'Cliente no encontrado',
+                        telefono: ventaActual?.clienteId?.telefono || '',
+                        direccion: ventaActual?.direccionDespachoId || { _id: '', nombre: '', latitud: 0, longitud: 0 }
                     },
-                    comentario: ventaActual.comentario || undefined,
-                    quienRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0
+                    comentario: ventaActual?.comentario || undefined,
+                    quienRecibe: ventaActual?.entregasEnLocal && ventaActual?.entregasEnLocal.length > 0
                         ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].nombreRecibe || undefined
                         : undefined,
-                    rutRecibe: ventaActual.entregasEnLocal && ventaActual.entregasEnLocal.length > 0
+                    rutRecibe: ventaActual?.entregasEnLocal && ventaActual?.entregasEnLocal.length > 0
                         ? ventaActual.entregasEnLocal[ventaActual.entregasEnLocal.length - 1].rutRecibe || undefined
                         : undefined,
-                    tipo: ventaActual.tipo,
-                    fechaArribo: ruta.fechaArribo || null,
-                    direccionDestino: ruta.direccionDestinoId ? {
-                        _id: String(ruta.direccionDestinoId._id),
-                        nombre: ruta.direccionDestinoId.nombre || '',
-                        latitud: ruta.direccionDestinoId.latitud || 0,
-                        longitud: ruta.direccionDestinoId.longitud || 0
-                    } : null,
+                    fechaArribo: ruta.fechaArribo || null
                 }
             }),
         };

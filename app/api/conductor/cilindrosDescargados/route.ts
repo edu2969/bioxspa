@@ -7,8 +7,9 @@ import RutaDespacho from "@/models/rutaDespacho";
 import ItemCatalogo from "@/models/itemCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import { ICilindroView } from "@/components/prefabs/types";
+import { ICilindroView } from "@/types/types";
 import { IRutaDespacho } from "@/types/rutaDespacho";
+import { USER_ROLE } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
     try {
@@ -54,8 +55,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Verificar que el usuario tenga acceso a esta ruta
-        if (String(rutaDespacho.choferId) !== session.user.id) {
-            console.warn("User doesn't have access to this ruta");
+        if (String(rutaDespacho.choferId) !== session.user.id &&
+            ![USER_ROLE.cobranza, 
+                USER_ROLE.encargado, 
+                USER_ROLE.responsable].includes(session.user.role)) {
+            console.warn("User doesn't have access to this ruta", session.user.role);
             return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
         }
 
@@ -114,8 +118,7 @@ export async function GET(request: NextRequest) {
         console.log(`Returning ${cilindrosDescargadosView.length} cilindros descargados`);
         return NextResponse.json({ 
             ok: true, 
-            cilindrosDescargados: cilindrosDescargadosView,
-            total: cilindrosDescargadosView.length
+            cilindrosDescargados: cilindrosDescargadosView
         });
 
     } catch (error) {

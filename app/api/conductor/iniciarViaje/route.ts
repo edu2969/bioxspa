@@ -48,12 +48,6 @@ export async function POST(req: NextRequest) {
             }, { status: 404 });
         }
 
-        // Update estado to en_ruta
-        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.en_ruta;
-        rutaDespacho.ruta.push({
-            direccionDestinoId: direccionId
-        });
-
         // Buscar las ventas asociadas a la ruta con la dirección de despacho indicada
         const ventas = await Venta.find({
             _id: { $in: rutaDespacho.ventaIds },
@@ -66,9 +60,20 @@ export async function POST(req: NextRequest) {
                 { _id: { $in: ventas.map(v => v._id) } },
                 { $set: { estado: TIPO_ESTADO_VENTA.reparto } }
             );
-        }
+        }        
+
+        // Update estado to en_ruta
+        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.en_ruta;
         
         console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.en_ruta}`);
+        rutaDespacho.ruta.push({
+            direccionDestinoId: direccionId,
+            fechaArribo: null,
+        });
+        rutaDespacho.historialEstado.push({
+            estado: TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
+            fecha: new Date()
+        });
         await rutaDespacho.save();
 
         console.log("RutaDespacho updated successfully.");

@@ -12,12 +12,14 @@ export default function PowerScanView({
     scanMode, 
     setScanMode,
     rutaId,
-    ventaId
+    ventaId,
+    operacion
 } : {
     scanMode: boolean;
     setScanMode: (mode: boolean) => void,
     rutaId: string | null;
     ventaId: string | null;
+    operacion: 'cargar' | 'descargar' | 'gestionar';
 }) { 
     const qryClient = useQueryClient();
     const [powerScanModalVisible, setPowerScanModalVisible] = useState(false);
@@ -26,23 +28,26 @@ export default function PowerScanView({
 
     const mutationItemEscaneado = useMutation({
         mutationFn: async (codigo: string) => {
-            const response = await fetch(`/api/cilindros/gestionar/${codigo}`, {
+            const response = await fetch(`/api/cilindros/${operacion}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     rutaId: rutaId,
-                    ventaId: ventaId
+                    ventaId: ventaId,
+                    codigo
                 })
             });
             return response.json();
         },
         onSuccess: (data) => {
-            if (data.ok) {                
-                toast.success(`Cilindro ${data.item.codigo} procesado`);
-                qryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
-                setItemEscaneado(data.item);
+            if (data.ok) {
+                toast.success(`Cilindro procesado correctamente`);
+                qryClient.invalidateQueries({ queryKey: operacion === 'cargar' ? ['cargamentos-despacho'] : ['listado-descarga-vehiculo'] });
+                qryClient.invalidateQueries({ queryKey: ['carga-vehiculo'] });
+                qryClient.invalidateQueries({ queryKey: ['descarga-vehiculo'] });
+                setScanMode(false);
                 play('/sounds/accept_02.mp3');
             } else {
                 toast.error(data.error || 'Cilindro no encontrado');
@@ -55,8 +60,8 @@ export default function PowerScanView({
             }
         },
         onError: (error) => {
-            console.error('Error al buscar cilindro:', error);
             toast.error('Error al buscar el cilindro');
+            play('/sounds/error_02.mp3');
             setScanMode(false);
         }
     });

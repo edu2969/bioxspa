@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, memo } from 'react';
+import React, { useState, memo, Dispatch, SetStateAction } from 'react';
 import Link from 'next/link';
 import { BiTask } from 'react-icons/bi';
 import { FaCartPlus } from 'react-icons/fa6';
@@ -11,7 +11,7 @@ import 'dayjs/locale/es';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { MdDragIndicator } from 'react-icons/md';
 import { VscCommentUnresolved, VscCommentDraft } from "react-icons/vsc";
-import { useQuery } from '@tanstack/react-query';
+import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IPedidoPorAsignar } from '@/types/types';
 import { Control, useWatch } from 'react-hook-form';
 import { INuevaVentaSubmit } from '../pedidos/types';
@@ -22,14 +22,13 @@ dayjs.extend(relativeTime);
 
 export default function PorAsignar({
     control,
-    onShowDetalle,
+    setShowDetalleOrdenModal,
     onShowCommentModal,
 }: {
     control: Control<INuevaVentaSubmit>;
-    onShowDetalle: () => void;
-    onShowCommentModal: () => void;
+    setShowDetalleOrdenModal: Dispatch<SetStateAction<boolean>>;
+    onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
-    
     const [redirecting, setRedirecting] = useState(false);
     // const [expandido] = useState<{ [key:number]: boolean }>({});  // No usado actualmente
 
@@ -83,15 +82,18 @@ export default function PorAsignar({
             console.log("CLICK!");
             if (!isDragging) {
                 console.log("👆 CLICK EVENT");
-                onShowDetalle();
+                setShowDetalleOrdenModal(true);
             }
         };
 
-        const handleCommentClick = (e: React.MouseEvent) => {
+        const handleCommentClick = (e: React.MouseEvent) => {            
             e.stopPropagation();
             if (!isDragging) {
                 console.log("💬 COMMENT CLICK EVENT");
-                onShowCommentModal();
+                const invalidateQueries = () => {
+                    queryClient.invalidateQueries({ queryKey: ['pedidos-por-asignar', sucursalId] });
+                };
+                onShowCommentModal(pedido._id, pedido.comentario, invalidateQueries);
             }
         };
 

@@ -19,8 +19,6 @@ import { ICargaDespachoView } from "@/types/types";
 import SoundPlayerProvider from "./context/SoundPlayerContext";
 
 export default function JefaturaDespacho() {
-  const [localCargamentos, setLocalCargamentos] = useState<ICargaDespachoView[]>([]);
-  const [animating, setAnimating] = useState(false);
   const [scanMode, setScanMode] = useState(false);
   const [rutaId, setRutaId] = useState<string | null>(null);
   const [ventaId, setVentaId] = useState<string | null>(null);
@@ -30,40 +28,19 @@ export default function JefaturaDespacho() {
     queryFn: async () => {
       const response = await fetch("/api/pedidos/despacho");
       const data = await response.json();
-      console.log("Cargamentos de despacho obtenidos:", data.cargamentos);
-      setLocalCargamentos(data.cargamentos);
       return data.cargamentos;
     }
   });
 
-  const handleRemoveFirst = async () => {
-    console.log("Remover primer cargamento");
-    if (animating) return; // Evita múltiples clics durante la animación
-    setAnimating(true);
-    setTimeout(() => {
-      setAnimating(false);
-      setScanMode(false);
-    }, 1000);
-  };
-
   const handleShowNext = () => {
     console.log("Mostrar siguiente cargamento");
-    if (animating) return; // Evita múltiples clics durante la animación
-    setAnimating(true);
-    setTimeout(() => {
-      setLocalCargamentos((prev) => {
-        if (prev.length <= 1) return prev;
-        const [first, ...rest] = prev;
-        return [...rest, first];
-      });
-      setAnimating(false);
-      setScanMode(false);
-    }, 1000); // Cambia el tiempo de la animación aquí
+    // Esta función ahora solo cambia el orden de visualización sin animaciones
+    // La data real se maneja desde GestorDeCargaView con setQueryData
   }
 
   useEffect(() => {
-    if(localCargamentos && localCargamentos.length > 0) {
-      const firstCarga = localCargamentos[0];
+    if(cargamentos && cargamentos.length > 0) {
+      const firstCarga = cargamentos[0];
       
       if(!firstCarga.rutaId) {
         setVentaId(firstCarga.ventas[0].ventaId);
@@ -71,7 +48,7 @@ export default function JefaturaDespacho() {
         setRutaId(firstCarga.rutaId);
       }
     }
-  }, [localCargamentos]);
+  }, [cargamentos]);
 
   return (
     <SessionProvider>
@@ -81,20 +58,19 @@ export default function JefaturaDespacho() {
           <SoundPlayerProvider>
             <PowerScanView setScanMode={setScanMode}  
               scanMode={scanMode}
-              rutaId={rutaId} ventaId={ventaId}/>
+              rutaId={rutaId} ventaId={ventaId}
+              operacion="cargar"/>
           </SoundPlayerProvider>}
 
           <div className="w-full">
-            {!isLoading && localCargamentos && localCargamentos.map((cargamento, index) => (
+            {!isLoading && cargamentos && cargamentos.map((cargamento, index) => (
               <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
-                <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1 ${animating ? "transition-all duration-1000" : ""}`}
+                <div className="absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1"
                   style={{
                     top: `${index * 10 + 52}px`,
                     left: `${index * 10 + 16}px`,
-                    zIndex: localCargamentos.length - index,
+                    zIndex: cargamentos.length - index,
                     scale: 1 - index * 0.009,
-                    transform: `translateX(${animating && index === 0 ? "-100%" : "0"})`,
-                    opacity: animating && index === 0 ? 0 : 1,
                   }}
                 >
                   {index <= 1 && 
@@ -102,7 +78,6 @@ export default function JefaturaDespacho() {
                     cargamentos={[cargamento]}
                     setScanMode={setScanMode}
                     index={index}
-                    handleRemoveFirst={handleRemoveFirst}
                   />}
                 </div>
               </div>
@@ -114,7 +89,7 @@ export default function JefaturaDespacho() {
               </div>
             )}
             
-            {!isLoading && (!localCargamentos || localCargamentos.length === 0) &&
+            {!isLoading && cargamentos?.length === 0 &&
               <div className="w-full h-screen py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
                 <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
                 <p className="text-center text-2xl font-bold mb-4">¡TODO EN ORDEN!</p>
@@ -122,12 +97,12 @@ export default function JefaturaDespacho() {
             }
           </div>
 
-          {localCargamentos && localCargamentos.length > 1 && <div className="fixed bottom-2 right-4 z-40">
+          {cargamentos && cargamentos.length > 1 && <div className="fixed bottom-2 right-4 z-40">
             <button
               className="flex items-center px-6 py-3 bg-white text-gray-500 border border-gray-300 rounded-xl shadow-lg font-bold text-lg hover:bg-gray-100 transition duration-200"
               style={{ minWidth: 220 }}
               onClick={handleShowNext}
-              disabled={animating || localCargamentos.length === 0}
+              disabled={cargamentos.length === 0}
             >
               PASAR SIGUIENTE &gt;&gt;
             </button>

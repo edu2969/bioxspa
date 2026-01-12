@@ -8,10 +8,12 @@ import MensajeriaTab from './informacion/tabs/MensajeriaTab';
 export default function InformacionDeOrden({
     ventaId,
     onClose, 
+    show,
     loading = false 
 } : {
     ventaId: string | null;
     onClose: () => void;
+    show: boolean;
     loading?: boolean;
 }) {
     const [activeTab, setActiveTab] = useState('operaciones');
@@ -33,6 +35,8 @@ export default function InformacionDeOrden({
                 return <OperacionesTab ventaId={ventaId} />;
         }
     };
+
+    if(!show) return null;
 
     return (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">

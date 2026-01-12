@@ -1,4 +1,5 @@
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { IDireccion } from "./direccion";
 
 export interface IPedidoPorAsignar {
     _id: string;
@@ -46,65 +47,34 @@ export interface IConductoresResponse {
     checklist: boolean;
 }
 
-export interface IEnTransitoResponse {
-    _id: mongoose.Types.ObjectId;
-    ruta: Array<{
-        direccionDestinoId: {
-            _id: mongoose.Types.ObjectId;
-            nombre: string;
-        } | null;
-        [key: string]: any;
-    }>;
-    vehiculoId: {
-        _id: mongoose.Types.ObjectId;
-        patente: string;
-        marca: string;
-        modelo: string;
-    } | null;
-    choferId: {
-        _id: mongoose.Types.ObjectId;
-        name: string;
-    } | null;
-    cargaItemIds: Array<{
-        _id: mongoose.Types.ObjectId;
-        subcategoriaCatalogoId: {
-            _id: mongoose.Types.ObjectId;
-            cantidad?: number;
-            unidad?: string;
-            sinSifon?: boolean;
-            nombreGas?: string;
-            categoriaCatalogoId: {
-                _id: mongoose.Types.ObjectId;
-                elemento?: string;
-                esIndustrial?: boolean;
-                esMedicinal?: boolean;
-            } | null;
-        } | null;
-        codigo?: string;
-        nombre?: string;
-    }>;
+export interface IRutasEnTransitoResponse {    
+    rutaId: string;
     estado: number;
-    ventaIds: Array<{
-        _id: mongoose.Types.ObjectId;
-        clienteId: {
-            _id: mongoose.Types.ObjectId;
-            nombre: string;
-        } | null;
-        comentario?: string;
-        direccionDespachoId?: mongoose.Types.ObjectId;
-        estado: number;
-        tipo: number;
-        detalles?: Array<{
-            _id: mongoose.Types.ObjectId;
-            subcategoriaCatalogoId: mongoose.Types.ObjectId;
-            cantidad: number;
-        }>;
-    }>;
-    historialCarga?: Array<{
-        esCarga: boolean;
-        fecha: Date;
-        itemMovidoIds: Array<mongoose.Types.ObjectId>;
-    }>;
+}
+
+export interface IRutaEnTransito {
+    rutaId: string;
+    direccionDestino: string;
+    nombreChofer: string;
+}
+
+export interface IVentaEnTransito {
+    ventaId: string;
+    tipo: number;
+    estado: number;
+    fecha: Date;
+    nombreCliente: string;
+    telefonoCliente: string;
+    comentario?: string;
+    detalles: Array<{
+        multiplicador: number;
+        cantidad: number;
+        elemento: string;
+        unidad: string;
+        esIndustrial: boolean;
+        esMedicinal: boolean;
+        sinSifon: boolean;
+    }>
 }
 
 export interface IHistorialVentaView {
@@ -174,8 +144,12 @@ export interface ICargaDespachoView {
     retiroEnLocal?: boolean;
 }
 
-export interface IListadoDescargaView {
+export interface IListadoDeCargaView {
     encargado: string;
+    cilindros: IItemDeCargaView[];
+}
+
+export interface IListadoDescargaView {    
     cilindros: IItemDeCargaView[];
 }
 
@@ -201,23 +175,13 @@ export interface IItemCatalogoView extends ICilindroView {
     codigo: string;
 }
 
-export interface IDireccion {
-    _id: string;
-    nombre: string;
-    latitud: number;
-    longitud: number;
-}
-
 export interface ITramoView {
-    ventaId: string;
     tipo: number; // TIPO_ORDEN
-    direccionDestino: IDireccion | null;
     fechaArribo: Date | null;    
     cliente: {
         nombre: string;
-        direccion: string;
         telefono: string;
-        direccionDespacho: string;
+        direccion: IDireccion;
     },
     comentario?: string;
     quienRecibe?: string;
@@ -238,4 +202,10 @@ export interface IVehiculoView {
     patente: string;
     marca: string;
     modelo: string;
+}
+
+export interface IDestinoDisponible {
+    direccionId: string;
+    nombreCliente: string;
+    glosaDireccion: string;
 }

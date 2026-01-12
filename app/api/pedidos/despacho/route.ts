@@ -123,7 +123,7 @@ export async function GET() {
                 populate: {
                     path: "subcategoriaCatalogoId",
                     model: "SubcategoriaCatalogo",
-                    select: "nombre unidad categoriaCatalogoId cantidad sinSifon",
+                    select: "_id nombre unidad categoriaCatalogoId cantidad sinSifon",
                     populate: {
                         path: "categoriaCatalogoId",
                         model: "CategoriaCatalogo",
@@ -182,7 +182,7 @@ export async function GET() {
             .populate({
                 path: "subcategoriaCatalogoId",
                 model: "SubcategoriaCatalogo",
-                select: "nombre unidad categoriaCatalogoId cantidad sinSifon",
+                select: "_id nombre unidad categoriaCatalogoId cantidad sinSifon",
                 populate: {
                     path: "categoriaCatalogoId",
                     model: "CategoriaCatalogo",
@@ -196,6 +196,14 @@ export async function GET() {
         console.log("Mapping cargamentos...");
         const cargamentos: ICargaDespachoView[] = rutasDespacho.map((ruta) => {
             let fechaVentaMasReciente: Date | null = null;
+            
+            // Crear mapa de disponibilidad por subcategoría para esta ruta
+            const disponibilidadPorSubcat: { [subcatId: string]: number } = {};
+            ruta.cargaItemIds?.forEach(item => {
+                const subcatId = String(item.subcategoriaCatalogoId._id);
+                disponibilidadPorSubcat[subcatId] = (disponibilidadPorSubcat[subcatId] || 0) + 1;
+            });
+            
             return {
                 rutaId: String(ruta._id),
                 ventas: ruta.ventaIds.map((venta) => {
@@ -218,9 +226,20 @@ export async function GET() {
                                 fechaVentaMasReciente = venta.createdAt;
                             }
                             
+                            const subcatId = String(subcategoria._id);
+                            const cantidadRequerida = Number(detalle.cantidad);
+                            const disponible = disponibilidadPorSubcat[subcatId] || 0;
+                            
+                            // Descontar la cantidad requerida del mapa de disponibilidad
+                            const puedeDescontar = Math.min(cantidadRequerida, disponible);
+                            disponibilidadPorSubcat[subcatId] = disponible - puedeDescontar;
+                            const restantes = cantidadRequerida - puedeDescontar;
+                            
+                            console.log("---->", subcategoria.nombre, "Requerido:", cantidadRequerida, "Disponible:", disponible, "Restantes:", restantes);
+                            
                             return {
-                                multiplicador: Number(detalle.cantidad),
-                                restantes: detalle.cantidad - ruta.cargaItemIds.filter(item => item.subcategoriaCatalogoId._id?.toString() === subcategoria._id.toString())?.length,
+                                multiplicador: cantidadRequerida,
+                                restantes: restantes,
                                 itemCatalogoIds: detalle.itemCatalogoIds || [],
                                 subcategoriaCatalogoId: subcategoria, 
                             };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UseFormRegisterReturn } from "react-hook-form";
 import { IDireccion } from "@/types/direccion";
 import { MdAddLocationAlt } from "react-icons/md";
@@ -16,6 +16,21 @@ export default function ClientAddressManagerView({
     direcciones: IDireccion[]
 }) {
     const [editMode, setEditMode] = useState(false);    
+
+    // Efecto para seleccionar automáticamente si solo hay una dirección
+    useEffect(() => {
+        if (direcciones && direcciones.length === 1) {
+            // Establecer el valor de la única dirección disponible
+            const singleAddressValue = direcciones[0]._id;
+            // Simular un cambio en el input para que react-hook-form lo detecte
+            const event = new Event('input', { bubbles: true });
+            Object.defineProperty(event, 'target', {
+                writable: false,
+                value: { name: register.name, value: singleAddressValue }
+            });
+            register.onChange(event);
+        }
+    }, [direcciones, register]);    
 
     return (<div className="mt-4 space-y-4">
         {!editMode && direcciones && direcciones.length > 0 && (<div className="flex">
@@ -43,6 +58,7 @@ export default function ClientAddressManagerView({
                 <select
                     id="direccionDespachoId"
                     {...register}
+                    value={direcciones && direcciones.length === 1 ? direcciones[0]._id : undefined}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                 >
                     <option value="">Retiro en local</option>

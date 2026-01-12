@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
         mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
     }
 
+    console.log("RutaId:", rutaId, "Codigo:", codigo);
+
     if (!rutaId || !codigo) {
         return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 });
     }
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
         .populate({            
             path: "subcategoriaCatalogoId",
             model: "SubcategoriaCatalogo",
-            select: "nombre unidad categoriaCatalogoId cantidad sinSifon",
+            select: "_id nombre unidad categoriaCatalogoId cantidad sinSifon",
             populate: {
                 path: "categoriaCatalogoId",
                 model: "CategoriaCatalogo",
@@ -71,7 +73,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: false, error: "Venta not found in rutaDespacho" }, { status: 404 });
     }
 
-    const detalles = await DetalleVenta.find({ ventaId: venta?._id }).select("itemCatalogoIds cantidad subcategoriaCatalogoId").lean<IDetalleVenta[]>();
+    const detalles = await DetalleVenta.find({ ventaId: venta?._id })
+        .select("itemCatalogoIds cantidad subcategoriaCatalogoId")
+        .populate({
+            path: "subcategoriaCatalogoId",
+            model: "SubcategoriaCatalogo",
+            select: "_id"
+        })
+        .populate({
+            path: "itemCatalogoIds",
+            model: "ItemCatalogo",
+            select: "_id"
+        })
+        .lean<IDetalleVenta[]>();
 
     if (venta && venta.tipo === TIPO_ORDEN.traslado) {
         if (!mongoose.models.Sucursal) {
@@ -194,11 +208,11 @@ export async function POST(request: NextRequest) {
 
     console.log("Detalles", detalles);
     const detalleDisponible = detalles.find(detalle =>
-        String(detalle.subcategoriaCatalogoId) === String(item.subcategoriaCatalogoId._id) &&
+        String(detalle.subcategoriaCatalogoId?._id) === String(item.subcategoriaCatalogoId._id) &&
         (!Array.isArray(detalle.itemCatalogoIds) ||
         detalle.itemCatalogoIds.length < detalle.cantidad)
     );
-
+    
     if (!detalleDisponible) {
         return NextResponse.json({ ok: false, error: "No hay espacio en los detalles de la venta para este item" }, { status: 400 });
     }
@@ -218,15 +232,15 @@ export async function POST(request: NextRequest) {
         historial[historial.length - 1].esCarga === false
     ) {
         const ultimo = historial[historial.length - 1];
-        if (!ultimo.itemMovidoIds.some((id: string) => id  === String(item._id))) {
-            ultimo.itemMovidoIds.push(item._id);
+        if (!ultimo.itemMovidoIds.some((item: IItemCatalogo) => String(item._id) === String(item._id))) {
+            ultimo.itemMovidoIds.push(String(item._id));
             ultimo.fecha = now;
         }
     } else {
         historial.push({
             esCarga: false,
             fecha: now,
-            itemMovidoIds: [item._id]
+            itemMovidoIds: [String(item._id)]
         });
     }
 

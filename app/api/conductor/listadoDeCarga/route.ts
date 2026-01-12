@@ -4,19 +4,17 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/utils/authOptions";
 import mongoose from "mongoose";
 import RutaDespacho from "@/models/rutaDespacho";
-import User from "@/models/venta";
+import Venta from "@/models/venta";
 import DetalleVenta from "@/models/detalleVenta";
 import ItemCatalogo from "@/models/itemCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import Cliente from "@/models/cliente";
-import Direccion from "@/models/direccion";
-import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { USER_ROLE } from "@/app/utils/constants";
 import { IRutaDespacho } from "@/types/rutaDespacho";
 import { IItemDeCargaView } from "@/types/types";
+import User from "@/models/user";
 import Cargo from "@/models/cargo";
 import { IUser } from "@/types/user";
-import { IDetalleVenta } from "@/types/detalleVenta";
 
 export async function GET(request: NextRequest) {
     try {
@@ -27,7 +25,7 @@ export async function GET(request: NextRequest) {
 
         // Registrar modelos si no están registrados
         if (!mongoose.models.Venta) {
-            mongoose.model("Venta", User.schema);
+            mongoose.model("Venta", Venta.schema);
         }
         if (!mongoose.models.DetalleVenta) {
             mongoose.model("DetalleVenta", DetalleVenta.schema);
@@ -40,12 +38,6 @@ export async function GET(request: NextRequest) {
         }
         if (!mongoose.models.CategoriaCatalogo) {
             mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-        }
-        if (!mongoose.models.Cliente) {
-            mongoose.model("Cliente", Cliente.schema);
-        }
-        if (!mongoose.models.Direccion) {
-            mongoose.model("Direccion", Direccion.schema);
         }
 
         console.log("Fetching server session...");
@@ -71,13 +63,7 @@ export async function GET(request: NextRequest) {
                 select: '_id clienteId direccionDespachoId estado tipo comentario',
                 populate: {
                     path: 'clienteId',
-                    model: 'Cliente',
-                    select: '_id nombre rut giro direccionesDespacho',
-                    populate: {
-                        path: 'direccionesDespacho.direccionId',
-                        model: 'Direccion',
-                        select: '_id nombre latitud longitud'
-                    }
+                    select: '_id nombre rut giro'
                 }
             })
             .populate({
@@ -102,54 +88,16 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "Ruta no encontrada" }, { status: 404 });
         }
 
-        // Verificar que la ruta esté en estado de descarga
-        if (rutaDespacho.estado !== TIPO_ESTADO_RUTA_DESPACHO.descarga) {
-            console.warn(`Ruta no está en estado de descarga. Estado actual: ${rutaDespacho.estado}`);
-            return NextResponse.json({ ok: false, error: "La ruta no está en estado de descarga" }, { status: 400 });
-        }
-
         // Verificar que el usuario tenga acceso a esta ruta
         if (String(rutaDespacho.choferId._id) !== session.user.id) {
             console.warn("User doesn't have access to this ruta");
             return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
         }
 
-        // Obtener el último destino de la ruta
-        if (!rutaDespacho.ruta || rutaDespacho.ruta.length === 0) {
-            console.warn("La ruta no tiene destinos definidos");
-            return NextResponse.json({ ok: false, error: "La ruta no tiene destinos definidos" }, { status: 400 });
-        }
-
-        const ultimoDestino = rutaDespacho.ruta[rutaDespacho.ruta.length - 1];
-        const direccionDestinoId = ultimoDestino.direccionDestinoId;
-
-        // Encontrar la venta que corresponde al último destino
-        const ventaDestino = rutaDespacho.ventaIds.find(venta => {
-            // Si la venta tiene direccionDespachoId, usar esa
-            if (venta.direccionDespachoId) {
-                return String(venta.direccionDespachoId) === String(direccionDestinoId);
-            }
-            // Si no, buscar en las direcciones del cliente
-            const cliente = venta.clienteId;
-            if (cliente && cliente.direccionesDespacho) {
-                return cliente.direccionesDespacho.some(dir => 
-                    String(dir.direccionId._id) === String(direccionDestinoId)
-                );
-            }
-            return false;
-        });
-
-        if (!ventaDestino) {
-            console.warn("No se encontró venta para el destino actual");
-            return NextResponse.json({ ok: false, error: "No se encontró venta para el destino actual" }, { status: 404 });
-        }
-
-        console.log(`Venta para descarga encontrada: ${ventaDestino._id}`);
-
-        // Obtener detalles de venta para la venta del destino actual
-        // Obtener detalles de venta para la venta del destino actual
+        // Obtener detalles de venta para todas las ventas de la ruta
+        const ventaIds = rutaDespacho.ventaIds.map(v => v._id);
         const detallesVenta = await DetalleVenta.find({
-            ventaId: ventaDestino._id
+            ventaId: { $in: ventaIds }
         })
         .populate({
             path: 'subcategoriaCatalogoId',
@@ -166,42 +114,50 @@ export async function GET(request: NextRequest) {
             model: 'ItemCatalogo',
             select: '_id codigo fechaMantencion'
         })
-        .lean<IDetalleVenta[]>();
+        .lean();
+
+        // Agrupar detalles por venta
+        const detallesPorVenta = detallesVenta.reduce((acc, detalle) => {
+            const ventaId = detalle.ventaId.toString();
+            if (!acc[ventaId]) acc[ventaId] = [];
+            acc[ventaId].push(detalle);
+            return acc;
+        }, {} as Record<string, any[]>);
 
         // Crear el listado de descarga según IListadoDescargaView
-        const itemsDescarga: IItemDeCargaView[] = [];
+        const itemsDescarga: any[] = [];
 
-        for (const detalle of detallesVenta) {
-            const subcategoria = detalle.subcategoriaCatalogoId;
-            const categoria = subcategoria?.categoriaCatalogoId;
+        for (const venta of rutaDespacho.ventaIds) {
+            const detalles = detallesPorVenta[venta._id.toString()] || [];
             
-            if (!subcategoria || !categoria) continue;
+            for (const detalle of detalles) {
+                const subcategoria = detalle.subcategoriaCatalogoId;
+                const categoria = subcategoria?.categoriaCatalogoId;
+                
+                // Calcular restantes: multiplicador menos los ya escaneados en itemCatalogoIds
+                const multiplicador = detalle.cantidad || 0;
+                const yaEscaneados = detalle.itemCatalogoIds?.length || 0;
+                const restantes = Math.max(0, multiplicador - yaEscaneados);
 
-            // Calcular restantes: multiplicador menos los cargados de esa subcategoría
-            const multiplicador = detalle.cantidad || 0;
-            const cantidadCargada = detalle.itemCatalogoIds?.length || 0;
-            
-            // Los restantes son la diferencia entre lo que se necesita y lo que se puede entregar
-            const restantes = multiplicador - cantidadCargada;
+                // Crear IItemDeCargaView que extiende ICilindroView
+                const itemDescarga: IItemDeCargaView = {
+                    // Propiedades de ICilindroView
+                    _id: subcategoria?._id?.toString() || "",
+                    subcategoriaCatalogoId: subcategoria?._id?.toString() || "",
+                    cantidad: subcategoria?.cantidad || 0,
+                    unidad: subcategoria?.unidad || "",
+                    nombreGas: categoria?.gas || categoria?.nombre || "",
+                    sinSifon: subcategoria?.sinSifon || false,
+                    elemento: categoria?.elemento || "",
+                    esIndustrial: categoria?.esIndustrial || false,
+                    esMedicinal: categoria?.esMedicinal || false,
+                    vencido: false, 
+                    multiplicador: multiplicador,
+                    restantes: restantes
+                };
 
-            // Crear IItemDeCargaView que extiende ICilindroView
-            const itemDescarga: IItemDeCargaView = {
-                // Propiedades de ICilindroView
-                _id: String(subcategoria?._id),
-                subcategoriaCatalogoId: String(subcategoria._id),
-                cantidad: subcategoria.cantidad || 0,
-                unidad: subcategoria.unidad || "",
-                nombreGas: categoria.gas || categoria.nombre || "",
-                sinSifon: subcategoria.sinSifon || false,
-                elemento: categoria.elemento || "",
-                esIndustrial: categoria.esIndustrial || false,
-                esMedicinal: categoria.esMedicinal || false,
-                vencido: false, 
-                multiplicador: multiplicador,
-                restantes: restantes
-            };
-
-            itemsDescarga.push(itemDescarga);
+                itemsDescarga.push(itemDescarga);
+            }
         }
 
         console.log(`Returning listado de descarga con ${itemsDescarga.length} items`);

@@ -25,7 +25,7 @@ export default function Nav() {
     }
 
     return (
-        <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`}>
+        <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`} style={{ zIndex: 600 }}>
             <div className="absolute">
                 <div className="flex">
                     <AiOutlineMenu size="1.7rem" className="m-4 text-slate-800 cursor-pointer"
@@ -102,7 +102,10 @@ export default function Nav() {
                     </div>
                 )}
             </div>
-            {scanMode && <PowerScanView scanMode={scanMode} setScanMode={setScanMode} rutaId={null} ventaId={null} />}
+            {scanMode && 
+            <PowerScanView 
+                scanMode={scanMode} setScanMode={setScanMode} rutaId={null} ventaId={null}
+                operacion="gestionar" />}
         </div>
     )
 }

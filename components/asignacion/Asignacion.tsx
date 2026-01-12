@@ -27,15 +27,32 @@ interface ISucursalSelectable {
 export default function Asignacion() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showReasignacionModal, setShowReasignacionModal] = useState(false);
-    const [selectedChofer, setSelectedChofer] = useState<{ _id: string, nombre: string } | null>(null);
-    const [selectedVenta, setSelectedVenta] = useState<{ _id: string, cliente: string } | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
-    const [showCommentModal, setShowCommentModal] = useState(false);
     const [showDetalleOrdenModal, setShowDetalleOrdenModal] = useState(false);
+    const [showCommentModal, setShowCommentModal] = useState(false);
+    const [ventaIdForComment, setVentaIdForComment] = useState<string | null>(null);
+    const [comentarioActual, setComentarioActual] = useState<string | null>(null);
+    const [onSaveComment, setOnSaveComment] = useState<() => void>(() => () => {});
+    const [selectedChofer, setSelectedChofer] = useState<{ _id: string, nombre: string } | null>(null);
+    const [selectedVenta, setSelectedVenta] = useState<{ _id: string, cliente: string, comentario: string | null } | null>(null);
+
+    // Función callback unificada para manejo de comentarios
+    const handleShowCommentModal = (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => {
+        setVentaIdForComment(ventaId);
+        setComentarioActual(comentario || null);
+        setOnSaveComment(() => onSaveComment || (() => {})); // Wrapper para que sea una función
+        setShowCommentModal(true);
+    };
+
+    const handleCloseCommentModal = () => {
+        setShowCommentModal(false);
+        setVentaIdForComment(null);
+        setComentarioActual(null);
+        setOnSaveComment(() => () => {});
+    };
+    const [isSaving, setIsSaving] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [dragOrigin, setDragOrigin] = useState<'pedidos' | 'conductores' | null>(null);
     const [dragSourceConductor, setDragSourceConductor] = useState<string | null>(null);
-    // const [draggedPedido, setDraggedPedido] = useState<{ id: string, cliente: string } | null>(null); // No usado actualmente
     const { control, setValue } = useForm<INuevaVentaSubmit>();
 
     const { data: sucursales, isLoading } = useQuery<ISucursalSelectable[]>({
@@ -57,10 +74,6 @@ export default function Asignacion() {
             return data.sucursales;
         }
     });
-
-    const onCloseDetalleVenta = useCallback(() => {
-        setShowDetalleOrdenModal(false);
-    }, []);
 
     const sucursalId = useWatch({
         control,
@@ -128,7 +141,7 @@ export default function Asignacion() {
         const clienteNombre = pedido?.clienteNombre || 'Cliente desconocido';
         
         console.log('📝 Cliente seleccionado:', { _id: pedidoId, cliente: clienteNombre });
-        setSelectedVenta({ _id: pedidoId, cliente: clienteNombre });
+        setSelectedVenta({ _id: pedidoId, cliente: clienteNombre, comentario: pedido?.comentario || null });
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -180,7 +193,7 @@ export default function Asignacion() {
             console.log('📝 Cliente para asignar:', { _id: pedidoId, cliente: clienteNombre });
             
             setSelectedChofer({ _id: conductorId, nombre: conductorNombre });
-            setSelectedVenta({ _id: pedidoId, cliente: clienteNombre });
+            setSelectedVenta({ _id: pedidoId, cliente: clienteNombre, comentario: pedido?.comentario || null });
             setShowConfirmModal(true);
         } else if (dropZoneId === 'en-transito') {
             // Drop en tránsito - solo mostrar toast de éxito
@@ -195,7 +208,7 @@ export default function Asignacion() {
             const clienteNombre = pedido?.clienteNombre || 'Cliente desconocido';
             
             console.log('🔄 Pedido para reasignar:', { _id: pedidoId, cliente: clienteNombre });
-            setSelectedVenta({ _id: pedidoId, cliente: clienteNombre });
+            setSelectedVenta({ _id: pedidoId, cliente: clienteNombre, comentario: pedido?.comentario || null });
             setShowReasignacionModal(true);
         }
     };
@@ -257,21 +270,20 @@ export default function Asignacion() {
                     <div className="col-span-7 flex flex-col md:flex-row gap-4">
                         <PorAsignar
                             control={control}
-                            onShowDetalle={() => {
-                                setShowDetalleOrdenModal(true);
-                            }}
-                            onShowCommentModal={() => {
-                                setShowCommentModal(true);
-                            }}
+                            onShowCommentModal={handleShowCommentModal}
+                            setShowDetalleOrdenModal={setShowDetalleOrdenModal}
                         />
                         <Conductores
                             control={control}
+                            onShowCommentModal={handleShowCommentModal}
                             setShowDetalleOrdenModal={setShowDetalleOrdenModal}
-                            setShowCommentModal={setShowCommentModal}
                         />
                     </div>
 
-                    {sucursalId && <EnTransito sucursalId={sucursalId} setShowCommentModal={setShowCommentModal} />}
+                    {sucursalId && 
+                        <EnTransito 
+                            sucursalId={sucursalId} 
+                            onShowCommentModal={handleShowCommentModal}/>}
                 </div>}
 
                 <ConfirmModal
@@ -384,17 +396,21 @@ export default function Asignacion() {
                     confirmationLabel="DESASIGNAR"
                 />
 
-                {showCommentModal &&
-                    <CommentModal
-                        ventaId={selectedVenta?._id || null}
-                        setShowCommentModal={setShowCommentModal} />}
-
-                {showDetalleOrdenModal &&
-                    <InformacionDeOrden
-                        ventaId={selectedVenta?._id || null}
-                        onClose={onCloseDetalleVenta}
-                        loading={isSaving}
-                    />}
+                <CommentModal
+                    ventaId={ventaIdForComment}
+                    comentarioInicial={comentarioActual}
+                    show={showCommentModal}
+                    onSaveComment={onSaveComment}
+                    onClose={handleCloseCommentModal} />
+                
+                <InformacionDeOrden
+                    ventaId={selectedVenta?._id || null}
+                    show={showDetalleOrdenModal}
+                    onClose={() => {
+                        setShowDetalleOrdenModal(false);
+                    }}
+                    loading={isSaving}
+                />
 
                 <Toaster />
                 

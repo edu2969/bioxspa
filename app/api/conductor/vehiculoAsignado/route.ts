@@ -7,6 +7,7 @@ import RutaDespacho from "@/models/rutaDespacho";
 import Vehiculo from "@/models/vehiculo";
 import { IRutaDespacho } from "@/types/rutaDespacho";
 import { IVehiculoView } from "@/types/types";
+import { USER_ROLE } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
     try {
@@ -52,7 +53,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Verificar que el usuario tenga acceso a esta ruta
-        if (String(rutaDespacho.choferId) !== session.user.id) {
+        if (String(rutaDespacho.choferId) !== session.user.id && ![
+            USER_ROLE.cobranza,
+            USER_ROLE.encargado,
+            USER_ROLE.responsable
+        ].includes(session.user.role)) {
             console.warn("User doesn't have access to this ruta");
             return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
         }

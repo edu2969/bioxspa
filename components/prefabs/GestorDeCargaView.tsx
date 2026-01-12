@@ -4,7 +4,6 @@ import React, { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 import { getNUCode } from "@/lib/nuConverter";
-import { FaClipboardCheck } from "react-icons/fa";
 import type { ICargaDespachoView } from "@/types/types";
 import { LiaPencilAltSolid } from "react-icons/lia";
 import { useForm } from "react-hook-form";
@@ -16,7 +15,6 @@ import Loader from "../Loader";
 import QuienRecibeModal from "../modals/QuienRecibeModal";
 import ModalConfirmarCargaParcial from "../modals/ModalConfirmarCargaParcial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
 
 interface FormData {
   nombreRetira: string;
@@ -24,16 +22,14 @@ interface FormData {
   rutRetiraDv: string;
 }
 
-export default function GestorDeCargaView({  
+export default function GestorDeCargaView({
   cargamentos = [],
   index,
   setScanMode,
-  handleRemoveFirst
 }: {
   cargamentos: ICargaDespachoView[] | undefined;
   index: number;
   setScanMode: (scanMode: boolean) => void;
-  handleRemoveFirst: () => void;
 }) {
   const [animating, setAnimating] = useState(false);
   const [showModalNombreRetira, setShowModalNombreRetira] = useState(false);
@@ -43,10 +39,19 @@ export default function GestorDeCargaView({
   const { setValue } = useForm<FormData>();
   const queryClient = useQueryClient();
 
+  const handleRemoveFirst = () => {
+    console.log("Iniciando animación de remoción");
+    setAnimating(true);
+    setTimeout(() => {
+      setAnimating(false);
+      setScanMode(false);
+    }, 1000);
+  };
+
   const isReady = () => {
     if (!cargamentos || cargamentos.length === 0) return false;
     const cargamento = cargamentos[0];
-    const requiereQuienRecibe = cargamento?.retiroEnLocal ? 
+    const requiereQuienRecibe = cargamento?.retiroEnLocal ?
       (cargamento?.ventas?.[0]?.entregasEnLocal?.[0]?.nombreRecibe && cargamento?.ventas?.[0]?.entregasEnLocal?.[0]?.rutRecibe) : true;
     const alMenosUnEscaneado = loadState().partial || loadState().complete;
     return requiereQuienRecibe && alMenosUnEscaneado;
@@ -56,14 +61,14 @@ export default function GestorDeCargaView({
     mutationFn: async () => {
       const cargamento = cargamentos?.[0];
       if (!cargamento) throw new Error('No hay cargamento disponible');
-      
+
       if (!isReady()) {
         throw new Error('El cargamento no está listo para confirmar');
       }
 
       // Endpoint dinámico basado en si tiene rutaId
-      const endpoint = cargamento.rutaId ? 
-        `/api/pedidos/despacho` : 
+      const endpoint = cargamento.rutaId ?
+        `/api/pedidos/despacho` :
         `/api/pedidos/despacho/confirmarEntregaEnLocal`;
 
       // Payload dinámico basado en el tipo de entrega
@@ -82,39 +87,29 @@ export default function GestorDeCargaView({
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(`Error al guardar el cargamento: ${errorData.error || response.status}`);
       }
-      
+
       return await response.json();
     },
     onSuccess: (data: { ok: boolean }) => {
       if (data.ok) {
         toast.success('Cargamento confirmado con éxito');
-        
-        // Invalidar query de cargamentos para refrescar la data
-        queryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
-        
-        // Verificar si todos los detalles están completados
-        const cargamento = cargamentos?.[0];
-        if (cargamento) {
-          const detallesCompletados = cargamento.ventas.every(venta =>
-            venta.detalles.every(detalle => detalle.restantes === 0)
-          );
-          
-          if (detallesCompletados) {
-            handleRemoveFirst();
-          } else if (cargamentos.length > 1) {
-            // Lógica para manejar carga parcial con múltiples cargamentos
-            handleRemoveFirst();
-          } else {
-            handleRemoveFirst();
-          }
-        } else {
-          handleRemoveFirst();
-        }
+
+        // Ejecutar la animación de remoción
+        handleRemoveFirst();
+
+        // Después de 1 segundo (tiempo de animación), actualizar la query data
+        setTimeout(() => {
+          queryClient.setQueryData(['cargamentos-despacho'], (oldData: ICargaDespachoView[] | undefined) => {
+            if (!oldData || oldData.length === 0) return oldData;
+            // Remover el primer elemento del array
+            return oldData.slice(1);
+          });
+        }, 1000);
       } else {
         toast.error('Error: La respuesta no fue exitosa');
       }
@@ -132,7 +127,7 @@ export default function GestorDeCargaView({
     const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
     const ventaEnLocal = cargamento.ventas.some(v => v.entregasEnLocal);
 
-    
+
     if (tieneTraslado) {
       const itemsRetirados = Array.isArray(cargamento.cargaItemIds) && cargamento.cargaItemIds.length === 0;
 
@@ -140,7 +135,7 @@ export default function GestorDeCargaView({
         return { complete: true, porcentaje: 100 };
       }
       return {
-        partial: false, porcentaje: 0 
+        partial: false, porcentaje: 0
       };
     }
 
@@ -156,7 +151,7 @@ export default function GestorDeCargaView({
           const itemsEscaneados = totalItems - (detalle.restantes || 0);
           return accDetalle + (itemsEscaneados / totalItems) * 100;
         }
-        , 0) / venta.detalles.length;
+          , 0) / venta.detalles.length;
         return accVenta + porcentajeVenta;
       }, 0) / cargamento.ventas.length;
 
@@ -176,12 +171,12 @@ export default function GestorDeCargaView({
 
     if (esProcesoDescarga) {
       return {
-        partial: true,        
+        partial: true,
         porcentaje: Math.round(0)
       };
     }
-    
-if (ventaEnLocal) {
+
+    if (ventaEnLocal) {
       // Calcular porcentaje basado en los restantes
       const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
         const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
@@ -208,7 +203,7 @@ if (ventaEnLocal) {
         porcentaje: Math.round(porcentaje)
       };
     }
-    
+
     console.log("Estado de carga no reconocido", cargamentos[0]);
     throw new Error("Estado de carga no reconocido");
   }
@@ -274,15 +269,15 @@ if (ventaEnLocal) {
               <div className={`relative flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
                 <div className="mt-1 mr-2 cursor-pointer" onClick={(e) => {
                   e.stopPropagation();
-                  if(index === 0) {
+                  if (index === 0) {
                     toast(`${venta.comentario || "Sin comentarios"}`, { icon: '💬' });
-                  }                  
+                  }
                 }}>
                   {!venta.comentario
                     ? <VscCommentDraft size="1.75rem" />
                     : <VscCommentUnresolved size="1.75rem" />}
                 </div>
-                {venta.comentario && <div className="absolute top-[16px] right-[11px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
+                {venta.comentario && <div className="absolute top-[20px] right-[10px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
               </div>
             </div>
             <ul className="flex-1 flex flex-wrap items-center justify-center -mt-0.5">
@@ -346,7 +341,7 @@ if (ventaEnLocal) {
                   } else if (loadState().complete) {
                     mutation.mutate();
                   }
-                }} 
+                }}
                 disabled={!isReady()}>
                 <FaRoadCircleCheck className="text-4xl pb-0" />
                 <p className="ml-2 mt-2 text-md font-bold">
@@ -371,7 +366,7 @@ if (ventaEnLocal) {
             </div>
           </div>}
 
-          
+
           {index === 0 && inputTemporalVisible && <div className="absolute bottom-3 w-full pr-8 text-center pt-2">
             <label className="text-gray-600 text-sm mb-2">Ingrese código:</label>
             <input
@@ -387,6 +382,7 @@ if (ventaEnLocal) {
               }}
             />
           </div>}
+          
         </div>
       </div>
     )}

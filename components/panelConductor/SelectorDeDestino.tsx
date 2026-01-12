@@ -1,11 +1,11 @@
 import { TbFlagCheck } from "react-icons/tb";
-import { IRutaConductorView } from "@/types/types";
+import { IDestinoDisponible, IRutaConductorView } from "@/types/types";
 import { TIPO_ORDEN } from "@/app/utils/constants";
 import { FaMapLocationDot, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
 import { useForm } from "react-hook-form";
 import { Selector } from "../prefabs/Selector";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Loader from "../Loader";
 import { FaFlagCheckered } from "react-icons/fa";
 
@@ -21,23 +21,48 @@ export default function SelectorDeDestino({
 }: {
     rutaDespacho: IRutaConductorView;
 }) {
-    const { register, getValues } = useForm();
+    const { register, getValues, watch } = useForm();
     const queryClient = useQueryClient();
 
-const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
+    // Observar cambios en la selección de destino
+    const destinoSeleccionado = watch("direccionDestinoId");
+
+    const { data: destinos, isLoading: isLoadingDestinos } = useQuery<IDestinoDisponible[]>({
+        queryKey: ['destinos-ruta-conductor', rutaDespacho._id],
+        queryFn: async () => {
+            if (!rutaDespacho || !rutaDespacho._id) return [];
+            const response = await fetch(`/api/conductor/destinos?rutaId=${rutaDespacho._id}`);
+            const data = await response.json();
+            console.log("Destinos disponibles para la ruta de despacho:", data.destinos);
+            return data.destinos;
+        },
+        enabled: !!rutaDespacho?._id,
+        initialData: []
+    })
+
+    const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
         mutationFn: async () => {
-            if (!rutaDespacho?._id || !getValues("direccionDestinoId")) {
-                throw new Error('Missing rutaId or direccionId');
+            if (!rutaDespacho?._id) {
+                throw new Error('Missing rutaId');
             }
 
-            const response = await fetch('/api/pedidos/iniciarViaje', {
+            let direccionDestinoId = getValues("direccionDestinoId");
+            if (!direccionDestinoId) {
+                direccionDestinoId = rutaDespacho.tramos && rutaDespacho.tramos.find(tramo => tramo.fechaArribo == null)?.cliente?.direccion?._id;
+            }
+
+            if (!direccionDestinoId) {
+                throw new Error('Debe seleccionar un destino');
+            }
+
+            const response = await fetch('/api/conductor/iniciarViaje', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     rutaId: rutaDespacho._id,
-                    direccionId: getValues("direccionDestinoId")
+                    direccionId: direccionDestinoId
                 }),
             });
 
@@ -48,16 +73,15 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
 
             return response.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
+        onSuccess: () => {            
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
         },
         onError: (error) => {
             console.error('Error iniciando viaje:', error);
         }
-    });
-    
+    });    
 
-    return <div className="w-full flex flex-col items-center mb-5">
+    return <div className="w-full flex flex-col items-center mb-5 px-2 space-y-3">
         {getVentaActual(rutaDespacho)?.tipo === TIPO_ORDEN.traslado &&
             <div className="w-full bg-neutral-100 rounded p-2 mb-4">
                 <p className="text-xs">Misión:</p>
@@ -96,12 +120,12 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
                 </div>
                 {rutaDespacho.tramos?.length > 0 && rutaDespacho.tramos.map((tramo, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" />
-                    <span className="text-xs ml-2 w-36">{tramo.direccionDestino
-                        && tramo.direccionDestino.nombre?.split(",").slice(0, 3).join(",")}</span>
+                    <span className="text-xs ml-2 w-36">{tramo.cliente.direccion
+                        && tramo.cliente.direccion.nombre?.split(",").slice(0, 3).join(",")}</span>
                     {indexRuta == rutaDespacho.tramos?.length - 1 && <button
                         className="bg-blue-400 text-white font-bold rounded-md shadow-md w-10 h-10 pl-2"
                         onClick={() => {
-                            const destino = `${tramo.direccionDestino && tramo.direccionDestino.latitud},${tramo.direccionDestino && tramo.direccionDestino.longitud}`;
+                            const destino = `${tramo.cliente.direccion && tramo.cliente.direccion.latitud},${tramo.cliente.direccion && tramo.cliente.direccion.longitud}`;
                             // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
                             window.open(
                                 `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`,
@@ -115,33 +139,48 @@ const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
             </div>
         </div>
         
-        {getVentaActual(rutaDespacho)?.direccionDestino == null && <Selector 
-            options={rutaDespacho ? rutaDespacho.tramos?.map(tramo => {
+        {!isLoadingDestinos && destinos && destinos.length > 1 && <Selector 
+            options={destinos.map((destino: IDestinoDisponible): { label: string; value: string } => {
                 return {
-                    ventaId: tramo.ventaId,
-                    clienteNombre: tramo.cliente.nombre,
-                    direccion: tramo.direccionDestino ? tramo.direccionDestino.nombre : 'Sin dirección'
-                }}) : []}
+                    value: destino.direccionId,
+                    label: destino.glosaDireccion
+                }
+            })}
             register={register("direccionDestinoId")}
             label="Destino"
             placeholder={rutaDespacho && rutaDespacho.tramos?.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
-            getLabel={(option) => `${option.clienteNombre} | ${option.direccion}`}
-            getValue={(option) => option.ventaId}
+            getLabel={(option: { label: string; value: string }) => option.label}
+            getValue={(option: { label: string; value: string }) => option.value}
         />}
 
-        {rutaDespacho.tramos?.filter(r => r.fechaArribo != null).length < rutaDespacho.tramos?.length && 
-        <div className="flex flex-row w-full items-center justify-center">
-            <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${rutaDespacho.tramos?.length == 0 || rutaDespacho.tramos[rutaDespacho.tramos.length - 1].fechaArribo ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => iniciarViaje()}
-                disabled={isLoading}>
-                {isLoading ? <div className="mt-1">
-                    <Loader texto="INICIANDO" />
-                </div> :
-                    <div className="flex">
-                        <FaFlagCheckered className="mt-3 mr-3" />
-                        <span className="mt-2">INICIAR VIAJE</span>
-                    </div>}
-            </button>
+        {isLoadingDestinos && <div className="w-full">
+            <Loader texto="Cargando destinos..." />
         </div>}
+        
+        <div className="flex flex-row w-full items-center justify-center">
+            {/* Validar condiciones para habilitar el botón */}
+            {(() => {
+                return (
+                    <div className="flex flex-col w-full items-center space-y-2">
+                        {!destinoSeleccionado && destinos && destinos.length > 1 && (
+                            <div className="w-full text-center mb-2">
+                                <p className="text-sm text-amber-600">Selecciona un destino para continuar</p>
+                            </div>
+                        )}
+                        <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${isLoading || (!destinoSeleccionado && destinos.length === 1) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => iniciarViaje()}
+                            disabled={isLoading || (!destinoSeleccionado && destinos.length === 1)}>
+                            {isLoading ? <div className="mt-1">
+                                <Loader texto="INICIANDO" />
+                            </div> :
+                                <div className="flex">
+                                    <FaFlagCheckered className="mt-3 mr-3" />
+                                    <span className="mt-2">INICIAR VIAJE</span>
+                                </div>}
+                        </button>
+                    </div>
+                );
+            })()}
+        </div>
     </div>;
 }

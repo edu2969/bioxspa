@@ -25,6 +25,7 @@ export default function ConfirmacionLlegadaADestino({
 }) {
     const queryClient = useQueryClient();
     const [esperaConfirmacion, setEsperaConfirmacion] = useState(false);
+    const [ingresoQuienRecibe, setIngresoQuienRecibe] = useState(false);
     const { register, formState } = useForm<{
         rut: string,
         nombre: string
@@ -49,12 +50,11 @@ export default function ConfirmacionLlegadaADestino({
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Error reportando llegada');
-            }
-
+            }            
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
         },
         onError: (error) => {
             console.error('Error reportando llegada:', error);
@@ -64,8 +64,9 @@ export default function ConfirmacionLlegadaADestino({
     const handleHeLlegado = () => {
         setEsperaConfirmacion(true);
         setTimeout(() => {
+            setIngresoQuienRecibe(true);
             setEsperaConfirmacion(false);
-        });
+        }, 1000);
     };
 
     const { mutate: corregirDestino } = useMutation({
@@ -85,11 +86,11 @@ export default function ConfirmacionLlegadaADestino({
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Error corrigiendo destino');
-            }
+            }            
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
             toast.success("Destino corregido, por favor selecciona el nuevo destino");
         },
         onError: (error) => {
@@ -97,9 +98,9 @@ export default function ConfirmacionLlegadaADestino({
         }
     });
 
-    return (<div className="bg-white/80 rounded-t-lg px-2 py-4 shadow-lg w-full">
+    return (<div className="bg-white/80 rounded-t-lg px-4 py-4 shadow-lg w-full">
         <form>
-            {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && <div className="flex flex-col items-center justify-center space-y-3">
+            {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && !ingresoQuienRecibe && <div className="flex flex-col items-center justify-center space-y-3 text-center">
                 <h1 className="font-bold text-2xl">Conduce con precaución.</h1>
                 <MdBusAlert size="8rem" className="text-yellow-400" />
                 <span className="text-xl">Al llegar, avisas presionando el botón</span>
@@ -107,16 +108,21 @@ export default function ConfirmacionLlegadaADestino({
                     className={`w-full flex justify-center mt-4 py-3 px-8 bg-blue-400 text-white font-bold rounded-lg shadow-md mb-4 h-12 ${esperaConfirmacion ? 'opacity-50' : ''}`}
                     onClick={() => handleHeLlegado()}
                     disabled={esperaConfirmacion}>
+                        <FaBuildingFlag size="1.4rem"/>&nbsp;&nbsp;&nbsp;HE LLEGADO
+                        {esperaConfirmacion &&
+                        <div className="absolute -mt-1">
+                            <Loader texto="" />
+                        </div>}
                 </button>
             </div>}
 
-            {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && <div className="w-full">
-                <FaBuildingFlag size="9rem" className="text-yellow-500 mb-4 mx-auto" />
+            {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && ingresoQuienRecibe && <div className="w-full">
+                <FaBuildingFlag size="9rem" className="text-blue-500 mb-4 mx-auto" />
                 <div>
                     <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
                     <div className="flex bg-blue-400 text-white border-lg shadow-md rounded-lg mx-2 p-2">
                         <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
-                        <p className="text-xl text-center">{rutaDespacho.tramos[rutaDespacho.tramos.length - 1].direccionDestinoId?.nombre || "un destino"}</p>
+                        <p className="text-xl text-center">{rutaDespacho.tramos.find(t => t.fechaArribo === null)?.cliente.direccion.nombre || "un destino"}</p>
                     </div>
 
                     <div className="w-full px-6 py-4 bg-white mx-auto">

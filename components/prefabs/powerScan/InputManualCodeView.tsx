@@ -1,6 +1,7 @@
 import Loader from "@/components/Loader";
 import { InputEvent, useEffect, useRef, useState } from "react";
 import { BsQrCodeScan } from "react-icons/bs";
+import { useOnVisibilityChange } from "@/components/uix/useOnVisibilityChange";
 
 export default function InputManualCodeView(props: {
     onCodeSubmit: (code: string) => void,
@@ -11,6 +12,18 @@ export default function InputManualCodeView(props: {
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
     const hiddenInputRef = useRef<HTMLInputElement>(null);
     const visibleInputRef = useRef<HTMLInputElement>(null);
+    
+    // Hook para manejar cuando la aplicación vuelve a ser visible
+    useOnVisibilityChange(() => {
+        if (scanMode && !inputTemporalVisible) {
+            // Mantener el foco en el input oculto cuando volvemos a la aplicación
+            setTimeout(() => {
+                if (hiddenInputRef.current) {
+                    hiddenInputRef.current.focus();
+                }
+            }, 100);
+        }
+    });
     
     useEffect(() => {
         const handleTextInput = (e: Event) => {
@@ -51,14 +64,12 @@ export default function InputManualCodeView(props: {
         };
     }, [scanMode, inputTemporalVisible, setScanMode]);
 
-    return (<div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 px-4">
+    return (<div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-50 px-4">
         {!inputTemporalVisible ? <>
-            <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-lg p-8 max-w-xs">
-                <BsQrCodeScan className="text-8xl text-green-500 mb-4" />
+            <div className="absolute top-2 bg-white rounded-lg shadow-lg px-4 py-2 max-w-xs">
                 <div className="flex">
-                    <Loader texto="Escaneando código..." />
+                    <Loader texto="Escanee un código..." />
                 </div>
-                <p className="text-gray-500 text-sm mt-2">Por favor, escanee un código QR</p>
             </div>
             <input
                 ref={hiddenInputRef}

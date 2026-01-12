@@ -22,9 +22,9 @@
  * @param {Request} request - The incoming HTTP request containing JSON body with `rutaDespachoId`, `itemId`, `ventaId`, or `codigo`.
  * @returns {Promise<NextResponse>} JSON response with `{ ok: true, item }` on success, or `{ ok: false, error }` on error.
  */
-import { mongoose } from "mongoose";
+import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import RutaDespacho from "@/models/rutaDespacho";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Venta from "@/models/venta";
@@ -34,9 +34,12 @@ import { authOptions } from "@/app/utils/authOptions";
 import Cargo from "@/models/cargo";
 import Dependencia from "@/models/dependencia";
 import Sucursal from "@/models/sucursal";
+import { IItemCatalogo } from "@/types/itemCatalogo";
+import { IVenta } from "@/types/venta";
 
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
+    console.log("CARGANDO CILINDRO");
     await connectMongoDB();
 
     if(!mongoose.models.Dependencia) {
@@ -76,22 +79,22 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { rutaDespachoId, itemId, ventaId, codigo } = body;
-    console.log("BODY", { rutaDespachoId, itemId, ventaId, codigo });
+    const { rutaId, ventaId, codigo } = body;
+    console.log("BODY", { rutaId, ventaId, codigo });
 
-    if (!itemId && !codigo) {
-        console.log("Missing itemId", { itemId });
-        return NextResponse.json({ ok: false, error: "Missing itemId or codigo" }, { status: 400 }); 
+    if (!rutaId && !codigo) {
+        console.log("Missing rutaId/codigo", { rutaId, codigo });
+        return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 }); 
     }
 
     // Verifica que el item exista
-    if(rutaDespachoId) {
+    if(rutaId) {
         // Busca la ruta de despacho
-        const rutaDespacho = await RutaDespacho.findById(rutaDespachoId);
+        const rutaDespacho = await RutaDespacho.findById(rutaId);
         if (!rutaDespacho) {
             return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
         }
-        const item = await ItemCatalogo.findOne(itemId ? { _id: itemId } : { codigo })
+        const item = await ItemCatalogo.findOne({ codigo })
         .populate({
             path: "subcategoriaCatalogoId",
             model: "SubcategoriaCatalogo",
@@ -102,12 +105,13 @@ export async function POST(request) {
                 select: "nombre elemento esIndustrial esMedicinal"
             }
         })
-        .lean();
+        .lean<IItemCatalogo>();
+
         if(!item) {
             return NextResponse.json({ ok: false, error: "Item no encontrado" }, { status: 404 });
         }
         // Agrega el item a cargaItemIds si no está
-        if (!rutaDespacho.cargaItemIds?.some(id => id.equals(item._id))) {
+        if (!rutaDespacho.cargaItemIds?.some((id: string) => String(id) === String(item._id))) {
             rutaDespacho.cargaItemIds.push(item._id);
         }
         // Obtiene el historial más reciente
@@ -115,7 +119,7 @@ export async function POST(request) {
 
         if (lastHistorial && lastHistorial.esCarga) {
             // Si el item ya existe en itemMovidoIds, arroja error
-            if (lastHistorial.itemMovidoIds.some(id => id.equals(item._id))) {
+            if (lastHistorial.itemMovidoIds.some((id: string) => String(id) === String(item._id))) {
                 return NextResponse.json({ ok: false, error: "El item ya fue cargado en el último historial" }, { status: 400 });
             }
             // Si no, agrega el item a itemMovidoIds
@@ -131,7 +135,7 @@ export async function POST(request) {
         await rutaDespacho.save();        
         return NextResponse.json({ ok: true, item });
     } else if(ventaId) {
-        const venta = await Venta.findById(ventaId).select("estado historialEstados direccionDespachoId").lean();
+        const venta = await Venta.findById(ventaId).select("estado historialEstados direccionDespachoId").lean<IVenta>();
         if (!venta) {
             return NextResponse.json({ ok: false, error: "Venta not found" }, { status: 404 });
         }
@@ -141,14 +145,17 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "La venta no está en estado preparacion" }, { status: 400 });
         }
 
-        const item = await ItemCatalogo.findOne({ _id: itemId, direccionId: userDireccionId }).select("_id subcategoriaCatalogoId").lean();
+        const item = await ItemCatalogo.findOne({ codigo, direccionId: userDireccionId }).select("_id subcategoriaCatalogoId").lean<IItemCatalogo>();
         if(!item) {            
             return NextResponse.json({ ok: true, error: "Item not found or does not belong to the route's address" }, { status: 404 });
         }
 
         // Verificar si la dirección del item coincide con la del usuario
-        const itemWithValidation = { ...item };
-        if (item.direccionId && !item.direccionId.equals(userDireccionId)) {
+        const itemWithValidation = {
+            ...item,
+            direccionInvalida: undefined as boolean | undefined
+        };
+        if (item.direccionId && String(item.direccionId._id) !== String(userDireccionId)) {
             itemWithValidation.direccionInvalida = true;
         }
 
@@ -159,7 +166,7 @@ export async function POST(request) {
         }
 
         // Verifica si el item ya está en cargaItemIds
-        if (rutaDespacho.cargaItemIds?.some(id => id.equals(item._id))) {
+        if (rutaDespacho.cargaItemIds?.some((id: string) => String(id) === String(item._id))) {
             return NextResponse.json({ ok: false, error: "El item ya fue cargado en la ruta de despacho" });
         }
 
@@ -172,7 +179,7 @@ export async function POST(request) {
         // Actualiza el historialCarga
         const lastHistorial = rutaDespacho.historialCarga[rutaDespacho.historialCarga.length - 1];
         if (lastHistorial && lastHistorial.esCarga) {
-            if (lastHistorial.itemMovidoIds.some(id => id.equals(item._id))) {
+            if (lastHistorial.itemMovidoIds.some((id: string) => String(id) === String(item._id))) {
                 return NextResponse.json({ ok: false, error: "El item ya fue cargado en el último historial" }, { status: 400 });
             }
             lastHistorial.itemMovidoIds.push(item._id);

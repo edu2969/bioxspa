@@ -7,8 +7,9 @@ import RutaDespacho from "@/models/rutaDespacho";
 import ItemCatalogo from "@/models/itemCatalogo";
 import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import { ICilindroView } from "@/components/prefabs/types";
 import { IRutaDespacho } from "@/types/rutaDespacho";
+import { USER_ROLE } from "@/app/utils/constants";
+import { ICilindroView } from "@/types/types";
 
 export async function GET(request: NextRequest) {
     try {
@@ -40,9 +41,8 @@ export async function GET(request: NextRequest) {
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
 
-        if (!session || !session.user || !session.user.id) {
-            console.warn("Unauthorized access attempt.");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        if (!session?.user?.id) {
+            return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
         }
 
         console.log(`Fetching rutaDespacho with ID: ${rutaId}`);
@@ -70,8 +70,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Verificar que el usuario tenga acceso a esta ruta
-        if (String(rutaDespacho.choferId) !== session.user.id) {
-            console.warn("User doesn't have access to this ruta");
+        if (String(rutaDespacho.choferId) !== session.user.id &&
+            ![USER_ROLE.cobranza, 
+                USER_ROLE.encargado, 
+                USER_ROLE.responsable].includes(session.user.role)) {
+            console.warn("User doesn't have access to this ruta", session.user.role);
             return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
         }
 
