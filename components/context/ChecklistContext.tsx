@@ -21,17 +21,14 @@ export function ChecklistProvider({ tipo, children }: {
         queryFn: async () => {
             const r = await fetch("/api/users/checklist");
             const data = await r.json();
+            console.log("Checklist data:", data);
             return data;
         }
     });
 
     useEffect(() => {
         if (!isLoadingChecklist 
-            && !checklist.passed 
-            && checklist.checklists.every((cl: {
-                tipo: string;
-                aprobado: boolean;
-            }) => cl.tipo !== tipo)) {
+            && !checklist.passed) {
             setShowModal(true);
         }
     }, [isLoadingChecklist, checklist]);

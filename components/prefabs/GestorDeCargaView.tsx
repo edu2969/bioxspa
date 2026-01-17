@@ -33,6 +33,7 @@ export default function GestorDeCargaView({
 }) {
   const [animating, setAnimating] = useState(false);
   const [showModalNombreRetira, setShowModalNombreRetira] = useState(false);
+  const [selectedVentaId, setSelectedVentaId] = useState<string | null>(null);
   const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
   const [modalConfirmarCargaParcial, setModalConfirmarCargaParcial] = useState(false);
   const temporalRef = useRef<HTMLInputElement>(null);
@@ -252,6 +253,7 @@ export default function GestorDeCargaView({
                     setValue("nombreRetira", venta.entregasEnLocal[0]?.nombreRecibe || "");
                     setValue("rutRetiraNum", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[0] : "");
                     setValue("rutRetiraDv", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[1] : "");
+                    setSelectedVentaId(venta.ventaId);
                     setShowModalNombreRetira(true);
                   }} />
                 </div>
@@ -396,8 +398,11 @@ export default function GestorDeCargaView({
     />}
 
     {index === 0 && showModalNombreRetira && <QuienRecibeModal
-      rutaId={cargamentos && cargamentos.length > 0 ? cargamentos[0].rutaId || "" : ""}
-      onClose={() => setShowModalNombreRetira(false)}
+      ventaId={selectedVentaId || ""}
+      onClose={() => {
+        setShowModalNombreRetira(false);
+        setSelectedVentaId(null);
+      }}
     />}
   </div>);
 }

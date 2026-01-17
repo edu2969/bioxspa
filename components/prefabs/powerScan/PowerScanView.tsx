@@ -19,7 +19,7 @@ export default function PowerScanView({
     setScanMode: (mode: boolean) => void,
     rutaId: string | null;
     ventaId: string | null;
-    operacion: 'cargar' | 'descargar' | 'gestionar';
+    operacion: 'cargar' | 'descargar' | 'gestionar' | 'entregarEnLocal';
 }) { 
     const qryClient = useQueryClient();
     const [powerScanModalVisible, setPowerScanModalVisible] = useState(false);
@@ -42,26 +42,27 @@ export default function PowerScanView({
             return response.json();
         },
         onSuccess: (data) => {
+            console.log("DATA", data);
             if (data.ok) {
                 toast.success(`Cilindro procesado correctamente`);
-                qryClient.invalidateQueries({ queryKey: operacion === 'cargar' ? ['cargamentos-despacho'] : ['listado-descarga-vehiculo'] });
+                qryClient.invalidateQueries({ queryKey: operacion !== 'descargar' ? ['cargamentos-despacho'] : ['listado-descarga-vehiculo'] });
                 qryClient.invalidateQueries({ queryKey: ['carga-vehiculo'] });
                 qryClient.invalidateQueries({ queryKey: ['descarga-vehiculo'] });
                 setScanMode(false);
                 play('/sounds/accept_02.mp3');
-            } else {
+            } else {                                
                 toast.error(data.error || 'Cilindro no encontrado');
                 if(data.item) {
-                    setPowerScanModalVisible(true);
+                    console.log("ITEM ENCONTRADO", data.item);
                     setItemEscaneado(data.item);
-                    setScanMode(false);
+                    setPowerScanModalVisible(true);              
                 }
                 play('/sounds/error_01.mp3');                
             }
         },
         onError: (error) => {
             toast.error('Error al buscar el cilindro');
-            play('/sounds/error_02.mp3');
+            play('/sounds/error_02.mp3');            
             setScanMode(false);
         }
     });

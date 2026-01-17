@@ -7,6 +7,5 @@ interface IChecklistAnswer {
 
 interface IChecklistlistResult {
     tipo: 'vehiculo' | 'personal';
-    aprobado: boolean;
     fecha: Date;
 }

@@ -10,6 +10,7 @@ type SelectorProps<T> = {
   register: UseFormRegisterReturn;
   isLoading?: boolean;
   onChange?: (value: string) => void;
+  disableAutoSelect?: boolean; // Nueva prop para deshabilitar auto-selección
 };
 
 export function Selector<T>({
@@ -21,11 +22,12 @@ export function Selector<T>({
   register,
   isLoading,
   onChange,
+  disableAutoSelect = false, // Por defecto false para mantener comportamiento actual
 }: SelectorProps<T>) {
   
-  // Seleccionar automáticamente si solo hay una opción
+  // Seleccionar automáticamente si solo hay una opción (solo si no está deshabilitado)
   useEffect(() => {
-    if (options && options.length === 1 && !isLoading) {
+    if (options && options.length === 1 && !isLoading && !disableAutoSelect) {
       const singleValue = getValue(options[0]);
       // Simular un cambio en el select para que react-hook-form lo detecte
       const event = new Event('change', { bubbles: true });
@@ -36,7 +38,7 @@ export function Selector<T>({
       register.onChange(event);
       onChange?.(singleValue);
     }
-  }, [options, isLoading, getValue, register, onChange]);
+  }, [options, isLoading, getValue, register, onChange, disableAutoSelect]);
 
   return (
     <div className="w-full">
@@ -50,7 +52,7 @@ export function Selector<T>({
           onChange?.(e.target.value);
         }}
         disabled={isLoading}
-        value={options && options.length === 1 && !isLoading ? getValue(options[0]) : undefined}
+        value={options && options.length === 1 && !isLoading && !disableAutoSelect ? getValue(options[0]) : undefined}
         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
       >
         <option value="">{isLoading ? `Cargando${label ? " " + label : ""}...` : (placeholder || `Seleccione${label ? " " + label : ""}...`)}</option>

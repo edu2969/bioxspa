@@ -1,6 +1,7 @@
 import { ICliente } from "@/types/cliente";
 import { IDireccion } from "@/types/direccion";
 import { IRutaDespacho } from "@/types/rutaDespacho";
+import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
 import { Types } from "mongoose";
 
 export interface IVentaView {
@@ -77,26 +78,16 @@ export interface IItemCatalogoPowerScanView {
     ownerId?: ICliente | null;
     direccionId?: IDireccion | null;
     elemento: string;
-    subcategoriaCatalogoId: string;
-    categoriaCatalogoId: string;
-    esIndustrial: boolean;
-    esMedicinal: boolean;
-    sinSifon: boolean;
-    cantidad: number;
-    unidad: string;
     codigo: string;
-    nombre: string;
-    descripcion: string;
-    descripcionCorta: string;
+    subcategoriaCatalogoId: ISubcategoriaCatalogo;
     stockActual: number;
     stockMinimo: number;
     garantiaAnual: number;
     estado: number;
-    destacado: boolean;
-    visible: boolean;
-    url: string;
-    urlImagen: string;
-    urlFichaTecnica: string;
-    fichaTecnica: string;
     fechaMantencion?: Date | null;
+    direccionInvalida?: boolean;
+    direccionEsperada?: {
+        _id: string;
+        nombre: string;
+    };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useOnVisibilityChange } from "./uix/useOnVisibilityChange";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,6 +23,14 @@ export default function JefaturaDespacho() {
   const [scanMode, setScanMode] = useState(false);
   const [rutaId, setRutaId] = useState<string | null>(null);
   const [ventaId, setVentaId] = useState<string | null>(null);
+
+  // Hook para restaurar el foco cuando la aplicación vuelve a ser visible
+  useOnVisibilityChange(() => {
+    // El foco se maneja dentro de InputManualCodeView, pero podemos agregar lógica adicional aquí si es necesario
+    if (scanMode) {
+      console.log("Aplicación visible nuevamente - modo scan activo");
+    }
+  });
 
   const { data: cargamentos, isLoading } = useQuery<ICargaDespachoView[]>({
     queryKey: ['cargamentos-despacho'],
@@ -60,7 +69,7 @@ export default function JefaturaDespacho() {
             <PowerScanView setScanMode={setScanMode}  
               scanMode={scanMode}
               rutaId={rutaId} ventaId={ventaId}
-              operacion="cargar"/>
+              operacion={`${rutaId ? 'cargar' : 'entregarEnLocal'}`}/>
           </SoundPlayerProvider>}
 
           <div className="w-full">

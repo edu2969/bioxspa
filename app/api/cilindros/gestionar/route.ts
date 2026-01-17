@@ -1,5 +1,5 @@
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Cargo from "@/models/cargo";
 import { getServerSession } from "next-auth";
@@ -34,7 +34,7 @@ async function verificarAutorizacion() {
     return { authorized: true, userId: session.user.id };
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
     await connectMongoDB();
 
     const auth = await verificarAutorizacion();
@@ -45,6 +45,9 @@ export async function POST(request) {
     try {
         const body = await request.json();
         const { itemId, ...updateData } = body;
+
+        console.log("Received update request for itemId:", itemId);
+        console.log("Update data:", updateData);
 
         if (!itemId) {
             return NextResponse.json({ ok: false, error: "Missing itemId" }, { status: 400 });
@@ -66,10 +69,11 @@ export async function POST(request) {
             'stockActual',
             'visible',
             'url',
-            'fechaMantencion'
+            'fechaMantencion',
+            'direccionId',
         ];
 
-        const datosActualizacion = {};
+        const datosActualizacion: Record<string, any> = {};
         for (const campo of camposPermitidos) {
             if (updateData.hasOwnProperty(campo)) {
                 datosActualizacion[campo] = updateData[campo];

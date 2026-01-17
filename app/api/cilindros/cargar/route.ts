@@ -36,11 +36,21 @@ import Dependencia from "@/models/dependencia";
 import Sucursal from "@/models/sucursal";
 import { IItemCatalogo } from "@/types/itemCatalogo";
 import { IVenta } from "@/types/venta";
+import { ICargo } from "@/types/cargo";
 
 
 export async function POST(request: NextRequest) {
     console.log("CARGANDO CILINDRO");
-    await connectMongoDB();
+    await connectMongoDB();    
+
+    const body = await request.json();
+    const { rutaId, ventaId, codigo } = body;
+    console.log("BODY", { rutaId, ventaId, codigo });
+
+    if (!rutaId && !codigo) {
+        console.log("Missing rutaId/codigo", { rutaId, codigo });
+        return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 }); 
+    }
 
     if(!mongoose.models.Dependencia) {
         mongoose.model("Dependencia", Dependencia.schema);
@@ -60,31 +70,70 @@ export async function POST(request: NextRequest) {
     const cargo = await Cargo.findOne({
         userId: userId,
         hasta: null // Cargo activo
-    }).populate('dependenciaId').populate('sucursalId');
+    })
+    .populate({
+        path: 'dependenciaId',
+        select: '_id direccionId',
+        populate: {
+            path: 'direccionId',
+            select: '_id nombre'
+        }
+    })
+    .populate({
+        path: 'sucursalId',
+        select: '_id direccionId',
+        populate: {
+            path: 'direccionId',
+            select: '_id nombre'
+        }
+    })
+    .lean<ICargo>();
 
     if (!cargo) {
         return NextResponse.json({ ok: false, error: "No active cargo found for user" }, { status: 403 });
     }
 
+    console.log("CARGO", cargo);    
+
     // Obtener la dirección del usuario desde dependencia o sucursal
-    let userDireccionId = null;
+    let userDireccion = null;
     if (cargo.dependenciaId && cargo.dependenciaId.direccionId) {
-        userDireccionId = cargo.dependenciaId.direccionId;
+        userDireccion = cargo.dependenciaId.direccionId;
     } else if (cargo.sucursalId && cargo.sucursalId.direccionId) {
-        userDireccionId = cargo.sucursalId.direccionId;
+        userDireccion = cargo.sucursalId.direccionId;
     }
 
-    if (!userDireccionId) {
+    if (!userDireccion) {
         return NextResponse.json({ ok: false, error: "No address found for user's workplace" }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { rutaId, ventaId, codigo } = body;
-    console.log("BODY", { rutaId, ventaId, codigo });
+    const item = await ItemCatalogo.findOne({ codigo })
+        .populate({
+            path: "subcategoriaCatalogoId",
+            model: "SubcategoriaCatalogo",
+            select: "_id nombre cantidad unidad sinSifon nombreGas categoriaCatalogoId ownerId",
+            populate: {
+                path: "categoriaCatalogoId",
+                model: "CategoriaCatalogo",
+                select: "_id nombre elemento esIndustrial esMedicinal"
+            }
+        })
+        .populate({
+            path: "direccionId",
+            select: "_id nombre"
+        })
+        .lean<IItemCatalogo>();
 
-    if (!rutaId && !codigo) {
-        console.log("Missing rutaId/codigo", { rutaId, codigo });
-        return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 }); 
+    if(!item) {
+        return NextResponse.json({ ok: false, error: "Item no encontrado" }, { status: 404 });
+    }
+
+    if(String(item.direccionId?._id) !== String(userDireccion._id)) {
+        return NextResponse.json({ ok: false, item: {
+            ...item,
+            direccionInvalida: true,
+            direccionEsperada: userDireccion
+        }, error: "El item no está donde se esperaba" }, { status: 400 });
     }
 
     // Verifica que el item exista
@@ -93,23 +142,8 @@ export async function POST(request: NextRequest) {
         const rutaDespacho = await RutaDespacho.findById(rutaId);
         if (!rutaDespacho) {
             return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
-        }
-        const item = await ItemCatalogo.findOne({ codigo })
-        .populate({
-            path: "subcategoriaCatalogoId",
-            model: "SubcategoriaCatalogo",
-            select: "nombre cantidad unidad sinSifon nombreGas categoriaCatalogoId ownerId",
-            populate: {
-                path: "categoriaCatalogoId",
-                model: "CategoriaCatalogo",
-                select: "nombre elemento esIndustrial esMedicinal"
-            }
-        })
-        .lean<IItemCatalogo>();
+        }        
 
-        if(!item) {
-            return NextResponse.json({ ok: false, error: "Item no encontrado" }, { status: 404 });
-        }
         // Agrega el item a cargaItemIds si no está
         if (!rutaDespacho.cargaItemIds?.some((id: string) => String(id) === String(item._id))) {
             rutaDespacho.cargaItemIds.push(item._id);

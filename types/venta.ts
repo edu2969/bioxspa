@@ -37,7 +37,7 @@ export interface IVenta {
     numeroVale?: string;
     saldo?: number;
     documentoTributarioId?: IDocumentoTributario;
-    direccionDespachoId: IDireccion;
+    direccionDespachoId: IDireccion | null;
     tasaImpuesto?: number;
     tieneOT?: boolean;
     numeroOrden?: string;

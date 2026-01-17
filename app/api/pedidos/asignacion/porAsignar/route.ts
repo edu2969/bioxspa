@@ -43,13 +43,18 @@ export async function GET(request: NextRequest) {
             ]
         }
     })
+    .populate({
+        path: 'direccionDespachoId',        
+        select: '_id'
+    })
     .sort({ fecha: -1 }) // Ordenar por fecha descendente (más reciente primero)
     .limit(25)
     .lean<IVenta[]>();
-    console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
+    console.log(`Fetched ${ventas.length} ventas`);
 
     const pedidos = await Promise.all(
         ventas.map(async (venta: IVenta) => {
+            console.log("Analizando venta:", venta);
             // Fetch cliente details
             const cliente = await Cliente.findById(venta.clienteId).lean<ICliente>();
             const clienteNombre = cliente?.nombre || "Desconocido";
@@ -82,7 +87,7 @@ export async function GET(request: NextRequest) {
                 clienteNombre,
                 clienteRut,
                 estado: venta.estado,
-                despachoEnLocal: false,
+                despachoEnLocal: venta.direccionDespachoId === null,
                 fecha: venta.fecha,
                 items: itemsWithNames
             };

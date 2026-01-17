@@ -16,11 +16,13 @@ import Venta from "@/models/venta";
 import ItemCatalogo from "@/models/itemCatalogo";
 import Cliente from "@/models/cliente";
 import Direccion from "@/models/direccion";
+import Sucursal from "@/models/sucursal";
 import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN } from "@/app/utils/constants";
 import { ICargo } from "@/types/cargo";
 import { IVenta } from "@/types/venta";
 import { IRutaDespacho } from "@/types/rutaDespacho";
 import { ICargaDespachoView } from "@/types/types";
+import { IDependencia } from "@/types/dependencia";
 
 export async function GET() {
     try {
@@ -55,6 +57,9 @@ export async function GET() {
         if (!mongoose.models.Direccion) {
             mongoose.model("Direccion", Direccion.schema);
         }
+        if (!mongoose.models.Sucursal) {
+            mongoose.model("Sucursal", Sucursal.schema);
+        }
         console.log("Fetching server session...");
         const session = await getServerSession(authOptions);
 
@@ -73,28 +78,33 @@ export async function GET() {
                     TIPO_CARGO.responsable
                 ]
             }
-        }).populate([{
-            path: "dependenciaId",
-            model: "Dependencia",
-            select: "_id direccionId",
-        }, {
+        }).populate({
             path: "sucursalId",
             model: "Sucursal",
             select: "_id direccionId",
-        }]).lean<ICargo>();
+        }).lean<ICargo>();
 
         if(!cargo) {
             console.warn(`No cargo found for userId: ${userId}`);
             return NextResponse.json({ ok: false, error: "User has no assigned cargo" }, { status: 400 });
-        }
+        }       
 
-        let qry = cargo.dependenciaId ? {
-            dependenciaId: cargo.dependenciaId
-        } : {
-            sucursalId: cargo.sucursalId
-        };        
-
-        const choferes = await Cargo.find({...qry, tipo: TIPO_CARGO.conductor }).populate("userId").lean<ICargo[]>();
+        const choferes = await Cargo.find({
+            sucursalId: cargo.sucursalId?._id, 
+            tipo: TIPO_CARGO.conductor 
+        })
+            .populate("userId")
+            .populate({
+                path: "sucursalId",
+                model: "Sucursal",
+                select: "_id nombre direccionId",
+                populate: {
+                    path: "direccionId",
+                    model: "Direccion",
+                    select: "_id nombre latitud longitud",
+                }
+            })
+            .lean<ICargo[]>();
 
         const choferIds = choferes?.map(c => c.userId._id) || [];
         console.log("Fetching rutasDespacho for choferes...");
@@ -159,20 +169,33 @@ export async function GET() {
             .lean<IRutaDespacho[]>();
 
         console.log("Fetching detalleVentas...");
-        const dependencia = await Dependencia.findOne({ _id: cargo.dependenciaId }).lean();
+        const dependencia = await Dependencia.findOne({ _id: cargo.dependenciaId?._id })
+        .populate({
+            path: "sucursalId",
+            model: "Sucursal",
+            select: "_id"
+        })
+        .lean<IDependencia>();
 
         console.log("DEPENDENCIA", dependencia);
         if (!dependencia) {
-            console.warn(`No dependencia found for dependenciaId: ${cargo.dependenciaId}`);
+            console.warn(`No dependencia found for dependenciaId: ${cargo.dependenciaId?._id}`);
             return NextResponse.json({ ok: false, error: "No dependencia found for this dependencia" }, { status: 404 });
         }
 
-        console.log("Mapping cargamentos en local...");
+        console.log("Mapping cargamentos en local", cargo);
         const ventasDespachoEnLocal = await Venta.find({
             estado: { $in: [TIPO_ESTADO_VENTA.por_asignar, TIPO_ESTADO_VENTA.preparacion] },
             direccionDespachoId: null,
-            sucursalId: cargo.sucursalId?._id
-        }).populate("clienteId").lean<IVenta[]>();
+            sucursalId: dependencia.sucursalId?._id     
+        })
+        .populate({
+            path: "direccionDespachoId",
+            model: "Direccion",
+            select: "_id nombre latitud longitud"
+        })
+        .populate("clienteId").lean<IVenta[]>();
+
         console.log("Ventas en local", ventasDespachoEnLocal);
 
         // Buscar los detalles de venta que correspondan a esas ventas

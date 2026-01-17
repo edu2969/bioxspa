@@ -1,18 +1,18 @@
 import mongoose from "mongoose";
 import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Cliente from "@/models/cliente";
 import BIDeuda from "@/models/biDeuda";
 import Venta from "@/models/venta";
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
     try {
         console.log("Conectando a MongoDB...");
         await connectMongoDB();
 
         // Get query params
         const { searchParams } = new URL(request.url);
-        const q = parseInt(searchParams.get("q"), 10); // 0: mes actual, 30: mes pasado, etc.
+        const q = parseInt(searchParams.get("q") ?? "0", 10); // 0: mes actual, 30: mes pasado, etc.
         const page = parseInt(searchParams.get("page") || "1", 10);
         const sortBy = searchParams.get("sortBy") || "nombre";
         const sortOrder = searchParams.get("sortOrder") || "asc";
@@ -24,7 +24,6 @@ export async function GET(request) {
             console.warn("Parámetro 'q' inválido:", q);
             return NextResponse.json({ ok: false, error: "Invalid 'q' parameter" }, { status: 400 });
         }
-
         
         if (!mongoose.models.Venta) {
             mongoose.model("Venta", Venta.schema);
@@ -43,7 +42,11 @@ export async function GET(request) {
         console.log("Periodo fecha calculada:", periodoFecha);
 
         // Construir query para biDeuda
-        let biDeudaQuery = {
+        let biDeudaQuery: {
+            periodo: string;
+            clienteId: { $ne: null };
+            fecha?: { $lte: Date } | Date;            
+        } = {
             periodo: "M",
             clienteId: { $ne: null }
         };
@@ -62,11 +65,11 @@ export async function GET(request) {
         }
 
         // Obtener IDs únicos de clientes con deuda en el periodo
-        const clienteIds = [...new Set(biDeudas.map(d => String(d.clienteId)))];
+        const clienteIds = biDeudas.map(d => String(d.clienteId));
         console.log("IDs únicos de clientes con deuda:", clienteIds);
 
         // Buscar clientes activos con deuda en el periodo
-        const clientes = await Cliente.find({ _id: { $in: clienteIds }, activo: true })
+        const clientes = await Cliente.find({ _id: { $in: clienteIds } })
             .select("nombre credito telefono email");
 
         console.log("Clientes activos encontrados:", clientes.length);

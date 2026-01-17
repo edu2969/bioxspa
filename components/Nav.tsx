@@ -25,7 +25,7 @@ export default function Nav() {
     }
 
     return (
-        <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`} style={{ zIndex: 600 }}>
+        <div className={`w-full absolute top-0 left-0 ${path === '/' ? 'hidden' : 'visible'}`} style={{ zIndex: 201 }}>
             <div className="absolute">
                 <div className="flex">
                     <AiOutlineMenu size="1.7rem" className="m-4 text-slate-800 cursor-pointer"

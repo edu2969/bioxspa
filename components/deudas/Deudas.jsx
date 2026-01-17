@@ -13,6 +13,8 @@ dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 import { useForm } from "react-hook-form";
+import Nav from "../Nav";
+import { SessionProvider } from "next-auth/react";
 
 const PERIODS = [
     { label: "Actual", value: 0 },
@@ -50,7 +52,7 @@ export default function Deudas() {
     const filtered = clientes.filter(cliente =>
         cliente.nombre?.toLowerCase().includes(search.toLowerCase())
     );
-    
+
     // Cambia a una página específica
     const goToPage = (page) => {
         setLoading(true);
@@ -71,7 +73,7 @@ export default function Deudas() {
         }
     };
 
-    return (
+    return (<SessionProvider>
         <main className="w-full h-dvh overflow-hidden mt-2">
             <div className="px-6 sticky top-0">
                 <div className="mx-32 mb-2">
@@ -127,7 +129,7 @@ export default function Deudas() {
                                                             console.log("CLIENTE", cliente);
                                                             setLoadingCliente(true);
                                                             setValue("cliente", cliente.nombre);
-                                                            router.push(`/modulos/cobros/${cliente._id}`);
+                                                            router.push(`/pages/cobros/${cliente._id}`);
                                                         }}
                                                     >
                                                         <p>{cliente.nombre}</p>
@@ -204,10 +206,10 @@ export default function Deudas() {
                                 key={cliente._id}
                                 onClick={() => {
                                     setRedirecting(true);
-                                    router.push(`/modulos/cobros/${cliente._id}`);
+                                    router.push(`/pages/cobros/${cliente._id}`);
                                 }}
                                 className="relative w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] rounded-lg shadow p-4 border border-gray-200 flex flex-col hover:scale-105 hover:bg-blue-50 hover:top-2 transition-all cursor-pointer"
-                            >                               
+                            >
 
                                 <div className="flex justify-between items-center mb-2">
                                     <div className="overflow-hidden">
@@ -231,7 +233,7 @@ export default function Deudas() {
                                         <p className="text-xs text-gray-500">
                                             última venta: {new Date(cliente.ultimaVenta || 0).toLocaleDateString("es-CL", { year: "numeric", month: "2-digit", day: "2-digit" })} ({dayjs(cliente.ultimaVenta).fromNow()})
                                         </p>
-                                    </div>                                    
+                                    </div>
                                 </div>
                                 <div className="flex gap-4 items-center mb-4">
                                     <div className="w-20 text-center">
@@ -275,7 +277,7 @@ export default function Deudas() {
                                             </div>
                                         </div>
                                     </div>
-                                </div>                                
+                                </div>
                             </div>
                         );
                     })}
@@ -366,6 +368,7 @@ export default function Deudas() {
                     <Loader texto="Cargando..." />
                 </div>
             )}
+            <Nav />
         </main>
-    );
+    </SessionProvider>);
 }

@@ -1,8 +1,10 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { LiaTimesSolid } from "react-icons/lia";
+import Loader from "../Loader";
 
 interface FormData {
     nombreRetira: string;
@@ -11,31 +13,55 @@ interface FormData {
 }
 
 export default function QuienRecibeModal({
-    rutaId,
+    ventaId,
     onClose
 }: {
-    rutaId: string;
+    ventaId: string;
     onClose: () => void;
 }) {
     const { handleSubmit, register } = useForm<FormData>();
+    const queryClient = useQueryClient();
 
-    const onSubmit = async (data: FormData) => {
-        try {
-            await fetch('/api/pedidos/despacho/actualizarRetira', {
-                method: 'POST',
+    const { mutate: saveQuienRecibe, isPending: isSaving } = useMutation({
+        mutationFn: async (data: FormData) => {            
+            console.log("SUBMITTING DATA:", data);
+            const response = await fetch(`/api/pedidos/despacho/actualizarRetira`, {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ ...data, rutaId })
+                body: JSON.stringify({
+                    ventaId,
+                    nombreRecibe: data.nombreRetira,
+                    rutRecibe: `${data.rutRetiraNum}-${data.rutRetiraDv}`
+                })
             });
 
-            toast.success("Información actualizada correctamente");
-        } catch (error) {
-            console.error("Error updating data:", error);
-            toast.error("Error al actualizar la información");
-        } finally {
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al guardar el comentario');
+            }
+            return response.json();
+        },
+        onSuccess: (data) => {
+            if (data.ok) {
+                toast.success("Comentario guardado con éxito");
+                queryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
+            } else {
+                toast.error(`Error al guardar el comentario: ${data.error}`);
+            }
+        },
+        onError: (error: any) => {
+            console.error("Error en saveComment:", error);
+            toast.error(error.message || 'Error desconocido al guardar comentario');            
+        },
+        onSettled: () => {            
             onClose();
         }
+    });
+
+    const onSubmit = async (data: FormData) => {
+        saveQuienRecibe(data);
     }
 
     return (<form onSubmit={handleSubmit(onSubmit)}>
@@ -75,7 +101,7 @@ export default function QuienRecibeModal({
                                     placeholder="12.345.678"
                                     maxLength={10}
                                 />
-                                <span className="text-gray-500 font-bold text-lg">-</span>
+                                <span className="text-gray-500 font-bold text-lg mt-2">-</span>
                                 <input
                                     id="rutRetiraDv"
                                     type="text"
@@ -91,9 +117,11 @@ export default function QuienRecibeModal({
                     <div className="mt-4">
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`flex justify-center items-center relative px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
                             GUARDAR
+                            {isSaving && <div className="absolute -mt-1">
+                                <Loader texto=""/></div>}
                         </button>
                         <button
                             onClick={() => onClose()}

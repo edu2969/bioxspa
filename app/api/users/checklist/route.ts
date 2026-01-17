@@ -47,21 +47,9 @@ export async function GET() {
             }
         }).select("tipo passed fecha").lean();
 
-        // Formatear la salida como arreglo de objetos con tipo, aprobado y fecha
-        const checklistResults: IChecklistlistResult[] = checklists.map(cl => ({
-            tipo: cl.tipo,
-            aprobado: cl.passed,
-            fecha: cl.fecha
-        }));
-        const passed = checklistResults.length === tiposChecklist.length
-            && checklistResults.every(cl => cl.aprobado);
-
-        console.log("Checklist results:", checklistResults.length, "tests:", tiposChecklist.length);
-
         return new Response(JSON.stringify({ 
             ok: true, 
-            passed, 
-            checklists: checklistResults 
+            passed: checklists.length === tiposChecklist.length
         }));
     } catch (error) {
         console.error("Error fetching checklists:", error);
