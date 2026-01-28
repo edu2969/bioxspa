@@ -1,16 +1,9 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import Venta from "@/models/venta";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
-    console.log("Connecting to MongoDB...");
-    await connectMongoDB();
-    console.log("Connected to MongoDB");
-
     try {
         const { ventaId, nombreRecibe, rutRecibe } = await request.json();
-
-        console.log("Received data:", { ventaId, nombreRecibe, rutRecibe });
 
         if (!ventaId || !nombreRecibe || !rutRecibe) {
             return NextResponse.json(
@@ -19,34 +12,48 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log("Actualizando entrega en local para venta:", ventaId);
+        // Fetch current entregas_en_local
+        const { data: venta, error: fetchError } = await supabase
+            .from('ventas')
+            .select('id, entregas_en_local')
+            .eq('id', ventaId)
+            .single();
 
-        const venta = await Venta.findByIdAndUpdate(
-            ventaId,
-            {
-                $push: {
-                    entregasEnLocal: {
-                        nombreRecibe,
-                        rutRecibe
-                    }
-                }
-            },
-            { new: true, runValidators: true }
-        );
-
-        if (!venta) {
+        if (fetchError || !venta) {
             return NextResponse.json(
                 { ok: false, error: "Venta no encontrada" },
                 { status: 404 }
             );
         }
 
-        console.log("Entrega en local agregada exitosamente");
+        const nuevaEntrega = {
+            nombre_recibe: nombreRecibe,
+            rut_recibe: rutRecibe
+        };
+
+        const entregas = Array.isArray(venta.entregas_en_local)
+            ? [...venta.entregas_en_local, nuevaEntrega]
+            : [nuevaEntrega];
+
+        const { data: updated, error: updateError } = await supabase
+            .from('ventas')
+            .update({ entregas_en_local: entregas })
+            .eq('id', ventaId)
+            .select('id, entregas_en_local')
+            .single();
+
+        if (updateError || !updated) {
+            console.error('Error updating venta:', updateError);
+            return NextResponse.json(
+                { ok: false, error: "Error interno del servidor" },
+                { status: 500 }
+            );
+        }
 
         return NextResponse.json({
             ok: true,
             message: "Entrega en local agregada exitosamente",
-            venta
+            venta: updated
         });
 
     } catch (error) {

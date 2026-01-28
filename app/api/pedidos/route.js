@@ -1,52 +1,59 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import Venta from "@/models/venta";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET() {
     try {
-        console.log("Fetching Pedidos...");
-        await connectMongoDB();
+        console.log("Fetching Pedidos from Supabase...");
 
-        const ventas = await Venta.find({
-            estado: { $in: [TIPO_ESTADO_VENTA.preparacion, TIPO_ESTADO_VENTA.reparto] },
-        })
-            .populate("clienteId", "nombre rut direccion")
-            .populate({
-                path: "detalleVentas",
-                populate: [
-                    {
-                        path: "itemsCatalogoId",
-                        select: "codigo createdAt",
-                    },
-                    {
-                        path: "subcategoriaCatalogoId",
-                        select: "nombre categoriaCatalogoId",
-                        populate: {
-                            path: "categoriaCatalogoId",
-                            select: "nombre",
-                        },
-                    },
-                ],
-            })
-            .sort({ updatedAt: -1 });
+        const { data: ventas, error } = await supabase
+            .from('ventas')
+            .select(`
+                id,
+                updated_at,
+                clientes (
+                    nombre,
+                    rut,
+                    direccion
+                ),
+                detalle_ventas (
+                    id,
+                    subcategoria_catalogos (
+                        nombre,
+                        categoria_catalogos (
+                            nombre
+                        )
+                    ),
+                    item_catalogos (
+                        codigo,
+                        created_at
+                    )
+                )
+            `)
+            .in('estado', [TIPO_ESTADO_VENTA.preparacion, TIPO_ESTADO_VENTA.reparto])
+            .order('updated_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching pedidos:', error);
+            return NextResponse.json({ error: "Error fetching pedidos" }, { status: 500 });
+        }
 
         const result = ventas.map((venta) => ({
             cliente: {
-                nombre: venta.clienteId?.nombre,
-                rut: venta.clienteId?.rut,
-                direccion: venta.clienteId?.direccion,
+                nombre: venta.clientes?.nombre,
+                rut: venta.clientes?.rut,
+                direccion: venta.clientes?.direccion,
             },
-            fechaPedido: venta.updatedAt,
-            detalles: venta.detalleVentas.map((detalle) => ({
+            fechaPedido: venta.updated_at,
+            detalles: venta.detalle_ventas.map((detalle) => ({
                 nombreCategoria:
-                    detalle.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre +
+                    detalle.subcategoria_catalogos?.categoria_catalogos?.nombre +
                     " " +
-                    detalle.subcategoriaCatalogoId?.nombre,
+                    detalle.subcategoria_catalogos?.nombre,
                 itemCatalogo:
-                    detalle.itemsCatalogoId?.codigo +
+                    detalle.item_catalogos?.codigo +
                     " " +
-                    detalle.itemsCatalogoId?.createdAt,
+                    detalle.item_catalogos?.created_at,
             })),
         }));
 

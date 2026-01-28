@@ -1,13 +1,13 @@
 "use client";
 
-import { USER_ROLE } from "@/app/utils/constants";
+import { ROLES, TIPO_CARGO } from "@/app/utils/constants";
 import { IUser } from "@/types/user";
 import { useQuery } from "@tanstack/react-query";
 import { ISucursal } from "@/types/sucursal";
 import { INuevaVentaSubmit } from "./types";
 import { Selector } from "../prefabs/Selector";
 import { UseFormRegister, UseFormSetValue } from "react-hook-form";
-import { useSession } from "next-auth/react";
+import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { useEffect } from "react";
 
 export default function DatosGenerales({
@@ -17,7 +17,7 @@ export default function DatosGenerales({
     register: UseFormRegister<INuevaVentaSubmit>;
     setValue: UseFormSetValue<INuevaVentaSubmit>;
 }) {
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
 
     const { data: sucursales, isLoading: loadingSucursales } = useQuery<ISucursal[]>({
         queryKey: ['sucursales-a-cargo'],
@@ -31,11 +31,13 @@ export default function DatosGenerales({
     const { data: usuarios, isLoading: loadingUsuarios } = useQuery<IUser[]>({
         queryKey: ['usuarios-lista'],
         queryFn: async () => {
-            const response = await fetch('/api/users');
+            if(!user) return [];
+            const response = await fetch('/api/usuarios');
             const data = await response.json();
+            console.log("Usuarios fetched:", data);
             return data.usuarios;
         },
-        enabled: session?.user?.role === USER_ROLE.gerente
+        enabled: hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR])
     });
 
     useEffect(() => {
@@ -44,34 +46,34 @@ export default function DatosGenerales({
             const defaultId = stored && sucursales.some(s => s._id === stored)
                 ? stored
                 : sucursales[0]._id;
-            setValue("sucursalId", defaultId);
+            setValue("sucursal_id", defaultId);
         }
     }, [loadingSucursales, sucursales, setValue]);
 
     useEffect(() => {
-        if(!session) return;
-        setValue("usuarioId", session.user?.id as string);
-    }, [session, setValue]);
+        if(!user?.id) return;
+        setValue("usuario_id", user.id);
+    }, [user, setValue]);
 
     return (<fieldset className="border rounded-md px-4 pb-4 space-y-4">
         <legend className="font-bold text-gray-700 px-2">Datos Generales</legend>
 
-        {session?.user?.role == USER_ROLE.gerente &&
+        {hasRole([ROLES.MANAGER]) &&
             <Selector options={usuarios || []}
                 label="Seleccione usuario*"
                 getLabel={u => u.name}
                 getValue={u => u._id || ''}
-                register={register("usuarioId", { required: true })}
+                register={register("usuario_id", { required: true })}
                 isLoading={loadingUsuarios} />}
 
         <Selector options={sucursales || []}
             label="Sucursal"
             getLabel={s => s.nombre}
             getValue={s => s._id}
-            register={register("sucursalId", { required: true })}
+            register={register("sucursal_id", { required: true })}
             onChange={val => {
-                setValue("sucursalId", val);
-                localStorage.setItem("sucursalId", val);
+                setValue("sucursal_id", val);
+                localStorage.setItem("sucursal_id", val);
             }}
             isLoading={loadingSucursales} />
 

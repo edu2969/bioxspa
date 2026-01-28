@@ -1,26 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
-import RutaDespacho from "@/models/rutaDespacho";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
+import { supabase } from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
-import Cargo from "@/models/cargo";
-import Dependencia from "@/models/dependencia";
 import { TIPO_CARGO } from "@/app/utils/constants";
 
-export async function POST(req) {
+export const POST = migrateAuthEndpoint(async ({ user }, req) => {
     try {
-        console.log("POST request received for iniciarViaje.");
-        await connectMongoDB();
-        console.log("MongoDB connected.");
+        console.log("POST request received for volverABase from Supabase.");
 
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user || !session.user.id) {
+        if (!user || !user.id) {
             console.warn("Unauthorized access attempt.");
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const choferId = session.user.id;
+        const choferId = user.id;
         const body = await req.json();
         const { rutaId } = body;
 
@@ -32,30 +25,32 @@ export async function POST(req) {
             }, { status: 400 });
         }
 
-        // Find the rutaDespacho
-        const rutaDespacho = await RutaDespacho.findOne({
-            _id: rutaId,
-            choferId: choferId
-        });
+        // Find the rutaDespacho using Supabase
+        const { data: rutaDespacho, error: rutaError } = await supabase
+            .from('rutas_despacho')
+            .select('*')
+            .eq('id', rutaId)
+            .eq('chofer_id', choferId)
+            .single();
         
-        if (!rutaDespacho) {
-            console.warn(`RutaDespacho not found or not in 'carga_confirmada' state for ID: ${rutaId}`);
+        if (rutaError || !rutaDespacho) {
+            console.warn(`RutaDespacho not found for ID: ${rutaId}`, rutaError);
             return NextResponse.json({ 
                 ok: false, 
-                error: "RutaDespacho not found or not in correct state" 
+                error: "RutaDespacho not found" 
             }, { status: 404 });
         }
 
-        // Import necessary models and constants
-
         // Find the driver's cargo (position) that corresponds to conductor (driver) type
-        const cargo = await Cargo.findOne({
-            userId: choferId,
-            tipo: TIPO_CARGO.conductor
-        });
+        const { data: cargo, error: cargoError } = await supabase
+            .from('cargos')
+            .select('*')
+            .eq('user_id', choferId)
+            .eq('tipo', TIPO_CARGO.conductor)
+            .single();
 
-        if (!cargo) {
-            console.warn(`No conductor cargo found for user ID: ${choferId}`);
+        if (cargoError || !cargo) {
+            console.warn(`No conductor cargo found for user ID: ${choferId}`, cargoError);
             return NextResponse.json({ 
                 ok: false, 
                 error: "No conductor cargo found for user" 
@@ -63,10 +58,14 @@ export async function POST(req) {
         }
 
         // Get the dependencia associated with the cargo
-        const dependencia = await Dependencia.findById(cargo.dependenciaId);
+        const { data: dependencia, error: depError } = await supabase
+            .from('dependencias')
+            .select('*')
+            .eq('id', cargo.dependencia_id)
+            .single();
 
-        if (!dependencia) {
-            console.warn(`Dependencia not found for ID: ${cargo.dependenciaId}`);
+        if (depError || !dependencia) {
+            console.warn(`Dependencia not found for ID: ${cargo.dependencia_id}`, depError);
             return NextResponse.json({ 
                 ok: false, 
                 error: "Dependencia not found" 
@@ -74,28 +73,43 @@ export async function POST(req) {
         }
 
         // Get the direccion ID from the dependencia
-        const direccionId = dependencia.direccionId;
+        const direccionId = dependencia.direccion_id;
 
         if (!direccionId) {
-            console.warn(`DireccionId not found in dependencia ID: ${dependencia._id}`);
+            console.warn(`DireccionId not found in dependencia ID: ${dependencia.id}`);
             return NextResponse.json({ 
                 ok: false, 
                 error: "DireccionId not found in dependencia" 
             }, { status: 404 });
         }
 
-        rutaDespacho.ruta.push({
+        // Update the ruta array by adding the new destination
+        const newRutaDestination = {
             direccionDestinoId: direccionId,
             fecha: null
-        });
+        };
 
-        // Update estado to en_ruta
-        rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.regreso;
-        
-        console.log(`Updating rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.regreso}`);
-        await rutaDespacho.save();
+        const updatedRuta = [...(rutaDespacho.ruta || []), newRutaDestination];
 
-        console.log("RutaDespacho updated successfully.");
+        // Update estado to regreso and add new route destination
+        const { error: updateError } = await supabase
+            .from('rutas_despacho')
+            .update({
+                estado: TIPO_ESTADO_RUTA_DESPACHO.regreso,
+                ruta: updatedRuta,
+                updated_at: new Date()
+            })
+            .eq('id', rutaId);
+
+        if (updateError) {
+            console.error('Error updating rutaDespacho:', updateError);
+            return NextResponse.json({ 
+                ok: false, 
+                error: "Error updating rutaDespacho" 
+            }, { status: 500 });
+        }
+
+        console.log(`Updated rutaDespacho ID: ${rutaId} to estado: ${TIPO_ESTADO_RUTA_DESPACHO.regreso}`);
         return NextResponse.json({ 
             ok: true, 
             message: "Viaje iniciado correctamente"
@@ -107,4 +121,4 @@ export async function POST(req) {
             error: "Internal Server Error" 
         }, { status: 500 });
     }
-}
+});

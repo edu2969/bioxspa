@@ -1,6 +1,5 @@
 "use client";
 
-import React from 'react';
 import { GoCopilot } from 'react-icons/go';
 import { RiZzzFill } from 'react-icons/ri';
 import Loader from '../Loader';
@@ -17,11 +16,11 @@ export default function Conductores({
     onShowCommentModal,
 }: {
     control: Control<INuevaVentaSubmit>;
-    setShowDetalleOrdenModal: (show: boolean, pedido?: { _id: string; clienteNombre?: string; comentario?: string | null }) => void;
+    setShowDetalleOrdenModal: (show: boolean, pedido?: { id: string; cliente_nombre?: string; comentario?: string | null }) => void;
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const sucursalId = useWatch({
-        name: 'sucursalId',
+        name: 'sucursal_id',
         control
     });
 
@@ -30,6 +29,7 @@ export default function Conductores({
     const { data: conductores, isLoading } = useQuery({
         queryKey: ['conductores', sucursalId],
         queryFn: async (): Promise<IConductoresResponse[]> => {
+            if(sucursalId === undefined) return [];
             const response = await fetch(`/api/pedidos/asignacion/conductores?sucursalId=${sucursalId}`);
             const data = await response.json();
             console.log("Conductores fetched:", data);
@@ -44,7 +44,7 @@ export default function Conductores({
     // Componente individual de conductor con @dnd-kit
     const ConductorItem = ({ chofer, index }: { chofer: IConductoresResponse, index: number }) => {
         const { setNodeRef, isOver } = useDroppable({
-            id: `conductor-${chofer._id}`,
+            id: `conductor-${chofer.id}`,
             disabled: !chofer.checklist
         });
 
@@ -55,7 +55,7 @@ export default function Conductores({
                 className={`text-white relative p-2 rounded-lg mb-2 transition-all duration-200 ${!chofer.checklist ? 'bg-neutral-400' : 'bg-green-500'
                     } ${isOver && chofer.checklist ? 'border-2 border-dashed border-yellow-400 bg-green-400 scale-105' : 'border'
                     }`}
-                data-id={`choferId_${chofer._id}`}
+                data-id={`choferId_${chofer.id}`}
             >
                 <div className="font-bold uppercase flex">
                     <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
@@ -68,11 +68,11 @@ export default function Conductores({
                 )}
                 {chofer.pedidos.length ? chofer.pedidos.map((pedido: unknown, indexPedido: number) => (
                     <PedidoConductor
-                        key={`pedido_chofer_${chofer._id}_${indexPedido}`}
+                        key={`pedido_chofer_${chofer.id}_${indexPedido}`}
                         pedido={pedido as any} // TODO: tipar correctamente
-                        choferId={chofer._id}
+                        choferId={chofer.id}
                         onSaveComment={onSaveComment}
-                        onShowDetalle={() => setShowDetalleOrdenModal(true, { _id: (pedido as IPedidoConductor)._id, clienteNombre: (pedido as IPedidoConductor).nombreCliente, comentario: (pedido as IPedidoConductor).comentario })}
+                        onShowDetalle={() => setShowDetalleOrdenModal(true, { id: (pedido as IPedidoConductor).id, cliente_nombre: (pedido as IPedidoConductor).nombre_cliente, comentario: (pedido as IPedidoConductor).comentario })}
                         onShowCommentModal={onShowCommentModal}
                         indexPedido={indexPedido}
                     />

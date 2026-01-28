@@ -1,13 +1,10 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { authOptions } from "@/app/utils/authOptions";
-import Venta from "@/models/venta";
+import { supabase } from "@/lib/supabase";
 
-export async function POST(request: NextRequest) {
+export const POST = migrateAuthEndpoint(async ({ user }, request: NextRequest) => {
     try {
-        await connectMongoDB();
-
         // Get ventaId and comentario from request body
         const { ventaId, comentario } = await request.json();
 
@@ -15,20 +12,21 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "ventaId is required" }, { status: 400 });
         }
 
-        // Get user from session
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
+        if (!user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        // Update the comentario field of the venta
-        const venta = await Venta.findByIdAndUpdate(
-            ventaId,
-            { comentario }
-        );
+        // Update the comentario field of the venta using Supabase
+        const { data: venta, error } = await supabase
+            .from('ventas')
+            .update({ comentario })
+            .eq('id', ventaId)
+            .select('*')
+            .single();
 
-        if (!venta) {
-            return NextResponse.json({ ok: false, error: "Venta not found" }, { status: 404 });
+        if (error || !venta) {
+            console.error('Error updating venta comentario:', error);
+            return NextResponse.json({ ok: false, error: "Venta not found or update failed" }, { status: 404 });
         }
 
         return NextResponse.json({ ok: true, message: "Comentario actualizado", venta });
@@ -36,4 +34,4 @@ export async function POST(request: NextRequest) {
         console.error("Error in POST /ventas/comentar:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
-}
+});

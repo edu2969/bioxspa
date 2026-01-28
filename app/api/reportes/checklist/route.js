@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
+import { supabase } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM } from "@/app/utils/constants";
-import Vehiculo from "@/models/vehiculo";
+// DB access migrated to Supabase; Vehiculo model no longer used
 
-export async function POST(req) {
+export const POST = migrateAuthEndpoint(async ({ user }, req) => {
     try {
-        // Conectar a la base de datos
-        console.log("Generating checklist report v0.91");
-        await connectMongoDB();
-        const session = await getServerSession(authOptions);
-
-        if (!session || !session.user || !session.user.id) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
+        console.log("Generating checklist report v0.92 (Supabase)");
 
         const body = await req.json();
 
@@ -56,7 +48,12 @@ export async function POST(req) {
 
         let vehiculoData = null;
         if (tipo === TIPO_CHECKLIST.vehiculo && vehiculoId) {
-            vehiculoData = await Vehiculo.findById(vehiculoId).lean();
+            const { data: vehiculo, error } = await supabase
+                .from('vehiculos')
+                .select('id, marca, modelo, patente')
+                .eq('id', vehiculoId)
+                .single();
+            if (!error && vehiculo) vehiculoData = vehiculo;
         }
 
         // Etiquetas para los ítems
@@ -221,4 +218,4 @@ export async function POST(req) {
         console.error("Error generating checklist report:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
-}
+});

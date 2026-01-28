@@ -9,7 +9,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import Link from "next/link";
 import { MdAddTask } from "react-icons/md";
 import { useForm } from "react-hook-form";
-import Toaster, { toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 function formatFecha(fecha) {
     return new Date(fecha).toLocaleDateString("es-CL", {
@@ -25,7 +25,7 @@ function amountFormat(num) {
     return num.toLocaleString("es-CL");
 }
 
-export default function GestionPedidos({ session }) {
+export default function GestionPedidos() {
     const [pedidoEdit, setPedidoEdit] = useState(null);
     const [pedido, setPedido] = useState({});
     const [items, setItems] = useState([]);
@@ -484,7 +484,6 @@ export default function GestionPedidos({ session }) {
                     </div>
                 </div>
             )}
-            <Toaster />
         </main>
     );
 }

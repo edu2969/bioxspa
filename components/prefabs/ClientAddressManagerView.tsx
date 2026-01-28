@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { UseFormRegisterReturn } from "react-hook-form";
 import { IDireccion } from "@/types/direccion";
 import { MdAddLocationAlt } from "react-icons/md";
@@ -18,11 +18,11 @@ export default function ClientAddressManagerView({
     const [editMode, setEditMode] = useState(false);    
 
     return (<div className="mt-4 space-y-4">
-        {!editMode && direcciones && direcciones.length > 0 && (<div className="flex">
+        {!editMode && direcciones && (<div className="flex">
             <Selector getLabel={d => d.nombre || "Sin nombre"}
                 label={label}
                 placeholder="Retiro en local"
-                getValue={d => d._id}
+                getValue={d => d.id}
                 options={direcciones}
                 register={register}
                 disableAutoSelect={true}
@@ -40,16 +40,16 @@ export default function ClientAddressManagerView({
 
         {editMode && <div className="w-full pr-0 md:pr-4 flex">
             <div className="w-full">
-                <label htmlFor="direccionesDespacho" className="block text-sm font-medium text-gray-700">{label}</label>
+                <label htmlFor="direccion_despacho_id" className="block text-sm font-medium text-gray-700">{label}</label>
                 <select
-                    id="direccionDespachoId"
+                    id="direccion_despacho_id"
                     {...register}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                 >
                     <option value="">Retiro en local</option>
                     {direcciones && direcciones.length > 0
                         && direcciones.map((dir, dirIdx) => (
-                            <option key={`${dir._id}-${dirIdx}`} value={dir._id}>
+                            <option key={`${dir.id}-${dirIdx}`} value={dir.id}>
                                 {dir.nombre}
                             </option>
                         ))}

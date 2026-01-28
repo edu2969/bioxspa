@@ -19,7 +19,7 @@ export function ChecklistProvider({ tipo, children }: {
     const { data: checklist, isLoading: isLoadingChecklist } = useQuery({
         queryKey: ["checklist"],
         queryFn: async () => {
-            const r = await fetch("/api/users/checklist");
+            const r = await fetch("/api/usuarios/checklist");
             const data = await r.json();
             console.log("Checklist data:", data);
             return data;

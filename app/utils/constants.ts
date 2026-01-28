@@ -1,3 +1,11 @@
+// ===============================================
+// IMPORTS DEL NUEVO SISTEMA DE PERMISOS
+// ===============================================
+import { ROLES, ROLE_MAPPING } from '@/lib/auth/permissions';
+
+// ===============================================
+// ROLES LEGACY (Para compatibilidad hacia atrás)
+// ===============================================
 export const USER_ROLE = {
     neo: 2969,
     gerente: 1,
@@ -10,13 +18,6 @@ export const USER_ROLE = {
     invitado: 128
 }
 
-export const TIPO_DEPENDENCIA = {
-    sucursal: 1,
-    bodega: 10,
-    sucursal_bodega: 11,
-    bodega_proveedor: 20,
-}
-
 export const TIPO_CARGO = {
     neo: 2969,
     gerente: 1,
@@ -26,6 +27,22 @@ export const TIPO_CARGO = {
     despacho: 16,
     conductor: 32,
     proveedor: 64  
+}
+
+// ===============================================
+// NUEVOS ROLES SEMÁNTICOS (Recomendado usar estos)
+// ===============================================
+export { ROLES, ROLE_MAPPING } from '@/lib/auth/permissions';
+
+// ===============================================
+// CONSTANTES DE DEPENDENCIAS Y OTROS (Sin cambios)
+// ===============================================
+
+export const TIPO_DEPENDENCIA = {
+    sucursal: 1,
+    bodega: 10,
+    sucursal_bodega: 11,
+    bodega_proveedor: 20,
 }
 
 export const TIPO_PRECIO = {

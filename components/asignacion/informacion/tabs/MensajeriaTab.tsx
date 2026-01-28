@@ -34,8 +34,7 @@ type MessageStatusUpdate = {
 import Image from 'next/image';
 import { BsCheck2All, BsCheck2 } from 'react-icons/bs';
 import { MdSend } from 'react-icons/md';
-import { useSession } from 'next-auth/react';
-import { useChatSocket } from '@/lib/hooks/useChatSocket';
+import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { useQuery } from '@tanstack/react-query';
 
 interface MensajeriaTabProps {
@@ -43,7 +42,7 @@ interface MensajeriaTabProps {
 }
 
 export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
-    const { data: session } = useSession();
+    const { user } = useAuthorization();
     const [newMessage, setNewMessage] = useState<string>('');
     const [messages, setMessages] = useState<MessageType[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -68,7 +67,7 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
     }, []);
 
     const handleUserTyping = useCallback((data: TypingUserData) => {
-        if (data.userId !== session?.user?.id) {
+        if (data.userId !== user?.id) {
             setTypingUsers(prev => {
                 if (data.isTyping) {
                     return prev.includes(data.userName) ? prev : [...prev, data.userName];
@@ -77,7 +76,7 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
                 }
             });
         }
-    }, [session?.user?.id]);
+    }, [user?.id]);
 
     const handleMessageStatusUpdate = useCallback((data: MessageStatusUpdate) => {
         setMessages(prevMessages => 
@@ -90,20 +89,7 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
     }, []);
 
     // Hook de socket chat
-    const { sendSocketMessage, sendTyping, disconnect } = useChatSocket(
-        ventaId,
-        handleMessageReceived,
-        handleUserTyping,
-        handleMessageStatusUpdate
-    );
-
-    // Cleanup al desmontar el componente
-    useEffect(() => {
-        return () => {
-            disconnect();
-        };
-    }, [disconnect]);
-
+    
     const scrollToBottom = () => {
         if (chatEndRef.current) {
             chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -124,13 +110,13 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
         // Crear mensaje temporal con estado "sending"
         const tempMessage: MessageType = {
             id: tempId,
-            usuario: session?.user?.name || 'Usuario',
-            email: session?.user?.email || '',
+            usuario: user?.email || 'Usuario',
+            email: user?.email || '',
             mensaje: messageText,
             fecha: new Date().toISOString().split('T')[0],
             hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
             esPropio: true,
-            avatar: session?.user?.email ? `${session.user.email.split('@')[0]}.jpg` : 'default.jpg',
+            avatar: user?.email ? `${user.email.split('@')[0]}.jpg` : 'default.jpg',
             status: 'sending' as MessageStatus,
             isTemp: true
         };
@@ -177,7 +163,7 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
                 );
 
                 // Enviar via socket para notificar a otros usuarios
-                sendSocketMessage(realMessage);
+                
                 
             } else {
                 // Remover mensaje temporal si hay error
@@ -213,10 +199,10 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
         // Manejar typing indicator
         if (value.trim() && !isTypingRef.current) {
             isTypingRef.current = true;
-            sendTyping(true);
+            
         } else if (!value.trim() && isTypingRef.current) {
             isTypingRef.current = false;
-            sendTyping(false);
+            
         }
     };
 
@@ -358,8 +344,7 @@ export default function MensajeriaTab({ ventaId }: MensajeriaTabProps) {
                     type="text"
                     placeholder="Escribe un mensaje..."
                     value={newMessage}
-                    onChange={handleInputChange}
-                    onKeyPress={handleKeyPress}
+                    onChange={handleInputChange}                    
                     disabled={sending || !ventaId}
                     className="flex-1 px-3 py-2 text-sm border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />

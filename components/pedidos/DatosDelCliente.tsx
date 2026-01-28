@@ -1,8 +1,8 @@
 import { ICliente } from "@/types/cliente";
 import { UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { INuevaVentaSubmit } from "./types";
-import { useSession } from "next-auth/react";
-import { USER_ROLE } from "@/app/utils/constants";
+import { useAuthorization } from '@/lib/auth/useAuthorization';
+import { ROLES } from '@/lib/auth/permissions';
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Selector } from "../prefabs/Selector";
@@ -21,7 +21,7 @@ export default function DatosDelCliente({
     register: UseFormRegister<INuevaVentaSubmit>;
     setValue: UseFormSetValue<INuevaVentaSubmit>;
 }) {
-    const { data: session } = useSession();
+    const auth = useAuthorization();
     const [clienteSelected, setClienteSelected] = useState<IClienteSeachResult | null>(null);    
 
     const { data: documentosTributarios, isLoading: loadingDocumentosTributarios } = useQuery<IDocumentoTributario[]>({
@@ -36,17 +36,18 @@ export default function DatosDelCliente({
     const { data: cliente, isLoading: loadingCliente } = useQuery<ICliente>({
         queryKey: ['cliente-by-id', clienteSelected],
         queryFn: async () => {
-            if (!clienteSelected?._id) return null;
-            const response = await fetch(`/api/clientes?id=${clienteSelected._id}`);
+            if (!clienteSelected?.id) return null;
+            const response = await fetch(`/api/clientes?id=${clienteSelected.id}`);
             const data = await response.json();
+            console.log("Cliente cargado:", data.cliente);
             return data.cliente;
         }
     });
 
     useEffect(() => {
         if (cliente && !loadingDocumentosTributarios && documentosTributarios && documentosTributarios.length > 0) {            
-            setValue("documentoTributarioId", String(cliente.documentoTributarioId));
-            setValue("clienteId", cliente._id);
+            setValue("documento_tributario_id", String(cliente.documento_tributario_id));
+            setValue("cliente_id", cliente.id);
         }
     }, [cliente, documentosTributarios, loadingDocumentosTributarios, setValue]);
 
@@ -56,25 +57,24 @@ export default function DatosDelCliente({
         {/* SELECCION DE CLIENTE */}
         {(tipoOrden == 1 || tipoOrden == 4) && <div className="w-full">
             <ClienteSearchView titulo="Seleccione al cliente" 
-                register={register("clienteId", { required: true })}
+                register={register("cliente_id", { required: true })}
                 setClienteSelected={setClienteSelected}
                 isLoading={loadingCliente} />
         </div>}
 
         {/*EDICIÓN DE DIRECCIÓN DE DESPACHO */}
         {(cliente && (tipoOrden == 1 || tipoOrden == 4) &&
-        <ClientAddressManagerView register={register("direccionDespachoId")}
+        <ClientAddressManagerView register={register("direccion_despacho_id")}
             label="Dirección de despacho"
-            direcciones={cliente.direccionesDespacho?.map(d => d.direccionId) || []}/>)}
+            direcciones={cliente.direcciones_despacho?.map(d => d.direccion_id) || []}/>)}
 
         {/* DOCUMENTO TRIBUTARIO */}
-        {(session?.user.role === USER_ROLE.gerente || session?.user.role === USER_ROLE.cobranza 
-            || session?.user.role === USER_ROLE.encargado)
+        {auth.hasRole([ROLES.MANAGER, ROLES.COLLECTIONS, ROLES.SUPERVISOR])
             && cliente && tipoOrden == 1 && 
             <Selector options={documentosTributarios || []}
                 label="Documento tributario"
-                getLabel={dt => dt.nombre} getValue={dt => String(dt._id)} 
-                register={register("documentoTributarioId", { required: true })} />}
+                getLabel={dt => dt.nombre} getValue={dt => String(dt.id)} 
+                register={register("documento_tributario_id", { required: true })} />}
 
             {loadingCliente && !cliente && <div className="h-40 flex items-center justify-center">
                 <Loader texto="Cargando cliente..." />

@@ -1,10 +1,7 @@
 import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import ItemCatalogo from "@/models/itemCatalogo";
-import Cargo from "@/models/cargo";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
 import { TIPO_CARGO } from "@/app/utils/constants";
+import { supabase } from "@/lib/supabase";
 
 const ROLES_PERMITIDOS = [
     TIPO_CARGO.encargado,
@@ -16,18 +13,21 @@ const ROLES_PERMITIDOS = [
 ];
 
 async function verificarAutorizacion() {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || !session.user.id) {
+    const { data, error } = await supabase.auth.getSession();
+    const session = data?.session;
+
+    if (error || !session || !session.user) {
         return { authorized: false, error: "Unauthorized" };
     }
 
-    const cargo = await Cargo.findOne({
-        userId: session.user.id,
-        tipo: { $in: ROLES_PERMITIDOS }
-    }).lean();
+    const { data: cargo, error: cargoError } = await supabase
+        .from('cargos')
+        .select('*')
+        .eq('usuario_id', session.user.id)
+        .in('tipo', ROLES_PERMITIDOS)
+        .single();
 
-    if (!cargo) {
+    if (cargoError || !cargo) {
         return { authorized: false, error: "Cargo not found or insufficient permissions" };
     }
 
@@ -59,18 +59,17 @@ export async function POST(request: NextRequest) {
             'estado',
             'nombre',
             'descripcion',
-            'descripcionCorta',
-            'fichaTecnica',
-            'urlFichaTecnica',
-            'urlImagen',
-            'garantiaAnual',
+            'descripcion_corta',
+            'ficha_tecnica',
+            'url_ficha_tecnica',
+            'url_imagen',
+            'garantia_anual',
             'destacado',
-            'stockMinimo',
-            'stockActual',
+            'stock_minimo',
+            'stock_actual',
             'visible',
-            'url',
-            'fechaMantencion',
-            'direccionId',
+            'fecha_mantencion',
+            'direccion_id',
         ];
 
         const datosActualizacion: Record<string, any> = {};
@@ -84,20 +83,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
         }
 
-        const itemActualizado = await ItemCatalogo.findByIdAndUpdate(
-            itemId,
-            datosActualizacion,
-            { new: true, runValidators: true }
-        ).lean();
+        const { data, error } = await supabase
+            .from('items_catalogo')
+            .update(datosActualizacion)
+            .eq('id', itemId)
+            .select();
 
-        if (!itemActualizado) {
+        if (error) {
+            console.error("Error updating item:", error);
+            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        }
+
+        if (!data || data.length === 0) {
             return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
         }
 
         return NextResponse.json({ 
             ok: true, 
             message: "Item updated successfully",
-            item: itemActualizado 
+            item: data[0] 
         });
 
     } catch (error) {

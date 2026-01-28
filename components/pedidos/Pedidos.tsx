@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { USER_ROLE } from '@/app/utils/constants';
+import { ROLES } from '@/app/utils/constants';
 import Loader from '@/components/Loader';
 import toast, { Toaster } from 'react-hot-toast';
-import { useSession } from 'next-auth/react';
+import { useAuthorization } from '@/lib/auth/useAuthorization';
 import type { ICliente } from '@/types/cliente';
 import type { INuevaVentaSubmit } from './types';
 import DatosGenerales from './DatosGenerales';
@@ -16,6 +16,7 @@ import DatosOrdenDeTrabajo from './DatosOrdenDeTrabajo';
 import DatosDelCliente from './DatosDelCliente';
 import { useQuery } from '@tanstack/react-query';
 import Nav from '../Nav';
+import { useUser } from "@/components/providers/UserProvider";
 
 export default function Pedidos() {
     const router = useRouter();
@@ -25,8 +26,9 @@ export default function Pedidos() {
     const [creandoOrden, setCreandoOrden] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
     const formScrollRef = useRef<HTMLDivElement>(null);
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
     const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
+    const userContext = useUser(); // Mover el hook aquí
 
     const tipoOrden = useWatch({
         control,
@@ -35,17 +37,17 @@ export default function Pedidos() {
 
     const clienteId = useWatch({
         control,
-        name: 'clienteId'
+        name: 'cliente_id'
     });
 
     const direccionRetiroSeleccionado = useWatch({
         control,
-        name: 'direccionRetiroId'
+        name: 'direccion_despacho_id'
     });
 
     const motivoTrasladoSeleccionado = useWatch({
         control,
-        name: 'motivoTraslado'
+        name: 'motivo_traslado'
     });
     
     const { data: cliente } = useQuery<ICliente | null>({
@@ -58,75 +60,52 @@ export default function Pedidos() {
         }
     });
 
-    const onSubmit = async (data: INuevaVentaSubmit) => {
-        setCreandoOrden(true);
-        console.log("DATA", data);
-        // Solo incluir los precios seleccionados como items de la venta
-        const payload: {
-            tipo: number;
-            usuarioId: string;
-            comentario: string;
-            clienteId?: string;
-            documentoTributarioId?: string;
-            direccionDespachoId?: string;
-            sucursalId?: string;
-            items?: { cantidad: number; subcategoriaId: string }[];
-            numeroOrden?: string;
-            codigoHES?: string;
-            motivoTraslado?: string;
-            empresaDondeRetirarId?: string;
-            direccionRetiroId?: string;
-        } = {
-            tipo: data.tipo,
-            usuarioId: data.usuarioId,
-            comentario: data.comentario || ""
-        };
-        // Ventas y cotizaciones
-        if (data.tipo == 1 || data.tipo == 4) {
-            payload.clienteId = cliente?._id;
-            payload.documentoTributarioId = data.documentoTributarioId;
-            payload.direccionDespachoId = data.direccionDespachoId;
-            payload.sucursalId = data.sucursalId;
-            payload.items = data.precios && data.precios
-                .filter(precio => precio.seleccionado && precio.cantidad > 0)
-                .map(precio => ({
-                    cantidad: precio.cantidad,
-                    subcategoriaId: precio.subcategoriaId
-                }));
-            if (cliente && cliente.ordenCompra) {
-                payload.numeroOrden = data.numeroOrden;
-                payload.codigoHES = data.codigoHES;
-            }
-        } else if (data.tipo == 2) {
-            payload.motivoTraslado = motivoTrasladoSeleccionado ? "??" : undefined;
-            payload.empresaDondeRetirarId = data.empresaDondeRetirarId;
-            payload.direccionRetiroId = direccionRetiroSeleccionado;
-        } else if (data.tipo == 3) {
-            // TODO Orden de traslado - empresaOrigenId, direccionOrigenId, empresaDestinoId, direccionDespacho, razón traslado, items
+    const fetchWithAuth = async (payload: any) => {
+        if (!userContext || !userContext.session) {
+            console.error("No hay sesión activa");
+            return;
         }
 
-        console.log("PAYLOAD", payload);
-        
+        const token = userContext.session.access_token;
+
+        const response = await fetch('/api/ventas', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Incluir el token en el encabezado
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            toast.error("Error en la solicitud:", data);
+        } else {
+            toast.success("Solicitud exitosa!");
+        }
+    };
+
+    const onSubmit = async (data: INuevaVentaSubmit) => {
+        if (!user) return;
+        setCreandoOrden(true);
+        console.log("DATA", data);
+        const payload = {
+            tipo: data.tipo,
+            usuario_id: data.usuario_id,
+            comentario: data.comentario || "",
+            cliente_id: cliente?.id,
+            documento_tributario_id: data.documento_tributario_id,
+            direccion_despacho_id: data.direccion_despacho_id,
+            sucursal_id: data.sucursal_id,
+            items: data.precios?.filter(precio => precio.seleccionado && precio.cantidad > 0).map(precio => ({
+                cantidad: precio.cantidad,
+                subcategoria_id: precio.subcategoria_id
+            }))
+        };
+
         try {
-            const resp = await fetch('/api/ventas', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            const result = await resp.json();            
-            if (resp.ok && result.ok) {
-                toast.success("Venta creada exitosamente.", {
-                    position: "top-center"
-                });
-                setRedirecting(true);
-                router.back();
-            } else {
-                toast.error(result.error || "Error al crear la venta. Por favor, inténtelo más tarde.", {
-                    position: "top-center"
-                });
-            }
+            await fetchWithAuth(payload);
+            setCreandoOrden(false);
         } catch (error) {
             console.error(error);
             toast.error("Ocurrió un error al crear la venta. Por favor, inténtelo más tarde.", {
@@ -141,33 +120,35 @@ export default function Pedidos() {
         // Validación adicional para precios seleccionados
         const precios = getValues('precios');
 
-        console.log("PRECIOS", precios);
-        console.log("FORM isValid", formState.isValid);
-
-        if(!precios || precios.length == 0) {
+        if(!precios || precios.length == 0) {            
             return true;
         }
 
         const noSeleccionados = precios.every(precio => !precio.seleccionado);
-        if(noSeleccionados) {
+        if(noSeleccionados) {            
             return true;
         }
+
         if (precios && Array.isArray(precios)) {
             const hasSelectedWithoutQuantity = precios.some(precio => 
                 precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
             );
-            if (hasSelectedWithoutQuantity) {
+            if (hasSelectedWithoutQuantity) {                
                 return true;
             }
         }
 
         // Validación básica del formulario
-        return (!formState.isValid || formState.isSubmitting || redirecting);
+        if (!formState.isValid || formState.isSubmitting || redirecting) {            
+            return true;
+        }
+
+        return false;
     }
 
     useEffect(() => {
         if(selectedPlace && tipoOrden == 2) {
-            setValue("direccionRetiroId", selectedPlace.place_id || '');
+            setValue("direccion_retiro_id", selectedPlace.place_id || '');
         }
     }, [selectedPlace, tipoOrden, setValue]);
 
@@ -192,9 +173,8 @@ export default function Pedidos() {
                             {tipoOrden == 3 && <DatosOrdenDeTrabajo register={register} />}
 
                             {/* IFORMACION EXTRA */}
-                            {(session?.user?.role == USER_ROLE.gerente || 
-                                session?.user?.role == USER_ROLE.encargado || session?.user?.role == USER_ROLE.cobranza)
-                                && cliente != null && cliente.ordenCompra &&
+                            {hasRole([ROLES.COLLECTIONS])
+                                && cliente != null && cliente.orden_compra &&
                                 <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
                                     <legend className="font-bold text-gray-700 px-2">Orden de compra</legend>
                                     <div className="w-full flex-col mt-3 space-y-4">
@@ -202,7 +182,7 @@ export default function Pedidos() {
                                             <label htmlFor="numeroOrden" className="block text-sm font-medium text-gray-700">N° de órden</label>
                                             <input
                                                 id="numeroOrden"
-                                                {...register('numeroOrden')}
+                                                {...register('numero_orden')}
                                                 type="text"
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                 placeholder="Ingrese el número de órden"
@@ -212,7 +192,7 @@ export default function Pedidos() {
                                             <label htmlFor="codigoHES" className="block text-sm font-medium text-gray-700">Código HES</label>
                                             <input
                                                 id="codigoHES"
-                                                {...register('codigoHES')}
+                                                {...register('codigo_hes')}
                                                 type="text"
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                 placeholder="Ingrese el código HES"
@@ -302,7 +282,9 @@ export default function Pedidos() {
                                 type="submit"
                                 disabled={formInvalid()}
                             >
-                                {creandoOrden ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> : `CREAR ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
+                                {creandoOrden 
+                                    ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> 
+                                    : `CREAR ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
                             </button>
                         </div>
 

@@ -28,7 +28,7 @@ export default function DatosOrdenDeTrabajo({
                 <label htmlFor="controlEnvase" className="block text-sm font-medium text-gray-700">Control de envase</label>
                 <input
                     id="controlEnvase"
-                    {...register(`controlEnvase`)}
+                    {...register(`control_envase`)}
                     type="text"
                     className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
                 />

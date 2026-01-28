@@ -4,8 +4,9 @@ import Loader from "../Loader";
 import { UseFormRegister, UseFormSetValue, UseFormGetValues, UseFormWatch } from "react-hook-form";
 import { INuevaVentaSubmit, IPrecioView } from "../pedidos/types";
 import { useQuery } from "@tanstack/react-query";
-import { USER_ROLE } from "@/app/utils/constants";
-import { useSession } from "next-auth/react";
+import { ROLES } from "@/app/utils/constants";
+import { useAuthorization } from "@/lib/auth/useAuthorization";
+import { Can } from "@/lib/auth/AuthorizationComponents";
 import { useState } from "react";
 import SolicitudPrecioModal from "../modals/SolicitudPrecioModal";
 
@@ -26,14 +27,16 @@ export default function ListadoDePrecios({
 }) {
 
     const [modalSolicitudPrecio, setModalSolicitudPrecio] = useState(false);
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
 
     const { data: precios, isLoading: loadingPrecios } = useQuery<IPrecioView[]>({
         queryKey: ['precios-cliente', clienteId],
         queryFn: async () => {
+            console.log("Fetching precios for clienteId:", clienteId);
             if (!clienteId) return [];
             const response = await fetch(`/api/clientes/precios?clienteId=${clienteId}`);
             const data = await response.json();
+            console.log("Precios obtenidos:", data);
             return data.precios;
         },
         enabled: clienteId != null,
@@ -51,28 +54,24 @@ export default function ListadoDePrecios({
                     }}
                     disabled={loadingPrecios}
                 >
-                    {loadingPrecios ? <Loader texto="Cargando..." /> : (session?.user.role == USER_ROLE.gerente
-                        || session?.user.role == USER_ROLE.cobranza
-                        || session?.user.role === USER_ROLE.encargado) ? 'Nuevo producto' : 'Solicitar producto'}
+                    {loadingPrecios ? <Loader texto="Cargando..." /> : hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.SUPER_ADMIN]) ? 'Nuevo producto' : 'Solicitar producto'}
                 </button>
             </div>
             <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
                 <div className="w-3/12 pr-4">
                     <p className="font-bold">Cantidad</p>
                 </div>
-                <div className={`${(session?.user.role == USER_ROLE.gerente
-                    || session?.user.role == USER_ROLE.cobranza
-                    || session?.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} pr-4`}>
+                <div className={`${hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.SUPER_ADMIN]) ? 'w-3/12' : 'w-9/12'} pr-4`}>
                     <p className="font-bold">ITEM</p>
                 </div>
-                {(session?.user.role === USER_ROLE.gerente || session?.user.role === USER_ROLE.cobranza || session?.user.role === USER_ROLE.encargado) && <>
+                <Can actions={['read']} resources={['precios']}>
                     <div className="w-3/12 pr-4">
                         <p className="font-bold text-center">Precio</p>
                     </div>
                     <div className="w-3/12 pr-4">
                         <p className="font-bold text-center">SubTotal</p>
                     </div>
-                </>}
+                </Can>
             </div>
             {precios && precios.map((precio, index) => {
                 const seleccionado = watch(`precios.${index}.seleccionado`);
@@ -89,55 +88,53 @@ export default function ListadoDePrecios({
                                     const checked = e.target.checked;                                    
                                     setValue(`precios.${index}.seleccionado`, checked);
                                     setValue(`precios.${index}.cantidad`, checked ? 1 : 0);
-                                    setValue(`precios.${index}.subcategoriaId`, checked ? precio.subcategoriaCatalogoId?._id || "" : "");
+                                    setValue(`precios.${index}.subcategoria_id`, checked ? precio.subcategorias_catalogo?.id || "" : "");
                                 }}
                             />
                             <input
                                 id={`precios-${index}`}
                                 {...register(`precios.${index}.cantidad`, { valueAsNumber: true })}
-                                defaultValue={precio.cantidad}
+                                defaultValue={0}
                                 type="number"
                                 min={0}
                                 max={999}
                                 className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right" />
                         </div>
                     </div>
-                    <div className={`${(session?.user.role == USER_ROLE.gerente
-                        || session?.user.role == USER_ROLE.cobranza
-                        || session?.user.role === USER_ROLE.encargado) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                        {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento ? <div className='w-full'>
-                            <p className="font-bold text-lg">{precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento}</p>
-                            <span className="relative -top-1">{precio.subcategoriaCatalogoId?.cantidad} {precio.subcategoriaCatalogoId?.unidad}</span>
+                    <div className={`${hasRole([ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.SUPER_ADMIN]) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
+                        {precio.subcategorias_catalogo?.categorias_catalogo?.elemento ? <div className='w-full'>
+                            <p className="font-bold text-lg">{precio.subcategorias_catalogo?.categorias_catalogo?.elemento}</p>
+                            <span className="relative -top-1">{precio.subcategorias_catalogo?.cantidad} {precio.subcategorias_catalogo?.unidad}</span>
                         </div> : <div className='w-full'>
-                            <p className="font-bold text-lg">{precio.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre}</p>
-                            <span className="relative -top-1">{precio.subcategoriaCatalogoId?.nombre}</span>
+                            <p className="font-bold text-lg">{precio.subcategorias_catalogo?.categorias_catalogo?.nombre}</p>
+                            <span className="relative -top-1">{precio.subcategorias_catalogo?.nombre}</span>
                         </div>}
-                        {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
-                            {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
-                            {precio.subcategoriaCatalogoId?.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
-                            {precio.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
+                        {precio.subcategorias_catalogo?.categorias_catalogo?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
+                            {precio.subcategorias_catalogo?.categorias_catalogo?.es_medicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
+                            {precio.subcategorias_catalogo?.sin_sifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
+                            {precio.subcategorias_catalogo?.categorias_catalogo?.es_industrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
                         </div>}
                     </div>
-                    {(session?.user.role == USER_ROLE.gerente
-                        || session?.user.role == USER_ROLE.cobranza
-                        || session?.user.role === USER_ROLE.encargado) && <><div className="w-3/12 pr-4">
+                    <Can actions={['read']} resources={['precios']}>
+                        <div className="w-3/12 pr-4">
                             <div className="flex">
                                 <span className="font-bold mt-2 px-4">$</span>
                                 <span className="w-full font-bold text-sm text-right mt-2">
-                                    {(precios[index].valor || 0).toLocaleString('es-CL')}
+                                    {(precio.valor || 0).toLocaleString('es-CL')}
                                 </span>
                             </div>
                         </div>
-                            <div className="w-3/12 pr-4">
-                                <div className="flex">
-                                    <span className="font-bold mt-2 px-4">$</span>
-                                    <span className="w-full font-bold text-sm text-right mt-2">
-                                        {seleccionado && cantidad > 0
-                                            ? (cantidad * precios[index].valor).toLocaleString('es-CL')
-                                            : 0}
-                                    </span>
-                                </div>
-                            </div></>}
+                        <div className="w-3/12 pr-4">
+                            <div className="flex">
+                                <span className="font-bold mt-2 px-4">$</span>
+                                <span className="w-full font-bold text-sm text-right mt-2">
+                                    {seleccionado && cantidad > 0
+                                        ? (cantidad * precio.valor).toLocaleString('es-CL')
+                                        : 0}
+                                </span>
+                            </div>
+                        </div>
+                    </Can>
                 </div>)
             })}
 

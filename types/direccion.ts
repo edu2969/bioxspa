@@ -1,15 +1,15 @@
 export interface IDireccion {
-    _id: string;
+    id: string;
     nombre?: string;
-    direccionOriginal?: string;
-    apiId?: string;
+    direccion_original?: string;
+    api_id?: string;
     latitud?: number;
     longitud?: number;
     comuna?: string;
     ciudad?: string;
     region?: string;
-    isoPais?: string;
-    codigoPostal?: string;
+    iso_pais?: string;
+    codigo_postal?: string;
     categoria?: string;
     comentario?: string;
 }

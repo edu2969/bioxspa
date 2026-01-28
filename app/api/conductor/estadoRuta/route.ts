@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import RutaDespacho from '@/models/rutaDespacho';
-import { connectMongoDB } from '@/lib/mongodb';
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
     try {
-        await connectMongoDB();
-        
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get('rutaId');
         
@@ -13,9 +10,13 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'rutaId is required' }, { status: 400 });
         }
         
-        const ruta = await RutaDespacho.findById(rutaId).select('estado');
+        const { data: ruta, error } = await supabase
+            .from('rutas_despacho')
+            .select('estado')
+            .eq('id', rutaId)
+            .single();
         
-        if (!ruta) {
+        if (error || !ruta) {
             return NextResponse.json({ error: 'Ruta not found' }, { status: 404 });
         }
         

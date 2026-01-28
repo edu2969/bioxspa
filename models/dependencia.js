@@ -1,4 +1,5 @@
-import mongoose, { models } from "mongoose";
+import mongoose from "mongoose";
+const { models } = mongoose;
 
 const dependenciaSchema = new mongoose.Schema({
     nombre: { type: String },

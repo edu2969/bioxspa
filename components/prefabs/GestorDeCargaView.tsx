@@ -16,6 +16,16 @@ import QuienRecibeModal from "../modals/QuienRecibeModal";
 import ModalConfirmarCargaParcial from "../modals/ModalConfirmarCargaParcial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+/**
+ * Reordena los cargamentos después de remover el primer elemento
+ * Preserva el orden personalizado establecido por el botón SIGUIENTE
+ */
+function preserveOrderAfterRemoval(oldData: ICargaDespachoView[] | undefined) {
+  if (!oldData || oldData.length === 0) return oldData;
+  // Remover el primer elemento del array manteniendo el resto en orden
+  return oldData.slice(1);
+}
+
 interface FormData {
   nombreRetira: string;
   rutRetiraNum: string;
@@ -41,7 +51,6 @@ export default function GestorDeCargaView({
   const queryClient = useQueryClient();
 
   const handleRemoveFirst = () => {
-    console.log("Iniciando animación de remoción");
     setAnimating(true);
     setTimeout(() => {
       setAnimating(false);
@@ -49,23 +58,10 @@ export default function GestorDeCargaView({
     }, 1000);
   };
 
-  const isReady = () => {
-    if (!cargamentos || cargamentos.length === 0) return false;
-    const cargamento = cargamentos[0];
-    const requiereQuienRecibe = cargamento?.retiroEnLocal ?
-      (cargamento?.ventas?.[0]?.entregasEnLocal?.[0]?.nombreRecibe && cargamento?.ventas?.[0]?.entregasEnLocal?.[0]?.rutRecibe) : true;
-    const alMenosUnEscaneado = loadState().partial || loadState().complete;
-    return requiereQuienRecibe && alMenosUnEscaneado;
-  };
-
   const mutation = useMutation({
     mutationFn: async () => {
       const cargamento = cargamentos?.[0];
       if (!cargamento) throw new Error('No hay cargamento disponible');
-
-      if (!isReady()) {
-        throw new Error('El cargamento no está listo para confirmar');
-      }
 
       // Endpoint dinámico basado en si tiene rutaId
       const endpoint = cargamento.rutaId ?
@@ -103,13 +99,38 @@ export default function GestorDeCargaView({
         // Ejecutar la animación de remoción
         handleRemoveFirst();
 
-        // Después de 1 segundo (tiempo de animación), actualizar la query data
+        // Preservar el orden actual antes de cualquier actualización
+        const cargamentosActuales = queryClient.getQueryData(['cargamentos-despacho']);
+
+        // Después de 1 segundo (tiempo de animación), actualizar la query data preservando orden
         setTimeout(() => {
-          queryClient.setQueryData(['cargamentos-despacho'], (oldData: ICargaDespachoView[] | undefined) => {
-            if (!oldData || oldData.length === 0) return oldData;
-            // Remover el primer elemento del array
-            return oldData.slice(1);
-          });
+          if (cargamentosActuales && Array.isArray(cargamentosActuales)) {
+            // Usar la función que preserva el orden al remover el primer elemento
+            const cargamentosActualizados = preserveOrderAfterRemoval(cargamentosActuales);
+            queryClient.setQueryData(['cargamentos-despacho'], cargamentosActualizados);
+            
+            // También invalidar para obtener datos frescos, pero después de establecer el orden
+            setTimeout(() => {
+              const datosActuales = queryClient.getQueryData(['cargamentos-despacho']);
+              queryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
+              
+              // Si después de invalidar hay cambios, reordenar preservando la estructura
+              setTimeout(() => {
+                const datosNuevos = queryClient.getQueryData(['cargamentos-despacho']);
+                if (datosNuevos && Array.isArray(datosNuevos) && datosActuales && Array.isArray(datosActuales)) {
+                  // Solo reordenar si hay diferencias en la estructura, no en el orden
+                  if (datosNuevos.length !== datosActuales.length) {
+                    queryClient.setQueryData(['cargamentos-despacho'], datosNuevos);
+                  }
+                }
+              }, 100);
+            }, 50);
+          } else {
+            // Fallback al comportamiento original si no hay datos actuales
+            queryClient.setQueryData(['cargamentos-despacho'], (oldData: ICargaDespachoView[] | undefined) => {
+              return preserveOrderAfterRemoval(oldData);
+            });
+          }
         }, 1000);
       } else {
         toast.error('Error: La respuesta no fue exitosa');
@@ -122,11 +143,13 @@ export default function GestorDeCargaView({
 
   const loadState = () => {
     if (!cargamentos || cargamentos.length === 0) return { complete: false, partial: false };
-    const cargamento = cargamentos[0];
-    const esProcesoCarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
-    const esProcesoDescarga = cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
+    // Usar el cargamento específico de este componente visual (index), no necesariamente el primero
+    const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento
+    console.log("Calculando estado de carga para:", cargamento);
+    const esProcesoCarga = cargamento.rutaId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
+    const esProcesoDescarga = cargamento.rutaId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
     const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
-    const ventaEnLocal = cargamento.ventas.some(v => v.entregasEnLocal);
+    const ventaEnLocal = cargamento.rutaId === null;
 
 
     if (tieneTraslado) {
@@ -178,6 +201,7 @@ export default function GestorDeCargaView({
     }
 
     if (ventaEnLocal) {
+      console.log("VENTA EN LOCAL");
       // Calcular porcentaje basado en los restantes
       const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
         const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
@@ -198,9 +222,15 @@ export default function GestorDeCargaView({
         venta.detalles.some(detalle => detalle.restantes < detalle.multiplicador)
       );
 
+      const validacionQuienRecibe = cargamento.ventas[0]?.entregasEnLocal?.[0];
+      if (!validacionQuienRecibe || !validacionQuienRecibe.nombreRecibe || !validacionQuienRecibe.rutRecibe) {
+        console.log("Falta información de quién recibe en local");        
+      }
+
       return {
         complete: porcentaje >= 100,
         partial: !todasLasEntregasCompletas && hayEntregasParciales,
+        faltaQuienRecibe: !validacionQuienRecibe || !validacionQuienRecibe.nombreRecibe || !validacionQuienRecibe.rutRecibe,
         porcentaje: Math.round(porcentaje)
       };
     }
@@ -212,7 +242,7 @@ export default function GestorDeCargaView({
   return (<div className="flex flex-col w-full">
     {cargamentos && cargamentos.map((cargamento, cidx) =>
       <div key={`cargamento_${cidx}`} className="w-full">
-        <div className={`absolute w-11/12 md:w-1/2 h-[calc(100vh-124px)] bg-gray-100 shadow-lg rounded-lg px-1 ${animating ? "transition-all duration-500" : ""}`}
+        <div className={`absolute -ml-2 md:w-1/2 h-[calc(100vh-124px)] ${animating ? "transition-all duration-500" : ""}`}
           style={{
             top: `${cidx * 10 + 12}px`,
             left: `${cidx * 10 + 16}px`,
@@ -220,6 +250,7 @@ export default function GestorDeCargaView({
             scale: 1 - cidx * 0.009,
             transform: `translateX(${animating && cidx == 0 ? "-100%" : "0"})`,
             opacity: animating && cidx == 0 ? 0 : 1,
+            width: '95%'
           }}>
 
           {!cargamento.retiroEnLocal && <div className="w-full flex text-xl font-bold px-3 pt-0 pb-1">
@@ -332,22 +363,20 @@ export default function GestorDeCargaView({
                 }}>
                 <BsQrCodeScan className="text-4xl" />
               </button>
-              <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${isReady() && loadState().complete ? 'bg-green-500 cursor-pointer' : isReady() && loadState().partial ? 'bg-yellow-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
+              <button className={`relative w-full h-12 flex justify-center text-white border border-gray-300 rounded-lg py-1 px-4 ${loadState().complete ? 'bg-green-500 cursor-pointer' : loadState().partial ? 'bg-yellow-500 cursor-pointer' : 'bg-gray-400 opacity-50 cursor-not-allowed'}`}
                 onClick={() => {
-                  if (!isReady()) {
-                    toast.error('El cargamento no está listo para confirmar');
-                    return;
-                  }
                   if (loadState().partial && !loadState().complete) {
                     setModalConfirmarCargaParcial(true);
-                  } else if (loadState().complete) {
+                  } else if (loadState().complete && !loadState().faltaQuienRecibe) {
                     mutation.mutate();
+                  } else if (loadState().faltaQuienRecibe) {
+                    toast.error("Falta completar el nombre y RUT de quién recibe en local");
                   }
                 }}
-                disabled={!isReady()}>
+                disabled={!loadState().complete && !loadState().partial}>
                 <FaRoadCircleCheck className="text-4xl pb-0" />
                 <p className="ml-2 mt-2 text-md font-bold">
-                  {!isReady() ? 'NO ESTÁ LISTO' : loadState().complete ? 'CARGA COMPLETA' : loadState().partial ? 'CARGA PARCIAL' : 'CARGA NO INICIADA'}
+                  {loadState().complete ? 'CARGA COMPLETA' : loadState().partial ? 'CARGA PARCIAL' : 'CARGA NO INICIADA'}
                 </p>
                 {mutation.isPending && <div className="absolute w-full top-0">
                   <div className="w-full h-12 bg-gray-100 opacity-80"></div>

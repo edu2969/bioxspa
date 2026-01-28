@@ -1,49 +1,50 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Vehiculo from "@/models/vehiculo";
+import { supabase } from "@/lib/supabase";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { USER_ROLE } from "@/app/utils/constants";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import Cargo from "@/models/cargo";
-import User from "@/models/user";
-import { IUser } from "@/types/user";
 
-export async function GET() {
+export const GET = migrateAuthEndpoint(async ({ user }) => {
     try {
-        console.log("GET /api/flota/porConductor called...");
-        await connectMongoDB();
+        // Verify user cargo is conductor
+        const { data: cargo, error: cargoError } = await supabase
+            .from('cargos')
+            .select('tipo')
+            .eq('user_id', user.id)
+            .single();
 
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user || !session.user.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (cargoError) {
+            console.error('Error fetching cargo:', cargoError);
+            return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
         }
 
-        const userId = session.user.id;
-        const user = await User.findById(userId).select('role').lean<IUser>();
-        if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
-        }
-
-        const cargo = await Cargo.findOne({ userId });
         if (!cargo) {
-            return NextResponse.json({ error: "User has no assigned cargo" }, { status: 400 });
+            return NextResponse.json({ error: 'User has no assigned cargo' }, { status: 400 });
         }
 
         if (cargo.tipo !== USER_ROLE.conductor) {
-            return NextResponse.json({ error: "User is not a conductor" }, { status: 403 });
+            return NextResponse.json({ error: 'User is not a conductor' }, { status: 403 });
         }
 
-        const vehiculos = await Vehiculo.find({ 
-            choferIds: { $in: [userId] } 
-        })
-        .select('_id marca modelo patente')
-        .lean();
+        // Fetch vehicles assigned to the conductor
+        const { data: vehiculos, error } = await supabase
+            .from('vehiculos')
+            .select('id, marca, modelo, patente, chofer_ids')
+            .contains('chofer_ids', [user.id]);
 
-        return NextResponse.json({ 
-            vehiculos 
-        });
+        if (error) {
+            console.error('Error fetching vehiculos:', error);
+            return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
 
+        const result = (vehiculos || []).map(v => ({
+            _id: v.id,
+            marca: v.marca,
+            modelo: v.modelo,
+            patente: v.patente
+        }));
+
+        return NextResponse.json({ vehiculos: result });
     } catch (error) {
         return NextResponse.json({ error: (error as Error).message }, { status: 500 });
     }
-}
+});

@@ -1,69 +1,89 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import supabase from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import RutaDespacho from "@/models/rutaDespacho";
-import Venta from "@/models/venta";
-import { IRutasEnTransitoResponse } from "@/types/types";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/utils/authOptions";
 
 export async function GET(request: NextRequest) {
     try {
-        console.log("Connecting to MongoDB...");
-        await connectMongoDB();
-        console.log("Connected to MongoDB");
+        console.log("[GET /rutasEnTransito] Starting request...");
 
-        // Obtener la sesión del usuario autenticado
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Usuario no autenticado' }, { status: 401 });
-        }
-
-        // Obtener sucursalId de los parámetros de la URL
         const { searchParams } = new URL(request.url);
-        const sucursalId = searchParams.get('sucursalId');
-        
+        const sucursalId = searchParams.get("sucursalId");
+
         if (!sucursalId) {
-            return NextResponse.json({ error: 'sucursalId es requerido' }, { status: 400 });
+            console.warn("[GET /rutasEnTransito] Missing sucursalId parameter.");
+            return NextResponse.json({ error: "sucursalId es requerido" }, { status: 400 });
         }
 
-        // Primero, buscar ventas activas en la sucursal especificada
-        const ventasActivas = await Venta.find({
-            sucursalId: sucursalId,
-            estado: {
-                $in: [
-                    TIPO_ESTADO_VENTA.reparto,
-                    TIPO_ESTADO_VENTA.preparacion,
-                    TIPO_ESTADO_VENTA.entregado
-                ]
-            }
-        }).select("_id").lean();
+        console.log(`[GET /rutasEnTransito] Fetching active ventas for sucursalId: ${sucursalId}`);
 
-        const ventaIds = ventasActivas.map(venta => venta._id);
+        // Fetch active ventas for the specified sucursal
+        const { data: ventasActivas, error: ventasError } = await supabase
+            .from("ventas")
+            .select("id")
+            .eq("sucursal_id", sucursalId)
+            .in("estado", [
+                TIPO_ESTADO_VENTA.reparto,
+                TIPO_ESTADO_VENTA.preparacion,
+                TIPO_ESTADO_VENTA.entregado
+            ]);
+
+        if (ventasError) {
+            console.error("[GET /rutasEnTransito] Error fetching ventas:", ventasError);
+            return NextResponse.json({ error: ventasError.message }, { status: 500 });
+        }
+
+        const ventaIds = ventasActivas.map((venta) => venta.id);
 
         if (ventaIds.length === 0) {
+            console.log("[GET /rutasEnTransito] No active ventas found.");
             return NextResponse.json({ enTransito: [] });
         }
 
-        // Buscar rutas de despacho que contengan estas ventas y estén en tránsito
-        const enTransito = await RutaDespacho.find({
-            ventaIds: { $in: ventaIds },
-            estado: {
-                $gte: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
-                $lte: TIPO_ESTADO_RUTA_DESPACHO.regreso
-            }
-        })
-        .select("_id estado").lean();
+        console.log(`[GET /rutasEnTransito] Found ${ventaIds.length} active ventas. Fetching rutas en transito...`);
 
-        const enTransitoReponse: IRutasEnTransitoResponse[] = enTransito.map(ruta => ({
-            rutaId: String(ruta._id),
+        // Fetch rutas en transito using the intermediate table ruta_ventas
+        const { data: rutasRelacionadas, error: rutasRelacionadasError } = await supabase
+            .from("ruta_ventas")
+            .select("ruta_id")
+            .in("venta_id", ventaIds);
+
+        if (rutasRelacionadasError) {
+            console.error("[GET /rutasEnTransito] Error fetching rutas relacionadas:", rutasRelacionadasError);
+            return NextResponse.json({ error: rutasRelacionadasError.message }, { status: 500 });
+        }
+
+        const rutaIds = rutasRelacionadas.map((relacion) => relacion.ruta_id);
+
+        if (rutaIds.length === 0) {
+            console.log("[GET /rutasEnTransito] No rutas found for the active ventas.");
+            return NextResponse.json({ enTransito: [] });
+        }
+
+        console.log(`[GET /rutasEnTransito] Found ${rutaIds.length} rutas. Fetching details...`);
+
+        // Fetch details of the rutas en transito
+        const { data: enTransito, error: rutasError } = await supabase
+            .from("rutas_despacho")
+            .select("id, estado")
+            .in("id", rutaIds)
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
+            .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso);
+
+        if (rutasError) {
+            console.error("[GET /rutasEnTransito] Error fetching rutas en transito:", rutasError);
+            return NextResponse.json({ error: rutasError.message }, { status: 500 });
+        }
+
+        console.log(`[GET /rutasEnTransito] Found ${enTransito.length} rutas en transito.`);
+
+        const enTransitoResponse = enTransito.map((ruta) => ({
+            rutaId: ruta.id,
             estado: ruta.estado
         }));
 
-        return NextResponse.json({ enTransito: enTransitoReponse });
-        
+        return NextResponse.json({ enTransito: enTransitoResponse });
     } catch (error) {
-        console.error('Error en rutasEnTransito:', error);
-        return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+        console.error("[GET /rutasEnTransito] Internal Server Error:", error);
+        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
     }
 }

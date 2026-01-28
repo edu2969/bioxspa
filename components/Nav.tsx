@@ -1,23 +1,25 @@
 'use client'
 
-import { signOut } from 'next-auth/react';
 import Link from 'next/link'
 import { useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
 import { usePathname, useRouter } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
-import { USER_ROLE } from '@/app/utils/constants';
-import { useSession } from 'next-auth/react';
+import { useAuthorization } from '@/lib/auth/useAuthorization';
+import { RESOURCES, ACTIONS, ROLES } from '@/lib/auth/permissions';
+import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './prefabs/powerScan/PowerScanView';
+import { supabase } from '@/lib/supabase';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
     const path = usePathname();
-    const { data: session } = useSession();
+    const auth = useAuthorization();
     const [scanMode, setScanMode] = useState(false);
+    const router = useRouter();
 
     const activateSuperScanMode = () => {
         setScanMode(true);
@@ -41,20 +43,23 @@ export default function Nav() {
                 <AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4"
                     onClick={() => setMenuActivo(false)} />
                 <div className="mt-12 text-white space-y-6">
-                    {session && session.user?.role == USER_ROLE.gerente && <>
+                    <Can resources={[RESOURCES.CONFIGURACION]} actions={[ACTIONS.READ]}>
                         <Link href="/pages/configuraciones" onClick={() => setMenuActivo(false)}>
                             <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
                                 <IoSettingsSharp size="4rem" />
                                 <p className="text-2xl mx-6 mt-4">CONFIGURACIONES</p>
                             </div>
                         </Link>
+                    </Can>
+                    
+                    <Can resources={[RESOURCES.INVENTARIO]} actions={[ACTIONS.READ]}>
                         <Link href="/pages/operacion" onClick={() => setMenuActivo(false)}>
                             <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
                                 <MdOutlinePropaneTank size="4rem" />
                                 <p className="text-2xl mx-6 mt-4">OPERACIÓN</p>
                             </div>
                         </Link>
-                    </>}
+                    </Can>
                     <Link href="/pages/pedidos/nuevo" onClick={() => setMenuActivo(false)}>
                         <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
                             <MdSell size="4rem" />
@@ -78,21 +83,26 @@ export default function Nav() {
                     <div className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md px-2 m-0 bg-slate-500 shadow-sm"
                         onClick={async () => {
                             setMenuActivo(false);
-                            signOut();
+                            try {
+                                await supabase.auth.signOut(); // Cerrar sesión con Supabase
+                                router.replace("/"); // Redirigir a la página principal
+                            } catch (error) {
+                                console.error("Error al cerrar sesión:", error);
+                            }
                         }}>
                         <AiOutlineLogout size="4rem" />
                         <p className="text-2xl mx-6 my-4">Cerrar sesión</p>
                     </div>
                 </div>
-                {session?.user && (
+                {auth.user && (
                     <div className="absolute bottom-6 right-6 flex flex-col items-end space-y-2">
                         <div className="flex flex-row items-center space-x-4">
                             <div className="flex flex-col text-right">
-                                <span className="text-lg text-green-800 font-semibold">{session.user.name}</span>
-                                <span className="text-sm text-gray-300">{session.user.email}</span>
+                                <span className="text-lg text-green-800 font-semibold">{auth.user.nombre}</span>
+                                <span className="text-sm text-gray-300">{auth.user.email}</span>
                             </div>
                             <Image
-                                src={`/profiles/${session.user.email.split('@')[0]}.jpg`}
+                                src={`/profiles/${auth.user.email.split('@')[0]}.jpg`}
                                 alt="Perfil"
                                 className="w-14 h-14 rounded-full object-cover border-2 border-white"
                                 width={56}

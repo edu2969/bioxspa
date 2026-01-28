@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
-import Venta from "@/models/venta";
-import User from "@/models/user";
-import mongoose from "mongoose";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(request) {
     try {

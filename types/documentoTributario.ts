@@ -1,6 +1,6 @@
 export interface IDocumentoTributario {
-    _id?: string;
-    temporalId: string;
+    id?: string;
+    temporal_id: string;
     nombre: string;
     stock?: boolean;
     afecto?: boolean;
@@ -8,6 +8,6 @@ export interface IDocumentoTributario {
     venta?: boolean;
     operacion: number; // 0: Ninguna, 1: suma, 2: resta
     formato: number;   // 1: p, 2: p
-    createdAt?: Date;
-    updatedAt?: Date;
+    created_at?: Date;
+    updated_at?: Date;
 }

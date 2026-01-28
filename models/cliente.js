@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import mongoose from "mongoose";
+const { Schema, models } = mongoose;
 
 const direccionSchema = new Schema({
     direccionId: { type: Schema.Types.ObjectId, ref: 'Direccion', required: true },

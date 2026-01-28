@@ -10,7 +10,7 @@ import 'dayjs/locale/es';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import GestorDeCargaView from "./prefabs/GestorDeCargaView";
 import PowerScanView from "./prefabs/powerScan/PowerScanView";
 import Nav from "./Nav";
@@ -23,6 +23,9 @@ export default function JefaturaDespacho() {
   const [scanMode, setScanMode] = useState(false);
   const [rutaId, setRutaId] = useState<string | null>(null);
   const [ventaId, setVentaId] = useState<string | null>(null);
+  const [animating, setAnimating] = useState(false);
+  
+  const queryClient = useQueryClient();
 
   // Hook para restaurar el foco cuando la aplicación vuelve a ser visible
   useOnVisibilityChange(() => {
@@ -43,22 +46,52 @@ export default function JefaturaDespacho() {
   });
 
   const handleShowNext = () => {
+    if (!cargamentos || cargamentos.length <= 1 || animating) return;
+    
     console.log("Mostrar siguiente cargamento");
-    // Esta función ahora solo cambia el orden de visualización sin animaciones
-    // La data real se maneja desde GestorDeCargaView con setQueryData
-  }
-
-  useEffect(() => {
-    if(cargamentos && cargamentos.length > 0) {
-      const firstCarga = cargamentos[0];
+    setAnimating(true);
+    
+    setTimeout(() => {
+      // Crear nuevo array moviendo el primer elemento al final
+      const nuevosCargamentos = [...cargamentos];
+      const primerCargamento = nuevosCargamentos.shift(); // Remover primer elemento
+      if (primerCargamento) {
+        nuevosCargamentos.push(primerCargamento); // Agregarlo al final
+      }
       
-      if(!firstCarga.rutaId) {
-        setVentaId(firstCarga.ventas[0].ventaId);
+      // Actualizar la query data con el nuevo orden
+      queryClient.setQueryData(['cargamentos-despacho'], nuevosCargamentos);
+      
+      // Actualizar rutaId/ventaId basado en el nuevo primer cargamento
+      if (nuevosCargamentos.length > 0) {
+        const newFirstCarga = nuevosCargamentos[0];
+        if (!newFirstCarga.rutaId) {
+          setVentaId(newFirstCarga.ventas[0]?.ventaId || null);
+          setRutaId(null);
+        } else {
+          setRutaId(newFirstCarga.rutaId);
+          setVentaId(null);
+        }
+      }
+      
+      setAnimating(false);
+      setScanMode(false);
+    }, 1000);
+  };
+
+  // Establecer rutaId/ventaId inicial cuando se cargan los cargamentos
+  useEffect(() => {
+    if (cargamentos && cargamentos.length > 0) {
+      const firstCarga = cargamentos[0];
+      if (!firstCarga.rutaId) {
+        setVentaId(firstCarga.ventas[0]?.ventaId || null);
+        setRutaId(null);
       } else {
         setRutaId(firstCarga.rutaId);
+        setVentaId(null);
       }
     }
-  }, [cargamentos]);
+  }, [cargamentos?.length]); // Solo ejecutar cuando cambie la cantidad de cargamentos
 
   return (
     <SessionProvider>
@@ -74,13 +107,16 @@ export default function JefaturaDespacho() {
 
           <div className="w-full">
             {!isLoading && cargamentos && cargamentos.map((cargamento, index) => (
-              <div key={`cargamento_${index}`} className="flex flex-col h-full overflow-y-hidden">
-                <div className="absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg p-1"
+              <div key={`cargamento_${cargamento.rutaId || cargamento.ventas[0]?.ventaId}_${index}`} 
+                   className="flex flex-col h-full overflow-y-hidden">
+                <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg py-1 ${animating ? "transition-all duration-500" : ""}`}
                   style={{
-                    top: `${index * 10 + 52}px`,
-                    left: `${index * 10 + 16}px`,
-                    zIndex: cargamentos.length - index,
-                    scale: 1 - index * 0.009,
+                    top: `${animating && index > 0 ? (index - 1) * 10 + 52 : index * 10 + 52}px`,
+                    left: `${animating && index > 0 ? (index - 1) * 10 + 16 : index * 10 + 16}px`,
+                    zIndex: animating && index > 0 ? cargamentos.length - index + 1 : cargamentos.length - index,
+                    scale: animating && index > 0 ? 1 - (index - 1) * 0.009 : 1 - index * 0.009,
+                    transform: `translateX(${animating && index == 0 ? "-100%" : "0"})`,
+                    opacity: animating && index == 0 ? 0 : 1,
                   }}
                 >
                   {index <= 1 && 
@@ -112,7 +148,7 @@ export default function JefaturaDespacho() {
               className="flex items-center px-6 py-3 bg-white text-gray-500 border border-gray-300 rounded-xl shadow-lg font-bold text-lg hover:bg-gray-100 transition duration-200"
               style={{ minWidth: 220 }}
               onClick={handleShowNext}
-              disabled={cargamentos.length === 0}
+              disabled={animating || cargamentos.length === 0}
             >
               PASAR SIGUIENTE &gt;&gt;
             </button>

@@ -48,7 +48,7 @@ export default function EnTransito({ sucursalId, onShowCommentModal } : {
             ) : rutasEnTransito.map((rd, index) => (
                 <RutaEnTransito
                     key={`ruta_en_transito_${index}`}
-                    rutaId={rd.rutaId}
+                    rutaId={rd.ruta_id}
                     estado={rd.estado}
                     index={index}
                     onShowCommentModal={onShowCommentModal} />

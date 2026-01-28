@@ -1,4 +1,5 @@
-import mongoose, { Schema, models } from "mongoose";
+import mongoose from "mongoose";
+const { Schema, models } = mongoose;
 
 const cargoSchema = new Schema({
     userId: { type: mongoose.Types.ObjectId, ref: "User", required: true },

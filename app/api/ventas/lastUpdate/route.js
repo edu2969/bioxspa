@@ -1,31 +1,30 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
-import Venta from "@/models/venta";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
+import { supabase } from "@/lib/supabase";
 
-export async function GET() {
+export const GET = migrateAuthEndpoint(async ({ user }) => {
     try {
-        await connectMongoDB();
-        const session = await getServerSession(authOptions);
+        console.log("Fetching last venta update from Supabase");
 
-        if (!session || !session.user || !session.user.id) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        // Buscar la venta más reciente por updated_at
+        const { data: lastVenta, error } = await supabase
+            .from('ventas')
+            .select('updated_at')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+            throw error;
         }
-
-        // Buscar la venta más reciente por updatedAt
-        const lastVenta = await Venta.findOne({})
-            .sort({ updatedAt: -1 })
-            .select("updatedAt")
-            .lean();
 
         if (!lastVenta) {
             return NextResponse.json({ ok: true, updatedAt: null });
         }
 
-        return NextResponse.json({ ok: true, updatedAt: lastVenta.updatedAt });
+        return NextResponse.json({ ok: true, updatedAt: lastVenta.updated_at });
     } catch (error) {
         console.error("Error fetching last venta update:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
-}
+});

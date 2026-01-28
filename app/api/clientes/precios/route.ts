@@ -1,107 +1,148 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import Cliente from "@/models/cliente";
-import Precio from "@/models/precio";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import { IPrecio } from "@/types/precio";
-import { ICliente } from "@/types/cliente";
 
 export async function GET(req: NextRequest) {
+    console.log("[GET /api/clientes/precios] Request received");
+
     try {
-        await connectMongoDB();
-        const { searchParams } = new URL(req.url);
+        const { searchParams } = req.nextUrl;
         const searchText = searchParams.get("search") || "";
-        const clienteId = searchParams.get("clienteId"); // Keep this for backward compatibility
-        
-        // Optional clienteId support for backward compatibility
+        const clienteId = searchParams.get("clienteId");
+
+        console.log(`[GET /api/clientes/precios] Search text: ${searchText}, Cliente ID: ${clienteId}`);
+
         if (clienteId) {
-            const cliente = await Cliente.findById(clienteId);
-            if (!cliente) {
+            console.log(`[GET /api/clientes/precios] Fetching cliente with ID: ${clienteId}`);
+            const { data: cliente, error: clienteError } = await supabase
+                .from("clientes")
+                .select("id")
+                .eq("id", clienteId)
+                .single();
+
+            if (clienteError || !cliente) {
+                console.error(`[GET /api/clientes/precios] Cliente not found: ${clienteError?.message}`);
                 return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
             }
 
-            const precios = await Precio.find({ clienteId }).select("-__v -createdAt -updatedAt")
-            .populate({ 
-                path: "subcategoriaCatalogoId", 
-                select: "nombre cantidad unidad sinSifon categoriaCatalogoId", 
-                populate: { 
-                    path: "categoriaCatalogoId", 
-                    select: "nombre tipo gas elemento esIndustrial esMedicial" } })            
-            .lean();
+            console.log(`[GET /api/clientes/precios] Fetching precios for cliente ID: ${clienteId}`);
+            const { data: precios, error: preciosError } = await supabase
+                .from("precios")
+                .select(`
+                    id,
+                    valor,
+                    subcategorias_catalogo:subcategoria_catalogo_id(
+                        id,
+                        nombre,
+                        cantidad,
+                        unidad,
+                        sin_sifon,
+                        categorias_catalogo:categoria_id(
+                            id,
+                            nombre,
+                            tipo,
+                            gas,
+                            elemento,
+                            es_industrial,
+                            es_medicinal
+                        )
+                    )
+                `)
+                .eq("cliente_id", clienteId);
 
+            if (preciosError) {
+                console.error(`[GET /api/clientes/precios] Error fetching precios: ${preciosError.message}`);
+                return NextResponse.json({ error: "Error fetching precios" }, { status: 500 });
+            }
+
+            console.log(`[GET /api/clientes/precios] Successfully fetched precios for cliente ID: ${clienteId}`);
             return NextResponse.json({ precios });
-        } 
-        // Main flow - search using the provided text
-        else {
+        } else {
             if (!searchText) {
+                console.warn("[GET /api/clientes/precios] Missing search parameter");
                 return NextResponse.json({ error: "Search parameter is required" }, { status: 400 });
             }
-            
-            const searchRegex = new RegExp(searchText, 'i');
-            
-            // Find matching clients by name or rut
-            const matchingClientes = await Cliente.find({
-                $or: [{ nombre: searchRegex }, { rut: searchRegex }]
-            }).select("_id nombre rut tipoPrecio").lean();
-            
-            // Find matching categories and subcategories
-            const matchingCategorias = await CategoriaCatalogo.find({ nombre: searchRegex }).select("_id").lean();
-            const matchingSubcategorias = await SubcategoriaCatalogo.find({
-                $or: [
-                    { nombre: searchRegex },
-                    { categoriaCatalogoId: { $in: matchingCategorias.map(c => c._id) } }
-                ]
-            }).select("_id").lean();
-            
-            // Find all prices matching either clients or subcategories
-            const precios = await Precio.find({
-                $or: [
-                    { clienteId: { $in: matchingClientes.map(c => c._id) } },
-                    { subcategoriaCatalogoId: { $in: matchingSubcategorias.map(s => s._id) } }
-                ]
-            }).populate({ 
-                path: "subcategoriaCatalogoId", 
-                select: "nombre cantidad unidad sinSifon categoriaCatalogoId", 
-                populate: { 
-                    path: "categoriaCatalogoId", 
-                    select: "nombre tipo gas elemento esIndustrial esMedicial" } })            
-            .lean<IPrecio[]>();
-            
-            // Get unique client IDs from the prices
-            const clienteIds = precios.map(p => p.clienteId.toString())
-            
-            // Get details for all relevant clients
-            const clientes = await Cliente.find({
-                _id: { $in: clienteIds }
-            }).select("_id nombre rut tipoPrecio").lean<ICliente[]>();
-            
-            // Group prices by client ID
-            const preciosPorCliente = new Map();
-            precios.forEach(precio => {
-                const clienteId = precio.clienteId.toString();
-                if (!preciosPorCliente.has(clienteId)) preciosPorCliente.set(clienteId, []);
-                preciosPorCliente.get(clienteId).push(precio);
-            });
-            
-            // Build the result array
-            const resultados = [];
-            
-            for (const cliente of clientes) {
-                const clienteId = String(cliente._id);
-                if (preciosPorCliente.has(clienteId)) {
-                    resultados.push({
-                        clienteId: cliente._id,
-                        nombre: cliente.nombre,
-                        rut: cliente.rut,
-                        precios: preciosPorCliente.get(clienteId)
-                    });
-                }
+
+            console.log(`[GET /api/clientes/precios] Searching for clientes and subcategorias with text: ${searchText}`);
+            const { data: matchingClientes, error: clientesError } = await supabase
+                .from("clientes")
+                .select("id, nombre, rut, tipo_precio")
+                .or(`nombre.ilike.%${searchText}%,rut.ilike.%${searchText}%`);
+
+            if (clientesError) {
+                console.error(`[GET /api/clientes/precios] Error fetching clientes: ${clientesError.message}`);
+                return NextResponse.json({ error: "Error fetching clientes" }, { status: 500 });
             }
-            
+
+            console.log(`[GET /api/clientes/precios] Found ${matchingClientes.length} matching clientes`);
+
+            const { data: matchingSubcategorias, error: subcategoriasError } = await supabase
+                .from("subcategorias_catalogo")
+                .select("id, nombre, categoria_catalogo_id")
+                .or(`nombre.ilike.%${searchText}%`);
+
+            if (subcategoriasError) {
+                console.error(`[GET /api/clientes/precios] Error fetching subcategorias: ${subcategoriasError.message}`);
+                return NextResponse.json({ error: "Error fetching subcategorias" }, { status: 500 });
+            }
+
+            console.log(`[GET /api/clientes/precios] Found ${matchingSubcategorias.length} matching subcategorias`);
+
+            const subcategoriaIds = matchingSubcategorias.map((s) => s.id);
+            const clienteIds = matchingClientes.map((c) => c.id);
+
+            console.log(`[GET /api/clientes/precios] Fetching precios for cliente IDs: ${clienteIds} and subcategoria IDs: ${subcategoriaIds}`);
+            const { data: precios, error: preciosError } = await supabase
+                .from("precios")
+                .select(`
+                    cliente_id,
+                    valor,
+                    subcategorias_catalogo:subcategoria_catalogo_id(
+                        id,
+                        nombre,
+                        cantidad,
+                        unidad,
+                        sin_sifon,
+                        categorias_catalogo:categoria_id(
+                            id,
+                            nombre,
+                            tipo,
+                            gas,
+                            elemento,
+                            es_industrial,
+                            es_medicinal
+                        )
+                    )
+                `)
+                .or(
+                    `cliente_id.in.(${clienteIds.join(",")}),subcategoria_catalogo_id.in.(${subcategoriaIds.join(",")})`
+                );
+
+            if (preciosError) {
+                console.error(`[GET /api/clientes/precios] Error fetching precios: ${preciosError.message}`);
+                return NextResponse.json({ error: "Error fetching precios" }, { status: 500 });
+            }
+
+            console.log(`[GET /api/clientes/precios] Successfully fetched precios`, precios[0]);
+
+            const preciosPorCliente = precios.reduce<Record<string, any[]>>((acc, precio) => {
+                const clienteId = precio.cliente_id;
+                if (!acc[clienteId]) acc[clienteId] = [];
+                acc[clienteId].push(precio);
+                return acc;
+            }, {});
+
+            const resultados = matchingClientes.map((cliente) => ({
+                clienteId: cliente.id,
+                nombre: cliente.nombre,
+                rut: cliente.rut,
+                precios: preciosPorCliente[cliente.id] || []
+            }));
+
+            console.log(`[GET /api/clientes/precios] Successfully built response with ${resultados.length} clientes`);
             return NextResponse.json({ ok: true, clientes: resultados });
         }
     } catch (error) {
+        console.error(`[GET /api/clientes/precios] Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
         return NextResponse.json({ error: String(error) }, { status: 500 });
     }
 }

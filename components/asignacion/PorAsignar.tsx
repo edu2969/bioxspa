@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, memo, Dispatch, SetStateAction } from 'react';
+import React, { useState, memo } from 'react';
 import Link from 'next/link';
 import { BiTask } from 'react-icons/bi';
 import { FaCartPlus } from 'react-icons/fa6';
@@ -27,14 +27,14 @@ export default function PorAsignar({
 }: {
     control: Control<INuevaVentaSubmit>;
     setShowDetalleOrdenModal: (show: boolean, pedido?: IPedidoPorAsignar) => void;
-    onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
+    onShowCommentModal: (venta_id: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const [redirecting, setRedirecting] = useState(false);
     const queryClient = useQueryClient();
 
     const sucursalId = useWatch({
         control,
-        name: 'sucursalId'
+        name: 'sucursal_id'
     })
 
     const { data: pedidos, isLoading } = useQuery<IPedidoPorAsignar[]>({
@@ -58,7 +58,7 @@ export default function PorAsignar({
     const PedidoItem = memo(function PedidoItem({ pedido, index }: { pedido: IPedidoPorAsignar, index: number }) {
         // const isExpanded = !!expandido[index];
         const items = pedido.items || [];
-        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal;
+        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despacho_en_local;
         // const isDraggedItem = draggedPedido?.id === pedido._id;
 
         // Hook de @dnd-kit para hacer el elemento draggable
@@ -69,7 +69,7 @@ export default function PorAsignar({
             transform,
             isDragging,
         } = useDraggable({
-            id: pedido._id,
+            id: pedido.id,
             disabled: !isArrastrable
         });
 
@@ -93,7 +93,7 @@ export default function PorAsignar({
                 const invalidateQueries = () => {
                     queryClient.invalidateQueries({ queryKey: ['pedidos-por-asignar', sucursalId] });
                 };
-                onShowCommentModal(pedido._id, pedido.comentario, invalidateQueries);
+                onShowCommentModal(pedido.id, pedido.comentario, invalidateQueries);
             }
         };
 
@@ -111,9 +111,9 @@ export default function PorAsignar({
                 onClick={handleClick}
             >
                 <div className="w-full">
-                    <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
+                    <p className="text-md font-bold uppercase w-full -mb-1">{pedido.cliente_nombre}</p>
                     {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-teal-100 text-xs bg-neutral-900 rounded px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
-                    {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
+                    {pedido.despacho_en_local && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
                     <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>
                         {dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}
                     </p>

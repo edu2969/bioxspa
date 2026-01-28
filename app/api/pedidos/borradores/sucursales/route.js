@@ -1,84 +1,104 @@
-import { connectMongoDB } from "@/lib/mongodb";
-import Sucursal from "@/models/sucursal";
-import Venta from "@/models/venta";
 import { NextResponse } from "next/server";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import User from "@/models/user";
-import Cargo from "@/models/cargo";
+import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
+import { supabase } from "@/lib/supabase";
 
 // GET all sucursales: Trae _id y nombre de las sucursales a las cuales el usuario en sessión tiene acceso.
-export async function GET() {
+export const GET = migrateAuthEndpoint(async ({ user }) => {
     try {
-        await connectMongoDB();
+        const userId = user.id;
 
-        console.log("Fetching server session...");
-        const session = await getServerSession(authOptions);
+        // Fetch cargos for user with allowed roles
+        const { data: cargos, error: cargosError } = await supabase
+            .from('cargos')
+            .select('id, tipo, sucursal_id, dependencia_id')
+            .eq('user_id', userId)
+            .in('tipo', [
+                TIPO_CARGO.gerente,
+                TIPO_CARGO.encargado,
+                TIPO_CARGO.responsable,
+                TIPO_CARGO.cobranza
+            ]);
 
-        if (!session || !session.user || !session.user.id) {
-            console.warn("Unauthorized access attempt.");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        if (cargosError) {
+            console.error('Error fetching cargos:', cargosError);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
         }
 
-        const userId = session.user.id;
-        console.log(`Fetching user with ID: ${userId}`);
-        const user = await User.findById(userId).lean();
-        if (!user) {
-            console.warn(`User not found for ID: ${userId}`);
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-        }
-        console.log("`Fetching cargo...");
-        const cargos = await Cargo.find({ 
-            userId,
-            tipo: { $in: [
-                TIPO_CARGO.gerente, TIPO_CARGO.encargado, 
-                TIPO_CARGO.responsable, TIPO_CARGO.cobranza
-            ] }
-        }).populate("sucursalId dependenciaId").lean();
-
-        if (cargos.length === 0) {
-            console.warn(`Cargos not found for ID: ${userId}`);
-            return NextResponse.json({ ok: false, error: "Cargos not found" }, { status: 404 });
+        if (!cargos || cargos.length === 0) {
+            return NextResponse.json({ ok: false, error: 'Cargos not found' }, { status: 404 });
         }
 
-        let sucursalIds = []
-        cargos.forEach(cargo => {
-            sucursalIds.push(cargo.sucursalId ? cargo.sucursalId : cargo.dependenciaId.sucursalId);
-        });
+        // Map dependencia -> sucursal
+        const dependenciaIds = cargos
+            .filter(c => c.dependencia_id)
+            .map(c => c.dependencia_id);
 
-        const sucursales = await Sucursal.find({ _id: {
-            $in: sucursalIds
-        }, visible: true }).select("_id nombre").sort({ prioridad: 1 }).lean();
+        let sucursalIds = cargos
+            .filter(c => c.sucursal_id)
+            .map(c => c.sucursal_id);
 
-        const ventas = await Venta.find({ 
-            estado: { 
-            $in: [
-                TIPO_ESTADO_VENTA.borrador, TIPO_ESTADO_VENTA.cotizacion,
-                TIPO_ESTADO_VENTA.anulado, TIPO_ESTADO_VENTA.rechazado
-            ]
-            },
-            porCobrar: false
-        }).lean();
+        if (dependenciaIds.length > 0) {
+            const { data: dependencias, error: depError } = await supabase
+                .from('dependencias')
+                .select('id, sucursal_id')
+                .in('id', dependenciaIds);
 
-        // Contar ventas activas por sucursal
-        const ventasPorSucursal = ventas.reduce((acc, venta) => {
-            const sucursalId = venta.sucursalId;
+            if (depError) {
+                console.error('Error fetching dependencias:', depError);
+            }
+
+            const depSucursalIds = (dependencias || []).map(d => d.sucursal_id);
+            sucursalIds = [...sucursalIds, ...depSucursalIds];
+        }
+
+        // Fetch visible sucursales
+        const { data: sucursales, error: sucursalesError } = await supabase
+            .from('sucursales')
+            .select('id, nombre, prioridad')
+            .in('id', sucursalIds)
+            .eq('visible', true)
+            .order('prioridad', { ascending: true });
+
+        if (sucursalesError) {
+            console.error('Error fetching sucursales:', sucursalesError);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+
+        // Fetch ventas in active states and not por_cobrar
+        const { data: ventas, error: ventasError } = await supabase
+            .from('ventas')
+            .select('id, sucursal_id, estado, por_cobrar')
+            .in('estado', [
+                TIPO_ESTADO_VENTA.borrador,
+                TIPO_ESTADO_VENTA.cotizacion,
+                TIPO_ESTADO_VENTA.anulado,
+                TIPO_ESTADO_VENTA.rechazado
+            ])
+            .eq('por_cobrar', false);
+
+        if (ventasError) {
+            console.error('Error fetching ventas:', ventasError);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+
+        const ventasPorSucursal = (ventas || []).reduce((acc, venta) => {
+            const sucursalId = venta.sucursal_id;
             if (sucursalId) {
                 acc[sucursalId] = (acc[sucursalId] || 0) + 1;
             }
             return acc;
         }, {});
 
-        // Adornar sucursales con contador de ventas activas
-        const sucursalesConVentas = sucursales.map(sucursal => ({
-            ...sucursal,
-            ventasActivas: ventasPorSucursal[sucursal._id.toString()] || 0
+        const sucursalesConVentas = (sucursales || []).map(sucursal => ({
+            _id: sucursal.id,
+            nombre: sucursal.nombre,
+            ventasActivas: ventasPorSucursal[sucursal.id] || 0
         }));
 
         return NextResponse.json({ sucursales: sucursalesConVentas });
     } catch (error) {
         console.log(error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-}
+});

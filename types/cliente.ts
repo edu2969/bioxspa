@@ -2,39 +2,39 @@ import { IDireccion } from "./direccion";
 
 export interface IDireccionDespacho {
     comentario?: string;
-    direccionId: IDireccion;
+    direccion_id: IDireccion;
 }
 
 export interface ICliente {
-    _id?: string; // ObjectId as string
-    temporalId?: string;
-    creadorId?: string | null;
+    id?: string; // ObjectId as string
+    temporal_id?: string;
+    creador_id?: string | null;
     nombre: string;
     rut: string;
-    direccionId?: string | null;
+    direccion_id?: string | null;
     giro?: string;
     telefono?: string;
     email?: string;
-    emailIntercambio?: string | null;
-    envioFactura?: boolean;
-    envioReporte?: boolean;
+    email_intercambio?: string | null;
+    envio_factura?: boolean;
+    envio_reporte?: boolean;
     seguimiento?: boolean;
-    ordenCompra?: boolean;
-    reporteDeuda?: boolean;
+    orden_compra?: boolean;
+    reporte_deuda?: boolean;
     arriendo?: boolean;
     dias_de_pago?: number;
     notificacion?: boolean;
     credito?: number;
-    urlWeb?: string;
+    url_web?: string;
     comentario?: string;
     contacto?: string;
-    documentoTributarioId?: string | null;
+    documento_tributario_id?: string | null;
     activo?: boolean;
-    cilindrosMin?: string;
-    cilindrosMax?: number;
-    enQuiebra?: boolean;
-    mesesAumento?: number[];
-    direccionesDespacho?: IDireccionDespacho[];
-    createdAt?: Date;
-    updatedAt?: Date;
+    cilindros_min?: string;
+    cilindros_max?: number;
+    en_quiebra?: boolean;
+    meses_aumento?: number[];
+    direcciones_despacho?: IDireccionDespacho[];
+    created_at?: Date;
+    updated_at?: Date;
 }

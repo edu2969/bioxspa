@@ -5,8 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { IClienteSeachResult } from "./types";
 import { UseFormRegisterReturn } from "react-hook-form";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { USER_ROLE } from "@/app/utils/constants";
+import { useAuthorization } from "@/lib/auth/useAuthorization";
+import { ROLES } from "@/app/utils/constants";
 import { useRouter } from "next/navigation";
 import { LiaPencilAltSolid } from "react-icons/lia";
 
@@ -21,7 +21,7 @@ export default function ClienteSearchView({
     setClienteSelected: (value: IClienteSeachResult | null) => void;
     isLoading?: boolean;
 }) {
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
     const [textoBusqueda, setTextoBusqueda] = useState("");
     const router = useRouter();
     const [debouncedSearch, setDebouncedSearch] = useState("");    
@@ -48,7 +48,7 @@ export default function ClienteSearchView({
 
     const handleSelect = (cliente: IClienteSeachResult) => {
         setTextoBusqueda(cliente.nombre);
-        setClienteId(cliente._id || null);
+        setClienteId(cliente.id || null);
         setClienteSelected(cliente);
     };
     
@@ -77,8 +77,7 @@ export default function ClienteSearchView({
                 {searchingClientes && <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 z-10">
                     <Loader texto="" />
                 </div>}
-                {(session?.user?.role === USER_ROLE.gerente || session?.user?.role === USER_ROLE.encargado 
-                || session?.user?.role === USER_ROLE.cobranza)
+                {hasRole([ROLES.SUPERVISOR, ROLES.SUPERVISOR, ROLES.MANAGER])
                     && <button
                         type="button"
                         className={`ml-2 flex items-center justify-center px-2 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${

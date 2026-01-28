@@ -1,32 +1,31 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import Cliente from "@/models/cliente";
 
 export async function GET(req: NextRequest) {
     console.log("[GET] /api/clientes/search - Request received");
-    try {
-        await connectMongoDB();
-        console.log("[GET] Connected to MongoDB");
 
-        const { searchParams } = new URL(req.url);
-        const query = searchParams.get('q');
+    try {
+        const { searchParams } = req.nextUrl;
+        const query = searchParams.get("q");
         console.log(`[GET] Query parameter 'q': ${query}`);
 
         if (!query) {
             console.warn("[GET] Missing query parameter 'q'");
             return NextResponse.json({ error: "Query parameter 'q' is required" }, { status: 400 });
         }
-        console.log("[GET] Searching for clientes...");
-        // Mejorar la búsqueda: eliminar espacios, usar regex más seguro, buscar en nombre y rut
-        const sanitizedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escapa caracteres especiales de regex
-        const regex = new RegExp(sanitizedQuery, "i");
 
-        const clientes = await Cliente.find({
-            $or: [
-            { nombre: regex },
-            { rut: regex }
-            ]
-        }).select("_id nombre rut");
+        console.log("[GET] Searching for clientes...");
+        const sanitizedQuery = query.trim();
+
+        const { data: clientes, error } = await supabase
+            .from("clientes")
+            .select("id, nombre, rut")
+            .or(`nombre.ilike.%${sanitizedQuery}%,rut.ilike.%${sanitizedQuery}%`);
+
+        if (error) {
+            console.error("[GET] Error fetching clientes:", error);
+            return NextResponse.json({ error: "Error fetching clientes" }, { status: 500 });
+        }
 
         console.log(`[GET] Found ${clientes.length} clientes`);
         return NextResponse.json({ ok: true, clientes });

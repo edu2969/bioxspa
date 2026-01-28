@@ -41,7 +41,6 @@ export function PowerScanOptionsModal({
 }) {
     const [clienteSeleccionado, setClienteSeleccionado] = useState<IClienteSeachResult | null>(null);
     const [editMode, setEditMode] = useState(false);
-    const [savingItem, setSavingItem] = useState(false);
     const { register, handleSubmit } = useForm<ItemFormData>({
         defaultValues: { 
             estado: item ? item.estado : 0,
@@ -90,7 +89,7 @@ export function PowerScanOptionsModal({
         onSuccess: (data) => {
             if (data.ok) {
                 toast.success(data.message || `Cilindro ${item?.codigo} actualizado correctamente`);
-                play('/sounds/accept_02.mp3');
+                play('/sounds/accept_01.mp3');
             } else {                                
                 toast.error(data.error || 'Error al actualizar el cilindro');
                 play('/sounds/error_01.mp3');                
@@ -329,16 +328,13 @@ export function PowerScanOptionsModal({
                         <form onSubmit={handleSubmit(guardarCambiosItem)}>
                             <button
                                 type="submit"
-                                disabled={savingItem}
-                                className="relative px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2"
+                                disabled={mutationActualizarItem.isPending}
+                                className={`relative px-4 py-2 ${mutationActualizarItem.isPending ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-700'} text-white text-base font-medium rounded-md w-full shadow-sm focus:outline-none focus:ring-2`}
                             >
-                                ACTUALIZAR
-                                {savingItem && (
-                                    <div className="absolute top-0 left-0 w-full h-10">
-                                        <div className="absolute top-0 left-0 w-full h-full bg-gray-100 opacity-80"></div>
-                                        <div className="mt-1"><Loader texto="" /></div>
-                                    </div>
-                                )}
+                                Actualizar
+                                {mutationActualizarItem.isPending && <div className="absolute top-0 left-0 w-full h-10">
+                                    <div className="mt-1"><Loader texto="" /></div>
+                                </div>}                            
                             </button>
                         </form>
                     ) : (
@@ -346,7 +342,7 @@ export function PowerScanOptionsModal({
                             onClick={onCloseModal}
                             className="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2"
                         >
-                            ACEPTAR
+                            Aceptar
                         </button>
                     )}
 
@@ -355,7 +351,7 @@ export function PowerScanOptionsModal({
                             onClick={() => setEditMode(true)}
                             className="mt-2 px-4 py-2 bg-orange-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                         >
-                            CORREGIR
+                            Corregir
                         </button>
                     )}
 
@@ -363,7 +359,7 @@ export function PowerScanOptionsModal({
                         onClick={onCloseModal}
                         className="mt-2 px-4 py-2 bg-gray-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
-                        CANCELAR
+                        Cancelar
                     </button>
                 </div>
             </div>

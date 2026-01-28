@@ -1,100 +1,103 @@
-import mongoose from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 import { NextRequest, NextResponse } from "next/server";
-import Cliente from "@/models/cliente";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import DetalleVenta from "@/models/detalleVenta";
-import Venta from "@/models/venta";
+import supabase from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { IVenta } from "@/types/venta";
-import { ICliente } from "@/types/cliente";
-import { IDetalleVenta } from "@/types/detalleVenta";
-import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
-import { ICategoriaCatalogo } from "@/types/categoriaCatalogo";
 
 export async function GET(request: NextRequest) {
-    console.log("Connecting to MongoDB...");
-    await connectMongoDB();
-    console.log("Connected to MongoDB");
+    try {
+        console.log("[GET /porAsignar] Starting request...");
 
-    if (!mongoose.models.CategoriaCatalogo) {
-        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.SubcategoriaCatalogo) {
-        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-    }
+        // Authenticate user
+        const { user } = await getAuthenticatedUser();
+        const userId = user.id;
+        console.log(`[GET /porAsignar] Authenticated user ID: ${userId}`);
 
-    const { searchParams } = new URL(request.url);
-    const sucursalId = searchParams.get("sucursalId");
-    if (!sucursalId) {
-        return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
-    }
+        // Get sucursalId from query parameters
+        const { searchParams } = new URL(request.url);
+        const sucursalId = searchParams.get("sucursalId");
 
-    console.log("Fetching ventas in 'borrador' state...");
-    const ventas = await Venta.find({
-        sucursalId,
-        estado: {
-            $in: [
+        if (!sucursalId) {
+            console.warn("[GET /porAsignar] Missing sucursalId parameter.");
+            return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
+        }
+
+        console.log(`[GET /porAsignar] Fetching ventas for sucursalId: ${sucursalId}`);
+
+        // Fetch ventas in "por_asignar" state
+        const { data: ventas, error: ventasError } = await supabase
+            .from("ventas")
+            .select(`
+                id,
+                tipo,
+                comentario,
+                cliente:clientes(id, nombre, rut),
+                estado,
+                direccion_despacho_id,
+                fecha,
+                items:detalle_ventas(
+                    id,
+                    subcategoria:subcategorias_catalogo(id, nombre, categoria:categorias_catalogo(id, nombre)),
+                    detalle_items:detalle_venta_items(
+                        id,
+                        item:items_catalogo(id, nombre)
+                    )
+                )
+            `)
+            .eq("sucursal_id", sucursalId)
+            .in("estado", [
                 TIPO_ESTADO_VENTA.por_asignar,
                 TIPO_ESTADO_VENTA.pagado,
                 TIPO_ESTADO_VENTA.entregado,
-                TIPO_ESTADO_VENTA.cerrado,
-            ]
+                TIPO_ESTADO_VENTA.cerrado
+            ])
+            .order("fecha", { ascending: false })
+            .limit(25);
+
+        if (ventasError) {
+            console.error("[GET /porAsignar] Error fetching ventas:", ventasError);
+            return NextResponse.json({ ok: false, error: ventasError.message }, { status: 500 });
         }
-    })
-    .populate({
-        path: 'direccionDespachoId',        
-        select: '_id'
-    })
-    .sort({ fecha: -1 }) // Ordenar por fecha descendente (más reciente primero)
-    .limit(25)
-    .lean<IVenta[]>();
-    console.log(`Fetched ${ventas.length} ventas`);
 
-    const pedidos = await Promise.all(
-        ventas.map(async (venta: IVenta) => {
-            console.log("Analizando venta:", venta);
-            // Fetch cliente details
-            const cliente = await Cliente.findById(venta.clienteId).lean<ICliente>();
-            const clienteNombre = cliente?.nombre || "Desconocido";
-            const clienteRut = cliente?.rut || "Desconocido";
+        console.log(`[GET /porAsignar] Retrieved ${ventas.length} ventas.`);
 
-            // Fetch items for the venta
-            const items = await DetalleVenta.find({ ventaId: venta._id }).lean<IDetalleVenta[]>();
-            const itemsWithNames = await Promise.all(
-                items.map(async (item) => {
-                    const subcategoria = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId).lean<ISubcategoriaCatalogo>();
-                    const categoria = subcategoria
-                        ? await CategoriaCatalogo.findById(subcategoria.categoriaCatalogoId).lean<ICategoriaCatalogo>()
-                        : null;
+        // Transform ventas data
+        const pedidos = ventas.map((venta) => {           
+            
+            const items = venta.items || [];
+            const cliente = Array.isArray(venta.cliente) ? venta.cliente[0] : venta.cliente;
 
-                    const categoriaNombre = categoria?.nombre || "Desconocido";
-                    const subcategoriaNombre = subcategoria?.nombre || "Desconocido";
+            const itemsWithNames = items.map((item) => {
+                const subcategoria = (item.subcategoria && typeof item.subcategoria === "object" &&
+                    "nombre" in item.subcategoria && "categoria" in item.subcategoria &&
+                    typeof item.subcategoria.categoria === "object")
+                    ? item.subcategoria as { nombre: string; categoria: { nombre: string } }
+                    : { nombre: "Desconocido", categoria: { nombre: "Desconocido" } };
+                const categoria = subcategoria.categoria?.nombre || "Desconocido";
 
-                    return {
-                        ...item,
-                        nombre: `${categoriaNombre} - ${subcategoriaNombre}`,
-                    };
-                })
-            );
+                return {
+                    ...item,
+                    nombre: `${categoria} - ${subcategoria.nombre}`
+                };
+            });
 
             return {
-                _id: venta._id,
+                _id: venta.id,
                 tipo: venta.tipo,
                 comentario: venta.comentario || "",
-                clienteId: venta.clienteId,
-                clienteNombre,
-                clienteRut,
+                cliente_id: cliente.id,
+                cliente_nombre: cliente.nombre,
+                cliente_rut: cliente.rut,
                 estado: venta.estado,
-                despachoEnLocal: venta.direccionDespachoId === null,
+                despacho_en_local: !venta.direccion_despacho_id,
                 fecha: venta.fecha,
                 items: itemsWithNames
             };
-        })
-    );
+        });
 
-    return NextResponse.json({
-        pedidos
-    });
+        console.log(`[GET /porAsignar] Final response data:`, pedidos);
+        return NextResponse.json({ pedidos });
+    } catch (error) {
+        console.error("[GET /porAsignar] Internal Server Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
 }

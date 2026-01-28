@@ -1,7 +1,5 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Precio from "@/models/precio";
-import Cliente from "@/models/cliente";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -9,49 +7,81 @@ export async function GET(req, props) {
     const { searchParams } = new URL(req.url);
     const clienteId = searchParams.get("clienteId");
     const usuarioId = searchParams.get("usuarioId");
-    
-    console.log("PARAMS", params);
-    console.log("SEARCH PARAMS", searchParams);
 
-    console.log("Connecting to MongoDB...");
-    await connectMongoDB();
-    console.log("Connected to MongoDB");
-
-    const query = { subcategoriaCatalogoId: item[0] };
-    if (clienteId) {
-        console.log(`Filtering by clienteId: ${clienteId}`);
-        query.clienteId = clienteId;
-    }
-    if (usuarioId) {
-        console.log(`Filtering by usuarioId: ${usuarioId}`);
-        query.userId = usuarioId;
-    }
-    console.log("Fetching price...");
-    const precio = await Precio.findOne(query).populate('subcategoriaCatalogoId').lean();
-
-    console.log("PRECIO", query, precio);
-
-    if (!precio) {
-        const cliente = clienteId ? await Cliente.findById(clienteId).select('tipoPrecio').lean() : null;
-        if (cliente) {
-            console.log(`Searching for clients with the same price type: ${cliente.tipoPrecio}`);
-            const similarClients = await Cliente.find({ tipoPrecio: cliente.tipoPrecio }).select('_id').lean();
-            const similarClientIds = similarClients.map(c => c._id);
-
-            console.log(`Found ${similarClientIds.length} clients with the same price type`);
-            const similarPrice = await Precio.findOne({
-                'subcategoriaCatalogoId': item[0],
-                'clienteId': { $in: similarClientIds },
-            }).sort({ createdAt: -1 }).populate('subcategoriaCatalogoId').populate('clienteId').lean();
-
-            if (similarPrice) {
-                console.log("Returning the most recent similar price");
-                return NextResponse.json({ ...similarPrice, sugerido: true });
-            }
+    try {
+        const filters = {
+            subcategoria_catalogo_id: item[0]
+        };
+        if (clienteId) {
+            filters.cliente_id = clienteId;
         }
-        return NextResponse.json({ error: "Price not found" }, { status: 404 });
-    }
+        if (usuarioId) {
+            filters.user_id = usuarioId;
+        }
 
-    console.log("Returning price");
-    return NextResponse.json(precio);
+        const { data: precio, error } = await supabase
+            .from('precios')
+            .select('*, subcategoria_catalogos(*), clientes(*)')
+            .match(filters)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Error fetching precio:', error);
+            return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
+
+        if (!precio) {
+            if (clienteId) {
+                const { data: cliente, error: clienteError } = await supabase
+                    .from('clientes')
+                    .select('tipo_precio')
+                    .eq('id', clienteId)
+                    .single();
+
+                if (clienteError) {
+                    console.error('Error fetching cliente:', clienteError);
+                }
+
+                if (cliente?.tipo_precio) {
+                    const { data: similarClients, error: clientsError } = await supabase
+                        .from('clientes')
+                        .select('id')
+                        .eq('tipo_precio', cliente.tipo_precio);
+
+                    if (clientsError) {
+                        console.error('Error fetching similar clients:', clientsError);
+                    }
+
+                    const similarClientIds = (similarClients || []).map(c => c.id);
+
+                    if (similarClientIds.length > 0) {
+                        const { data: similarPrice, error: priceError } = await supabase
+                            .from('precios')
+                            .select('*, subcategoria_catalogos(*), clientes(*)')
+                            .eq('subcategoria_catalogo_id', item[0])
+                            .in('cliente_id', similarClientIds)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (priceError) {
+                            console.error('Error fetching similar price:', priceError);
+                        }
+
+                        if (similarPrice) {
+                            return NextResponse.json({ ...similarPrice, sugerido: true });
+                        }
+                    }
+                }
+            }
+            return NextResponse.json({ error: "Price not found" }, { status: 404 });
+        }
+
+        return NextResponse.json(precio);
+    } catch (err) {
+        console.error('Error in precios/[...item] GET:', err);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
 }

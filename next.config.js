@@ -17,5 +17,5 @@ const nextConfig = {
 //   disable: !isProd, // 👈 desactiva en desarrollo
 // });
 
-// module.exports = withPWA(nextConfig);
-module.exports = nextConfig;
+// export default withPWA(nextConfig);
+export default nextConfig;

@@ -1,88 +1,94 @@
 import { NextResponse } from "next/server";
-import Venta from "@/models/venta";
-import Cliente from "@/models/cliente";
-import User from "@/models/user";
-import DetalleVenta from "@/models/detalleVenta";
-import Persona from "@/models/persona";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import Precio from "@/models/precio";
+import { supabase } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { connectMongoDB } from "@/lib/mongodb";
-
-// filepath: d:/git/bioxspa/app/api/pedidos/borradores/route.js
 
 export async function GET(request) {
-    await connectMongoDB();
-
     const { searchParams } = new URL(request.url);
     const sucursalId = searchParams.get("sucursalId");
     if (!sucursalId) {
         return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
     }
 
-    // Buscar ventas en estado "borrador"
-    const ventas = await Venta.find({
-        sucursalId,
-        estado: {
-            $in: [
-                TIPO_ESTADO_VENTA.borrador, TIPO_ESTADO_VENTA.cotizacion,
-                TIPO_ESTADO_VENTA.anulado, TIPO_ESTADO_VENTA.rechazado
-            ]
-        },
-    }).lean();
+    // Fetch ventas in borrador state
+    const { data: ventas, error: ventasError } = await supabase
+        .from('ventas')
+        .select('id, cliente_id, solicitante_id, vendedor_id, fecha, created_at, estado, detalles(venta_id, cantidad, neto, subcategoria_catalogo_id)')
+        .eq('sucursal_id', sucursalId)
+        .in('estado', [
+            TIPO_ESTADO_VENTA.borrador,
+            TIPO_ESTADO_VENTA.cotizacion,
+            TIPO_ESTADO_VENTA.anulado,
+            TIPO_ESTADO_VENTA.rechazado
+        ]);
 
-    // Enriquecer ventas
+    if (ventasError) {
+        console.error('Error fetching ventas:', ventasError);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+
     const pedidos = await Promise.all(
-        ventas.map(async (venta) => {
-            const cliente = await Cliente.findById(venta.clienteId).lean();
-            const solicitante = await User.findById(venta.solicitanteId || venta.vendedorId).lean();
+        (ventas || []).map(async (venta) => {
+            const { data: cliente, error: clienteError } = await supabase
+                .from('clientes')
+                .select('id, nombre, rut')
+                .eq('id', venta.cliente_id)
+                .single();
 
-            // Obtener teléfono desde Persona si existe
+            const { data: solicitante, error: solicitanteError } = await supabase
+                .from('users')
+                .select('id, name, persona_id')
+                .eq('id', venta.solicitante_id || venta.vendedor_id)
+                .single();
+
             let telefono = "";
-            if (solicitante && solicitante.personaId) {
-                const persona = await Persona.findById({ userId: solicitante._id }).lean();
+            if (solicitante && solicitante.persona_id) {
+                const { data: persona, error: personaError } = await supabase
+                    .from('personas')
+                    .select('telefono')
+                    .eq('id', solicitante.persona_id)
+                    .single();
                 telefono = persona?.telefono || "";
             }
 
-            // Traer detalles de venta
-            const detalles = await DetalleVenta.find({ ventaId: venta._id }).lean();
-
-            // Enriquecer detalles con catálogo
             const items = await Promise.all(
-                detalles.map(async (item) => {
-                    let subcat = null;
-                    let cat = null;
-                    if (item.subcategoriaCatalogoId) {
-                        subcat = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId).lean();
-                        if (subcat && subcat.categoriaCatalogoId) {
-                            // Importar aquí para evitar ciclos si es necesario
-                            const CategoriaCatalogo = (await import('@/models/categoriaCatalogo')).default;
-                            cat = await CategoriaCatalogo.findById(subcat.categoriaCatalogoId).lean();
-                        }
-                    }
+                (venta.detalles || []).map(async (item) => {
+                    const { data: subcat, error: subcatError } = await supabase
+                        .from('subcategoria_catalogos')
+                        .select('id, nombre, cantidad, unidad, categoria_catalogo_id')
+                        .eq('id', item.subcategoria_catalogo_id)
+                        .single();
+
+                    const { data: cat, error: catError } = subcat?.categoria_catalogo_id
+                        ? await supabase
+                            .from('categoria_catalogos')
+                            .select('id, nombre')
+                            .eq('id', subcat.categoria_catalogo_id)
+                            .single()
+                        : { data: null, error: null };
+
                     return {
                         producto: (cat && subcat) ? `${cat.nombre} - ${subcat.nombre}` : "",
                         capacidad: subcat?.cantidad ? `${subcat.cantidad} ${subcat.unidad || ""}`.trim() : "",
                         cantidad: item.cantidad,
                         precio: item.neto || undefined,
-                        subcategoriaCatalogoId: item.subcategoriaCatalogoId || null,
+                        subcategoriaCatalogoId: item.subcategoria_catalogo_id || null,
                     };
                 })
             );
 
             return {
-                _id: venta._id.toString(),
+                _id: venta.id,
                 cliente: cliente
-                    ? { nombre: cliente.nombre, rut: cliente.rut, _id: cliente._id.toString() }
+                    ? { nombre: cliente.nombre, rut: cliente.rut, _id: cliente.id }
                     : { nombre: "Sin cliente", rut: "" },
                 solicitante: solicitante
                     ? {
-                        _id: solicitante._id.toString(),
-                        nombre: solicitante.name || solicitante.nombre || "",
+                        _id: solicitante.id,
+                        nombre: solicitante.name || "",
                         telefono,
                     }
                     : { _id: "", nombre: "", telefono: "" },
-                fecha: venta.fecha || venta.createdAt,
+                fecha: venta.fecha || venta.created_at,
                 items,
             };
         })
@@ -92,85 +98,103 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-    await connectMongoDB();
-    console.log("Conexión a MongoDB establecida en POST /borradores");
-
     const body = await request.json();
-    console.log("Body recibido:", body);
-
     const { ventaId, precios, eliminar } = body;
 
     if (!ventaId) {
-        console.warn("Falta ventaId en la solicitud");
         return NextResponse.json({ ok: false, error: "Falta ventaId" }, { status: 400 });
     }
 
-    const venta = await Venta.findById(ventaId);
-    if (!venta) {
-        console.warn(`Venta no encontrada: ${ventaId}`);
+    const { data: venta, error: ventaError } = await supabase
+        .from('ventas')
+        .select('id, cliente_id, estado')
+        .eq('id', ventaId)
+        .single();
+
+    if (ventaError || !venta) {
         return NextResponse.json({ ok: false, error: "Venta no encontrada" }, { status: 404 });
     }
 
     if (eliminar) {
-        // Anular venta
-        venta.estado = TIPO_ESTADO_VENTA.anulado;
-        await venta.save();
-        console.log(`Venta ${ventaId} anulada`);
+        const { error: updateError } = await supabase
+            .from('ventas')
+            .update({ estado: TIPO_ESTADO_VENTA.anulado })
+            .eq('id', ventaId);
+
+        if (updateError) {
+            console.error('Error updating venta:', updateError);
+            return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });
+        }
+
         return NextResponse.json({ ok: true, estado: "anulado" });
     }
 
     if (!Array.isArray(precios) || precios.length === 0) {
-        console.warn("No se enviaron precios");
         return NextResponse.json({ ok: false, error: "Debe enviar precios" }, { status: 400 });
     }
 
-    // Guardar precios para el cliente
     for (const { subcategoriaCatalogoId, precio } of precios) {
         if (!subcategoriaCatalogoId || !precio) {
-            console.warn("Precio o subcategoriaCatalogoId faltante en item:", { subcategoriaCatalogoId, precio });
             continue;
         }
-        // Buscar si ya existe un precio para este cliente y subcategoria
-        let precioDoc = await Precio.findOne({
-            clienteId: venta.clienteId,
-            subcategoriaCatalogoId: subcategoriaCatalogoId,
-        });
+
+        const { data: precioDoc, error: precioError } = await supabase
+            .from('precios')
+            .select('id, valor, historial')
+            .eq('cliente_id', venta.cliente_id)
+            .eq('subcategoria_catalogo_id', subcategoriaCatalogoId)
+            .single();
+
         if (precioDoc) {
-            // Actualizar historial y valor
-            precioDoc.historial.push({
+            const historial = precioDoc.historial || [];
+            historial.push({
                 valor: precio,
                 fecha: new Date(),
                 varianza: precio - precioDoc.valor,
             });
-            precioDoc.valor = precio;
-            precioDoc.valorBruto = precio;
-            precioDoc.fechaDesde = new Date();
-            await precioDoc.save();
-            console.log(`Precio actualizado para cliente ${venta.clienteId}, subcategoria ${subcategoriaCatalogoId}: ${precio}`);
-        } else {
-            // Crear nuevo precio
-            await Precio.create({
-                clienteId: venta.clienteId,
-                subcategoriaCatalogoId: subcategoriaCatalogoId,
-                valor: precio,
-                valorBruto: precio,
-                impuesto: 0,
-                moneda: "CLP",
-                historial: [{
+
+            const { error: updateError } = await supabase
+                .from('precios')
+                .update({
                     valor: precio,
-                    fecha: new Date(),
-                    varianza: 0,
-                }],
-                fechaDesde: new Date(),
-            });
-            console.log(`Precio creado para cliente ${venta.clienteId}, subcategoria ${subcategoriaCatalogoId}: ${precio}`);
+                    valor_bruto: precio,
+                    fecha_desde: new Date(),
+                    historial,
+                })
+                .eq('id', precioDoc.id);
+
+            if (updateError) {
+                console.error('Error updating precio:', updateError);
+            }
+        } else {
+            const { error: insertError } = await supabase
+                .from('precios')
+                .insert({
+                    cliente_id: venta.cliente_id,
+                    subcategoria_catalogo_id: subcategoriaCatalogoId,
+                    valor: precio,
+                    valor_bruto: precio,
+                    impuesto: 0,
+                    moneda: "CLP",
+                    historial: [{ valor: precio, fecha: new Date(), varianza: 0 }],
+                    fecha_desde: new Date(),
+                });
+
+            if (insertError) {
+                console.error('Error inserting precio:', insertError);
+            }
         }
     }
 
-    // Cambiar estado a "por_asignar"
-    venta.estado = TIPO_ESTADO_VENTA.por_asignar;
-    await venta.save();
-    console.log(`Venta ${ventaId} cambiada a estado 'por_asignar'`);
+    const { error: updateVentaError } = await supabase
+        .from('ventas')
+        .update({ estado: TIPO_ESTADO_VENTA.por_asignar })
+        .eq('id', ventaId);
+
+    if (updateVentaError) {
+        console.error('Error updating venta estado:', updateVentaError);
+        return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, estado: "por_asignar" });
 }

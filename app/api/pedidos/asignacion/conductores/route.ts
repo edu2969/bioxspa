@@ -1,195 +1,162 @@
-import mongoose, { Types } from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
-import User from "@/models/user";
-import Cliente from "@/models/cliente";
-import Cargo from "@/models/cargo";
+import { NextRequest, NextResponse } from "next/server";
+import supabase from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
-import DetalleVenta from "@/models/detalleVenta";
-import Venta from "@/models/venta";
-import RutaDespacho from "@/models/rutaDespacho";
-import Checklist from "@/models/checklist";
-import Sucursal from "@/models/sucursal";
-import Dependencia from "@/models/dependencia";
-import { IUser } from "@/types/user";
-import { IRutaDespacho } from "@/types/rutaDespacho";
-import { ISucursal } from "@/types/sucursal";
-import { ICliente } from "@/types/cliente";
-import { IVenta } from "@/types/venta";
-import { IDetalleVenta } from "@/types/detalleVenta";
-import Precio from "@/models/precio";
-import { IPrecio } from "@/types/precio";
-import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
 
-interface IConductoresResponse {
+interface Pedido {
     _id: string;
-    nombre: string;
-    pedidos: {
-        _id: string;
-        tipo: number;
-        estado: number;
-        fecha: Date;
-        nombreCliente: string;
-        rutCliente: string;
-        comentario: string;
-        items: {
-            _id: string;
-            ventaId: string;
-            subcategoriaCatalogoId: string;
-            cantidad: number;
-            precio: number;
-            nombre: string;
-        }[];
-    }[];
-    checklist: boolean;
+    tipo: string;
+    estado: string;
+    fecha: string;
+    cliente_nombre: string;
+    cliente_rut: string;
+    comentario: string;
+    items: any[]; // Define un tipo más específico si conoces la estructura de los items
 }
 
-export async function GET(request: Request) {
-    console.log("Connecting to MongoDB...");
-    await connectMongoDB();
-    console.log("Connected to MongoDB");
-    
-    if (!mongoose.models.SubcategoriaCatalogo) {
-        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.CategoriaCatalogo) {
-        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-    }
+export async function GET(request: NextRequest) {
+    try {
+        console.log("[GET /conductores] Starting request...");
 
-    const { searchParams } = new URL(request.url);
-    const sucursalId = searchParams.get("sucursalId");
-    if (!sucursalId) {
-        return new Response(JSON.stringify({ ok: false, error: "sucursalId is required" }), { status: 400 });
-    }
+        // Obtener sucursalId de los parámetros de la URL
+        const { searchParams } = new URL(request.url);
+        const sucursalId = searchParams.get("sucursalId");
 
-    const choferesEnRuta = await RutaDespacho.find({
-        estado: {
-            $gte: TIPO_ESTADO_RUTA_DESPACHO.en_ruta,
-            $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado
+        if (!sucursalId) {
+            console.warn("[GET /conductores] Missing sucursalId parameter.");
+            return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
         }
-    }).lean();
-    const choferesIds = choferesEnRuta.map((ruta) => ruta.choferId);    
 
-    const qry: {        
-        tipo: number;
-        userId?: { $nin: Types.ObjectId[] };
-        $or: Array<{ sucursalId: Types.ObjectId } | { dependenciaId: { $in: Types.ObjectId[] } }>;
-    } = {
-        tipo: TIPO_CARGO.conductor,
-        $or: []
-    };
-    if (choferesIds.length > 0) {
-        qry.userId = { $nin: choferesIds };
-    }
+        console.log(`[GET /conductores] Fetching conductores for sucursalId: ${sucursalId}`);
 
-    const sucursal = await Sucursal.findById(sucursalId).lean<ISucursal>();
-    if (!sucursal) {
-        return new Response(JSON.stringify({ ok: false, error: "Sucursal no encontrada" }), { status: 400 });
-    }
-    const dependencias = sucursal ? await Dependencia.find({ sucursalId: sucursal._id }).lean() : [];
-    if (dependencias.length == 0) {
-        return new Response(JSON.stringify({ ok: false, error: "No se encontraron dependencias para la sucursal" }), { status: 400 });
-    }
-    qry.$or = [
-        { sucursalId: new Types.ObjectId(sucursal._id) },
-        { dependenciaId: { $in: dependencias.map(d => new Types.ObjectId(String(d._id))) } }
-    ];
-    const cargosChoferes = await Cargo.find(qry).lean();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+        // Obtener choferes en ruta
+        const { data: conductoresEnRuta, error: conductoresEnRutaError } = await supabase
+            .from("rutas_despacho")
+            .select("conductor_id")
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.en_ruta)
+            .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado);
 
-    const conductores = await Promise.all(
-        cargosChoferes.map(async (cargo) => {
-            const user = await User.findById(cargo.userId).lean<IUser>();
+        if (conductoresEnRutaError) {
+            console.error("[GET /conductores] Error fetching conductores en ruta:", conductoresEnRutaError);
+            return NextResponse.json({ ok: false, error: conductoresEnRutaError.message }, { status: 500 });
+        }
 
-            if(!user) {
-                return new Response(JSON.stringify({ ok: false, error: `No se encontró el usuario para el cargo ${cargo._id}` }), { status: 400 });
-            }
+        const conductoresIds = conductoresEnRuta.map((ruta) => ruta.conductor_id);
 
-            // Find the rutaDespacho where the user is the chofer
-            const rutaDespacho = await RutaDespacho.findOne({
-                choferId: user._id,
-                estado: {
-                    $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                    $lt: TIPO_ESTADO_RUTA_DESPACHO.en_ruta
+        // Obtener sucursal y dependencias
+        const { data: sucursal, error: sucursalError } = await supabase
+            .from("sucursales")
+            .select("id")
+            .eq("id", sucursalId)
+            .single();
+
+        if (sucursalError || !sucursal) {
+            console.error("[GET /conductores] Error fetching sucursal:", sucursalError);
+            return NextResponse.json({ ok: false, error: "Sucursal no encontrada" }, { status: 400 });
+        }
+
+        console.log("Sucursal encontrada:", sucursal);
+
+        const { data: dependencias, error: dependenciasError } = await supabase
+            .from("dependencias")
+            .select("id")
+            .eq("sucursal_id", sucursal.id);
+
+        if (dependenciasError || !dependencias || dependencias.length === 0) {
+            console.error("[GET /conductores] Error fetching dependencias:", dependenciasError);
+            return NextResponse.json({ ok: false, error: "No se encontraron dependencias para la sucursal" }, { status: 400 });
+        }
+
+        const dependenciaIds = dependencias.map((d) => d.id);
+
+        // Obtener cargos de conductores
+        const { data: cargosChoferes, error: cargosError } = await supabase
+            .from("cargos")
+            .select("usuario_id")
+            .eq("tipo", TIPO_CARGO.conductor)
+            .or(`sucursal_id.eq.${sucursal.id},dependencia_id.in.(${dependenciaIds.join(",")})`)
+            .not("usuario_id", "in", `(${conductoresIds.join(",")})`);
+
+        if (cargosError) {
+            console.error("[GET /conductores] Error fetching cargos de conductores:", cargosError);
+            return NextResponse.json({ ok: false, error: cargosError.message }, { status: 500 });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Obtener datos de los conductores
+        const conductores = await Promise.all(
+            cargosChoferes.map(async (cargo) => {
+                const { data: usuario, error: userError } = await supabase
+                    .from("usuarios")
+                    .select("id, nombre")
+                    .eq("id", cargo.usuario_id)
+                    .single();
+
+                if (userError || !usuario) {
+                    console.error(`[GET /conductores] Error fetching user for cargo ${cargo.usuario_id}:`, userError);
+                    return null;
                 }
-            }).lean<IRutaDespacho>();
 
-            let pedidos: IConductoresResponse["pedidos"] = [];
+                // Obtener ruta de despacho para el conductor
+                const { data: rutaDespacho } = await supabase
+                    .from("rutas_despacho")
+                    .select("venta_ids")
+                    .eq("chofer_id", usuario.id)
+                    .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+                    .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.en_ruta)
+                    .single();
 
-            if (rutaDespacho) {
-                const ventas = await Venta.find({ _id: { $in: rutaDespacho.ventaIds } }).lean<IVenta[]>();
-                pedidos = await Promise.all(
-                    ventas.map(async (venta) => {
-                        const cliente = await Cliente.findById(venta.clienteId).lean<ICliente | null>();
-                        const nombreCliente = cliente?.nombre || "Desconocido";
-                        const rutCliente = cliente?.rut || "Desconocido";
+                let pedidos: Pedido[] = [];
+                if (rutaDespacho && rutaDespacho.venta_ids.length > 0) {
+                    const { data: ventas } = await supabase
+                        .from("ventas")
+                        .select("id, tipo, estado, fecha, comentario, cliente:clientes(id, nombre, rut)")
+                        .in("id", rutaDespacho.venta_ids);
 
-                        const detalleItems = await DetalleVenta.find({ ventaId: venta._id })
-                            .populate({
-                                path: "subcategoriaCatalogoId",
-                                populate: { path: "categoriaCatalogoId" }
-                            })
-                            .lean<IDetalleVenta[]>();
-                            
-                        const items = await Promise.all(
-                            detalleItems.map(async (item: IDetalleVenta) => {
-                                const precioDoc = await Precio.findOne({
-                                    subcategoriaCatalogoId: item.subcategoriaCatalogoId?._id,
-                                    clienteId: venta.clienteId?._id
-                                }).lean<IPrecio>();                                
-                                return {
-                                    _id: item._id?.toString() ?? "",
-                                    ventaId: item.ventaId?.toString() ?? "",
-                                    subcategoriaCatalogoId: (item.subcategoriaCatalogoId 
-                                        && typeof item.subcategoriaCatalogoId === "object" 
-                                        && "_id" in item.subcategoriaCatalogoId)
-                                        ? String((item.subcategoriaCatalogoId as ISubcategoriaCatalogo)._id)
-                                        : item.subcategoriaCatalogoId?.toString() ?? "",
-                                    cantidad: item.cantidad,
-                                    precio: precioDoc ? precioDoc.valor : 0,
-                                    nombre: (item.subcategoriaCatalogoId?.nombre ?? "") +
-                                        (item.subcategoriaCatalogoId?.categoriaCatalogoId?.nombre ?? "")
-                                };
-                            })
-                        );
+                    pedidos = ventas
+                        ? ventas.map((venta) => {
+                            const cliente = Array.isArray(venta.cliente) && venta.cliente.length > 0
+                                ? venta.cliente[0]
+                                : { id: null, nombre: "Desconocido", rut: "Desconocido" };
+                            return {
+                                _id: venta.id,
+                                tipo: venta.tipo,
+                                estado: venta.estado,
+                                fecha: venta.fecha,
+                                cliente_nombre: cliente.nombre,
+                                cliente_rut: cliente.rut,
+                                comentario: venta.comentario || "",
+                                items: [] // Puedes agregar lógica para obtener los items si es necesario
+                            };
+                        })
+                        : [];
+                }
 
-                        return {
-                            _id: venta._id.toString(),
-                            tipo: venta.tipo,
-                            estado: venta.estado,
-                            fecha: venta.fecha ?? new Date(0),
-                            nombreCliente: nombreCliente,
-                            rutCliente: rutCliente,
-                            comentario: venta.comentario || "",
-                            items
-                        };
-                    })
-                );
-            }
+                // Verificar si existe un checklist para hoy
+                const { data: checklistExists } = await supabase
+                    .from("checklists")
+                    .select("id")
+                    .eq("usuario_id", usuario.id)
+                    .eq("tipo", TIPO_CHECKLIST.vehiculo)
+                    .gte("fecha", today.toISOString())
+                    .lt("fecha", new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString())
+                    .single();
 
-            // Check if checklist exists for today
-            const checklistExists = await Checklist.findOne({
-                userId: user._id,
-                tipo: TIPO_CHECKLIST.vehiculo,
-                fecha: {
-                    $gte: today,
-                    $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-                },
-                passed: true
-            }).lean();
+                return {
+                    _id: usuario.id,
+                    nombre: usuario.nombre,
+                    pedidos,
+                    checklist: !!checklistExists
+                };
+            })
+        );
 
-            return {
-                _id: user._id,
-                nombre: user.name,
-                pedidos,
-                checklist: !!checklistExists
-            };
-        })
-    );
-
-    return new Response(JSON.stringify({
-        conductores
-    }));
+        return NextResponse.json({
+            conductores: conductores.filter((c) => c !== null)
+        });
+    } catch (error) {
+        console.error("[GET /conductores] Internal Server Error:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
 }

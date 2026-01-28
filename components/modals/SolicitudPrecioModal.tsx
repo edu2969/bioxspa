@@ -1,4 +1,4 @@
-import { useSession } from "next-auth/react";
+import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { ChangeEvent, useState } from "react";
 import { ICategoriasView } from "@/types/categoriaCatalogo";
 import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LiaTimesSolid } from "react-icons/lia";
 import { useForm } from "react-hook-form";
-import { USER_ROLE } from "@/app/utils/constants";
+import { TIPO_CARGO } from "@/app/utils/constants";
 import Loader from "../Loader";
 
 interface ISolicitudPrecioForm {    
@@ -22,7 +22,7 @@ export default function SolicitudPrecioModal({
     onClose: () => void;
 }) {
 
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
     const [categoriaIdSeleccionada, setCategoriaIdSeleccionada] = useState<string>('');
     const [precioData, setPrecioData] = useState<ISolicitudPrecioForm | null>(null);
     const { register, setValue } = useForm<ISolicitudPrecioForm>();
@@ -150,7 +150,7 @@ export default function SolicitudPrecioModal({
                                     }
                                 </select>
                             </div>
-                            {(session?.user.role == USER_ROLE.gerente || session?.user.role == USER_ROLE.encargado || session?.user.role == USER_ROLE.cobranza)
+                            {hasRole([TIPO_CARGO.gerente, TIPO_CARGO.encargado, TIPO_CARGO.cobranza])
                                 && <div className="flex flex-col">
                                     <label htmlFor="precio" className="text-sm text-gray-500">Precio</label>
                                     <div className="flex items-center">
@@ -176,9 +176,7 @@ export default function SolicitudPrecioModal({
                             disabled={savingPrecio}
                             className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${savingPrecio ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
                             {savingPrecio && <div className="absolute -mt-1"><Loader texto="" /></div>}
-                            {(session?.user.role == USER_ROLE.gerente
-                                || session?.user.role == USER_ROLE.encargado
-                                || session?.user.role == USER_ROLE.cobranza) ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                            {hasRole([TIPO_CARGO.gerente, TIPO_CARGO.encargado, TIPO_CARGO.cobranza]) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                         </button>
                         <button
                             onClick={handleCancel}

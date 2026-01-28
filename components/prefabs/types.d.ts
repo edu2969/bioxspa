@@ -5,25 +5,25 @@ import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
 import { Types } from "mongoose";
 
 export interface IVentaView {
-    _id: string;
+    id: string;
     tipo: number;
     estado: number;
     comentario?: string;
     cliente: {
-        _id: string;
+        id: string;
         nombre: string;
         rut: string;
-        direccionesDespacho: Array<IDireccion>;
+        direcciones_despacho: Array<IDireccion>;
         giro: string;
         telefono: string;
     },
     detalles: Array<{
-        _id: string;
+        id: string;
         multiplicador: number;
-        subcategoriaCatalogoId: ICilindroView;
-        itemCatalogoIds: Array<IItemCatalogoView>;
+        subcategoria_catalogo_id: ICilindroView;
+        item_catalogo_ids: Array<IItemCatalogoView>;
     }>;
-    direccionDespachoId: IDireccionView | null;            
+    direccion_despacho_id: IDireccionView | null;            
 }
 
 export interface IDetalleVentaActual {
@@ -34,32 +34,32 @@ export interface IDetalleVentaActual {
     multiplicador: number;
     unidad: string;
     elemento?: string;
-    esIndustrial?: boolean;
-    sinSifon?: boolean;
-    esMedicinal?: boolean;
+    es_industrial?: boolean;
+    sin_sifon?: boolean;
+    es_medicinal?: boolean;
 }
 
 export interface IVentaActual {
-    nombreCliente: string;
-    rutCliente: string;
-    giroCliente: string;
+    nombre_cliente: string;
+    rut_cliente: string;
+    giro_cliente: string;
     comentario?: string;
-    tipo: 'preparacion' | 'retiroEnLocal' | 'ot' | 'traslado' | 'otros';
-    totalCilindros: number;
+    tipo: 'preparacion' | 'retiro_en_local' | 'ot' | 'traslado' | 'otros';
+    total_cilindros: number;
     detalles: IDetalleVentaActual[];
-    porcentajeCompletado: number;
+    porcentaje_completado: number;
 }
 
 export interface IGestorDeCargaView {
     ventas: IVentaActual[];    
-    porcentajeCompletado: number;
+    porcentaje_completado: number;
 }
 
 export interface IClienteSeachResult {
-    _id: string;
+    id: string;
     nombre: string;
     rut: string;
-    direccionesDespacho: Array<IDireccion>;
+    direcciones_despacho: Array<IDireccion>;
 }
 
 export interface IChecklistAnswer {
@@ -74,20 +74,20 @@ export interface IChecklistlistResult {
 }
 
 export interface IItemCatalogoPowerScanView {
-    _id: Types.ObjectId;
-    ownerId?: ICliente | null;
-    direccionId?: IDireccion | null;
+    id: Types.ObjectId;
+    owner_id?: ICliente | null;
+    direccion_id?: IDireccion | null;
     elemento: string;
     codigo: string;
-    subcategoriaCatalogoId: ISubcategoriaCatalogo;
-    stockActual: number;
-    stockMinimo: number;
-    garantiaAnual: number;
+    subcategoria_catalogo_id: ISubcategoriaCatalogo;
+    stock_actual: number;
+    stock_minimo: number;
+    garantia_anual: number;
     estado: number;
-    fechaMantencion?: Date | null;
-    direccionInvalida?: boolean;
-    direccionEsperada?: {
-        _id: string;
+    fecha_mantencion?: Date | null;
+    direccion_invalida?: boolean;
+    direccion_esperada?: {
+        id: string;
         nombre: string;
     };
 }

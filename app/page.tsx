@@ -1,18 +1,7 @@
-import LoginForm from "@/components/LoginForm";
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/app/utils/authOptions";
+'use client';
 
-export default async function Home() {
-  const session = await getServerSession(authOptions);
+import LoginForm from '@/components/LoginForm';
 
-  if (session) {
-    redirect("/pages");
-  }
-
-  return (
-    <>
-      <LoginForm />
-    </>
-  );
+export default function RootPage() {
+  return <LoginForm />;
 }

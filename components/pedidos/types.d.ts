@@ -1,71 +1,56 @@
 export interface IPrecioView {
-    _id?: string;
-    clienteId: string;
-    subcategoriaCatalogoId: {
-        _id: string;
-        nombre: string;
-        categoriaCatalogoId: {
-            _id: string;
-            nombre: string;
-            esIndustrial: boolean;
-            tipo: number;
-            gas?: string | null;
-            elemento?: string | null;
-            esMedicinal?: boolean;
-        };
-        sinSifon: boolean;
-        cantidad: number | null;
-        unidad: string | null;
-    };
-    dependenciaId?: string | null;
-    fechaDesde?: string | Date;
-    historial: Array<{
-        valor: number;
-        fecha: string | Date;
-        varianza: number;
-    }>;
-    impuesto: number;
-    moneda: string;
-    sucursalId?: string | null;
+    id: string;
     valor: number;
-    valorBruto: number;
-    cantidad: number;
-    seleccionado?: boolean;
+    subcategorias_catalogo: {
+        id: string;
+        nombre: string;
+        unidad: string;
+        cantidad: number;
+        sin_sifon: boolean;
+        categorias_catalogo: {
+            id: string;
+            gas: string;
+            tipo: number;
+            nombre: string;
+            elemento: string;
+            es_medicinal: boolean;
+            es_industrial: boolean;
+        };
+    };
 }
 
 export interface IPrecioSeleccionado {
-    precioId: string;
+    precio_id: string;
     cantidad: number;
 }
 
 export interface INuevaVentaSubmit {
     tipo: number;
-    usuarioId: string;
+    usuario_id: string;
     comentario?: string;
     cliente?: string;
-    clienteId?: string;
-    documentoTributarioId?: string;
-    direccionDespachoId?: string;
-    sucursalId?: string;
-    categoriaId?: string;
-    subcategoriaCatalogoId?: string;
+    cliente_id?: string;
+    documento_tributario_id?: string;
+    direccion_despacho_id?: string;
+    sucursal_id?: string;
+    categoria_id?: string;
+    subcategoria_catalogo_id?: string;
     items?: {
         cantidad: number;
-        subcategoriaId: string;
+        subcategoria_id: string;
     }[];
-    numeroOrden?: string;
-    codigoHES?: string;
-    motivoTraslado?: number;
-    empresaDondeRetirar?: string;
-    empresaDondeRetirarId?: string;
-    direccionRetiroId?: string;
+    numero_orden?: string;
+    codigo_hes?: string;
+    motivo_traslado?: number;
+    empresa_donde_retirar?: string;
+    empresa_donde_retirar_id?: string;
+    direccion_retiro_id?: string;
     motivo?: string;
-    controlEnvase?: string;
+    control_envase?: string;
     servicio?: string;
     precios?: {
         seleccionado: boolean;
         cantidad: number;
-        subcategoriaId: string;
+        subcategoria_id: string;
     }[];
-    [key: string]: number;
 }

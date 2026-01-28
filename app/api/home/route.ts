@@ -1,116 +1,124 @@
-import { connectMongoDB } from "@/lib/mongodb";
-import RutaDespacho from "@/models/rutaDespacho";
-import Cargo from "@/models/cargo";
-import Venta from "@/models/venta";
-import { authOptions } from "@/app/utils/authOptions";
-import { getServerSession } from "next-auth";
-import Cliente from "@/models/cliente";
-
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { NextResponse } from "next/server";
 import {
-    USER_ROLE,
     TIPO_CARGO,
     TIPO_ESTADO_VENTA,
     TIPO_ESTADO_RUTA_DESPACHO,
     TIPO_ORDEN
 } from "@/app/utils/constants";
+import supabase from "@/lib/supabase";
 
-export async function GET() {
-    try {
-        const session = await getServerSession(authOptions);
+export async function GET() {    
+    const { user, userData } = await getAuthenticatedUser();
+    const userTipoCargo = userData.role;
+    const userId = user.id;
+    // COBRANZA
+    if (userTipoCargo === TIPO_CARGO.encargado || userTipoCargo === TIPO_CARGO.cobranza) {
+        console.log("Fetching data for COBRANZA or ENCARGADO role");
 
-        if (!session || !session.user || !session.user.id) {
-            return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401 });
-        }
-        await connectMongoDB();
-        const userId = session.user.id;
-        const userRole = session.user.role;
+        // Contar ventas por estado
+        const { data: ventas, error: ventasError } = await supabase
+            .from('ventas')
+            .select('estado, direccion_despacho_id')
+            .gte('estado', TIPO_ESTADO_VENTA.borrador)
+            .lte('estado', TIPO_ESTADO_VENTA.reparto);
 
-        // COBRANZA
-        if (userRole === USER_ROLE.cobranza || userRole === USER_ROLE.encargado) {
-            console.log("Fetching data for COBRANZA or ENCARGADO role");
-            const ventas = await Venta.find({
-                estado: { $gte: TIPO_ESTADO_VENTA.borrador, $lte: TIPO_ESTADO_VENTA.reparto },
-            });
-            const pedidosCount = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.borrador).length;
-            const porAsignar = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.por_asignar).length;
-            const preparacion = ventas.filter(v => v.estado === TIPO_ESTADO_VENTA.preparacion).length;
-            const enRuta = ventas.length - pedidosCount - porAsignar - preparacion;
+        if (ventasError) throw ventasError;
 
-            // Clientes activos
-            const clientesActivos = await Cliente.countDocuments({ activo: true });
+        const pedidosCount = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.borrador).length || 0;
+        const porAsignar = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.por_asignar).length || 0;
+        const preparacion = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.preparacion).length || 0;
+        const enRuta = (ventas?.length || 0) - pedidosCount - porAsignar - preparacion;
 
-            // Clientes en quiebra
-            const clientesEnQuiebra = await Cliente.countDocuments({ activo: true, enQuiebra: true });
+        // Clientes activos
+        const { count: clientesActivos, error: clientesError } = await supabase
+            .from('clientes')
+            .select('id', { count: 'exact' });
 
-            const contadores = [pedidosCount, porAsignar, preparacion, 
-                enRuta, clientesActivos, clientesEnQuiebra];
-            return new Response(JSON.stringify({ ok: true, contadores }));
-        }
+        if (clientesError) throw clientesError;
 
-        // DESPACHO ó RESPONSABLE
-        if (userRole === USER_ROLE.despacho || userRole === USER_ROLE.responsable) {
-            // Find the user's cargo
-            const userCargo = await Cargo.findOne({
-                userId,
-                tipo: { $in: [TIPO_CARGO.despacho, TIPO_CARGO.responsable] }
-            });
-
-            if (!userCargo) {
-                return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 403 });
+        return NextResponse.json({
+            ok: true,
+            data: {
+                pedidosCount,
+                porAsignar,
+                preparacion,
+                enRuta,
+                clientesActivos
             }
-
-            // Find all chofer cargos in the same dependencia
-            const choferCargos = await Cargo.find({
-                dependenciaId: userCargo.dependenciaId,
-                tipo: TIPO_CARGO.conductor
-            });
-
-            const choferIds = choferCargos?.map(cargo => cargo.userId) || [];
-
-            // Find ventas in estado 'preparacion' for choferes in the dependencia
-            const ventas = await Venta.find({
-                $or: [{
-                    estado: TIPO_ESTADO_VENTA.preparacion
-                }, {
-                    estado: TIPO_ESTADO_VENTA.por_asignar,
-                    direccionDespachoId: null
-                }, {
-                    estado: TIPO_ESTADO_VENTA.entregado
-                }]
-            });
-
-            const ventaIds = ventas.filter(venta => {
-                if(venta.estado === TIPO_ESTADO_VENTA.entregado) {
-                    return venta.tipo === TIPO_ORDEN.traslado;
-                }
-                return true;
-            }).map(venta => venta._id);
-            const ventasDespachoEnLocal = ventas.filter(venta => !venta.direccionDespachoId).length;
-
-            // Count rutasDespacho where the ventas are present
-            const contadores = await RutaDespacho.countDocuments({
-                ventaIds: { $in: ventaIds },
-                choferId: { $in: choferIds },
-                estado: { $in: [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado] }
-            });
-            return new Response(JSON.stringify({ ok: true, contadores: [contadores + ventasDespachoEnLocal]}));
-        }
-
-        // CHOFER
-        if (userRole === USER_ROLE.conductor) {
-            const unaRuta = await RutaDespacho.findOne({
-                estado: {
-                    $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                    $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado
-                },
-                choferId: userId
-            });
-            return new Response(JSON.stringify({ ok: true, contadores: [unaRuta ? 1 : 0]}));
-        }
-
-        // Otros roles: respuesta vacía
-        return new Response(JSON.stringify({ ok: true, message: "No data for this role." }));
-    } catch (error) {
-        return new Response(JSON.stringify({ error }), { status: 500 });
+        });
     }
+
+    // DESPACHO ó RESPONSABLE
+    if (userTipoCargo === TIPO_CARGO.despacho || userTipoCargo === TIPO_CARGO.responsable) {
+        // Find the user's cargo
+        const { data: userCargo, error: cargoError } = await supabase
+            .from('cargos')
+            .select('dependencia_id')
+            .eq('usuario_id', userId)
+            .in('tipo', [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
+            .is('hasta', null)
+            .single();
+
+        if (cargoError || !userCargo) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+        }
+
+        // Find all chofer cargos in the same dependencia
+        const { data: choferCargos, error: choferError } = await supabase
+            .from('cargos')
+            .select('usuario_id')
+            .eq('dependencia_id', userCargo.dependencia_id)
+            .eq('tipo', TIPO_CARGO.conductor)
+            .is('hasta', null);
+
+        if (choferError) throw choferError;
+
+        const choferIds = choferCargos?.map((cargo) => cargo.usuario_id) || [];
+
+        // Find ventas in estado 'preparacion' for choferes in the dependencia
+        const { data: ventas, error: ventasError } = await supabase
+            .from('ventas')
+            .select('id, estado, direccion_despacho_id, tipo')
+            .or(`estado.eq.${TIPO_ESTADO_VENTA.preparacion},and(estado.eq.${TIPO_ESTADO_VENTA.por_asignar},direccion_despacho_id.is.null),estado.eq.${TIPO_ESTADO_VENTA.entregado}`);
+
+        if (ventasError) throw ventasError;
+
+        const ventaIds = ventas?.filter(venta => {
+            if (venta.estado === TIPO_ESTADO_VENTA.entregado) {
+                return venta.tipo === TIPO_ORDEN.traslado;
+            }
+            return true;
+        }).map(venta => venta.id) || [];
+
+        const ventasDespachoEnLocal = ventas?.filter((venta) => !venta.direccion_despacho_id).length || 0;
+
+        // Count rutasDespacho where the ventas are present
+        const { count: contadores, error: rutasError } = await supabase
+            .from('rutas_despacho')
+            .select('*', { count: 'exact', head: true })
+            .overlaps('venta_ids', ventaIds)
+            .in('chofer_id', choferIds)
+            .in('estado', [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado]);
+
+        if (rutasError) throw rutasError;
+
+        return NextResponse.json({ ok: true, contadores: [(contadores || 0) + ventasDespachoEnLocal] });
+    }
+
+    // CHOFER
+    if (userTipoCargo === TIPO_CARGO.conductor) {
+        const { data: unaRuta, error: rutaError } = await supabase
+            .from('rutas_despacho')
+            .select('id')
+            .gte('estado', TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+            .lt('estado', TIPO_ESTADO_RUTA_DESPACHO.terminado)
+            .eq('chofer_id', userId)
+            .single();
+
+        return NextResponse.json({ ok: true, contadores: [unaRuta ? 1 : 0] });
+    }
+
+    // Otros roles: respuesta vacía
+    return NextResponse.json({ ok: true, message: "No data for this role.", contadores: [] });
 }

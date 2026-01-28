@@ -8,6 +8,40 @@ import type { IItemCatalogoPowerScanView } from "../types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSoundPlayer } from "@/components/context/SoundPlayerContext";
 
+/**
+ * Reordena los nuevos cargamentos según el orden de los cargamentos actuales
+ * Preserva el orden personalizado después de actualizar los datos
+ */
+function reorderCargamentos(nuevosCargamentos: any[], cargamentosActuales: any[]) {
+    if (!nuevosCargamentos || !cargamentosActuales) return nuevosCargamentos;
+    
+    // Crear mapa de IDs para orden rápido
+    const ordenActual = cargamentosActuales.map(c => c.rutaId || c.ventas[0]?.ventaId);
+    
+    // Reordenar nuevos cargamentos según el orden actual
+    const reordenados = [];
+    
+    // Primero agregar los que están en el orden actual
+    for (const id of ordenActual) {
+        const cargamento = nuevosCargamentos.find(c => 
+            (c.rutaId || c.ventas[0]?.ventaId) === id
+        );
+        if (cargamento) {
+            reordenados.push(cargamento);
+        }
+    }
+    
+    // Luego agregar cualquier cargamento nuevo que no estuviera antes
+    for (const cargamento of nuevosCargamentos) {
+        const id = cargamento.rutaId || cargamento.ventas[0]?.ventaId;
+        if (!ordenActual.includes(id)) {
+            reordenados.push(cargamento);
+        }
+    }
+    
+    return reordenados;
+}
+
 export default function PowerScanView({ 
     scanMode, 
     setScanMode,
@@ -45,7 +79,32 @@ export default function PowerScanView({
             console.log("DATA", data);
             if (data.ok) {
                 toast.success(`Cilindro procesado correctamente`);
-                qryClient.invalidateQueries({ queryKey: operacion !== 'descargar' ? ['cargamentos-despacho'] : ['listado-descarga-vehiculo'] });
+                
+                // Para operaciones de carga, preservar el orden de cargamentos actual
+                if (operacion === 'cargar') {
+                    // Obtener el orden actual de los cargamentos antes de invalidar
+                    const cargamentosActuales = qryClient.getQueryData(['cargamentos-despacho']);
+                    
+                    // Invalidar para obtener datos actualizados
+                    qryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
+                    
+                    // Si hay un orden personalizado, restaurarlo después de la actualización
+                    if (cargamentosActuales && Array.isArray(cargamentosActuales) && cargamentosActuales.length > 1) {
+                        // Usar un timeout para permitir que se complete la invalidación
+                        setTimeout(() => {
+                            const nuevosCargamentos = qryClient.getQueryData(['cargamentos-despacho']);
+                            if (nuevosCargamentos && Array.isArray(nuevosCargamentos)) {
+                                // Reordenar los nuevos datos según el orden que tenían los actuales
+                                const cargamentosReordenados = reorderCargamentos(nuevosCargamentos, cargamentosActuales);
+                                qryClient.setQueryData(['cargamentos-despacho'], cargamentosReordenados);
+                            }
+                        }, 100);
+                    }
+                } else {
+                    // Para otras operaciones, invalidar normalmente
+                    qryClient.invalidateQueries({ queryKey: operacion !== 'descargar' ? ['cargamentos-despacho'] : ['listado-descarga-vehiculo'] });
+                }
+                
                 qryClient.invalidateQueries({ queryKey: ['carga-vehiculo'] });
                 qryClient.invalidateQueries({ queryKey: ['descarga-vehiculo'] });
                 setScanMode(false);

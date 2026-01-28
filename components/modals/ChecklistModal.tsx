@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { TIPO_CHECKLIST_ITEM, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "../Loader";
 import { IoIosArrowBack } from "react-icons/io";
 import type { IChecklistAnswer } from "../prefabs/types";
-import { useSession } from "next-auth/react";
+import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IVehiculo } from "@/types/vehiculo";
@@ -111,7 +111,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
             }, {} as Record<string, number>)
         }
     });    
-    const { data: session } = useSession();
+    const { user, hasRole } = useAuthorization();
     const kilometros = useWatch({
         control,
         name: "kilometros"
@@ -242,7 +242,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
                     </div>
                     {/* Items del checklist */}
                     {checklistItems.map((key, idx) => {
-                        const label = (session?.user.role == USER_ROLE.conductor ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
+                        const label = (hasRole([TIPO_CARGO.conductor]) ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
                             || `¿${String(key.tipo).replace(/_/g, " ")}?`;
                         const value = watch(key.tipo as string) || 0;
                         

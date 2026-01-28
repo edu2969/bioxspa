@@ -2,13 +2,13 @@ import { ICategoriaCatalogo } from "./categoriaCatalogo";
 
 export interface ISubcategoriaCatalogo {
     _id?: string;
-    temporalId?: string;
+    temporal_id?: string;
     nombre: string;
-    categoriaCatalogoId: ICategoriaCatalogo;
+    categoria_catalogo_id: ICategoriaCatalogo;
     cantidad?: number;
     unidad?: string;
-    sinSifon?: boolean;
-    urlImagen?: string | null;
-    createdAt?: string;
-    updatedAt?: string;
+    sin_sifon?: boolean;
+    url_imagen?: string | null;
+    created_at?: string;
+    updated_at?: string;
 }

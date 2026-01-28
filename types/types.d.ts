@@ -2,19 +2,19 @@ import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { IDireccion } from "./direccion";
 
 export interface IPedidoPorAsignar {
-    _id: string;
+    id: string;
     tipo: number;
     comentario: string;
-    clienteId: string;
-    clienteNombre: string;
-    clienteRut: string;
+    cliente_id: string;
+    cliente_nombre: string;
+    cliente_rut: string;
     estado: number;
-    despachoEnLocal: boolean;
+    despacho_en_local: boolean;
     fecha: Date;
     items: Array<{
-        _id: string;
-        ventaId: string;
-        subcategoriaCatalogoId: string;
+        id: string;
+        venta_id: string;
+        subcategoria_catalogo_id: string;
         cantidad: number;
         precio: number;
         nombre: string;
@@ -22,18 +22,18 @@ export interface IPedidoPorAsignar {
 }
 
 export interface IPedidoConductor {
-    _id: string;
+    id: string;
     tipo: number;
     estado: number;
     fecha: Date;
-    nombreCliente: string;
-    rutCliente: string;
+    nombre_cliente: string;
+    rut_cliente: string;
     comentario: string;
-    retiroEnLocal?: boolean;
+    retiro_en_local?: boolean;
     items: {
-        _id: string;
-        ventaId: string;
-        subcategoriaCatalogoId: string;
+        id: string;
+        venta_id: string;
+        subcategoria_catalogo_id: string;
         cantidad: number;
         precio: number;
         nombre: string;
@@ -41,39 +41,39 @@ export interface IPedidoConductor {
 }
 
 export interface IConductoresResponse {
-    _id: string;
+    id: string;
     nombre: string;
     pedidos: IPedidoConductor[];
     checklist: boolean;
 }
 
 export interface IRutasEnTransitoResponse {    
-    rutaId: string;
+    ruta_id: string;
     estado: number;
 }
 
 export interface IRutaEnTransito {
-    rutaId: string;
-    direccionDestino: string;
-    nombreChofer: string;
+    ruta_id: string;
+    direccion_destino: string;
+    nombre_chofer: string;
 }
 
 export interface IVentaEnTransito {
-    ventaId: string;
+    venta_id: string;
     tipo: number;
     estado: number;
     fecha: Date;
-    nombreCliente: string;
-    telefonoCliente: string;
+    nombre_cliente: string;
+    telefono_cliente: string;
     comentario?: string;
     detalles: Array<{
         multiplicador: number;
         cantidad: number;
         elemento: string;
         unidad: string;
-        esIndustrial: boolean;
-        esMedicinal: boolean;
-        sinSifon: boolean;
+        es_industrial: boolean;
+        es_medicinal: boolean;
+        sin_sifon: boolean;
     }>
 }
 
@@ -87,32 +87,32 @@ export interface IHistorialVentaView {
 }
 
 export interface ISubcategoriaCatalogoPoblado {
-    _id?: string;
+    id?: string;
     nombre: string;
     unidad?: string;
     cantidad?: number;
-    sinSifon?: boolean;
-    categoriaCatalogoId: {
-        _id?: string;
+    sin_sifon?: boolean;
+    categoria_catalogo_id: {
+        id?: string;
         nombre: string;
         tipo?: number;
         gas?: string;
         elemento?: string;
-        esIndustrial?: boolean;
+        es_industrial?: boolean;
     };
 }
 
 export interface ICargaDespachoView {
-    rutaId: string | null;
+    ruta_id: string | null;
     ventas: Array<{
-        ventaId: string;
+        venta_id: string;
         tipo: number;
         fecha: Date;
         detalles: Array<{
             multiplicador: number;
             restantes: number;
-            itemCatalogoIds: string[];
-            subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
+            item_catalogo_ids: string[];
+            subcategoria_catalogo_id: ISubcategoriaCatalogoPoblado;
         }>;
         comentario: string | null;
         cliente: {
@@ -120,28 +120,28 @@ export interface ICargaDespachoView {
             rut?: string | null;
             direccion?: string | null;
             telefono?: string | null;
-            direccionesDespacho: Array<{
+            direcciones_despacho: Array<{
                 nombre: string | null;
-                direccionId: string | null;
+                direccion_id: string | null;
                 latitud: number | null;
                 longitud: number | null;
             }>;
         };
-        entregasEnLocal: Array<{
-            nombreRecibe: string | null;
-            rutRecibe: string | null;
-            createdAt: Date;
-        }>
+        entregas_en_local: Array<{
+            nombre_recibe: string | null;
+            rut_recibe: string | null;
+            created_at: Date;
+        }>;
     }>;
-    nombreChofer: string | null;
-    patenteVehiculo: string | null;
-    fechaVentaMasReciente: Date | null;
-    cargaItemIds: Array<{
-        _id: string;
-        subcategoriaCatalogoId: string;
+    nombre_chofer: string | null;
+    patente_vehiculo: string | null;
+    fecha_venta_mas_reciente: Date | null;
+    carga_item_ids: Array<{
+        id: string;
+        subcategoria_catalogo_id: string;
     }>;
     estado: number | null;
-    retiroEnLocal?: boolean;
+    retiro_en_local?: boolean;
 }
 
 export interface IListadoDeCargaView {
@@ -159,15 +159,15 @@ export interface IItemDeCargaView extends ICilindroView {
 }
 
 export interface ICilindroView {
-    _id: string;
-    subcategoriaCatalogoId: string;
+    id: string;
+    subcategoria_catalogo_id: string;
     cantidad: number;
     unidad: string;
-    nombreGas: string;
-    sinSifon: boolean;
+    nombre_gas: string;
+    sin_sifon: boolean;
     elemento: string;
-    esIndustrial: boolean;
-    esMedicinal: boolean;
+    es_industrial: boolean;
+    es_medicinal: boolean;
     vencido: boolean;
 }
 
@@ -177,35 +177,31 @@ export interface IItemCatalogoView extends ICilindroView {
 
 export interface ITramoView {
     tipo: number; // TIPO_ORDEN
-    fechaArribo: Date | null;    
+    fecha_arribo: Date | null;    
     cliente: {
         nombre: string;
         telefono: string;
         direccion: IDireccion;
     },
     comentario?: string;
-    quienRecibe?: string;
-    rutRecibe?: string;
-}
-
-export interface IListadoDescargaView {
-    cilindros: ICilindroView[];
+    quien_recibe?: string;
+    rut_recibe?: string;
 }
 
 export interface IRutaConductorView {
-    _id: string;
+    id: string;
     tramos: ITramoView[];
 }
 
 export interface IVehiculoView {
-    vehiculoId: string;
+    vehiculo_id: string;
     patente: string;
     marca: string;
     modelo: string;
 }
 
 export interface IDestinoDisponible {
-    direccionId: string;
-    nombreCliente: string;
-    glosaDireccion: string;
+    direccion_id: string;
+    nombre_cliente: string;
+    glosa_direccion: string;
 }

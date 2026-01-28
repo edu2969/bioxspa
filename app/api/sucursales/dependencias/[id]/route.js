@@ -1,14 +1,17 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import Dependencia from "@/models/dependencia";
-import Direccion from "@/models/direccion";
 
 export async function GET(req, props) {
     const params = await props.params;
-    console.log("Dependencia getById...", params);
-    await connectMongoDB();
-    const dependencia = await Dependencia.findById(params.id);
-    if (!dependencia) {
+    console.log("Dependencia getById from Supabase...", params);
+    
+    const { data: dependencia, error } = await supabase
+        .from('dependencias')
+        .select('*')
+        .eq('id', params.id)
+        .single();
+        
+    if (error || !dependencia) {
         return NextResponse.json({ error: "Dependencia not found" }, { status: 400 });
     }
     return NextResponse.json(dependencia);

@@ -5,104 +5,206 @@ import { HiUserGroup } from "react-icons/hi";
 import { TbReportMoney, TbTruckLoading } from "react-icons/tb";
 import AccessButton from "./homeAccessPanel/AccessButton";
 import { IAccessButtonProps } from "./homeAccessPanel/types";
-import { USER_ROLE } from "@/app/utils/constants";
 import { useQuery } from "@tanstack/react-query";
 import Loader from "../Loader";
-import { useSession } from "next-auth/react";
-import { Session } from "next-auth";
 import { useState } from "react";
+import { useAuthorization } from "@/lib/auth/useAuthorization";
+import { RESOURCES, ACTIONS, ROLES } from "@/lib/auth/permissions";
 
-const modules = (contadores: number[], session: Session): IAccessButtonProps[] => {
-    const role = session?.user?.role ?? USER_ROLE.invitado;
-    return [USER_ROLE.encargado, USER_ROLE.responsable, USER_ROLE.cobranza].includes(role) ?
-    [{
-        key: "button_01",        
-        href: "/pages/pedidos",
-        icon: <FaFileContract className="mx-auto mb-1" size="6rem" />,
-        label: "PEDIDOS",
-        index: 0,
-        badges: [{
-            color: "bg-red-500",
-            value: contadores[0] > 999999 ? '999999+' : contadores[0],
-            text: "x APROBAR"
-        }],        
-    },
-    {
-        key: "button_02",
-        href: "/pages/asignacion",
-        icon: <FaSignInAlt className="mx-auto mb-1" size="6rem" />,
-        label: "ASIGNACION",
-        index: 1,
-        badges: [{
-            color: "bg-red-500",
-            value: contadores[1] > 999999 ? '999999+' : (contadores[1] ?? 0),
-            text: "x ASIGNAR"
-        }, {
-            color: "bg-blue-500",
-            value: contadores[2] > 999999 ? '999999+' : (contadores[2] ?? 0),
-            text: "x PREPARAR"
-        }, {
-            color: "bg-blue-500",
-            value: contadores[3] > 999999 ? '999999+' : (contadores[3] ?? 0),
-            text: "en RUTA"
-        }]
-    }, {
-        key: "button_03",
-        href: "/pages/cobros",
-        icon: <TbReportMoney className="mx-auto mb-1" size="6rem" />,
-        label: "COBROS",
-        index: 2
-    }, {
-        key: "button_04",
-        href: "/pages/configuraciones/clientes",
-        icon: <HiUserGroup className="mx-auto mb-1" size="6rem" />,
-        label: "CLIENTES",
-        index: 3,
-        badges: [
-            {
-                color: "bg-green-500",
-                value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
-                text: "x ACTIVOS"
-            }, {
-                color: "bg-gray-500",
-                value: contadores[1] > 999999 ? '999999+' : (contadores[1] ?? 0),
-                text: "en QUIEBRA"
-            }
-        ]
-    }] : [{
-        key: "button_05",
-        href: `/pages/home${session?.user?.role === USER_ROLE.conductor ? "Conductor" : "Despacho"}/pedidos`,
-        icon: session?.user?.role === USER_ROLE.conductor 
-            ? <FaRoute className="mx-auto mb-1" size="6rem" />
-            : <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
-        label: "PEDIDOS",
-        index: 0,
-        badges: [{
-            color: "bg-green-500",
-            value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
-            text: "x ACTIVOS"
-        }]
-    }]
+// ===============================================
+// CONFIGURACIÓN DE MÓDULOS BASADA EN PERMISOS
+// ===============================================
+
+const getModulesForUser = (
+  auth: ReturnType<typeof useAuthorization>,
+  contadores: number[]
+): IAccessButtonProps[] => {
+  const modules: IAccessButtonProps[] = [];
+
+  // Módulo de Pedidos para Gestores/Supervisores
+  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+    modules.push({
+      key: "pedidos_management",
+      href: "/pages/pedidos",
+      icon: <FaFileContract className="mx-auto mb-1" size="6rem" />,
+      label: "PEDIDOS",
+      index: 0,
+      badges: [{
+        color: "bg-red-500",
+        value: contadores[0] > 999999 ? '999999+' : contadores[0],
+        text: "x APROBAR"
+      }],
+    });
+  }
+
+  // Módulo de Asignación para Encargados/Responsables
+  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+    modules.push({
+      key: "asignacion",
+      href: "/pages/asignacion",
+      icon: <FaSignInAlt className="mx-auto mb-1" size="6rem" />,
+      label: "ASIGNACION",
+      index: 1,
+      badges: [{
+        color: "bg-red-500",
+        value: contadores[1] > 999999 ? '999999+' : (contadores[1] ?? 0),
+        text: "x ASIGNAR"
+      }, {
+        color: "bg-blue-500",
+        value: contadores[2] > 999999 ? '999999+' : (contadores[2] ?? 0),
+        text: "x PREPARAR"
+      }, {
+        color: "bg-blue-500",
+        value: contadores[3] > 999999 ? '999999+' : (contadores[3] ?? 0),
+        text: "en RUTA"
+      }]
+    });
+  }
+
+  // Módulo de Cobros para Cobranza
+  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+    modules.push({
+      key: "cobros",
+      href: "/pages/cobros",
+      icon: <TbReportMoney className="mx-auto mb-1" size="6rem" />,
+      label: "COBROS",
+      index: 2
+    });
+  }
+
+  // Módulo de Clientes para usuarios con permisos de gestión
+  if (auth.canAny([
+    { resource: RESOURCES.CLIENTES, action: ACTIONS.READ },
+    { resource: RESOURCES.CLIENTES, action: ACTIONS.CREATE },
+    { resource: RESOURCES.CLIENTES, action: ACTIONS.UPDATE }
+  ])) {
+    modules.push({
+      key: "clientes",
+      href: "/pages/configuraciones/clientes",
+      icon: <HiUserGroup className="mx-auto mb-1" size="6rem" />,
+      label: "CLIENTES",
+      index: 3,
+      badges: [{
+        color: "bg-green-500",
+        value: contadores[4] > 999999 ? '999999+' : (contadores[4] ?? 0),
+        text: "x ACTIVOS"
+      }, {
+        color: "bg-gray-500",
+        value: contadores[5] > 999999 ? '999999+' : (contadores[5] ?? 0),
+        text: "en QUIEBRA"
+      }]
+    });
+  }
+
+  // Módulo específico para Conductores
+  if (auth.hasRole([ROLES.DRIVER])) {
+    modules.push({
+      key: "rutas_conductor",
+      href: "/pages/homeConductor/pedidos",
+      icon: <FaRoute className="mx-auto mb-1" size="6rem" />,
+      label: "RUTAS",
+      index: 0,
+      badges: [{
+        color: "bg-green-500",
+        value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
+        text: "x ACTIVOS"
+      }]
+    });
+  }
+
+  // Módulo específico para Despachadores
+  if (auth.hasRole([ROLES.DISPATCHER]) && !auth.canAny([
+    { resource: RESOURCES.PEDIDOS, action: ACTIONS.APPROVE },
+    { resource: RESOURCES.PEDIDOS, action: ACTIONS.ASSIGN }
+  ])) {
+    modules.push({
+      key: "despacho",
+      href: "/pages/homeDespacho/pedidos",
+      icon: <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
+      label: "DESPACHO",
+      index: 0,
+      badges: [{
+        color: "bg-green-500",
+        value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
+        text: "x ACTIVOS"
+      }]
+    });
+  }
+
+  return modules;
 };
 
 export default function HomeAccessPanel() {
     const [routingIndex, setRoutingIndex] = useState(-1);
-    const { data: session } = useSession();
+    const auth = useAuthorization();
 
     const { data: homeCounters, isLoading } = useQuery<Array<number>>({
-        queryKey: ['homeCounters'],
+        queryKey: ['home-counters'],
         queryFn: async () => {
-            const response = await fetch('/api/home');
-            const data = await response.json();
-            return data.contadores;
-        }
+            const response = await fetch('/api/home', {
+                method: 'GET',
+                credentials: 'include'
+            });
+            const resp = await response.json();
+            console.log("Home counters data:", resp);
+            return resp.data;
+        },
+        enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
     });
 
-    return (<main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
-        {homeCounters && session &&<div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-            {modules(homeCounters, session).map((mod, idx) => (
-                <AccessButton key={`access_button_${idx}`} props={mod} routingIndex={routingIndex} setRoutingIndex={setRoutingIndex} />))}            
-        </div>}
-        {!homeCounters && isLoading && <Loader />}
-    </main>);
+    // Mostrar loader mientras carga la autenticación o los datos
+    if (!auth.user || isLoading || !homeCounters) {
+        return (
+            <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+                <Loader />
+            </main>
+        );
+    }
+
+    const userModules = getModulesForUser(auth, homeCounters);
+
+    // Si no hay módulos disponibles para el usuario
+    if (userModules.length === 0) {
+        return (
+            <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Bienvenido</h2>
+                    <p className="text-gray-600">
+                        Tu cuenta está configurada pero aún no tienes acceso a ningún módulo.
+                        <br />
+                        Contacta al administrador para obtener los permisos necesarios.
+                    </p>
+                </div>
+            </main>
+        );
+    }
+
+    return (
+        <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                {userModules.map((mod, idx) => (
+                    <AccessButton 
+                        key={mod.key} 
+                        props={mod} 
+                        routingIndex={routingIndex} 
+                        setRoutingIndex={setRoutingIndex} 
+                    />
+                ))}            
+            </div>
+            
+            {/* Debug info en desarrollo */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs">
+                    <details>
+                        <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
+                        <div className="mt-2 space-y-1">
+                            <div><strong>Usuario:</strong> {auth.user?.email}</div>
+                            <div><strong>Roles:</strong> {auth.userRoles.join(', ')}</div>
+                            <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
+                        </div>
+                    </details>
+                </div>
+            )}
+        </main>
+    );
 }

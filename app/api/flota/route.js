@@ -1,44 +1,49 @@
-import mongoose from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Vehiculo from "@/models/vehiculo";
-import User from "@/models/user";
+import { supabase } from "@/lib/supabase";
 
 // Obtener todos los vehículos
 export async function GET() {
-    await connectMongoDB();
+    // Fetch all vehicles from Supabase
+    const { data: vehiculos, error } = await supabase
+        .from('vehiculos')
+        .select('id, marca, modelo, patente, chofer_ids');
 
-    console.log("TODOS los vehiculos");
-
-    if (!mongoose.models.User) {
-       mongoose.model("User", User.schema);
+    if (error) {
+        console.error('Error fetching vehiculos:', error);
+        return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });
     }
-    const vehiculos = await Vehiculo.find().populate('choferIds').lean();
 
     return NextResponse.json({ vehiculos });
 }
 
 // Actualiza o crea un vehículo
 export async function POST(request) {
-    await connectMongoDB();
-
     const data = await request.json();
     const { _id, ...vehiculoData } = data;
 
     try {
-        let vehiculo;
         if (_id) {
-            vehiculo = await Vehiculo.findByIdAndUpdate(
-                _id,
-                { $set: vehiculoData },
-                { new: true, upsert: true }
-            );
+            const { data: vehiculo, error } = await supabase
+                .from('vehiculos')
+                .update(vehiculoData)
+                .eq('id', _id)
+                .select('*')
+                .single();
+
+            if (error) throw error;
+            return NextResponse.json({ ok: true, vehiculo });
         } else {
-            vehiculo = await Vehiculo.create(vehiculoData);
+            const { data: vehiculo, error } = await supabase
+                .from('vehiculos')
+                .insert(vehiculoData)
+                .select('*')
+                .single();
+
+            if (error) throw error;
+            return NextResponse.json({ ok: true, vehiculo });
         }
-        return NextResponse.json({ ok: true, vehiculo });
     } catch (error) {
         console.error("Error al guardar el vehículo:", error);
-        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        return NextResponse.json({ ok: false, error: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }

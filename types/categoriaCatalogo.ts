@@ -1,19 +1,19 @@
 export interface ICategoriaCatalogo {
     _id: string;
-    temporalId?: string;
+    temporal_id?: string;
     nombre: string;
     descripcion?: string | null;
     seguir?: boolean;
-    urlImagen: string;
+    url_imagen: string;
     tipo?: number;
     gas?: string;
     elemento?: string;
-    esIndustrial?: boolean;
-    esMedicinal?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
+    es_industrial?: boolean;
+    es_medicinal?: boolean;
+    created_at?: Date;
+    updated_at?: Date;
 }
 
 export interface ICategoriasView extends ICategoriaCatalogo {
-    cantidadSubcategorias: number;
+    cantidad_subcategorias: number;
 }

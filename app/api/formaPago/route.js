@@ -1,11 +1,21 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import FormaPago from "@/models/formaPago";
 
 export async function GET() {
-    await connectMongoDB();
-    const formasPago = await FormaPago.find({
-        porPagar: false
-    });
-    return NextResponse.json(formasPago);
+    try {
+        const { data: formasPago, error } = await supabase
+            .from('formas_pago')
+            .select('*')
+            .eq('por_pagar', false);
+        
+        if (error) {
+            console.error('Error fetching formas pago:', error);
+            return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
+        
+        return NextResponse.json(formasPago);
+    } catch (error) {
+        console.error('Error in formaPago route:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
 }
