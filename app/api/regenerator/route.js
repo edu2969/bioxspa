@@ -5,7 +5,8 @@ import Cliente from "@/models/cliente";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
-    console.log("[GET /api/regenerator] Starting migration v.191");
+    console.log("[GET /api/regenerator] Starting migration v.191. Disconnected...");
+    return NextResponse.json({ ok: true, message: "Skipped migration v.191" });
 
     try {
         // Connect to MongoDB

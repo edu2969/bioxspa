@@ -1,90 +1,81 @@
-import { connectMongoDB } from "@/lib/mongodb";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/utils/authOptions";
-import User from "@/models/user";
-import Cargo from "@/models/cargo";
-import Venta from "@/models/venta";
-import RutaDespacho from "@/models/rutaDespacho";
-import { USER_ROLE, TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { withAuthorization } from "@/lib/auth/apiAuthorization";
+import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO, ROLES } from "@/app/utils/constants";
 
-export async function POST(request) {
-    try {
-        await connectMongoDB();
+export const POST = withAuthorization(
+    async (req, user) => {
+        try {
+            // Get ventaId from request
+            const { ventaId } = await req.json();
 
-        // Get ventaId from request
-        const { ventaId } = await request.json();
-        
-        // Validate ventaId
-        if (!ventaId) {
-            return NextResponse.json({ ok: false, error: "ventaId is required" }, { status: 400 });
-        }
-
-        // Get user from session
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
-        const userId = session.user.id;
-        
-        // Verify the user is a driver (conductor)
-        const user = await User.findById(userId);
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-        }
-
-        // Verify user has the required role (manager or supervisor)
-        if (user.role && ![USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado].includes(user.role)) {
-            return NextResponse.json({ 
-                ok: false, 
-                error: "Insufficient permissions - requires manager or supervisor role" 
-            }, { status: 403 });
-        }
-        
-        // Verify the user has a conductor cargo assigned
-        const cargo = await Cargo.findOne({ 
-            userId: userId,
-            tipo: { $in: [USER_ROLE.gerente, USER_ROLE.cobranza, USER_ROLE.encargado] },
-            hasta: null 
-        });
-        
-        if (!cargo) {
-            return NextResponse.json({ ok: false, error: "User is not authorized" }, { status: 403 });
-        }
-
-        // Find the rutaDespacho that contains this venta
-        const rutaDespacho = await RutaDespacho.findOne({
-            ventaIds: ventaId,            
-            estado: { $lte: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino }
-        });
-
-        if (rutaDespacho) {
-            // Remove the ventaId from the rutaDespacho
-            await RutaDespacho.findByIdAndUpdate(
-                rutaDespacho._id,
-                { $pull: { ventaIds: ventaId } }
-            );
-
-            if(rutaDespacho.ventaIds.length === 1) {
-                // Delete the route if it becomes empty
-                await RutaDespacho.findByIdAndDelete(rutaDespacho._id);
+            // Validate ventaId
+            if (!ventaId) {
+                return NextResponse.json({ ok: false, error: "ventaId is required" }, { status: 400 });
             }
-        }
-        
-        // Update the venta status back to borrador
-        await Venta.findByIdAndUpdate(
-            ventaId,
-            { estado: TIPO_ESTADO_VENTA.por_asignar }
-        );
 
-        return NextResponse.json({ 
-            ok: true, 
-            message: "Venta successfully unassigned and returned to draft status" 
-        });
-        
-    } catch (error) {
-        console.error("Error in POST /desasignacion:", error);
-        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
+            // Verify user has the required role (manager or supervisor)
+            if (!user.roles.some((role) => [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.COLLECTIONS].includes(role))) {
+                return NextResponse.json({
+                    ok: false,
+                    error: "Insufficient permissions - requires manager or supervisor role",
+                }, { status: 403 });
+            }
+
+            // Find the rutaDespacho that contains this venta
+            const { data: rutaDespacho, error: rutaError } = await supabase
+                .from("rutas_despacho")
+                .select("id, venta_ids")
+                .contains("venta_ids", [ventaId])
+                .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
+                .single();
+
+            if (rutaError) {
+                console.error("Error fetching rutaDespacho:", rutaError);
+                return NextResponse.json({ ok: false, error: "Error fetching rutaDespacho" }, { status: 500 });
+            }
+
+            if (rutaDespacho) {
+                // Remove the ventaId from the rutaDespacho
+                const updatedVentaIds = rutaDespacho.venta_ids.filter((id) => id !== ventaId);
+
+                if (updatedVentaIds.length > 0) {
+                    await supabase
+                        .from("rutas_despacho")
+                        .update({ venta_ids: updatedVentaIds })
+                        .eq("id", rutaDespacho.id);
+                } else {
+                    // Delete the route if it becomes empty
+                    await supabase
+                        .from("rutas_despacho")
+                        .delete()
+                        .eq("id", rutaDespacho.id);
+                }
+            }
+
+            // Update the venta status back to "por_asignar"
+            const { error: ventaError } = await supabase
+                .from("ventas")
+                .update({ estado: TIPO_ESTADO_VENTA.por_asignar })
+                .eq("id", ventaId);
+
+            if (ventaError) {
+                console.error("Error updating venta status:", ventaError);
+                return NextResponse.json({ ok: false, error: "Error updating venta status" }, { status: 500 });
+            }
+
+            return NextResponse.json({
+                ok: true,
+                message: "Venta successfully unassigned and returned to draft status",
+            });
+        } catch (error) {
+            console.error("Error in POST /reasignacion:", error);
+            return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
+        }
+    },
+    {
+        resource: "pedidos",
+        action: "update",
+        allowedRoles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.COLLECTIONS],
     }
-}
+);

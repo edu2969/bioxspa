@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
             });
 
             return {
-                _id: venta.id,
+                id: venta.id,
                 tipo: venta.tipo,
                 comentario: venta.comentario || "",
                 cliente_id: cliente.id,

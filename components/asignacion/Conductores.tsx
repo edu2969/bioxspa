@@ -66,13 +66,13 @@ export default function Conductores({
                         Sin checklist
                     </div>
                 )}
-                {chofer.pedidos.length ? chofer.pedidos.map((pedido: unknown, indexPedido: number) => (
+                {chofer.pedidos.length ? chofer.pedidos.map((pedido: IPedidoConductor, indexPedido: number) => (
                     <PedidoConductor
                         key={`pedido_chofer_${chofer.id}_${indexPedido}`}
-                        pedido={pedido as any} // TODO: tipar correctamente
+                        pedido={pedido}
                         choferId={chofer.id}
                         onSaveComment={onSaveComment}
-                        onShowDetalle={() => setShowDetalleOrdenModal(true, { id: (pedido as IPedidoConductor).id, cliente_nombre: (pedido as IPedidoConductor).nombre_cliente, comentario: (pedido as IPedidoConductor).comentario })}
+                        onShowDetalle={() => setShowDetalleOrdenModal(true, { id: pedido.id, cliente_nombre: pedido.nombre_cliente, comentario: pedido.comentario })}
                         onShowCommentModal={onShowCommentModal}
                         indexPedido={indexPedido}
                     />

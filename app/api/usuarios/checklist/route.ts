@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, TIPO_CARGO, ROLES } from "@/app/utils/constants";
 import { IItemChecklist } from "@/types/checklist";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             ok: true,
-            passed: checklists.length > 0,
+            passed: checklists.filter(c => c.passed).length === tiposChecklist.length,
             checklists
         });
 }
@@ -50,19 +50,9 @@ export async function POST(req: NextRequest) {
         console.log("Processing checklist submission");
 
         const { searchParams } = new URL(req.url);
-        const userId = searchParams.get("userId");
-
-        if (!userId) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
-        const { data: user, error: userError } = await supabase
-            .from('usuarios')
-            .select('id, tipo_cargo')
-            .eq('id', userId)
-            .single();
-
-        if (userError || !user) {
+        const { user, userData } = await getAuthenticatedUser();
+        
+        if (!user) {
             return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
         }
 
@@ -94,12 +84,11 @@ export async function POST(req: NextRequest) {
 
         // Crear un nuevo checklist en Supabase
         const checklistPayload = {
-            usuario_id: userId,
+            usuario_id: user.id,
             tipo: tipo === 'personal' ? TIPO_CHECKLIST.personal : TIPO_CHECKLIST.vehiculo,
             vehiculo_id: tipo === 'vehiculo' ? vehiculoId : null,
             kilometraje: tipo === 'vehiculo' ? kilometraje : null,
             passed,
-            items,
             fecha: new Date().toISOString(),
         };
 

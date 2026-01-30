@@ -147,7 +147,7 @@ export default function HomeAccessPanel() {
             });
             const resp = await response.json();
             console.log("Home counters data:", resp);
-            return resp.data;
+            return resp.contadores || [];
         },
         enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
     });

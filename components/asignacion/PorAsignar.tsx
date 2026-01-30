@@ -51,15 +51,14 @@ export default function PorAsignar({
     })
     
     // Zona de drop para reasignación
-    const { setNodeRef: setReasignRef, isOver: isReasignOver } = useDroppable({
-        id: 'reasignacion'
-    });
+    const { setNodeRef: setReasignRef, isOver: isReasignOver } = useDroppable({
+        id: 'reasignacion'
+    });
 
     const PedidoItem = memo(function PedidoItem({ pedido, index }: { pedido: IPedidoPorAsignar, index: number }) {
         // const isExpanded = !!expandido[index];
         const items = pedido.items || [];
-        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despacho_en_local;
-        // const isDraggedItem = draggedPedido?.id === pedido._id;
+        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despacho_en_local;                
 
         // Hook de @dnd-kit para hacer el elemento draggable
         const {

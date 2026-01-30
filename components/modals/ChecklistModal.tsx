@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CHECKLIST_ITEM, TIPO_CARGO, ROLES } from "@/app/utils/constants";
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "../Loader";
 import { IoIosArrowBack } from "react-icons/io";
@@ -150,7 +150,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
                 data.kilometraje = formValues.kilometros;
             }
             console.log("DATA", data);
-            await fetch("/api/users/checklist", {
+            await fetch("/api/usuarios/checklist", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
@@ -242,7 +242,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
                     </div>
                     {/* Items del checklist */}
                     {checklistItems.map((key, idx) => {
-                        const label = (hasRole([TIPO_CARGO.conductor]) ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
+                        const label = (hasRole([ROLES.DRIVER]) ? itemDriverLabels : itemEmployeeLabels)[key.tipo as keyof typeof itemDriverLabels]
                             || `¿${String(key.tipo).replace(/_/g, " ")}?`;
                         const value = watch(key.tipo as string) || 0;
                         

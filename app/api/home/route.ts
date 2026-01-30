@@ -106,6 +106,8 @@ export async function GET() {
         return NextResponse.json({ ok: true, contadores: [(contadores || 0) + ventasDespachoEnLocal] });
     }
 
+    console.log("Fetching data for CHOFER role", userTipoCargo, TIPO_CARGO.conductor);
+
     // CHOFER
     if (userTipoCargo === TIPO_CARGO.conductor) {
         const { data: unaRuta, error: rutaError } = await supabase
@@ -117,7 +119,7 @@ export async function GET() {
             .single();
 
         return NextResponse.json({ ok: true, contadores: [unaRuta ? 1 : 0] });
-    }
+    }    
 
     // Otros roles: respuesta vacía
     return NextResponse.json({ ok: true, message: "No data for this role.", contadores: [] });

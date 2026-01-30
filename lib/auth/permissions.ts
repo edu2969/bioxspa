@@ -16,7 +16,8 @@ export const RESOURCES = {
   CONFIGURACION: 'configuracion',
   USUARIOS: 'usuarios',
   FACTURACION: 'facturacion',
-  PRECIOS: 'precios'
+  PRECIOS: 'precios',
+  FLOTA: 'flota'
 } as const;
 
 export const ACTIONS = {
@@ -133,7 +134,8 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.EXECUTE}`,
     `${RESOURCES.RUTAS}:${ACTIONS.READ}`,
-    `${RESOURCES.RUTAS}:${ACTIONS.EXECUTE}`
+    `${RESOURCES.RUTAS}:${ACTIONS.EXECUTE}`,
+    `${RESOURCES.FLOTA}:${ACTIONS.READ}`,
   ],
 
   [ROLES.SUPPLIER]: [

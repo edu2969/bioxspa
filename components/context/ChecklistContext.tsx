@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ChecklistModal from "../modals/ChecklistModal";
+import { TIPO_CHECKLIST } from "@/app/utils/constants";
 
 interface ChecklistContextType {
     tipo: 'personal' | 'vehiculo';
@@ -27,8 +28,11 @@ export function ChecklistProvider({ tipo, children }: {
     });
 
     useEffect(() => {
-        if (!isLoadingChecklist 
-            && !checklist.passed) {
+        if (!isLoadingChecklist && !checklist.passed) {
+            console.log("TIPO", tipo, checklist.checklists);
+            if (tipo === 'personal' && checklist.checklists.find((c: { tipo: number, passed: boolean }) => c.tipo === TIPO_CHECKLIST.personal && c.passed)) {
+                return;
+            }
             setShowModal(true);
         }
     }, [isLoadingChecklist, checklist]);

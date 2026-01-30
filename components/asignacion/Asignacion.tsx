@@ -38,6 +38,65 @@ export default function Asignacion() {
     const [onSaveComment, setOnSaveComment] = useState<() => void>(() => () => { });
     const [selectedChofer, setSelectedChofer] = useState<{ id: string, nombre: string } | null>(null);
     const [selectedVenta, setSelectedVenta] = useState<{ id: string, cliente_nombre?: string, comentario: string | null } | null>(null);
+    
+    const [isSaving, setIsSaving] = useState(false);
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [dragOrigin, setDragOrigin] = useState<'pedidos' | 'conductores' | null>(null);
+    const [dragSourceConductor, setDragSourceConductor] = useState<string | null>(null);
+    const { control, setValue } = useForm<INuevaVentaSubmit>();
+    const qryClient = useQueryClient();
+
+    const sucursalId = useWatch({
+        control,
+        name: 'sucursal_id'
+    });
+
+
+    const { data: sucursales, isLoading } = useQuery<ISucursalSelectable[]>({
+        queryKey: ['sucursales'],
+        queryFn: async () => {
+            const response = await fetch(`/api/pedidos/asignacion/sucursales`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch sucursales");
+            }
+            const data = await response.json();
+            const localSucursalId = localStorage.getItem("sucursal_id");
+            if (!localSucursalId) {
+                setValue("sucursal_id", data.sucursales[0]?.id);
+                localStorage.setItem("sucursal_id", String(data.sucursales[0]?.id));
+            } else {
+                setValue("sucursal_id", localSucursalId);
+            }
+            console.log("Fetched sucursales:", data.sucursales);
+            return data.sucursales;
+        }
+    });
+
+    // Queries para obtener datos de pedidos y conductores
+    const { data: pedidos } = useQuery<IPedidoPorAsignar[]>({
+        queryKey: ['pedidos-por-asignar', sucursalId],
+        queryFn: async () => {
+            if (!sucursalId) return [];
+            const response = await fetch(`/api/pedidos/asignacion/porAsignar?sucursalId=${sucursalId}`);
+            if (!response.ok) throw new Error('Failed to fetch pedidos');
+            const data = await response.json();
+            return data.pedidos;
+        },
+        enabled: !!sucursalId
+    });
+
+    const { data: conductores } = useQuery<IConductoresResponse[]>({
+        queryKey: ['conductores', sucursalId],
+        queryFn: async () => {
+            if (!sucursalId) return [];
+            const response = await fetch(`/api/pedidos/asignacion/conductores?sucursalId=${sucursalId}`);
+            const data = await response.json();
+            return data.conductores;
+        },
+        enabled: !!sucursalId
+    });
+
+    
 
     // Función para manejar la apertura del modal de detalle de orden
     const handleShowDetalleOrdenModal = (show: boolean, pedido?: PedidoDetalle) => {
@@ -67,169 +126,113 @@ export default function Asignacion() {
         setComentarioActual(null);
         setOnSaveComment(() => () => { });
     };
-    const [isSaving, setIsSaving] = useState(false);
-    const [activeId, setActiveId] = useState<string | null>(null);
-    const [dragOrigin, setDragOrigin] = useState<'pedidos' | 'conductores' | null>(null);
-    const [dragSourceConductor, setDragSourceConductor] = useState<string | null>(null);
-    const { control, setValue } = useForm<INuevaVentaSubmit>();
-
-    const { data: sucursales, isLoading } = useQuery<ISucursalSelectable[]>({
-        queryKey: ['sucursales'],
-        queryFn: async () => {
-            const response = await fetch(`/api/pedidos/asignacion/sucursales`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch sucursales");
-            }
-            const data = await response.json();
-            const localSucursalId = localStorage.getItem("sucursal_id");
-            if (!localSucursalId) {
-                setValue("sucursal_id", data.sucursales[0]?.id);
-                localStorage.setItem("sucursal_id", String(data.sucursales[0]?.id));
-            } else {
-                setValue("sucursal_id", localSucursalId);
-            }
-            console.log("Fetched sucursales:", data.sucursales);
-            return data.sucursales;
-        }
-    });
-
-    const sucursalId = useWatch({
-        control,
-        name: 'sucursal_id'
-    });
-
-    const qryClient = useQueryClient();
-
-    // Queries para obtener datos de pedidos y conductores
-    const { data: pedidos } = useQuery<IPedidoPorAsignar[]>({
-        queryKey: ['pedidos-por-asignar', sucursalId],
-        queryFn: async () => {
-            if (!sucursalId) return [];
-            const response = await fetch(`/api/pedidos/asignacion/porAsignar?sucursalId=${sucursalId}`);
-            if (!response.ok) throw new Error('Failed to fetch pedidos');
-            const data = await response.json();
-            return data.pedidos;
-        },
-        enabled: !!sucursalId
-    });
-
-    const { data: conductores } = useQuery<IConductoresResponse[]>({
-        queryKey: ['conductores', sucursalId],
-        queryFn: async () => {
-            if (!sucursalId) return [];
-            const response = await fetch(`/api/pedidos/asignacion/conductores?sucursalId=${sucursalId}`);
-            const data = await response.json();
-            return data.conductores;
-        },
-        enabled: !!sucursalId
-    });
 
     // Manejadores para @dnd-kit
     const handleDragStart = (event: DragStartEvent) => {
-        console.log('🎯 DND-KIT DRAG START:', event.active.id);
-        const pedidoId = event.active.id as string;
-        setActiveId(pedidoId);
-
-        // Detectar origen: si está en pedidos o en conductores
-        const enPedidos = pedidos?.some(p => p.id === pedidoId);
-        let conductorOrigen = null;
-        const enConductores = conductores?.some(c => {
-            const tienePedido = c.pedidos?.some(p => p.id === pedidoId);
-            if (tienePedido) {
-                conductorOrigen = c.id;
-            }
-            return tienePedido;
-        });
-
-        if (enPedidos && !enConductores) {
-            setDragOrigin('pedidos');
-            setDragSourceConductor(null);
-            console.log('📋 Arrastrando desde PorAsignar');
-        } else if (enConductores) {
-            setDragOrigin('conductores');
-            setDragSourceConductor(conductorOrigen);
-            console.log('🚚 Arrastrando desde Conductor:', conductorOrigen);
-        } else {
-            setDragOrigin('pedidos'); // fallback
-            setDragSourceConductor(null);
-        }
-
-        // Buscar el pedido para obtener el nombre del cliente
-        const pedido = pedidos?.find(p => p.id === pedidoId);
-        const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
-
-        console.log('📝 Cliente seleccionado:', { id: pedidoId, cliente_nombre: clienteNombre });
-        setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
-    };
+        console.log('🎯 DND-KIT DRAG START:', event.active.id);
+        const pedidoId = event.active.id as string;
+        setActiveId(pedidoId);
+ 
+        // Detectar origen: si está en pedidos o en conductores
+        const enPedidos = pedidos?.some(p => p.id === pedidoId);
+        let conductorOrigen = null;
+        const enConductores = conductores?.some(c => {
+            const tienePedido = c.pedidos?.some(p => p.id === pedidoId);
+            if (tienePedido) {
+                conductorOrigen = c.id;
+            }
+            return tienePedido;
+        });
+ 
+        if (enPedidos && !enConductores) {
+            setDragOrigin('pedidos');
+            setDragSourceConductor(null);
+            console.log('📋 Arrastrando desde pedidos');
+        } else if (enConductores) {
+            setDragOrigin('conductores');
+            setDragSourceConductor(conductorOrigen);
+            console.log('🚚 Arrastrando desde Conductor:', conductorOrigen);
+        } else {
+            setDragOrigin('pedidos'); // fallback
+            setDragSourceConductor(null);
+        }
+ 
+        // Buscar el pedido para obtener el nombre del cliente
+        const pedido = pedidos?.find(p => p.id === pedidoId);
+        const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+ 
+        console.log('📝 Cliente seleccionado:', { id: pedidoId, cliente: clienteNombre });
+        setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+    };
 
     const handleDragEnd = async (event: DragEndEvent) => {
-        console.log('🏁 DND-KIT DRAG END:', event);
-        const { active, over } = event;
+        console.log('🏁 DND-KIT DRAG END:', event);
+        const { active, over } = event;
+ 
+        setActiveId(null);
+        setDragOrigin(null);
+        setDragSourceConductor(null);
+        // setDraggedPedido(null); // No usado actualmente
+ 
+        if (!over) {
+            console.log('❌ Drop missed - no valid drop zone');
+            return;
+        }
 
-        setActiveId(null);
-        setDragOrigin(null);
-        setDragSourceConductor(null);
-        // setDraggedPedido(null); // No usado actualmente
-
-        if (!over) {
-            console.log('❌ Drop missed - no valid drop zone');
-            return;
-        }
-
-        const pedidoId = active.id as string;
-        const dropZoneId = over.id as string;
-
-        console.log(`🎯 Attempting drop: pedido ${pedidoId} -> ${dropZoneId}`);
-
-        // Verificar si se está arrastrando a sí mismo
-        if (dropZoneId.startsWith('conductor-')) {
-            const targetConductorId = dropZoneId.replace('conductor-', '');
-            if (dragOrigin === 'conductores' && dragSourceConductor === targetConductorId) {
-                console.log('🚫 Auto-asignación detectada - mismo conductor. No se ejecuta acción.');
-                return; // No hacer nada si es el mismo conductor
-            }
-        } else if (dropZoneId === 'reasignacion' && dragOrigin === 'pedidos') {
-            console.log('🚫 Auto-asignación detectada - pedido ya está en PorAsignar. No se ejecuta acción.');
-            return; // No hacer nada si ya está en por asignar
-        }
-
-        // Determinar el tipo de drop basado en el ID
-        if (dropZoneId.startsWith('conductor-')) {
-            // Drop en conductor
-            const conductorId = dropZoneId.replace('conductor-', '');
-            console.log('🚚 Drop on conductor:', conductorId);
-
-            // Buscar el conductor para obtener su nombre
-            const conductor = conductores?.find(c => c.id === conductorId);
-            const conductorNombre = conductor?.nombre || 'Conductor desconocido';
-
-            // Buscar el pedido para obtener el nombre del cliente
-            const pedido = pedidos?.find(p => p.id === pedidoId);
-            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
-
-            console.log('👤 Chofer seleccionado:', { id: conductorId, nombre: conductorNombre });
-            console.log('📝 Cliente para asignar:', { id: pedidoId, cliente_nombre: clienteNombre });
-
-            setSelectedChofer({ id: conductorId, nombre: conductorNombre });
-            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
-            setShowConfirmModal(true);
-        } else if (dropZoneId === 'en-transito') {
-            // Drop en tránsito - solo mostrar toast de éxito
-            console.log('🚚 Drop on en-transito');
-            toast.success('¡Pedido movido a En Tránsito!');
-        } else if (dropZoneId === 'reasignacion') {
-            // Drop para reasignación (desde conductores a por asignar)
-            console.log('🔄 Drop for reassignment');
-
-            // Buscar el pedido para obtener el nombre del cliente
-            const pedido = pedidos?.find(p => p.id === pedidoId);
-            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
-
-            console.log('🔄 Pedido para reasignar:', { id: pedidoId, cliente_nombre: clienteNombre });
-            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
-            setShowReasignacionModal(true);
-        }
-    };
+        const pedidoId = active.id as string;
+        const dropZoneId = over.id as string;
+ 
+        console.log(`🎯 Attempting drop: pedido ${pedidoId} -> ${dropZoneId}`);
+ 
+        // Verificar si se está arrastrando a sí mismo
+        if (dropZoneId.startsWith('conductor-')) {
+            const targetConductorId = dropZoneId.replace('conductor-', '');
+            if (dragOrigin === 'conductores' && dragSourceConductor === targetConductorId) {
+                console.log('🚫 Auto-asignación detectada - mismo conductor. No se ejecuta acción.');
+                return; // No hacer nada si es el mismo conductor
+            }
+        } else if (dropZoneId === 'reasignacion' && dragOrigin === 'pedidos') {
+            console.log('🚫 Auto-asignación detectada - pedido ya está en PorAsignar. No se ejecuta acción.');
+            return; // No hacer nada si ya está en por asignar
+        }
+ 
+        // Determinar el tipo de drop basado en el ID
+        if (dropZoneId.startsWith('conductor-')) {
+            // Drop en conductor
+            const conductorId = dropZoneId.replace('conductor-', '');
+            console.log('🚚 Drop on conductor:', conductorId);
+ 
+            // Buscar el conductor para obtener su nombre
+            const conductor = conductores?.find(c => c.id === conductorId);
+            const conductorNombre = conductor?.nombre || 'Conductor desconocido';
+ 
+            // Buscar el pedido para obtener el nombre del cliente
+            const pedido = pedidos?.find(p => p.id === pedidoId);
+            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+ 
+            console.log('👤 Chofer seleccionado:', { _id: conductorId, nombre: conductorNombre });
+            console.log('📝 Cliente para asignar:', { _id: pedidoId, cliente: clienteNombre });
+ 
+            setSelectedChofer({ id: conductorId, nombre: conductorNombre });
+            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+            setShowConfirmModal(true);
+        } else if (dropZoneId === 'en-transito') {
+            // Drop en tránsito - solo mostrar toast de éxito
+            console.log('🚚 Drop on en-transito');
+            toast.success('¡Pedido movido a En Tránsito!');
+        } else if (dropZoneId === 'reasignacion') {
+            // Drop para reasignación (desde conductores a por asignar)
+            console.log('🔄 Drop for reassignment');
+ 
+            // Buscar el pedido para obtener el nombre del cliente
+            const pedido = pedidos?.find(p => p.id === pedidoId);
+            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+ 
+            console.log('🔄 Pedido para reasignar:', { id: pedidoId, cliente_nombre: clienteNombre });
+            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+            setShowReasignacionModal(true);
+        }
+    };
 
     return (<DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <main className="w-full mt-2 h-screen overflow-hidden">
