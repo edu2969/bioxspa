@@ -127,6 +127,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
         queryFn: async () => {
             const r = await fetch("/api/flota/porConductor");
             const data = await r.json();
+            console.log("VEHICULOS-CONDUCTOR", data);
             return data.vehiculos;
         },        
         enabled: tipo === 'vehiculo',

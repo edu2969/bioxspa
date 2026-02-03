@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
+import { authorize } from "@/lib/auth/apiAuthorization";
 import { IVehiculoView } from "@/types/types";
-import { USER_ROLE } from "@/app/utils/constants";
+import { ROLES } from "@/lib/auth/permissions";
 
-export const GET = migrateAuthEndpoint(async ({ user }, request: NextRequest) => {
+export async function GET(request: NextRequest) {
     try {
+        const { authorized, user, error } = await authorize(request, {
+            resource: "vehiculoAsignado",
+            action: "read",
+            allowedRoles: [ROLES.DRIVER]
+        });
+
+        if (!authorized) {
+            return NextResponse.json({ ok: false, error: error || "Unauthorized" }, { status: 403 });
+        }
+
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "User not found" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
-        const rutaId = searchParams.get('rutaId');
+        const rutaId = searchParams.get('rutaId');   
 
         if (!rutaId) {
             return NextResponse.json({ ok: false, error: 'rutaId is required' }, { status: 400 });
@@ -23,12 +37,8 @@ export const GET = migrateAuthEndpoint(async ({ user }, request: NextRequest) =>
             return NextResponse.json({ ok: false, error: 'RutaDespacho not found' }, { status: 404 });
         }
 
-        // Access check: either chofer or privileged role
-        if (String(rutaDespacho.chofer_id) !== user.id && ![
-            USER_ROLE.cobranza,
-            USER_ROLE.encargado,
-            USER_ROLE.responsable
-        ].includes(user.role)) {
+        // Access check: ensure the user is the assigned driver
+        if (String(rutaDespacho.chofer_id) !== user.id) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
@@ -47,7 +57,7 @@ export const GET = migrateAuthEndpoint(async ({ user }, request: NextRequest) =>
         }
 
         const vehicleView: IVehiculoView = {
-            vehiculoId: vehiculo.id,
+            vehiculo_id: vehiculo.id,
             patente: vehiculo.patente,
             marca: vehiculo.marca,
             modelo: vehiculo.modelo
@@ -58,4 +68,4 @@ export const GET = migrateAuthEndpoint(async ({ user }, request: NextRequest) =>
         console.error('ERROR in vehiculo asignado:', error);
         return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });
     }
-});
+}

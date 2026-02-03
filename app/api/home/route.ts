@@ -8,119 +8,182 @@ import {
 } from "@/app/utils/constants";
 import supabase from "@/lib/supabase";
 
-export async function GET() {    
-    const { user, userData } = await getAuthenticatedUser();
-    const userTipoCargo = userData.role;
-    const userId = user.id;
-    // COBRANZA
-    if (userTipoCargo === TIPO_CARGO.encargado || userTipoCargo === TIPO_CARGO.cobranza) {
-        console.log("Fetching data for COBRANZA or ENCARGADO role");
+export async function GET() {   
+    try {
+        console.log("Starting GET /api/home");
 
-        // Contar ventas por estado
-        const { data: ventas, error: ventasError } = await supabase
-            .from('ventas')
-            .select('estado, direccion_despacho_id')
-            .gte('estado', TIPO_ESTADO_VENTA.borrador)
-            .lte('estado', TIPO_ESTADO_VENTA.reparto);
+        const { user, userData } = await getAuthenticatedUser();
+        console.log("Authenticated user:", user);
+        console.log("User data:", userData);
 
-        if (ventasError) throw ventasError;
+        const userTipoCargo = userData.role;
+        const userId = user.id;
+        console.log("User role:", userTipoCargo);
 
-        const pedidosCount = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.borrador).length || 0;
-        const porAsignar = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.por_asignar).length || 0;
-        const preparacion = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.preparacion).length || 0;
-        const enRuta = (ventas?.length || 0) - pedidosCount - porAsignar - preparacion;
+        // COBRANZA
+        if (userTipoCargo === TIPO_CARGO.encargado || userTipoCargo === TIPO_CARGO.cobranza) {
+            console.log("Fetching data for COBRANZA or ENCARGADO role");
 
-        // Clientes activos
-        const { count: clientesActivos, error: clientesError } = await supabase
-            .from('clientes')
-            .select('id', { count: 'exact' });
+            // Contar ventas por estado
+            const { data: ventas, error: ventasError } = await supabase
+                .from('ventas')
+                .select('estado, direccion_despacho_id')
+                .gte('estado', TIPO_ESTADO_VENTA.borrador)
+                .lte('estado', TIPO_ESTADO_VENTA.reparto);
 
-        if (clientesError) throw clientesError;
-
-        return NextResponse.json({
-            ok: true,
-            data: {
-                pedidosCount,
-                porAsignar,
-                preparacion,
-                enRuta,
-                clientesActivos
+            if (ventasError) {
+                console.error("Error fetching ventas:", ventasError);
+                throw ventasError;
             }
-        });
-    }
 
-    // DESPACHO ó RESPONSABLE
-    if (userTipoCargo === TIPO_CARGO.despacho || userTipoCargo === TIPO_CARGO.responsable) {
-        // Find the user's cargo
-        const { data: userCargo, error: cargoError } = await supabase
-            .from('cargos')
-            .select('dependencia_id')
-            .eq('usuario_id', userId)
-            .in('tipo', [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
-            .is('hasta', null)
-            .single();
+            console.log("Fetched ventas:", ventas);
 
-        if (cargoError || !userCargo) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+            const pedidosCount = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.borrador).length || 0;
+            const porAsignar = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.por_asignar).length || 0;
+            const preparacion = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.preparacion).length || 0;
+            const enRuta = (ventas?.length || 0) - pedidosCount - porAsignar - preparacion;
+
+            console.log("Pedidos count:", pedidosCount);
+            console.log("Por asignar:", porAsignar);
+            console.log("Preparacion:", preparacion);
+            console.log("En ruta:", enRuta);
+
+            // Clientes activos
+            const { count: clientesActivos, error: clientesError } = await supabase
+                .from('clientes')
+                .select('id', { count: 'exact' });
+
+            if (clientesError) {
+                console.error("Error fetching clientes activos:", clientesError);
+                throw clientesError;
+            }
+
+            console.log("Clientes activos count:", clientesActivos);
+
+            return NextResponse.json({
+                ok: true,
+                data: {
+                    pedidosCount,
+                    porAsignar,
+                    preparacion,
+                    enRuta,
+                    clientesActivos
+                }
+            });
         }
 
-        // Find all chofer cargos in the same dependencia
-        const { data: choferCargos, error: choferError } = await supabase
-            .from('cargos')
-            .select('usuario_id')
-            .eq('dependencia_id', userCargo.dependencia_id)
-            .eq('tipo', TIPO_CARGO.conductor)
-            .is('hasta', null);
+        // DESPACHO ó RESPONSABLE
+        if (userTipoCargo === TIPO_CARGO.despacho || userTipoCargo === TIPO_CARGO.responsable) {
+            console.log("Fetching data for DESPACHO or RESPONSABLE role");
 
-        if (choferError) throw choferError;
+            // Find the user's cargo
+            const { data: userCargo, error: cargoError } = await supabase
+                .from('cargos')
+                .select('dependencia_id')
+                .eq('usuario_id', userId)
+                .in('tipo', [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
+                .is('hasta', null)
+                .single();
 
-        const choferIds = choferCargos?.map((cargo) => cargo.usuario_id) || [];
-
-        // Find ventas in estado 'preparacion' for choferes in the dependencia
-        const { data: ventas, error: ventasError } = await supabase
-            .from('ventas')
-            .select('id, estado, direccion_despacho_id, tipo')
-            .or(`estado.eq.${TIPO_ESTADO_VENTA.preparacion},and(estado.eq.${TIPO_ESTADO_VENTA.por_asignar},direccion_despacho_id.is.null),estado.eq.${TIPO_ESTADO_VENTA.entregado}`);
-
-        if (ventasError) throw ventasError;
-
-        const ventaIds = ventas?.filter(venta => {
-            if (venta.estado === TIPO_ESTADO_VENTA.entregado) {
-                return venta.tipo === TIPO_ORDEN.traslado;
+            if (cargoError || !userCargo) {
+                console.error("Error fetching user cargo:", cargoError);
+                return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
             }
-            return true;
-        }).map(venta => venta.id) || [];
 
-        const ventasDespachoEnLocal = ventas?.filter((venta) => !venta.direccion_despacho_id).length || 0;
+            console.log("User cargo:", userCargo);
 
-        // Count rutasDespacho where the ventas are present
-        const { count: contadores, error: rutasError } = await supabase
-            .from('rutas_despacho')
-            .select('*', { count: 'exact', head: true })
-            .overlaps('venta_ids', ventaIds)
-            .in('chofer_id', choferIds)
-            .in('estado', [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado]);
+            // Find all chofer cargos in the same dependencia
+            const { data: choferCargos, error: choferError } = await supabase
+                .from('cargos')
+                .select('usuario_id')
+                .eq('dependencia_id', userCargo.dependencia_id)
+                .eq('tipo', TIPO_CARGO.conductor)
+                .is('hasta', null);
 
-        if (rutasError) throw rutasError;
+            if (choferError) {
+                console.error("Error fetching chofer cargos:", choferError);
+                throw choferError;
+            }
 
-        return NextResponse.json({ ok: true, contadores: [(contadores || 0) + ventasDespachoEnLocal] });
+            console.log("Conductor cargos:", choferCargos);
+
+            const conductorIds = choferCargos?.map((cargo) => cargo.usuario_id) || [];
+            console.log("Conductor IDs:", conductorIds);
+
+            // Find ventas in estado 'preparacion' for choferes in the dependencia
+            const { data: ventas, error: ventasError } = await supabase
+                .from('ventas')
+                .select('id, estado, direccion_despacho_id, tipo')
+                .or(`estado.eq.${TIPO_ESTADO_VENTA.preparacion},and(estado.eq.${TIPO_ESTADO_VENTA.por_asignar},direccion_despacho_id.is.null),estado.eq.${TIPO_ESTADO_VENTA.entregado}`);
+
+            if (ventasError) {
+                console.error("Error fetching ventas for DESPACHO/RESPONSABLE:", ventasError);
+                throw ventasError;
+            }
+
+            console.log("Fetched ventas for DESPACHO/RESPONSABLE:", ventas);
+
+            const ventaIds = ventas?.filter(venta => {
+                if (venta.estado === TIPO_ESTADO_VENTA.entregado) {
+                    return venta.tipo === TIPO_ORDEN.traslado;
+                }
+                return true;
+            }).map(venta => venta.id) || [];
+
+            console.log("Filtered venta IDs:", ventaIds);
+
+            const ventasDespachoEnLocal = ventas?.filter((venta) => !venta.direccion_despacho_id).length || 0;
+            console.log("Ventas despacho en local count:", ventasDespachoEnLocal);
+
+            // Count rutasDespacho where the ventas are present
+            const { data: rutas, error: rutasError } = await supabase
+                .from('rutas_despacho')
+                .select('id')
+                .in('conductor_id', conductorIds)
+                .in('estado', [
+                    TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                    TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
+                ]);
+
+            if (rutasError) {
+                console.error("Error fetching rutas_despacho:", rutasError);
+                throw rutasError;
+            }
+
+            const contadores = rutas ? rutas.length : 0;
+            console.log("Rutas despacho count:", contadores);
+
+            return NextResponse.json({ ok: true, contadores: [contadores + ventasDespachoEnLocal] });
+        }
+
+        console.log("Fetching data for CHOFER role", userTipoCargo, TIPO_CARGO.conductor);
+
+        // CHOFER
+        if (userTipoCargo === TIPO_CARGO.conductor) {
+            const { data: unaRuta, error: rutaError } = await supabase
+                .from('rutas_despacho')
+                .select('id')
+                .gte('estado', TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+                .lt('estado', TIPO_ESTADO_RUTA_DESPACHO.terminado)
+                .eq('conductor_id', userId)
+                .single();
+
+            if (rutaError) {
+                console.error("Error fetching ruta for CHOFER:", rutaError);
+                throw rutaError;
+            }
+
+            console.log("Fetched ruta for CHOFER:", unaRuta);
+
+            return NextResponse.json({ ok: true, contadores: [unaRuta ? 1 : 0] });
+        }    
+
+        console.log("No data for this role:", userTipoCargo);
+
+        // Otros roles: respuesta vacía
+        return NextResponse.json({ ok: true, message: "No data for this role.", contadores: [] });
+    } catch (error) {
+        console.error("Error in GET /api/home:", error);
+        return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
     }
-
-    console.log("Fetching data for CHOFER role", userTipoCargo, TIPO_CARGO.conductor);
-
-    // CHOFER
-    if (userTipoCargo === TIPO_CARGO.conductor) {
-        const { data: unaRuta, error: rutaError } = await supabase
-            .from('rutas_despacho')
-            .select('id')
-            .gte('estado', TIPO_ESTADO_RUTA_DESPACHO.preparacion)
-            .lt('estado', TIPO_ESTADO_RUTA_DESPACHO.terminado)
-            .eq('chofer_id', userId)
-            .single();
-
-        return NextResponse.json({ ok: true, contadores: [unaRuta ? 1 : 0] });
-    }    
-
-    // Otros roles: respuesta vacía
-    return NextResponse.json({ ok: true, message: "No data for this role.", contadores: [] });
 }

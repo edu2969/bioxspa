@@ -113,10 +113,7 @@ const getModulesForUser = (
   }
 
   // Módulo específico para Despachadores
-  if (auth.hasRole([ROLES.DISPATCHER]) && !auth.canAny([
-    { resource: RESOURCES.PEDIDOS, action: ACTIONS.APPROVE },
-    { resource: RESOURCES.PEDIDOS, action: ACTIONS.ASSIGN }
-  ])) {
+  if (auth.hasRole([ROLES.DISPATCHER])) {
     modules.push({
       key: "despacho",
       href: "/pages/homeDespacho/pedidos",

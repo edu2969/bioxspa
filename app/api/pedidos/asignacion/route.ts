@@ -4,9 +4,7 @@ import supabase from "@/lib/supabase";
 import {
     TIPO_ESTADO_VENTA,
     TIPO_CARGO,
-    TIPO_ESTADO_RUTA_DESPACHO,
-    TIPO_CHECKLIST,
-    TIPO_ORDEN
+    TIPO_ESTADO_RUTA_DESPACHO
 } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
@@ -64,14 +62,14 @@ export async function GET(request: NextRequest) {
         }
 
         return {
-            _id: venta.id,
+            id: venta.id,
             tipo: venta.tipo,
             comentario: venta.comentario || "",
-            clienteId: cliente.id,
-            clienteNombre: cliente.nombre || "Desconocido",
-            clienteRut: cliente.rut || "Desconocido",
+            cliente_id: cliente.id,
+            cliente_nombre: cliente.nombre || "Desconocido",
+            cliente_rut: cliente.rut || "Desconocido",
             estado: venta.estado,
-            despachoEnLocal: !venta.direccion_despacho_id,
+            despacho_en_local: !venta.direccion_despacho_id,
             fecha: venta.fecha,
             items: items.map((item: Item) => ({
             ...item,
@@ -99,7 +97,7 @@ export async function GET(request: NextRequest) {
         const rutas = chofer.rutas_despacho || [];
 
         return {
-            _id: user.id,
+            id: user.id,
             nombre: Array.isArray(user) ? "Desconocido" : user.name,
             pedidos: rutas.map((ruta) => ({
                 ...ruta,
@@ -120,6 +118,26 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "ventaId and choferId are required" }, { status: 400 });
         }
 
+        console.log("POST /asignacion - Request Body:", { ventaId, choferId });
+
+        // Fetch the chofer's cargo to get dependencia_id
+        const { data: cargo, error: cargoError } = await supabase
+            .from("cargos")
+            .select("dependencia_id")
+            .eq("usuario_id", choferId)
+            .eq("activo", true)
+            .single();
+
+        if (cargoError || !cargo) {
+            console.log("POST /asignacion - Error fetching cargo:", { choferId, error: cargoError?.message });
+            return NextResponse.json({ ok: false, error: "Cargo for chofer not found" }, { status: 404 });
+        }
+
+        const dependenciaId = cargo.dependencia_id;
+        if (!dependenciaId) {
+            return NextResponse.json({ ok: false, error: "No valid dependencia_id found for chofer" }, { status: 400 });
+        }
+
         // Update venta state
         const { error: ventaError } = await supabase
             .from("ventas")
@@ -127,48 +145,63 @@ export async function POST(request: NextRequest) {
             .eq("id", ventaId);
 
         if (ventaError) {
+            console.log("POST /asignacion - Error updating venta:", { ventaId, error: ventaError.message });
             return NextResponse.json({ ok: false, error: ventaError.message }, { status: 500 });
         }
 
-        // Check if chofer has an existing ruta
-        const { data: rutaExistente, error: rutaError } = await supabase
-            .from("rutas_despacho")
-            .select("*")
-            .eq("chofer_id", choferId)
-            .eq("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
-            .single();
-
-        if (rutaError && rutaError.code !== "PGRST116") {
-            return NextResponse.json({ ok: false, error: rutaError.message }, { status: 500 });
-        }
-
-        if (rutaExistente) {
-            // Add venta to existing ruta
-            const { error: updateRutaError } = await supabase
-                .from("rutas_despacho")
-                .update({ venta_ids: [...rutaExistente.venta_ids, ventaId] })
-                .eq("id", rutaExistente.id);
-
-            if (updateRutaError) {
-                return NextResponse.json({ ok: false, error: updateRutaError.message }, { status: 500 });
-            }
-
-            return NextResponse.json({ ok: true, message: "Venta added to existing RutaDespacho" });
-        }
-
         // Create a new ruta
-        const { error: createRutaError } = await supabase
+        const { data: nuevaRuta, error: createRutaError } = await supabase
             .from("rutas_despacho")
             .insert({
-                chofer_id: choferId,
+                conductor_id: choferId,
+                dependencia_id: dependenciaId,
                 estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                venta_ids: [ventaId]
-            });
+                hora_inicio: new Date(),
+                hora_destino: null,
+                created_at: new Date(),
+                updated_at: new Date()
+            })
+            .select("id")
+            .single();
 
-        if (createRutaError) {
-            return NextResponse.json({ ok: false, error: createRutaError.message }, { status: 500 });
+        if (createRutaError || !nuevaRuta) {
+            console.log("POST /asignacion - Error creating ruta:", { choferId, error: createRutaError?.message });
+            return NextResponse.json({ ok: false, error: "Failed to create RutaDespacho" }, { status: 500 });
         }
 
+        const rutaId = nuevaRuta.id;
+
+        // Associate the venta with the new ruta
+        const { error: rutaVentaError } = await supabase
+            .from("ruta_ventas")
+            .insert({
+                ruta_id: rutaId,
+                venta_id: ventaId,
+                created_at: new Date()
+            });
+
+        if (rutaVentaError) {
+            console.log("POST /asignacion - Error associating venta with ruta:", { rutaId, ventaId, error: rutaVentaError.message });
+            return NextResponse.json({ ok: false, error: "Failed to associate venta with RutaDespacho" }, { status: 500 });
+        }
+
+        // Log the initial state of the ruta
+        const { error: historialError } = await supabase
+            .from("ruta_historial_estados")
+            .insert({
+                ruta_id: rutaId,
+                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                fecha: new Date(),
+                usuario_id: choferId,
+                created_at: new Date()
+            });
+
+        if (historialError) {
+            console.log("POST /asignacion - Error logging initial ruta state:", { rutaId, error: historialError.message });
+            return NextResponse.json({ ok: false, error: "Failed to log initial RutaDespacho state" }, { status: 500 });
+        }
+
+        console.log("POST /asignacion - Nueva ruta creada y asociada:", { rutaId, ventaId, choferId });
         return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("Error in POST /asignacion:", error);

@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/apiAuthorization";
-import { TIPO_ESTADO_VENTA, TIPO_ESTADO_RUTA_DESPACHO, ROLES } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, ROLES } from "@/app/utils/constants";
 
 export const POST = withAuthorization(
     async (req, user) => {
@@ -22,34 +22,52 @@ export const POST = withAuthorization(
                 }, { status: 403 });
             }
 
-            // Find the rutaDespacho that contains this venta
-            const { data: rutaDespacho, error: rutaError } = await supabase
-                .from("rutas_despacho")
-                .select("id, venta_ids")
-                .contains("venta_ids", [ventaId])
-                .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
+            // Find the ruta_ventas entry that contains this venta
+            const { data: rutaVenta, error: rutaVentaError } = await supabase
+                .from("ruta_ventas")
+                .select("id, ruta_id")
+                .eq("venta_id", ventaId)
                 .single();
 
-            if (rutaError) {
-                console.error("Error fetching rutaDespacho:", rutaError);
-                return NextResponse.json({ ok: false, error: "Error fetching rutaDespacho" }, { status: 500 });
+            if (rutaVentaError) {
+                console.error("Error fetching ruta_ventas entry:", rutaVentaError);
+                return NextResponse.json({ ok: false, error: "Error fetching ruta_ventas entry" }, { status: 500 });
             }
 
-            if (rutaDespacho) {
-                // Remove the ventaId from the rutaDespacho
-                const updatedVentaIds = rutaDespacho.venta_ids.filter((id) => id !== ventaId);
+            if (rutaVenta) {
+                // Delete the ruta_ventas entry
+                const { error: deleteError } = await supabase
+                    .from("ruta_ventas")
+                    .delete()
+                    .eq("id", rutaVenta.id);
 
-                if (updatedVentaIds.length > 0) {
-                    await supabase
-                        .from("rutas_despacho")
-                        .update({ venta_ids: updatedVentaIds })
-                        .eq("id", rutaDespacho.id);
-                } else {
-                    // Delete the route if it becomes empty
-                    await supabase
+                if (deleteError) {
+                    console.error("Error deleting ruta_ventas entry:", deleteError);
+                    return NextResponse.json({ ok: false, error: "Error deleting ruta_ventas entry" }, { status: 500 });
+                }
+
+                // Check if the ruta_despacho has any remaining ventas
+                const { data: remainingVentas, error: remainingVentasError } = await supabase
+                    .from("ruta_ventas")
+                    .select("id")
+                    .eq("ruta_id", rutaVenta.ruta_id);
+
+                if (remainingVentasError) {
+                    console.error("Error checking remaining ventas for ruta_despacho:", remainingVentasError);
+                    return NextResponse.json({ ok: false, error: "Error checking remaining ventas for ruta_despacho" }, { status: 500 });
+                }
+
+                if (remainingVentas.length === 0) {
+                    // Delete the ruta_despacho if it has no remaining ventas
+                    const { error: deleteRutaError } = await supabase
                         .from("rutas_despacho")
                         .delete()
-                        .eq("id", rutaDespacho.id);
+                        .eq("id", rutaVenta.ruta_id);
+
+                    if (deleteRutaError) {
+                        console.error("Error deleting ruta_despacho:", deleteRutaError);
+                        return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho" }, { status: 500 });
+                    }
                 }
             }
 

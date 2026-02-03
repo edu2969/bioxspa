@@ -397,12 +397,10 @@ CREATE TABLE rutas_despacho (
 CREATE TABLE ruta_destinos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
-    direccion_id UUID REFERENCES direcciones(id) NOT NULL,
-    orden INTEGER NOT NULL,
+    direccion_id UUID REFERENCES direcciones(id),
     fecha_arribo TIMESTAMPTZ,
     rut_quien_recibe VARCHAR(12),
     nombre_quien_recibe VARCHAR(255),
-    completado BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -638,13 +636,11 @@ FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id);
 
 CREATE TABLE checklists (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tipo VARCHAR(50) NOT NULL, -- 'personal', 'vehiculo', etc.
+    tipo INTEGER NOT NULL, -- 'personal', 'vehiculo', etc.
     usuario_id UUID REFERENCES usuarios(id),
     vehiculo_id UUID REFERENCES vehiculos(id),
     ruta_id UUID REFERENCES rutas_despacho(id),
     fecha DATE NOT NULL,
-    completado BOOLEAN DEFAULT false,
-    items JSONB, -- Para flexibilidad en items de checklist
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

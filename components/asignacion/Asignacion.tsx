@@ -2,7 +2,7 @@
 
 import { ConfirmModal } from '../modals/ConfirmModal';
 import Loader from '../Loader';
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import PorAsignar from './PorAsignar';
 import Conductores from './Conductores';
@@ -15,6 +15,7 @@ import { INuevaVentaSubmit } from '../pedidos/types';
 import Nav from '../Nav';
 import CommentModal from '../modals/CommentModal';
 import { IPedidoPorAsignar, IConductoresResponse } from '@/types/types';
+import { useUser } from "@/components/providers/UserProvider";
 
 interface ISucursalSelectable {
     id: string;
@@ -45,6 +46,7 @@ export default function Asignacion() {
     const [dragSourceConductor, setDragSourceConductor] = useState<string | null>(null);
     const { control, setValue } = useForm<INuevaVentaSubmit>();
     const qryClient = useQueryClient();
+    const userContext = useUser(); 
 
     const sucursalId = useWatch({
         control,
@@ -329,8 +331,8 @@ export default function Asignacion() {
                                     "Content-Type": "application/json",
                                 },
                                 body: JSON.stringify({
-                                    ventaId: selectedVenta,
-                                    choferId: selectedChofer,
+                                    ventaId: selectedVenta?.id,
+                                    choferId: selectedChofer?.id,
                                 }),
                             });
 
@@ -378,10 +380,17 @@ export default function Asignacion() {
                     setIsSaving(true);
                     const deshacerAsignarPedido = async () => {
                         try {
+                            if (!userContext || !userContext.session) {
+                                console.error("No hay sesión activa");
+                                return;
+                            }
+
+                            const token = userContext.session.access_token;
                             const response = await fetch("/api/pedidos/reasignacion", {
                                 method: "POST",
                                 headers: {
                                     "Content-Type": "application/json",
+                                    "Authorization": `Bearer ${token}`
                                 },
                                 body: JSON.stringify({
                                     ventaId: selectedVenta?.id,

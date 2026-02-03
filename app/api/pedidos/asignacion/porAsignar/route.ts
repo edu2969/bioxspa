@@ -5,23 +5,17 @@ import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
     try {
-        console.log("[GET /porAsignar] Starting request...");
-
         // Authenticate user
         const { user } = await getAuthenticatedUser();
         const userId = user.id;
-        console.log(`[GET /porAsignar] Authenticated user ID: ${userId}`);
 
         // Get sucursalId from query parameters
         const { searchParams } = new URL(request.url);
         const sucursalId = searchParams.get("sucursalId");
 
-        if (!sucursalId) {
-            console.warn("[GET /porAsignar] Missing sucursalId parameter.");
+        if (!sucursalId) {            
             return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
-        }
-
-        console.log(`[GET /porAsignar] Fetching ventas for sucursalId: ${sucursalId}`);
+        }        
 
         // Fetch ventas in "por_asignar" state
         const { data: ventas, error: ventasError } = await supabase
@@ -37,10 +31,8 @@ export async function GET(request: NextRequest) {
                 items:detalle_ventas(
                     id,
                     subcategoria:subcategorias_catalogo(id, nombre, categoria:categorias_catalogo(id, nombre)),
-                    detalle_items:detalle_venta_items(
-                        id,
-                        item:items_catalogo(id, nombre)
-                    )
+                    cantidad,
+                    total
                 )
             `)
             .eq("sucursal_id", sucursalId)
@@ -53,16 +45,13 @@ export async function GET(request: NextRequest) {
             .order("fecha", { ascending: false })
             .limit(25);
 
-        if (ventasError) {
-            console.error("[GET /porAsignar] Error fetching ventas:", ventasError);
+        if (ventasError) {            
             return NextResponse.json({ ok: false, error: ventasError.message }, { status: 500 });
-        }
-
-        console.log(`[GET /porAsignar] Retrieved ${ventas.length} ventas.`);
+        }        
 
         // Transform ventas data
         const pedidos = ventas.map((venta) => {           
-            
+            console.log("Processing venta:", venta);
             const items = venta.items || [];
             const cliente = Array.isArray(venta.cliente) ? venta.cliente[0] : venta.cliente;
 
@@ -92,9 +81,7 @@ export async function GET(request: NextRequest) {
                 fecha: venta.fecha,
                 items: itemsWithNames
             };
-        });
-
-        console.log(`[GET /porAsignar] Final response data:`, pedidos);
+        });        
         return NextResponse.json({ pedidos });
     } catch (error) {
         console.error("[GET /porAsignar] Internal Server Error:", error);

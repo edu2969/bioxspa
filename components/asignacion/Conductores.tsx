@@ -34,7 +34,8 @@ export default function Conductores({
             const data = await response.json();
             console.log("Conductores fetched:", data);
             return data.conductores;
-        }
+        },
+        enabled: !!sucursalId
     });
 
     const onSaveComment = () => {
@@ -43,6 +44,8 @@ export default function Conductores({
 
     // Componente individual de conductor con @dnd-kit
     const ConductorItem = ({ chofer, index }: { chofer: IConductoresResponse, index: number }) => {
+        console.log("Rendering conductor:", chofer, index);
+
         const { setNodeRef, isOver } = useDroppable({
             id: `conductor-${chofer.id}`,
             disabled: !chofer.checklist

@@ -1,231 +1,98 @@
-import mongoose, { Types } from "mongoose";
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
-import User from "@/models/user";
-import RutaDespacho from "@/models/rutaDespacho";
-import Vehiculo from "@/models/vehiculo";
+import { NextRequest, NextResponse } from "next/server";
+import supabase from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
-import Cliente from "@/models/cliente";
-import Direccion from "@/models/direccion";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import ItemCatalogo from "@/models/itemCatalogo";
-import Venta from "@/models/venta";
-import CheckList from "@/models/checklist";
-import DetalleVenta from "@/models/detalleVenta";
-import { IRutaDespacho } from "@/types/rutaDespacho";
-import { IDetalleVenta } from "@/types/detalleVenta";
-import { IVenta } from "@/types/venta";
-import { IChecklist } from "@/types/checklist";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        console.log("GET request received for asignacion chofer.");
-        console.log("Connecting to MongoDB...");
-        await connectMongoDB();
-        console.log("MongoDB connected.");
-
-        if (!mongoose.models.Cliente) {
-            mongoose.model("Cliente", Cliente.schema);
-        }
-        if (!mongoose.models.Direccion) {
-            mongoose.model("Direccion", Direccion.schema);
-        }
-        if (!mongoose.models.SubcategoriaCatalogo) {
-            mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-        }
-        if (!mongoose.models.CategoriaCatalogo) {
-            mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-        }        
-        if (!mongoose.models.ItemCatalogo) {
-            mongoose.model("ItemCatalogo", ItemCatalogo.schema);
-        }
-        if (!mongoose.models.Venta) {
-            mongoose.model("Venta", Venta.schema);
-        }
-
-        console.log("Fetching server session...");
-        const session = await getServerSession(authOptions);
-
-        if (!session || !session.user || !session.user.id) {
-            console.warn("Unauthorized access attempt.");
+        // Fetch the authenticated user
+        const { data: user, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const choferId = session.user.id;
-        console.log(`Fetching chofer with ID: ${choferId}`);
-        const chofer = await User.findById(choferId).lean();
-        if (!chofer) {
-            console.warn(`Chofer not found for ID: ${choferId}`);
-            return NextResponse.json({ ok: false, error: "Chofer not found" }, { status: 404 });
+        const choferId = user.user.id;
+
+        // Fetch the active dispatch route for the driver
+        const { data: rutaDespacho, error: rutaError } = await supabase
+            .from("rutas_despacho")
+            .select(`
+                id,
+                estado,
+                hora_inicio,
+                hora_destino,
+                dependencia_id,
+                vehiculo_id,
+                ruta_ventas(venta_id),
+                ruta_historial_estados(estado, fecha, usuario_id)
+            `)
+            .eq("conductor_id", choferId)
+            .gt("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+            .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado)
+            .single();
+
+        if (rutaError) {
+            return NextResponse.json({ ok: false, error: rutaError.message }, { status: 500 });
         }
 
-        console.log(`Fetching rutasDespacho for choferId: ${choferId}`);
-        const rutaDespacho = await RutaDespacho.findOne({
-            choferId: choferId,
-            estado: { $gte: TIPO_ESTADO_RUTA_DESPACHO.preparacion, $lt: TIPO_ESTADO_RUTA_DESPACHO.terminado }
-        }).populate({
-            path: "vehiculoId",
-            model: "Vehiculo",
-            select: "_id patente modelo marca",
-        }).populate({
-            path: "cargaItemIds",
-            model: "ItemCatalogo",
-            select: "_id codigo subcategoriaCatalogoId",
-            populate: {
-                path: "subcategoriaCatalogoId",
-                model: "SubcategoriaCatalogo",
-                select: "cantidad unidad nombreGas sinSifon",
-                populate: {
-                    path: "categoriaCatalogoId",
-                    model: "CategoriaCatalogo",
-                    select: "elemento esIndustrial esMedicinal"
-                }
-            }
-        }).populate({
-            path: "ventaIds",
-            model: "Venta",
-            select: "_id clienteId direccionDespachoId estado tipo comentario",
-            populate: {
-                path: "clienteId",
-                model: "Cliente",
-                select: "_id nombre rut telefono giro direccionesDespacho",
-                populate: {
-                    path: "direccionesDespacho.direccionId",
-                    model: "Direccion",
-                    select: "_id nombre latitud longitud",
-                }
-            }
-        }).populate({
-            path: "ruta.direccionDestinoId",
-            model: "Direccion",
-            select: "_id nombre latitud longitud"
-        })
-        .lean<IRutaDespacho>();
-
-        // Ensure rutaDespacho is not an array before accessing ventaIds
-        if (rutaDespacho && rutaDespacho.ventaIds.length > 0) {
-            const ventaIds = rutaDespacho.ventaIds.map((v: IVenta | Types.ObjectId) => (v && typeof v === "object" && "_id" in v) ? v._id : v);
-            // Importar aquí para evitar ciclos si es necesario
-            // Obtener los detalles de venta
-            const detallesPorVenta = await DetalleVenta.find({
-                ventaId: { $in: ventaIds }
-            })
-            .select("ventaId subcategoriaCatalogoId cantidad itemCatalogoIds")
-            .populate({
-                path: "subcategoriaCatalogoId",
-                model: "SubcategoriaCatalogo",
-                select: "nombre unidad cantidad sinSifon categoriaCatalogoId",
-                populate: {
-                    path: "categoriaCatalogoId",
-                    model: "CategoriaCatalogo",
-                    select: "nombre elemento esIndustrial esMedicinal"
-                }
-            })
-            .lean<IDetalleVenta[]>();
-
-            // Agrupar detalles por ventaId
-            const detallesMap: Record<string, IDetalleVenta[]> = {};
-            detallesPorVenta.forEach(det => {
-                const vId = det.ventaId.toString();
-                if (!detallesMap[vId]) detallesMap[vId] = [];
-                detallesMap[vId].push({
-                    ...det
-                });
-            });
-
-            // Agregar el atributo detalles a cada venta en rutaDespacho.ventaIds
-            rutaDespacho.ventaIds = (rutaDespacho.ventaIds as IVenta[])?.map((venta) => {
-                const vId = (venta._id || venta).toString();
-                return {
-                    ...venta,
-                    detalles: detallesMap[vId] || []
-                };
-            });
-        }
-
-        console.log(`Fetching vehiculos for choferId: ${choferId}`);
-        const vehiculos = await Vehiculo.find({
-            choferIds: choferId
-        }).lean();
-
-        console.log("Returning response with rutasDespacho, vehiculos");
-        return NextResponse.json({ ok: true, rutaDespacho, vehiculos });
-    } catch (error) {
-        console.error("ERROR", error);
-        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
-    }
-}
-
-export async function POST() {
-    try {
-        console.log("POST request received for asignacion chofer.");
-        console.log("Connecting to MongoDB...");
-        await connectMongoDB();
-        console.log("MongoDB connected.");
-
-        console.log("Fetching server session...");
-        const session = await getServerSession(authOptions);
-
-        if (!session || !session.user || !session.user.id) {
-            console.warn("Unauthorized access attempt.");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
-        const choferId = session.user.id;
-        
-        // Buscar el checklist del usuario para hoy con passed: true y obtener vehiculoId
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-
-        const checklist = await CheckList.findOne({
-            userId: choferId,
-            passed: true,
-            fecha: { $gte: today }
-        }).lean<IChecklist>();
-
-        if (!checklist || !checklist.vehiculoId) {
-            console.warn("No se encontró un checklist válido para el usuario hoy.");
-            return NextResponse.json({ ok: false, error: "No se encontró un checklist válido para el usuario hoy" }, { status: 400 });
-        }
-
-        const vehiculoId = checklist.vehiculoId;
-
-        console.log(`Fetching rutaDespacho for choferId: ${choferId}`);
-        const rutaDespacho = await RutaDespacho.findOne({
-            choferId: choferId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-        });
-        
         if (!rutaDespacho) {
-            console.warn(`RutaDespacho not found or not in "orden_confirmada' state for choferId: ${choferId}`);
-            return NextResponse.json({ ok: true, rutaDespacho: null });
+            return NextResponse.json({ ok: true, ruta_despacho: null });
         }
 
-        console.log(`Assigning choferId: ${choferId} to rutaDespacho ID: ${rutaDespacho._id}`);
-        rutaDespacho.vehiculoId = vehiculoId;
-        if(rutaDespacho.ventaIds.length === 1) {
-            const venta = await Venta.findById(rutaDespacho.ventaIds[0])
-                .select("clienteId").populate("clienteId")
-                .select("direccionDespachoIds").populate("direccionDespachoIds").lean<IVenta>();
-            if(venta && venta.clienteId && venta.clienteId.direccionesDespacho && venta.clienteId.direccionesDespacho.length === 1) {
-                rutaDespacho.ruta = [{
-                    direccionId: venta.clienteId.direccionesDespacho[0].direccionId,
-                    fechaArribo: null
-                }]
+        // Fetch vehicle details if a vehicle is assigned
+        let vehiculo = null;
+        if (rutaDespacho.vehiculo_id) {
+            const { data: vehiculoData, error: vehiculoError } = await supabase
+                .from("vehiculos")
+                .select("id, patente, modelo, marca")
+                .eq("id", rutaDespacho.vehiculo_id)
+                .single();
+
+            if (vehiculoError) {
+                return NextResponse.json({ ok: false, error: vehiculoError.message }, { status: 500 });
             }
-            rutaDespacho.estado = TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino;
-        }
-        await rutaDespacho.save();
 
-        console.log("Returning updated rutaDespacho.");
-        return NextResponse.json({ ok: true });
+            vehiculo = vehiculoData;
+        }
+
+        // Fetch sales details for the route
+        const ventas = await Promise.all(
+            rutaDespacho.ruta_ventas.map(async (venta) => {
+                const { data: ventaData, error: ventaError } = await supabase
+                    .from("ventas")
+                    .select(`
+                        id,
+                        cliente:clientes(id, nombre, rut),
+                        direccion_despacho_id,
+                        estado,
+                        tipo,
+                        comentario
+                    `)
+                    .eq("id", venta.venta_id)
+                    .single();
+
+                if (ventaError) {
+                    return null;
+                }
+
+                return ventaData;
+            })
+        );
+
+        // Format the response
+        const response = {
+            id: rutaDespacho.id,
+            estado: rutaDespacho.estado,
+            hora_inicio: rutaDespacho.hora_inicio,
+            hora_destino: rutaDespacho.hora_destino,
+            dependencia_id: rutaDespacho.dependencia_id,
+            vehiculo,
+            ventas: ventas.filter(Boolean), // Remove null entries
+            historial_estados: rutaDespacho.ruta_historial_estados
+        };
+
+        return NextResponse.json({ ok: true, ruta_despacho: response });
     } catch (error) {
-        console.error("ERROR", error);
+        console.error("GET /conductor - Internal Server Error:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
 }

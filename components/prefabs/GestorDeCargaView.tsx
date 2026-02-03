@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 import { getNUCode } from "@/lib/nuConverter";
@@ -63,18 +63,18 @@ export default function GestorDeCargaView({
       const cargamento = cargamentos?.[0];
       if (!cargamento) throw new Error('No hay cargamento disponible');
 
-      // Endpoint dinámico basado en si tiene rutaId
-      const endpoint = cargamento.rutaId ?
+      // Endpoint dinámico basado en si tiene ruta_id
+      const endpoint = cargamento.ruta_id ?
         `/api/pedidos/despacho` :
         `/api/pedidos/despacho/confirmarEntregaEnLocal`;
 
       // Payload dinámico basado en el tipo de entrega
-      const payload = cargamento.rutaId ? {
-        rutaId: cargamento.rutaId
+      const payload = cargamento.ruta_id ? {
+        ruta_id: cargamento.ruta_id
       } : {
-        ventaId: cargamento.ventas[0]?.ventaId,
-        nombreRecibe: cargamento.ventas[0]?.entregasEnLocal?.[0]?.nombreRecibe || '',
-        rutRecibe: cargamento.ventas[0]?.entregasEnLocal?.[0]?.rutRecibe || ''
+        venta_id: cargamento.ventas[0]?.venta_id,
+        nombre_recibe: cargamento.ventas[0]?.entregas_en_local?.[0]?.nombre_recibe || '',
+        rut_recibe: cargamento.ventas[0]?.entregas_en_local?.[0]?.rut_recibe || ''
       };
 
       const response = await fetch(endpoint, {
@@ -146,14 +146,14 @@ export default function GestorDeCargaView({
     // Usar el cargamento específico de este componente visual (index), no necesariamente el primero
     const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento
     console.log("Calculando estado de carga para:", cargamento);
-    const esProcesoCarga = cargamento.rutaId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
-    const esProcesoDescarga = cargamento.rutaId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
+    const esProcesoCarga = cargamento.ruta_id !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
+    const esProcesoDescarga = cargamento.ruta_id !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
     const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
-    const ventaEnLocal = cargamento.rutaId === null;
+    const ventaEnLocal = cargamento.ruta_id === null;
 
 
     if (tieneTraslado) {
-      const itemsRetirados = Array.isArray(cargamento.cargaItemIds) && cargamento.cargaItemIds.length === 0;
+      const itemsRetirados = Array.isArray(cargamento.carga_item_ids) && cargamento.carga_item_ids.length === 0;
 
       if (itemsRetirados) {
         return { complete: true, porcentaje: 100 };
@@ -164,9 +164,9 @@ export default function GestorDeCargaView({
     }
 
     if (esProcesoCarga) {
-      // Crear un Set de los subcategoriaCatalogoId que están en cargaItemIds
+      // Crear un Set de los subcategoria_catalogo_id que están en carga_item_ids
       const cargaItemSubcategoriaIds = new Set(
-        cargamento.cargaItemIds.map(item => item.subcategoriaCatalogoId)
+        cargamento.carga_item_ids.map(item => item.subcategoria_catalogo_id)
       );
 
       const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
@@ -182,7 +182,7 @@ export default function GestorDeCargaView({
       // Verificar si cada venta tiene al menos un detalle con subcategoriaCatalogoId en cargaItemIds
       const todasLasVentasTienenAlMenosUno = porcentaje < 100 && cargamento.ventas.every(venta =>
         venta.detalles.some(detalle =>
-          cargaItemSubcategoriaIds.has(String(detalle.subcategoriaCatalogoId._id))
+          cargaItemSubcategoriaIds.has(String(detalle.subcategoria_catalogo_id.id))
         )
       );
 
@@ -222,15 +222,15 @@ export default function GestorDeCargaView({
         venta.detalles.some(detalle => detalle.restantes < detalle.multiplicador)
       );
 
-      const validacionQuienRecibe = cargamento.ventas[0]?.entregasEnLocal?.[0];
-      if (!validacionQuienRecibe || !validacionQuienRecibe.nombreRecibe || !validacionQuienRecibe.rutRecibe) {
+      const validacionQuienRecibe = cargamento.ventas[0]?.entregas_en_local?.[0];
+      if (!validacionQuienRecibe || !validacionQuienRecibe.nombre_recibe || !validacionQuienRecibe.rut_recibe) {
         console.log("Falta información de quién recibe en local");        
       }
 
       return {
         complete: porcentaje >= 100,
         partial: !todasLasEntregasCompletas && hayEntregasParciales,
-        faltaQuienRecibe: !validacionQuienRecibe || !validacionQuienRecibe.nombreRecibe || !validacionQuienRecibe.rutRecibe,
+        faltaQuienRecibe: !validacionQuienRecibe || !validacionQuienRecibe.nombre_recibe || !validacionQuienRecibe.rut_recibe,
         porcentaje: Math.round(porcentaje)
       };
     }
@@ -253,38 +253,38 @@ export default function GestorDeCargaView({
             width: '95%'
           }}>
 
-          {!cargamento.retiroEnLocal && <div className="w-full flex text-xl font-bold px-3 pt-0 pb-1">
+          {!cargamento.retiro_en_local && <div className="w-full flex text-xl font-bold px-3 pt-0 pb-1">
             <div>
               <p className="text-xs">CHOFER</p>
-              <p className="font-bold -mt-2 text-nowrap">{cargamento.nombreChofer?.split(" ").splice(0, 2).join(" ")}</p>
+              <p className="font-bold -mt-2 text-nowrap">{cargamento.nombre_chofer?.split(" ").splice(0, 2).join(" ")}</p>
             </div>
             <div className="w-full text-gray-500 mr-0 items-end flex justify-end">
               <div className="w-[76px] text-center bg-white rounded-md p-0.5">
                 <div className="flex justify-start md:justify-start bg-white rounded-sm border-gray-400 border px-0.5 pb-0.5 space-x-0.5">
-                  <p className="font-bold text-sm">{cargamento.patenteVehiculo?.substring(0, 2)}</p>
+                  <p className="font-bold text-sm">{cargamento.patente_vehiculo?.substring(0, 2)}</p>
                   <Image width={82} height={78} src="/ui/escudo.png" alt="separador" className="w-[9px] h-[9px]" style={{ "marginTop": "7px" }} />
-                  <p className="font-bold text-sm">{cargamento.patenteVehiculo?.substring(2, cargamento.patenteVehiculo.length)}</p>
+                  <p className="font-bold text-sm">{cargamento.patente_vehiculo?.substring(2, cargamento.patente_vehiculo.length)}</p>
                 </div>
               </div>
             </div>
           </div>}
 
           {cargamento.ventas && cargamento.ventas.map((venta, vidx) => <div key={`venta_${vidx}`} className="w-full mb-2 bg-gray-200 p-1 rounded-md shadow-md">
-            {cargamento.retiroEnLocal && <div className="w-full flex text-xl font-bold px-3 py-1">
+            {cargamento.retiro_en_local && <div className="w-full flex text-xl font-bold px-3 py-1">
               <div className="w-full flex text-lg font-bold px-3 relative">
                 <div className="w-full relative">
                   <p className="text-xs">Nombre de quién retira en local</p>
                   <div className="mt-1 text-nowrap border border-gray-300 rounded px-2">
-                    <p className="-mt-1">{venta.entregasEnLocal[0]?.nombreRecibe || 'Desconocido'}</p>
-                    <p className="text-xs -mt-1">RUT: {venta.entregasEnLocal[0]?.rutRecibe || '-'}</p>
+                    <p className="-mt-1">{venta.entregas_en_local[0]?.nombre_recibe || 'Desconocido'}</p>
+                    <p className="text-xs -mt-1">RUT: {venta.entregas_en_local[0]?.rut_recibe || '-'}</p>
                   </div>
                 </div>
                 <div className="absolute top-8 right-5 text-blue-500 flex items-center justify-end">
                   <LiaPencilAltSolid className="cursor-pointer hover:text-blue-600" size="1.3rem" onClick={() => {
-                    setValue("nombreRetira", venta.entregasEnLocal[0]?.nombreRecibe || "");
-                    setValue("rutRetiraNum", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[0] : "");
-                    setValue("rutRetiraDv", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[1] : "");
-                    setSelectedVentaId(venta.ventaId);
+                    setValue("nombreRetira", venta.entregas_en_local[0]?.nombre_recibe || "");
+                    setValue("rutRetiraNum", venta.entregas_en_local[0]?.rut_recibe ? venta.entregas_en_local[0].rut_recibe.split("-")[0] : "");
+                    setValue("rutRetiraDv", venta.entregas_en_local[0]?.rut_recibe ? venta.entregas_en_local[0].rut_recibe.split("-")[1] : "");
+                    setSelectedVentaId(venta.venta_id);
                     setShowModalNombreRetira(true);
                   }} />
                 </div>
@@ -294,7 +294,7 @@ export default function GestorDeCargaView({
               <div className="w-full text-left ml-2 text-gray-400">
                 <p className="text-md font-bold truncate -mb-1">{venta.cliente.nombre || "Sin cliente"}</p>
                 <p className="text-xs truncate m-0">{venta.cliente.rut}</p>
-                {cargamento.retiroEnLocal && <div className="text-sm font-bold text-gray-700">
+                {cargamento.retiro_en_local && <div className="text-sm font-bold text-gray-700">
                   <p>ENTREGA DE CILINDROS</p>
                   {index === 0 && <span className="text-xs">Escanee cilindros a entregar</span>}
                 </div>}
@@ -323,14 +323,14 @@ export default function GestorDeCargaView({
                   <div className="w-full flex items-left">
                     <div className="flex">
                       <div>
-                        <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
-                        {detalle.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                        {detalle.subcategoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                      <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(detalle.subcategoria_catalogo_id.categoria_catalogo_id.elemento)}</div>
+                      {detalle.subcategoria_catalogo_id.categoria_catalogo_id.es_industrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                      {detalle.subcategoria_catalogo_id.sin_sifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
                       </div>
                       <div className="font-bold text-xl ml-2">
-                        {detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <span>
+                        {detalle.subcategoria_catalogo_id.categoria_catalogo_id.elemento && <span>
                           {(() => {
-                            const elem = detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                            const elem = detalle.subcategoria_catalogo_id.categoria_catalogo_id.elemento;
                             let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
                             if (!match) {
                               match = ["", (elem ?? 'N/A'), ''];
@@ -346,7 +346,7 @@ export default function GestorDeCargaView({
                         </span>}
                       </div>
                     </div>
-                    <p className="text-2xl orbitron ml-2"><b>{detalle.subcategoriaCatalogoId.cantidad}</b> <small>{detalle.subcategoriaCatalogoId.unidad}</small></p>
+                        <p className="text-2xl orbitron ml-2"><b>{detalle.subcategoria_catalogo_id.cantidad}</b> <small>{detalle.subcategoria_catalogo_id.unidad}</small></p>
                   </div>
                   <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
                 </li>
