@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
                 dependencia_id,
                 vehiculo_id,
                 ruta_ventas(venta_id),
-                ruta_historial_estados(estado, fecha, usuario_id)
+                ruta_historial_estados(estado, usuario_id, created_at)
             `)
             .eq("conductor_id", choferId)
             .gt("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)

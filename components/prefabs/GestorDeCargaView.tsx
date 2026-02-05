@@ -77,6 +77,8 @@ export default function GestorDeCargaView({
         rut_recibe: cargamento.ventas[0]?.entregas_en_local?.[0]?.rut_recibe || ''
       };
 
+      console.log("Confirmando cargamento con payload:", payload);
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -144,8 +146,7 @@ export default function GestorDeCargaView({
   const loadState = () => {
     if (!cargamentos || cargamentos.length === 0) return { complete: false, partial: false };
     // Usar el cargamento específico de este componente visual (index), no necesariamente el primero
-    const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento
-    console.log("Calculando estado de carga para:", cargamento);
+    const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento    
     const esProcesoCarga = cargamento.ruta_id !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
     const esProcesoDescarga = cargamento.ruta_id !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
     const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);

@@ -6,7 +6,6 @@ import { TIPO_ESTADO_VENTA, ROLES } from "@/app/utils/constants";
 export const POST = withAuthorization(
   async (req, user) => {
     try {
-      console.log("Creating new venta with Supabase");
       const body = await req.json();
 
       const requiredFields = ["tipo", "usuario_id"];
@@ -81,26 +80,7 @@ export const POST = withAuthorization(
       const estadoInicial =
         body.tipo === 1 && esAdmin
           ? TIPO_ESTADO_VENTA.por_asignar
-          : TIPO_ESTADO_VENTA.borrador;
-
-          console.log("PAYLOAD", {
-          tipo: body.tipo,
-          cliente_id: body.cliente_id,
-          vendedor_id: body.usuario_id,
-          sucursal_id: body.sucursal_id,
-          dependencia_id: user.context.dependenciaId || null,
-          fecha: new Date().toISOString(),
-          estado: estadoInicial,
-          valor_neto: valorNeto,
-          valor_iva: valorIVA,
-          valor_bruto: valorNeto * (1 - 0.19),
-          valor_total: valorTotal,
-          documento_tributario_id: body.documento_tributario_id,
-          por_cobrar: false,
-          tiene_arriendo: cliente.arriendo,
-          direccion_despacho_id: body.direccion_despacho_id || null,
-          comentario: body.comentario || "",
-        });
+          : TIPO_ESTADO_VENTA.borrador;          
 
       const { data: nuevaVenta, error: ventaError } = await supabase
         .from("ventas")
@@ -127,8 +107,6 @@ export const POST = withAuthorization(
         return NextResponse.json({ error: "Error al crear la venta" }, { status: 500 });
       }      
 
-      console.log("Venta created successfully:", nuevaVenta);
-
       // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
       const detalles = body.items.map((item) => ({
         venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
@@ -138,8 +116,6 @@ export const POST = withAuthorization(
         iva: preciosMap[item.subcategoria_id] * item.cantidad * 0.19,
         total: preciosMap[item.subcategoria_id] * item.cantidad * 1.19,
       }));
-
-      console.log("INSERTANDO DETALLES", detalles);
 
       const { error: detalleError } = await supabase
         .from("detalle_ventas")

@@ -82,13 +82,13 @@ export default function Pedidos() {
             toast.error("Error en la solicitud:", data);
         } else {
             toast.success("Solicitud exitosa!");
+            router.back();
         }
     };
 
     const onSubmit = async (data: INuevaVentaSubmit) => {
         if (!user) return;
         setCreandoOrden(true);
-        console.log("DATA", data);
         const payload = {
             tipo: data.tipo,
             usuario_id: data.usuario_id,

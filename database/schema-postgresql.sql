@@ -263,6 +263,8 @@ CREATE TABLE ventas (
     vendedor_id UUID REFERENCES usuarios(id) NOT NULL,
     sucursal_id UUID REFERENCES sucursales(id) NOT NULL,
     dependencia_id UUID REFERENCES dependencias(id),
+    -- Optional direct relation to a ruta_despacho to allow Supabase relationship embedding
+    ruta_id UUID REFERENCES rutas_despacho(id),
     fecha DATE DEFAULT CURRENT_DATE,
     estado INTEGER NOT NULL,
     por_cobrar BOOLEAN DEFAULT false,
@@ -419,7 +421,6 @@ CREATE TABLE ruta_historial_estados (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     estado INTEGER NOT NULL,
-    fecha TIMESTAMPTZ NOT NULL,
     usuario_id UUID REFERENCES usuarios(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

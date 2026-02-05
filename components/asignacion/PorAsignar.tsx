@@ -118,17 +118,12 @@ export default function PorAsignar({
                     </p>
                     
                     <div className="w-full pl-4 mt-2">
-                        {items.slice(0, 1).map((item, i) => (
+                        {items.map((item, i) => (
                             <div key={i} className="w-full flex items-center">
                                 <div className={`${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'bg-gray-100' : 'bg-gray-800'} rounded-full h-2 w-2 mr-2`}></div>
                                 {item.cantidad}x {item.nombre}
                             </div>
                         ))}
-                        {items.length > 1 && (
-                            <div className="text-xs text-gray-300">
-                                +{items.length - 1} items más...
-                            </div>
-                        )}
                     </div>
                 </div>
                 

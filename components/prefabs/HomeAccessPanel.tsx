@@ -47,15 +47,15 @@ const getModulesForUser = (
       index: 1,
       badges: [{
         color: "bg-red-500",
-        value: contadores[1] > 999999 ? '999999+' : (contadores[1] ?? 0),
+        value: contadores[0] > 999999 ? '999999+' : (contadores[1] ?? 0),
         text: "x ASIGNAR"
       }, {
         color: "bg-blue-500",
-        value: contadores[2] > 999999 ? '999999+' : (contadores[2] ?? 0),
+        value: contadores[1] > 999999 ? '999999+' : (contadores[2] ?? 0),
         text: "x PREPARAR"
       }, {
         color: "bg-blue-500",
-        value: contadores[3] > 999999 ? '999999+' : (contadores[3] ?? 0),
+        value: contadores[2] > 999999 ? '999999+' : (contadores[3] ?? 0),
         text: "en RUTA"
       }]
     });
@@ -86,12 +86,8 @@ const getModulesForUser = (
       index: 3,
       badges: [{
         color: "bg-green-500",
-        value: contadores[4] > 999999 ? '999999+' : (contadores[4] ?? 0),
+        value: contadores[3] > 999999 ? '999999+' : (contadores[3] ?? 0),
         text: "x ACTIVOS"
-      }, {
-        color: "bg-gray-500",
-        value: contadores[5] > 999999 ? '999999+' : (contadores[5] ?? 0),
-        text: "en QUIEBRA"
       }]
     });
   }
@@ -123,7 +119,7 @@ const getModulesForUser = (
       badges: [{
         color: "bg-green-500",
         value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
-        text: "x ACTIVOS"
+        text: "x PEDIDO" + (contadores[0] === 1 ? "" : "S")
       }]
     });
   }
@@ -144,7 +140,7 @@ export default function HomeAccessPanel() {
             });
             const resp = await response.json();
             console.log("Home counters data:", resp);
-            return resp.contadores || [];
+            return resp.data || [];
         },
         enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
     });

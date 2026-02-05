@@ -53,22 +53,24 @@ export async function GET() {
                     fecha_arribo,
                     rut_quien_recibe,
                     nombre_quien_recibe,
-                    completado
+                    created_at
                 ),
-                ruta_ventas:ventas(
-                    id,
-                    tipo,
-                    comentario,
-                    cliente:clientes(
-                        nombre,
-                        telefono
+                ruta_ventas(
+                    venta:ventas(
+                        id,
+                        tipo,
+                        comentario,
+                        cliente:clientes(
+                            nombre,
+                            telefono
+                        )
                     )
                 )
             `)
             .eq("conductor_id", userId)
             .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
             .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado)
-            .single();
+            .maybeSingle();
 
         if (rutaError || !rutaDespacho) {
             console.log(`No active rutaDespacho found for conductor: ${userId}`);
@@ -83,24 +85,25 @@ export async function GET() {
 
         // Build response
         const rutaConductorView = {
-            _id: rutaDespacho.id,
+            id: rutaDespacho.id,
             estado: rutaDespacho.estado,
-            destinos: rutaDespacho.ruta_destinos.map((destino) => {
+            destinos: (rutaDespacho.ruta_destinos || []).map((destino) => {
                 return {
                     id: destino.id,
                     direccion: destino.direccion || { id: "", nombre: "", latitud: 0, longitud: 0 },
                     fecha_arribo: destino.fecha_arribo || null,
                     rut_quien_recibe: destino.rut_quien_recibe || null,
                     nombre_quien_recibe: destino.nombre_quien_recibe || null,
-                    completado: destino.completado || false
+                    created_at: destino.created_at || null
                 };
             }),
-            ventas: rutaDespacho.ruta_ventas.map((venta) => {
+            ventas: (rutaDespacho.ruta_ventas || []).map((rv) => {
+                const venta = rv.venta || null;
                 return {
-                    id: venta.id,
-                    tipo: venta.tipo || 0,
-                    comentario: venta.comentario || "",
-                    cliente: venta.cliente || { nombre: "Cliente no encontrado", telefono: "" }
+                    id: venta?.id || null,
+                    tipo: venta?.tipo || 0,
+                    comentario: venta?.comentario || "",
+                    cliente: venta?.cliente || { nombre: "Cliente no encontrado", telefono: "" }
                 };
             })
         };

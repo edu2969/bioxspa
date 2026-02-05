@@ -74,7 +74,7 @@ export interface IChecklistlistResult {
 }
 
 export interface IItemCatalogoPowerScanView {
-    id: Types.ObjectId;
+    id: string;
     owner_id?: ICliente | null;
     direccion_id?: IDireccion | null;
     elemento: string;

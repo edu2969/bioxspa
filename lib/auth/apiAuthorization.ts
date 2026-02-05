@@ -83,8 +83,6 @@ export async function authorize(
       return roleEntry ? roleEntry[0] : ROLES.GUEST;
     }) || [ROLES.GUEST];
 
-    console.log('User Roles ------------------->', userRoles);
-
     // 5. Crear contexto del usuario
     const userContext = {
       sucursalId: userData.cargos?.[0]?.sucursal_id,

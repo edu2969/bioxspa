@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import supabase from "@/lib/supabase";
-import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(request) {
@@ -11,16 +11,12 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        console.log(`[GET /api/pedidos/despacho] Authenticated user: ${user.id}`);
-
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select(`id, sucursal_id, dependencia_id`)
             .eq("usuario_id", user.id)
             .in("tipo", [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
             .single();
-
-        console.log(`[GET /api/pedidos/despacho] Cargo fetched for user ${user.id}: ${cargo ? `sucursal ${cargo.sucursal_id}, dependencia ${cargo.dependencia_id}` : 'failed'}`);
 
         if (cargoError || !cargo) {
             return NextResponse.json({ ok: false, error: "User has no assigned cargo" }, { status: 400 });
@@ -29,28 +25,21 @@ export async function GET(request) {
         // Determinar la sucursal_id para filtrar rutas
         let sucursalId = null;
         if (cargo.sucursal_id) {
-            console.log("[GET /api/pedidos/despacho] Using cargo's sucursal_id:", cargo.sucursal_id);
             sucursalId = cargo.sucursal_id;
         } else if (cargo.dependencia_id) {
-            console.log("[GET /api/pedidos/despacho] Fetching sucursal for dependencia_id:", cargo.dependencia_id);
             const { data: dependencias } = await supabase
                 .from("dependencias")
                 .select("sucursal_id")
                 .eq("id", cargo.dependencia_id)
                 .single();
-            console.log("[GET /api/pedidos/despacho] Sucursal fetched for dependencia:", dependencias);
             if (dependencias) {
-                console.log("[GET /api/pedidos/despacho] Using fetched sucursal id:", dependencias.sucursal_id);
                 sucursalId = dependencias.sucursal_id;
             }
         }
 
         if (!sucursalId) {
-            console.log(`[GET /api/pedidos/despacho] No valid sucursal found for cargo ${cargo.id}`);
             return NextResponse.json({ ok: false, error: "No valid sucursal found for user cargo" }, { status: 400 });
         }
-
-        console.log("[GET /api/pedidos/despacho] Using sucursalId:", sucursalId);
 
         const { data: rutasDespacho, error: rutasError } = await supabase
             .from("rutas_despacho")
@@ -77,6 +66,7 @@ export async function GET(request) {
                                 id,
                                 nombre,
                                 unidad,
+                                cantidad,
                                 categoria:categorias_catalogo(
                                     id,
                                     nombre,
@@ -103,10 +93,7 @@ export async function GET(request) {
                 TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
             ]);
 
-        console.log(`[GET /api/pedidos/despacho] Fetched ${rutasDespacho?.length ?? '??'} rutas for sucursal ${sucursalId}`);
-
         if (rutasError) {
-            console.error("Error fetching rutas_despacho:", rutasError);
             return NextResponse.json({ ok: false, error: rutasError.message }, { status: 500 });
         }
 
@@ -153,12 +140,12 @@ export async function GET(request) {
                     },
                     detalles: venta.detalles.map((det) => ({
                         multiplicador: det.cantidad,
-                        restantes: det.cantidad, // Asumir restantes = cantidad inicialmente
-                        item_catalogo_ids: det.items?.map(i => i.item_catalogo_id) || [],
+                        restantes: det.cantidad - (cargaItemsMap[ruta.id] || []).filter(i => i.subcategoria_catalogo_id === det.subcategoria?.id).length,
                         subcategoria_catalogo_id: {
                             id: det.subcategoria?.id,
                             nombre: det.subcategoria?.nombre,
                             unidad: det.subcategoria?.unidad,
+                            cantidad: det.subcategoria?.cantidad,
                             categoria_catalogo_id: {
                                 id: det.subcategoria?.categoria?.id,
                                 nombre: det.subcategoria?.categoria?.nombre,
@@ -193,11 +180,164 @@ export async function GET(request) {
             };
         });
 
-        console.log(`[GET /api/pedidos/despacho] Processed ${cargamentos.length} cargamentos`);
-
         return NextResponse.json({ ok: true, cargamentos });
     } catch (error) {
         console.error("Error fetching despacho data:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+export async function POST(request) {
+    try {
+        const { user } = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { ruta_id } = await request.json();
+        if (!ruta_id) {
+            return NextResponse.json({ error: "ruta_id is required" }, { status: 400 });
+        }
+
+        console.log("[despacho.POST] User", user.id, "confirming carga for ruta", ruta_id);
+
+        // Obtener la ruta y sus ventas
+        const { data: rutaData, error: rutaError } = await supabase
+            .from("rutas_despacho")
+            .select("id, ruta_ventas(venta_id)")
+            .eq("id", ruta_id)
+            .single();
+        if (rutaError || !rutaData) {
+            console.error("[despacho.POST] ruta not found", rutaError);
+            return NextResponse.json({ error: "RutaDespacho not found" }, { status: 404 });
+        }
+
+        const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+
+        // Obtener detalles de las ventas
+        const { data: detallesVentas, error: detallesError } = await supabase
+            .from("detalle_ventas")
+            .select("id, venta_id, cantidad, subcategoria_id")
+            .in("venta_id", ventaIds.length ? ventaIds : [null]);
+        if (detallesError) {
+            console.error("[despacho.POST] error fetching detalle_ventas", detallesError);
+            return NextResponse.json({ ok: false, error: detallesError.message }, { status: 500 });
+        }
+
+        // Tomar la carga más reciente (es_carga = true)
+        const { data: cargas, error: cargasError } = await supabase
+            .from("ruta_historial_carga")
+            .select(`
+                id,
+                items:ruta_items_movidos(
+                    item_catalogo:items_catalogo(id, subcategoria_id)
+                ),
+                fecha
+            `)
+            .eq("ruta_id", ruta_id)
+            .eq("es_carga", true)
+            .order("fecha", { ascending: false })
+            .limit(1);
+        if (cargasError) {
+            console.error("[despacho.POST] error fetching ruta_historial_carga", cargasError);
+            return NextResponse.json({ ok: false, error: cargasError.message }, { status: 500 });
+        }
+
+        const latestCarga = cargas && cargas.length ? cargas[0] : null;
+        if (!latestCarga) {
+            return NextResponse.json({ error: "No carga found for this route" }, { status: 400 });
+        }
+
+        // Contar items por subcategoria en la carga
+        const cantidadPorSubcat = {};
+        const itemCatalogoIds = [];
+        (latestCarga.items || []).forEach(it => {
+            const item = it.item_catalogo;
+            if (!item) return;
+            const subcat = item.subcategoria_id;
+            const id = item.id;
+            if (subcat) {
+                cantidadPorSubcat[subcat] = (cantidadPorSubcat[subcat] || 0) + 1;
+            }
+            if (id) itemCatalogoIds.push(id);
+        });
+
+        // Verificar que la carga cubre todos los detalles
+        const cargaCompleta = (detallesVentas || []).every(detalle => {
+            const subcatId = detalle.subcategoria_id;
+            const requerido = detalle.cantidad || 0;
+            const disponible = cantidadPorSubcat[subcatId] || 0;
+            return disponible >= requerido;
+        });
+
+        if (!cargaCompleta) {
+            console.warn("[despacho.POST] carga incompleta", { ruta_id, ventaIds });
+            return NextResponse.json({
+                error: "La carga no está complete. Faltan elementos por cargar.",
+                message: "No se puede confirmar la carga hasta que todos los pedidos estén cubiertos."
+            }, { status: 400 });
+        }
+
+        // Determinar tipo de las ventas
+        const { data: ventasRuta, error: ventasError } = await supabase
+            .from("ventas")
+            .select("id, tipo, estado")
+            .in("id", ventaIds.length ? ventaIds : [null]);
+        if (ventasError) {
+            console.error("[despacho.POST] error fetching ventas", ventasError);
+            return NextResponse.json({ ok: false, error: ventasError.message }, { status: 500 });
+        }
+
+        const todasSonTraslado = (ventasRuta || []).every(v => v.tipo === TIPO_ORDEN.traslado);
+
+        // Actualizar estado de la ruta
+        const nuevoEstado = todasSonTraslado ? TIPO_ESTADO_RUTA_DESPACHO.terminado : TIPO_ESTADO_RUTA_DESPACHO.orden_cargada;
+        const { error: updateRutaError } = await supabase
+            .from("rutas_despacho")
+            .update({ estado: nuevoEstado })
+            .eq("id", ruta_id);
+        if (updateRutaError) {
+            console.error("[despacho.POST] error updating ruta estado", updateRutaError);
+            return NextResponse.json({ ok: false, error: updateRutaError.message }, { status: 500 });
+        }
+
+        // Insertar historial de estado
+        const { error: histEstadoError } = await supabase
+            .from("ruta_historial_estados")
+            .insert({ ruta_id: ruta_id, estado: nuevoEstado, usuario_id: user.id });
+        if (histEstadoError) {
+            console.error("[despacho.POST] error inserting ruta_historial_estados", histEstadoError);
+        }
+
+        // Si todas son traslado, marcar ventas como entregado y agregar historial de ventas
+        if (todasSonTraslado && ventaIds.length) {
+            const { error: updateVentasError } = await supabase
+                .from("ventas")
+                .update({ estado: TIPO_ESTADO_VENTA.entregado })
+                .in("id", ventaIds);
+            if (updateVentasError) {
+                console.error("[despacho.POST] error updating ventas", updateVentasError);
+            }
+
+            // Insertar historial de estado para cada venta
+            const ventaHistorialRows = (ventaIds || []).map(vid => ({ venta_id: vid, estado: TIPO_ESTADO_VENTA.entregado, fecha: new Date().toISOString(), usuario_id: user.id }));
+            const { error: insertVentaHistError } = await supabase
+                .from("venta_historial_estados")
+                .insert(ventaHistorialRows);
+            if (insertVentaHistError) {
+                console.error("[despacho.POST] error inserting venta_historial_estados", insertVentaHistError);
+            }
+        }
+
+        console.log("[despacho.POST] carga confirmada for ruta", ruta_id, "items", itemCatalogoIds.length);
+
+        return NextResponse.json({ ok: true });
+        
+    } catch (error) {
+        console.error("Error updating item states:", error);
+        return NextResponse.json({ 
+            error: "Error updating item states.",
+            details: error.message 
+        }, { status: 500 });
     }
 }

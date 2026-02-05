@@ -28,8 +28,8 @@ export default function PanelConductor() {
         queryFn: async () => {
             const response = await fetch(`/api/conductor/rutaAsignada`);
             const data = await response.json();
+            console.log("Ruta de despacho del conductor:", data);
             if (!data.ruta) return null;
-            console.log("Ruta de despacho del conductor:", data.ruta);
             return data.ruta;
         }
     });
@@ -50,7 +50,7 @@ export default function PanelConductor() {
     const { data: cargados } = useQuery<ICilindroView[]>({
         queryKey: ['carga-vehiculo', ruta?.id],
         queryFn: async () => {
-            if (!ruta || ruta === undefined) return [];
+            if (!ruta || !ruta.id) return [];
             const response = await fetch(`/api/conductor/cilindrosCargados?rutaId=${ruta.id}`);
             const data = await response.json();
             return data.cilindrosCargados;
@@ -61,7 +61,7 @@ export default function PanelConductor() {
     const { data: descarga, isLoading: loadingDescarga } = useQuery<ICilindroView[]>({
         queryKey: ['descarga-vehiculo', ruta?.id],
         queryFn: async () => {
-            if (!ruta) return [];
+            if (!ruta || !ruta.id) return [];
             const response = await fetch(`/api/conductor/cilindrosDescargados?rutaId=${ruta.id}`);
             const data = await response.json();
             return data.cilindrosDescargados;

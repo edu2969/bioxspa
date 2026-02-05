@@ -18,15 +18,15 @@ import { useSoundPlayer } from "../context/SoundPlayerContext";
 interface ItemFormData {
     estado: number;
     elemento: string;
-    stockActual: number;
-    stockMinimo: number;
-    garantiaAnual: number;
+    stock_actual: number;
+    stock_minimo: number;
+    garantia_anual: number;
     codigo: string;
-    direccionValida: boolean;
-    fechaMantencion?: string;
-    ownerId?: string | null;
-    direccionId?: string | null;
-    direccionEsperada: {
+    direccion_valida: boolean;
+    fecha_mantencion?: string;
+    owner_id?: string | null;
+    direccion_id?: string | null;
+    direccion_esperada: {
         _id: string;
         nombre: string;
     }
@@ -44,15 +44,15 @@ export function PowerScanOptionsModal({
     const { register, handleSubmit } = useForm<ItemFormData>({
         defaultValues: { 
             estado: item ? item.estado : 0,
-            elemento: item ? item.subcategoriaCatalogoId.categoriaCatalogoId.elemento || '' : '',
-            stockActual: item ? item.stockActual || 0 : 0,
-            stockMinimo: item ? item.stockMinimo || 0 : 0,
-            garantiaAnual: item ? item.garantiaAnual || 0 : 0,
+            elemento: item ? item.subcategoria_catalogo_id.categoria_catalogo_id.elemento || '' : '',
+            stock_actual: item ? item.stock_actual || 0 : 0,
+            stock_minimo: item ? item.stock_minimo || 0 : 0,
+            garantia_anual: item ? item.garantia_anual || 0 : 0,
             codigo: item ? item.codigo || '' : '',
-            ownerId: item && item.ownerId ? String(item.ownerId._id) : null,
-            direccionId: item && item.direccionId ? String(item.direccionId._id) : null,
-            fechaMantencion: item && item.fechaMantencion ? dayjs(item.fechaMantencion).format('YYYY-MM-DD') : undefined,
-            direccionValida: !(item ? item.direccionInvalida || false : false)
+            owner_id: item && item.owner_id ? String(item.owner_id.id) : null,
+            direccion_id: item && item.direccion_id ? String(item.direccion_id.id) : null,
+            fecha_mantencion: item && item.fecha_mantencion ? dayjs(item.fecha_mantencion).format('YYYY-MM-DD') : undefined,
+            direccion_valida: !(item ? item.direccion_invalida || false : false)
         }
     });
     const { play } = useSoundPlayer();
@@ -60,12 +60,12 @@ export function PowerScanOptionsModal({
     const mutationActualizarItem = useMutation({
         mutationFn: async (data: ItemFormData) => {
             console.log("DATA FORM", data);
-            if (!item?._id) {
+            if (!item?.id) {
                 throw new Error('ID del item no disponible');
             }
 
-            if(data.direccionValida) {
-                data.direccionId = item.direccionEsperada?._id || undefined;
+            if(data.direccion_valida) {
+                data.direccion_id = item.direccion_esperada?.id || undefined;
             }
             
             const response = await fetch(`/api/cilindros/gestionar`, {
@@ -74,7 +74,7 @@ export function PowerScanOptionsModal({
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    itemId: String(item._id),
+                    itemId: String(item.id),
                     ...data
                 })
             });
@@ -122,12 +122,12 @@ export function PowerScanOptionsModal({
                     <div className="mt-0">
                         <div className="flex items-center justify-center gap-6">
                             {/* Imagen del cilindro a la izquierda */}
-                            {!editMode && item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && (
+                            {!editMode && item.subcategoria_catalogo_id.categoria_catalogo_id.elemento && (
                                 <div className="flex-shrink-0">
                                     <Image
                                         width={20}
                                         height={64}
-                                        src={`/ui/tanque_biox${getColorEstanque(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}.png`}
+                                        src={`/ui/tanque_biox${getColorEstanque(item.subcategoria_catalogo_id.categoria_catalogo_id.elemento)}.png`}
                                         style={{ width: "32px", height: "auto" }}
                                         alt="tanque_biox"
                                     />
@@ -138,15 +138,15 @@ export function PowerScanOptionsModal({
                             <div className="text-left flex-1 mt-4">
                                 {/* NUCode y Estado en la parte superior */}
                                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento && (
+                                    {item.subcategoria_catalogo_id.categoria_catalogo_id.elemento && (
                                         <div className="text-white bg-orange-600 px-2 py-0.5 rounded text-xs h-5 font-bold tracking-widest">
-                                            {getNUCode(item.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}
+                                            {getNUCode(item.subcategoria_catalogo_id.categoria_catalogo_id.elemento)}
                                         </div>
                                     )}
-                                    {item.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && (
+                                    {item.subcategoria_catalogo_id.categoria_catalogo_id.es_industrial && (
                                         <span className="text-white bg-blue-400 px-2 py-0.5 rounded text-xs h-5 font-bold">INDUSTRIAL</span>
                                     )}
-                                    {item.subcategoriaCatalogoId.sinSifon && (
+                                    {item.subcategoria_catalogo_id.sin_sifon && (
                                         <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-xs h-5 font-bold tracking-widest">sin SIFÓN</div>
                                     )}
 
@@ -178,8 +178,8 @@ export function PowerScanOptionsModal({
                                 {/* Nombre del gas */}
                                 <div className="flex mb-3 space-x-4">
                                     <p className="flex text-4xl font-bold">
-                                        {item.subcategoriaCatalogoId.categoriaCatalogoId.elemento ? (() => {
-                                            const elemento = item.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                        {item.subcategoria_catalogo_id.categoria_catalogo_id.elemento ? (() => {
+                                            const elemento = item.subcategoria_catalogo_id.categoria_catalogo_id.elemento;
                                             const match = elemento?.match(/^([a-zA-Z]*)(\d*)$/);
                                             let p1 = '';
                                             let p2 = '';
@@ -195,11 +195,11 @@ export function PowerScanOptionsModal({
                                                     {p2 ? <small>{p2}</small> : ''}
                                                 </>
                                             );
-                                        })() : item.subcategoriaCatalogoId.categoriaCatalogoId.nombre || 'N/A'}
+                                        })() : item.subcategoria_catalogo_id.categoria_catalogo_id.nombre || 'N/A'}
                                     </p>
                                     <p className="text-4xl font-bold orbitron">
-                                        {item.subcategoriaCatalogoId.cantidad || 'N/A'}
-                                        <small className="text-2xl ml-1">{item.subcategoriaCatalogoId.unidad || ''}</small>
+                                        {item.subcategoria_catalogo_id.cantidad || 'N/A'}
+                                        <small className="text-2xl ml-1">{item.subcategoria_catalogo_id.unidad || ''}</small>
                                     </p>
                                 </div>
 
@@ -220,34 +220,34 @@ export function PowerScanOptionsModal({
                                             <small>Código:</small> <b className="text-lg">{item.codigo || 'N/A'}</b>
                                         </p>
                                     )}
-                                    {item.fechaMantencion && (
+                                    {item.fecha_mantencion && (
                                         <p className="text-sm text-gray-600 mt-1">
-                                            <small>Vence:</small> <b>{dayjs(item.fechaMantencion).format("DD/MM/YYYY")}</b>
+                                            <small>Vence:</small> <b>{dayjs(item.fecha_mantencion).format("DD/MM/YYYY")}</b>
                                         </p>
                                     )}
 
-                                    {!editMode && item.direccionInvalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
+                                    {!editMode && item.direccion_invalida && <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
                                         <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">Indica que se ubica en</span>
                                         <p className="flex text-red-600 -mt-6">
-                                            <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{item.direccionId?.nombre}</span>
+                                            <BsFillGeoAltFill size="1.5rem" /><span className="text-xs ml-1">{item.direccion_id?.nombre}</span>
                                         </p>
                                     </div>}
 
                                     {editMode &&  (
                                         <div className="relative bg-white rounded-md p-4 border border-gray-300 mt-2">
-                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">{!item.direccionInvalida ? 'Se ubica en' : 'Cambiar a'}</span>
+                                            <span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">{!item.direccion_invalida ? 'Se ubica en' : 'Cambiar a'}</span>
                                             <div className="-mt-6">
-                                                {!item.direccionInvalida && <p className="text-xs font-bold">{item.direccionId?.nombre}</p>}
-                                                {item.direccionInvalida && <div className="flex">
+                                                {!item.direccion_invalida && <p className="text-xs font-bold">{item.direccion_id?.nombre}</p>}
+                                                {item.direccion_invalida && <div className="flex">
                                                     <div className="flex text-xs text-gray-700">
                                                         <input
-                                                            {...register('direccionValida')}
+                                                            {...register('direccion_valida')}
                                                             type="checkbox"
                                                             id="ubicacion-dependencia"
                                                             className="mr-2 h-8 w-8"
                                                         />
                                                         <div className="flex items-center">
-                                                            <BsFillGeoAltFill size="1.5rem" /><p className="text-xs ml-2">{item.direccionEsperada?.nombre}</p>
+                                                            <BsFillGeoAltFill size="1.5rem" /><p className="text-xs ml-2">{item.direccion_esperada?.nombre}</p>
                                                         </div>
                                                     </div>
                                                 </div>}
@@ -276,7 +276,7 @@ export function PowerScanOptionsModal({
                                                 <label className="block text-xs text-gray-600 mb-1">Stock actual</label>
                                                 <input
                                                     type="number"
-                                                    {...register('stockActual')}
+                                                    {...register('stock_actual')}
                                                     className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                                                 />
                                             </div>
@@ -284,7 +284,7 @@ export function PowerScanOptionsModal({
                                                 <label className="block text-xs text-gray-600 mb-1">Stock mínimo</label>
                                                 <input
                                                     type="number"
-                                                    {...register('stockMinimo')}
+                                                    {...register('stock_minimo')}
                                                     className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                                                 />
                                             </div>
@@ -295,7 +295,7 @@ export function PowerScanOptionsModal({
                                             <label className="block text-xs text-gray-600 mb-1">Garantía (años)</label>
                                             <input
                                                 type="number"
-                                                {...register('garantiaAnual')}
+                                                {...register('garantia_anual')}
                                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                                             />
                                         </div>
@@ -305,16 +305,16 @@ export function PowerScanOptionsModal({
                                             <label className="block text-xs text-gray-600 mb-1">Fecha mantención</label>
                                             <input
                                                 type="date"
-                                                {...register('fechaMantencion')}
+                                                {...register('fecha_mantencion')}
                                                 className="border border-gray-300 rounded px-2 py-1 text-sm w-full"
                                             />
                                         </div>                                        
 
-                                        <ClienteSearchView register={register("ownerId")} setClienteSelected={setClienteSeleccionado} />
-                                        {clienteSeleccionado && clienteSeleccionado.direccionesDespacho
+                                        <ClienteSearchView register={register("owner_id")} setClienteSelected={setClienteSeleccionado} />
+                                        {clienteSeleccionado && clienteSeleccionado.direcciones_despacho
                                             && <ClientAddressManagerView label="Dirección de despacho"
-                                                register={register("direccionId")}
-                                                direcciones={clienteSeleccionado.direccionesDespacho} />}
+                                                register={register("direccion_id")}
+                                                direcciones={clienteSeleccionado.direcciones_despacho} />}
                                     </div>
                                 )}
                             </div>

@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
 
         // Transform ventas data
         const pedidos = ventas.map((venta) => {           
-            console.log("Processing venta:", venta);
             const items = venta.items || [];
             const cliente = Array.isArray(venta.cliente) ? venta.cliente[0] : venta.cliente;
 

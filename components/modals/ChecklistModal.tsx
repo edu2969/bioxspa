@@ -10,6 +10,7 @@ import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IVehiculo } from "@/types/vehiculo";
+import { useUser } from "@/components/providers/UserProvider";
 
 const itemEmployeeLabels: { [key: string]: string } = {
     zapatos_seguridad: "¿Zapatos de seguridad presentes?",
@@ -111,12 +112,14 @@ export default function ChecklistModal({ tipo, onFinish }: {
             }, {} as Record<string, number>)
         }
     });    
-    const { user, hasRole } = useAuthorization();
+    const userContext = useUser();
+    const { hasRole } = useAuthorization();
+
     const kilometros = useWatch({
         control,
         name: "kilometros"
     });
-    const totalSteps = checklistItems.length + 1;
+    const totalSteps = checklistItems.length + 1;    
 
     useEffect(() => {
         console.log("Kilometros changed:", kilometros);
@@ -124,8 +127,20 @@ export default function ChecklistModal({ tipo, onFinish }: {
     
     const { data: vehiculos, isLoading } = useQuery<IVehiculo[]>({
         queryKey: ["vehiculos-conductor"],
-        queryFn: async () => {
-            const r = await fetch("/api/flota/porConductor");
+        queryFn: async () => { 
+            if (!userContext || !userContext.session) {
+                console.error("No hay sesión activa");
+                return [];
+            }
+
+            const token = userContext.session.access_token;           
+            const r = await fetch("/api/flota/porConductor", {
+                method: "GET",
+                headers: { 
+                    "Content-Type": "application/json", 
+                    "Authorization": `Bearer ${userContext.session.access_token}`
+                },
+            });
             const data = await r.json();
             console.log("VEHICULOS-CONDUCTOR", data);
             return data.vehiculos;

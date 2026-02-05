@@ -1,35 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { authorize } from "@/lib/auth/apiAuthorization";
-import { IVehiculoView } from "@/types/types";
-import { ROLES } from "@/lib/auth/permissions";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
-export async function GET(request: NextRequest) {
+export async function GET(request) {
     try {
-        const { authorized, user, error } = await authorize(request, {
-            resource: "vehiculoAsignado",
-            action: "read",
-            allowedRoles: [ROLES.DRIVER]
-        });
-
-        if (!authorized) {
-            return NextResponse.json({ ok: false, error: error || "Unauthorized" }, { status: 403 });
-        }
-
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 401 });
-        }
-
+        const { user } = await getAuthenticatedUser();
         const { searchParams } = new URL(request.url);
-        const rutaId = searchParams.get('rutaId');   
-
+        const rutaId = searchParams.get('rutaId');
+        
         if (!rutaId) {
             return NextResponse.json({ ok: false, error: 'rutaId is required' }, { status: 400 });
         }
 
         const { data: rutaDespacho, error: rutaError } = await supabase
             .from('rutas_despacho')
-            .select('id, chofer_id, vehiculo_id')
+            .select('id, conductor_id, vehiculo_id')
             .eq('id', rutaId)
             .single();
 
@@ -38,7 +23,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Access check: ensure the user is the assigned driver
-        if (String(rutaDespacho.chofer_id) !== user.id) {
+        if (String(rutaDespacho.conductor_id) !== user.id) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
@@ -56,7 +41,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ ok: false, error: 'Vehiculo not found' }, { status: 404 });
         }
 
-        const vehicleView: IVehiculoView = {
+        const vehicleView = {
             vehiculo_id: vehiculo.id,
             patente: vehiculo.patente,
             marca: vehiculo.marca,

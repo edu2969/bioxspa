@@ -86,7 +86,7 @@ export default function ListadoDePrecios({
                                 className="block w-8 h-8 mt-1 mr-2"
                                 onChange={e => {
                                     const checked = e.target.checked;                                    
-                                    setValue(`precios.${index}.seleccionado`, checked);
+                                    setValue(`precios.${index}.seleccionado`, checked, { shouldValidate:true, shouldDirty:true });
                                     setValue(`precios.${index}.cantidad`, checked ? 1 : 0);
                                     setValue(`precios.${index}.subcategoria_id`, checked ? precio.subcategorias_catalogo?.id || "" : "");
                                 }}

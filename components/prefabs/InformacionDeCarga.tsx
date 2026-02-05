@@ -18,7 +18,7 @@ export default function InformacionDeCarga({
         queryKey: ['listado-en-preparacion'],
         queryFn: async () => {
             if(!rutaDespacho) return { encargado: '', cilindros: [] };
-            const response = await fetch(`/api/conductor/listadoDeCarga?rutaId=${rutaDespacho._id}`);
+            const response = await fetch(`/api/conductor/listadoDeCarga?rutaId=${rutaDespacho.id}`);
             const data = await response.json();
             console.log("CARGA-vehiculo", {...data});
             return {...data};
@@ -45,7 +45,7 @@ export default function InformacionDeCarga({
             if (data.ok) {
                 toast.success("Carga confirmada correctamente");
                 queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
-                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });                
+                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });                
             } else {
                 toast.error(data.error || "Error al confirmar la carga");
             }
@@ -80,8 +80,8 @@ export default function InformacionDeCarga({
                         {listaDeCarga && listaDeCarga.cilindros.map((item, idx) => (
                             <div key={idx} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1">
                                 <b>{item.multiplicador}</b>x {item.elemento.toUpperCase()} {item.cantidad}{item.unidad}
-                                {item.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
-                                {item.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                {item.sin_sifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
+                                {item.es_industrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
                             </div>
                         ))}
                     </div>

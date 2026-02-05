@@ -4,7 +4,8 @@ import supabase from "@/lib/supabase";
 import {
     TIPO_ESTADO_VENTA,
     TIPO_CARGO,
-    TIPO_ESTADO_RUTA_DESPACHO
+    TIPO_ESTADO_RUTA_DESPACHO,
+    TIPO_CHECKLIST
 } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
@@ -118,8 +119,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "ventaId and choferId are required" }, { status: 400 });
         }
 
-        console.log("POST /asignacion - Request Body:", { ventaId, choferId });
-
         // Fetch the chofer's cargo to get dependencia_id
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
@@ -149,18 +148,42 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: ventaError.message }, { status: 500 });
         }
 
-        // Create a new ruta
+        // Look for today's checklist (from 00:00) of type 'vehiculo' for this conductor
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const { data: todayChecklist, error: checklistError } = await supabase
+            .from("checklists")
+            .select("vehiculo_id")
+            .eq("usuario_id", choferId)
+            .eq("tipo", TIPO_CHECKLIST.vehiculo)
+            .gte("fecha", startOfToday.toISOString())
+            .order("fecha", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (checklistError) {
+            return NextResponse.json({ ok: false, error: "Error fetching checklist" }, { status: 500 });
+        }
+
+        const vehiculoIdToAssign = todayChecklist && todayChecklist.vehiculo_id ? todayChecklist.vehiculo_id : null;
+
+        // Create a new ruta, assigning vehiculo_id when available
+        const insertPayload: any = {
+            conductor_id: choferId,
+            dependencia_id: dependenciaId,
+            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+            hora_inicio: new Date(),
+            hora_destino: null,
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+
+        if (vehiculoIdToAssign) insertPayload.vehiculo_id = vehiculoIdToAssign;
+
         const { data: nuevaRuta, error: createRutaError } = await supabase
             .from("rutas_despacho")
-            .insert({
-                conductor_id: choferId,
-                dependencia_id: dependenciaId,
-                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                hora_inicio: new Date(),
-                hora_destino: null,
-                created_at: new Date(),
-                updated_at: new Date()
-            })
+            .insert(insertPayload)
             .select("id")
             .single();
 
@@ -191,9 +214,7 @@ export async function POST(request: NextRequest) {
             .insert({
                 ruta_id: rutaId,
                 estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                fecha: new Date(),
-                usuario_id: choferId,
-                created_at: new Date()
+                usuario_id: choferId
             });
 
         if (historialError) {
@@ -201,7 +222,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ ok: false, error: "Failed to log initial RutaDespacho state" }, { status: 500 });
         }
 
-        console.log("POST /asignacion - Nueva ruta creada y asociada:", { rutaId, ventaId, choferId });
         return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("Error in POST /asignacion:", error);
