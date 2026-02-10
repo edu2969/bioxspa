@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         }
 
         const enTransitoResponse = enTransito.map((ruta) => ({
-            rutaId: ruta.id,
+            ruta_id: ruta.id,
             estado: ruta.estado
         }));
 

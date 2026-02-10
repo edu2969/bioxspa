@@ -32,7 +32,7 @@ CREATE TABLE comunas (
 CREATE TABLE direcciones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nombre VARCHAR(255) NOT NULL,
-    direccion TEXT,
+    direccion_original TEXT,
     comuna_id INTEGER REFERENCES comunas(id),
     latitud DECIMAL(10,8),
     longitud DECIMAL(11,8),
@@ -344,7 +344,6 @@ CREATE TABLE venta_historial_estados (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     estado INTEGER NOT NULL,
-    fecha TIMESTAMPTZ NOT NULL,
     usuario_id UUID REFERENCES usuarios(id),
     comentario TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -356,7 +355,6 @@ CREATE TABLE venta_comentarios_cobro (
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     usuario_id UUID REFERENCES usuarios(id) NOT NULL,
     comentario TEXT NOT NULL,
-    fecha TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -366,7 +364,6 @@ CREATE TABLE venta_entregas_local (
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     nombre_recibe VARCHAR(255) NOT NULL,
     rut_recibe VARCHAR(12) NOT NULL,
-    fecha_entrega TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -575,8 +572,8 @@ CREATE TABLE registro_comisiones (
 CREATE TABLE formas_pago (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    codigo VARCHAR(10) UNIQUE,
     activo BOOLEAN DEFAULT true,
+    por_pagar BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

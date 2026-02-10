@@ -17,7 +17,7 @@ export async function GET(request) {
         // Obtener la ruta con ventas y destinos
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select(`id, estado, chofer_id, dependencia_id, ruta_ventas(venta_id), ruta_destinos(id, direccion_destino_id, created_at)`) 
+            .select(`id, estado, conductor_id, dependencia_id, ruta_ventas(venta_id), ruta_destinos(id, direccion_id, created_at)`) 
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -32,7 +32,7 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: 'La ruta no está en estado de descarga' }, { status: 400 });
         }
 
-        if (String(rutaData.chofer_id) !== String(user.id)) {
+        if (String(rutaData.conductor_id) !== String(user.id)) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
@@ -42,7 +42,7 @@ export async function GET(request) {
         const ultimoDestino = destinos[0];
         if (!ultimoDestino) return NextResponse.json({ ok: false, error: 'La ruta no tiene destinos definidos' }, { status: 400 });
 
-        const direccionDestinoId = ultimoDestino.direccion_destino_id;
+        const direccionDestinoId = ultimoDestino.direccion_id;
 
         // Buscar ventas asociadas a la ruta
         const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);

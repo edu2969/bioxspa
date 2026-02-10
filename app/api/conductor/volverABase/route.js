@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
-import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { supabase } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
-import { TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CARGO } from "@/app/utils/constants";  
 
-export const POST = migrateAuthEndpoint(async ({ user }, req) => {
+export async function POST(req) {
     try {
         console.log("POST request received for volverABase from Supabase.");
+        const { user } = await getAuthenticatedUser();
 
         if (!user || !user.id) {
             console.warn("Unauthorized access attempt.");
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const choferId = user.id;
+        const conductorId = user.id;
         const body = await req.json();
         const { rutaId } = body;
 
@@ -30,7 +31,7 @@ export const POST = migrateAuthEndpoint(async ({ user }, req) => {
             .from('rutas_despacho')
             .select('*')
             .eq('id', rutaId)
-            .eq('chofer_id', choferId)
+            .eq('conductor_id', conductorId)
             .single();
         
         if (rutaError || !rutaDespacho) {
@@ -45,12 +46,12 @@ export const POST = migrateAuthEndpoint(async ({ user }, req) => {
         const { data: cargo, error: cargoError } = await supabase
             .from('cargos')
             .select('*')
-            .eq('user_id', choferId)
+            .eq('usuario_id', conductorId)
             .eq('tipo', TIPO_CARGO.conductor)
             .single();
 
         if (cargoError || !cargo) {
-            console.warn(`No conductor cargo found for user ID: ${choferId}`, cargoError);
+            console.warn(`No conductor cargo found for user ID: ${conductorId}`, cargoError);
             return NextResponse.json({ 
                 ok: false, 
                 error: "No conductor cargo found for user" 
@@ -88,15 +89,32 @@ export const POST = migrateAuthEndpoint(async ({ user }, req) => {
             direccionDestinoId: direccionId,
             fecha: null
         };
+        
+        // Insert the new destination into the ruta_destinos table
+        const { error: insertError } = await supabase
+            .from('ruta_destinos')
+            .insert({
+                ruta_id: rutaId,
+                direccion_id: direccionId,
+                fecha_arribo: null,
+                rut_quien_recibe: null,
+                nombre_quien_recibe: null,
+                created_at: new Date()
+            });
 
-        const updatedRuta = [...(rutaDespacho.ruta || []), newRutaDestination];
+        if (insertError) {
+            console.error('Error inserting new destination into ruta_destinos:', insertError);
+            return NextResponse.json({ 
+                ok: false, 
+                error: "Error adding new destination to ruta_destinos" 
+            }, { status: 500 });
+        }
 
         // Update estado to regreso and add new route destination
         const { error: updateError } = await supabase
             .from('rutas_despacho')
             .update({
                 estado: TIPO_ESTADO_RUTA_DESPACHO.regreso,
-                ruta: updatedRuta,
                 updated_at: new Date()
             })
             .eq('id', rutaId);
@@ -121,4 +139,4 @@ export const POST = migrateAuthEndpoint(async ({ user }, req) => {
             error: "Internal Server Error" 
         }, { status: 500 });
     }
-});
+}

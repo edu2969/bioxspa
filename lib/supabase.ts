@@ -121,7 +121,6 @@ export interface Venta {
     sucursal_id: string;
     vendedor_id: string;
     fecha_venta: string;
-    fecha_entrega?: string;
     subtotal: number;
     impuestos: number;
     descuentos: number;

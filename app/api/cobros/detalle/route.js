@@ -1,15 +1,5 @@
-import mongoose from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
-import { NextResponse } from "next/server";
-import Venta from "@/models/venta";
-import User from "@/models/user";
-import Cliente from "@/models/cliente"; // Asumiendo que existe el modelo Cliente
-import DocumentoTributario from "@/models/documentoTributario";
-import Direccion from "@/models/direccion";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
-import Pago from "@/models/pago";
-import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import supabase from "@/lib/supabase";
+import { NextResponse } from 'next/server';
 
 function getLast6Months() {
     const months = [];
@@ -26,12 +16,10 @@ function getLast6Months() {
 }
 
 function generateFakeDebtData(ventas, pagos) {
-    // Genera datos ficticios para los últimos 6 meses
     const months = getLast6Months();
     let deudaAcumulada = 0;
     let pagoAcumulado = 0;
     return months.map((m) => {
-        // Suma ventas y pagos de ese mes
         const ventasMes = ventas.filter(v => {
             const d = new Date(v.fecha);
             return d.getFullYear() === m.year && d.getMonth() === m.month;
@@ -40,7 +28,7 @@ function generateFakeDebtData(ventas, pagos) {
             const d = new Date(p.fecha);
             return d.getFullYear() === m.year && d.getMonth() === m.month;
         });
-        deudaAcumulada += ventasMes.reduce((sum, v) => sum + v.valorTotal, 0);
+        deudaAcumulada += ventasMes.reduce((sum, v) => sum + v.valor_total, 0);
         pagoAcumulado += pagosMes.reduce((sum, p) => sum + p.monto, 0);
         return {
             mes: m.label,
@@ -51,72 +39,99 @@ function generateFakeDebtData(ventas, pagos) {
 }
 
 export async function GET(request) {
-    await connectMongoDB();
-
-    if (!mongoose.models.User) {
-        mongoose.model("User", User.schema);
-    }
-    if (!mongoose.models.DocumentoTributario) {
-        mongoose.model("DocumentoTributario", DocumentoTributario.schema);
-    }
-    if (!mongoose.models.Direccion) {
-        mongoose.model("Direccion", Direccion.schema);
-    }
-    if (!mongoose.models.CategoriaCatalogo) {
-        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.SubcategoriaCatalogo) {
-        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-    }
-
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get("id");
     if (!clienteId) {
         return NextResponse.json({ ok: false, error: "Missing clienteId" }, { status: 400 });
     }
 
-    // Busca el cliente
-    const cliente = await Cliente.findById(clienteId).lean();
-    if (!cliente) {
-        return NextResponse.json({ ok: false, error: "Cliente not found" }, { status: 404 });
-    }
+    try {
+        // Fetch client details
+        const { data: cliente, error: clienteError } = await supabase
+            .from('clientes')
+            .select('id, nombre, rut, credito')
+            .eq('id', clienteId)
+            .single();
 
-    const documentoIds = await DocumentoTributario.find({
-        venta: true
-    }).select("_id");
-
-    // Busca ventas por cobrar del cliente
-    const ventas = await Venta.find({ 
-        clienteId, 
-        porCobrar: true, 
-        estado: TIPO_ESTADO_VENTA.entregado,
-        valorTotal: { $gt: 0 },
-        documentoTributarioId: { $in: documentoIds }
-    })
-        .populate("vendedorId", "name email telefono")
-        .populate("documentoTributarioId", "nombre")
-        .populate("direccionDespachoId", "direccion")
-        .sort({ fecha: -1 })
-        .lean();
-
-    const pagos = await Pago.find({ clienteId }).sort({ fecha: -1 }).limit(1).lean();
-
-    // Genera gráfico de deuda/pago últimos 6 meses
-    const graficoDeuda = generateFakeDebtData(ventas, pagos);
-
-    // Respuesta
-    return NextResponse.json({
-        ok: true,
-        cliente: {
-            _id: cliente._id,
-            nombre: cliente.nombre,
-            rut: cliente.rut,
-            credito: cliente.credito ?? 0,
-            totalDeuda: ventas.reduce((sum, v) => sum + v.valorTotal, 0),
-            disponible: (cliente.credito ?? 0) - ventas.reduce((sum, v) => sum + v.valorTotal, 0),
-            ultimaVenta: ventas[0]?.fecha || null,
-            ultimoPago: pagos[0]?.fecha || null,
-            graficoDeuda,
+        if (clienteError || !cliente) {
+            return NextResponse.json({ ok: false, error: "Cliente not found" }, { status: 404 });
         }
-    });
+
+        // Fetch sales for the client
+        const { data: ventas, error: ventasError } = await supabase
+            .from('ventas')
+            .select(`
+                id, fecha, valor_total, codigo,
+                vendedor:usuarios(nombre),
+                documento:documentos_tributarios(nombre),
+                direccion_despacho_id:direcciones(id, nombre)
+            `)
+            .eq('cliente_id', clienteId)
+            .eq('por_cobrar', true)
+            .order('fecha', { ascending: false });
+
+        if (ventasError) {
+            return NextResponse.json({ ok: false, error: ventasError.message }, { status: 500 });
+        }
+
+        // Fetch sale details
+        const ventaIds = ventas.map(v => v.id);
+        const { data: detalles, error: detallesError } = await supabase
+            .from('detalle_ventas')
+            .select('venta_id, glosa, cantidad, neto, iva, total')
+            .in('venta_id', ventaIds);
+
+        if (detallesError) {
+            return NextResponse.json({ ok: false, error: detallesError.message }, { status: 500 });
+        }
+
+        // Map sales with details
+        const ventasDetalladas = ventas.map(v => {
+            const detallesVenta = detalles.filter(d => d.venta_id === v.id);
+            return {
+                folio: v.codigo,
+                fecha: v.fecha,
+                total: v.valor_total,
+                vendedor: v.vendedor?.nombre || "",
+                documento: v.documento?.nombre || "",
+                direccion: v.direccion?.direccion || "",
+                detalles: detallesVenta.map(d => ({
+                    glosa: d.glosa,
+                    cantidad: d.cantidad,
+                    neto: d.neto,
+                    iva: d.iva,
+                    total: d.total
+                }))
+            };
+        });
+
+        // Generate fake payments for the last 6 months
+        const pagos = getLast6Months().map(m => ({
+            fecha: new Date(m.year, m.month, 10),
+            monto: Math.floor(Math.random() * 500000)
+        }));
+
+        // Generate debt graph
+        const graficoDeuda = generateFakeDebtData(ventas, pagos);
+
+        // Build response
+        return NextResponse.json({
+            ok: true,
+            cliente: {
+                _id: cliente.id,
+                nombre: cliente.nombre,
+                rut: cliente.rut,
+                credito: cliente.credito || 0,
+                totalDeuda: ventas.reduce((sum, v) => sum + v.valor_total, 0),
+                disponible: (cliente.credito || 0) - ventas.reduce((sum, v) => sum + v.valor_total, 0),
+                ultimaVenta: ventas[0]?.fecha || null,
+                ultimoPago: pagos[pagos.length - 1]?.fecha || null,
+                ventas: ventasDetalladas,
+                graficoDeuda
+            }
+        });
+    } catch (error) {
+        console.error("Error in GET /cobros/detalle:", error);
+        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
+    }
 }

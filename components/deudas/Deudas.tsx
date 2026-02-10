@@ -14,7 +14,7 @@ var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
 import { useForm } from "react-hook-form";
 import Nav from "../Nav";
-import { SessionProvider } from "next-auth/react";
+import { ICliente } from "@/types/cliente";
 
 const PERIODS = [
     { label: "Actual", value: 0 },
@@ -23,18 +23,43 @@ const PERIODS = [
     { label: "90 días", value: 90 },
 ];
 
+interface IClienteConDeuda {
+    id: string;
+    nombre: string;
+    credito: number;
+    telefono: string;
+    email: string;
+    totalDeuda: number;
+    disponible: number;
+    ultimaVenta: string;
+    ventasPorCobrar: number;
+    ultimoPago: string;
+    deudas: {
+        id: string;
+        cliente_id: string;
+        last_venta_id: string | null;
+        monto: number;
+        fecha: string;
+    }[];
+}
+
 export default function Deudas() {
-    const [clientes, setClientes] = useState([]);
+    const [clientes, setClientes] = useState<IClienteConDeuda[]>([]);
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState(0);
     const [search] = useState("");
     const [loadingClients, setLoadingClients] = useState(false);
     const [loadingCliente, setLoadingCliente] = useState(false);
-    const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
-    const [pagination, setPagination] = useState({});
+    const [autocompleteClienteResults, setAutocompleteClienteResults] = useState<ICliente[]>([]);
+    const [pagination, setPagination] = useState<{
+        page: number;
+        totalPages: number;
+        totalItems: number;
+    }>({ page: 1, totalPages: 1, totalItems: 0 });
     const router = useRouter();
     const { setValue } = useForm();
     const [redirecting, setRedirecting] = useState(false);
+    const [clienteSelected, setClienteSelected] = useState<IClienteConDeuda | null>(null);
 
     useEffect(() => {
         setClientes([]);
@@ -43,20 +68,20 @@ export default function Deudas() {
             .then(res => res.json())
             .then(data => {
                 console.log("Clientes data:", data);
-                setClientes(data.clientes || []);
-                setPagination(data.pagination || {});
+                setClientes(data.clientes);
+                setPagination(data.pagination || { page: 1, totalPages: 1, totalItems: 0 });
                 setLoading(false);
             });
     }, [period, pagination.page]);
 
-    const filtered = clientes.filter(cliente =>
+    const filtered = clientes && clientes.filter(cliente =>
         cliente.nombre?.toLowerCase().includes(search.toLowerCase())
     );
 
     // Cambia a una página específica
-    const goToPage = (page) => {
+    const goToPage = (page: string | number) => {
         setLoading(true);
-        setPagination(prev => ({ ...prev, page }));
+        setPagination(prev => ({ ...prev, page: typeof page === "string" ? parseInt(page, 10) : page }));
     };
 
     // Página anterior
@@ -73,8 +98,7 @@ export default function Deudas() {
         }
     };
 
-    return (<SessionProvider>
-        <main className="w-full h-dvh overflow-hidden mt-2">
+    return (<main className="w-full h-dvh overflow-hidden mt-2">
             <div className="px-6 sticky top-0">
                 <div className="mx-32 mb-2">
                     <div className="flex items-end gap-2">
@@ -123,13 +147,13 @@ export default function Deudas() {
                                             <ul className="absolute z-10 border border-gray-300 rounded-md shadow-sm mt-1 max-h-40 overflow-y-auto bg-white w-full">
                                                 {autocompleteClienteResults.map(cliente => (
                                                     <li
-                                                        key={cliente._id}
+                                                        key={cliente.id}
                                                         className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                         onClick={async () => {
                                                             console.log("CLIENTE", cliente);
                                                             setLoadingCliente(true);
                                                             setValue("cliente", cliente.nombre);
-                                                            router.push(`/pages/cobros/${cliente._id}`);
+                                                            router.push(`/pages/cobros/${cliente.id}`);
                                                         }}
                                                     >
                                                         <p>{cliente.nombre}</p>
@@ -174,7 +198,7 @@ export default function Deudas() {
                         <Loader texto="Cargando..." />
                     </div>
                 )}
-                {!loading && filtered.length === 0 && (
+                {!loading && filtered && filtered.length === 0 && (
                     <div
                         className="flex justify-center items-center"
                         style={{
@@ -185,7 +209,8 @@ export default function Deudas() {
                     </div>
                 )}
                 <div className="flex flex-wrap gap-6">
-                    {filtered.map(cliente => {
+                    {filtered && filtered.map(cliente => {
+                        console.log("FILTERED", cliente);
                         const credito = cliente.credito ?? 0;
                         const utilizado = cliente.totalDeuda ?? 0;
                         const disponible = cliente.disponible ?? 0;
@@ -203,10 +228,10 @@ export default function Deudas() {
                         }
                         return (
                             <div
-                                key={cliente._id}
+                                key={cliente.id}
                                 onClick={() => {
                                     setRedirecting(true);
-                                    router.push(`/pages/cobros/${cliente._id}`);
+                                    router.push(`/pages/cobros/${cliente.id}`);
                                 }}
                                 className="relative w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] rounded-lg shadow p-4 border border-gray-200 flex flex-col hover:scale-105 hover:bg-blue-50 hover:top-2 transition-all cursor-pointer"
                             >
@@ -222,7 +247,6 @@ export default function Deudas() {
                                                 maxWidth: "380px",
                                                 display: "block"
                                             }}
-                                            onClick={() => router.push(`/modulos/configuraciones/clientes?id=${cliente._id}`)}
                                             title={cliente.nombre}
                                         >
                                             {cliente.nombre}
@@ -283,7 +307,7 @@ export default function Deudas() {
                     })}
                 </div>
             </div>
-            {!loading && clientes.length > 0 && (
+            {!loading && clientes && clientes.length > 0 && (
                 <div className="w-full flex justify-center items-center">
                     <nav className="flex gap-2">
                         {/* Botón anterior */}
@@ -300,7 +324,7 @@ export default function Deudas() {
                             const totalPages = pagination?.totalPages || 1;
                             const currentPage = pagination?.page || 1;
                             const maxPagesToShow = 11;
-                            let pages = [];
+                            let pages: (number | string)[] = [];
 
                             if (totalPages <= maxPagesToShow) {
                                 // Mostrar todas las páginas
@@ -344,7 +368,7 @@ export default function Deudas() {
                                     <button
                                         key={num}
                                         className={`px-3 py-2 rounded-md font-semibold text-xs ${pagination?.page === num ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
-                                        onClick={() => goToPage(num)}
+                                        onClick={() => goToPage(Number(num))}
                                         disabled={pagination?.page === num}
                                     >
                                         {num}
@@ -369,6 +393,5 @@ export default function Deudas() {
                 </div>
             )}
             <Nav />
-        </main>
-    </SessionProvider>);
+        </main>);
 }

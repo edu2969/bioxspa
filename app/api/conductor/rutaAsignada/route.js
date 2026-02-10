@@ -62,7 +62,8 @@ export async function GET() {
                         comentario,
                         cliente:clientes(
                             nombre,
-                            telefono
+                            telefono,
+                            direcciones_despacho:cliente_direcciones_despacho(direccion_id)
                         )
                     )
                 )
@@ -70,7 +71,7 @@ export async function GET() {
             .eq("conductor_id", userId)
             .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
             .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado)
-            .maybeSingle();
+            .maybeSingle();        
 
         if (rutaError || !rutaDespacho) {
             console.log(`No active rutaDespacho found for conductor: ${userId}`);
@@ -79,9 +80,10 @@ export async function GET() {
                 rutaId: null,
                 message: "No hay ruta activa asignada"
             });
-        }
+        }        
 
-        console.log(`Found active rutaDespacho ID: ${rutaDespacho.id} with estado: ${rutaDespacho.estado}`);
+        const ultimaDireccion = rutaDespacho.ruta_destinos.length > 0 ? rutaDespacho.ruta_destinos[rutaDespacho.ruta_destinos.length - 1].direccion.id : null;
+        const cliente = ultimaDireccion ? rutaDespacho.ruta_ventas.find(rv => rv.venta.direcciones_despacho?.some(d => d.id === ultimaDireccion))?.cliente : null;
 
         // Build response
         const rutaConductorView = {
@@ -103,7 +105,8 @@ export async function GET() {
                     id: venta?.id || null,
                     tipo: venta?.tipo || 0,
                     comentario: venta?.comentario || "",
-                    cliente: venta?.cliente || { nombre: "Cliente no encontrado", telefono: "" }
+                    cliente: venta?.cliente || { nombre: "Cliente no encontrado", telefono: "" },
+                    actual: !cliente ? true :  venta?.cliente.id === cliente?.id                    
                 };
             })
         };

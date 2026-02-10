@@ -320,7 +320,7 @@ export async function POST(request) {
             }
 
             // Insertar historial de estado para cada venta
-            const ventaHistorialRows = (ventaIds || []).map(vid => ({ venta_id: vid, estado: TIPO_ESTADO_VENTA.entregado, fecha: new Date().toISOString(), usuario_id: user.id }));
+            const ventaHistorialRows = (ventaIds || []).map(vid => ({ venta_id: vid, estado: TIPO_ESTADO_VENTA.entregado, usuario_id: user.id }));
             const { error: insertVentaHistError } = await supabase
                 .from("venta_historial_estados")
                 .insert(ventaHistorialRows);

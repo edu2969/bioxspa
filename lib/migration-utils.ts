@@ -76,7 +76,6 @@ export const FIELD_MAPPING = {
   'sucursalId': 'sucursal_id',
   'vendedorId': 'vendedor_id',
   'fechaVenta': 'fecha_venta',
-  'fechaEntrega': 'fecha_entrega',
   'valorTotal': 'total',
   'valorNeto': 'subtotal',
   'tipoVenta': 'tipo_venta',

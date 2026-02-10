@@ -1,4 +1,4 @@
-import React, { forwardRef, RefObject } from "react";
+import React, { forwardRef, RefObject, useEffect } from "react";
 import Image from "next/image";
 import type { ICilindroView, IVehiculoView } from "@/types/types";
 import CargaCilindros from "./CargaCilindros";
@@ -12,12 +12,14 @@ const VehiculoView = forwardRef<HTMLDivElement, {
     cargados: Array<ICilindroView>,
     descargados: Array<ICilindroView>
 }>(({ rutaId, cargados, descargados }, ref) => {
+
     const { data: vehiculo, isLoading: loadingVehiculo } = useQuery<IVehiculoView>({
         queryKey: ['vehiculo-conductor', rutaId],
         queryFn: async () => {
             if (rutaId === undefined) return null;
             const response = await fetch(`/api/conductor/vehiculoAsignado?rutaId=${rutaId ?? ''}`);
             const data = await response.json();
+            console.log("**************** Vehículo asignado:", data, cargados, descargados);
             return data.vehiculo;
         },
         enabled: !!rutaId
@@ -37,14 +39,14 @@ const VehiculoView = forwardRef<HTMLDivElement, {
         >
             {currentScaling.isReady && (
                 <>
-                    {/* Imagen del camión (fondo) */}
                     <Image 
                         className={`absolute${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
                         src={`/ui/${currentScaling.getVehicleImageName(vehiculo)}.png`}
                         alt={`camion_atras_${vehiculo ? vehiculo.marca + vehiculo.modelo : 'desconocido'}`}
                         style={{
                             top: currentScaling.vehiclePosition.top,
-                            left: currentScaling.vehiclePosition.left
+                            left: currentScaling.vehiclePosition.left,
+                            zIndex: 100
                         }}
                         width={currentScaling.vehicleDimensions.width}
                         height={currentScaling.vehicleDimensions.height} 
@@ -52,31 +54,28 @@ const VehiculoView = forwardRef<HTMLDivElement, {
                     />
 
                     {!loadingVehiculo && (
-                        <>
-                            {/* Cilindros cargados */}
-                            <div className="absolute w-full">
+                        <div>
+                            <div className="absolute w-full">                            
                                 <CargaCilindros
                                     cargados={cargados}
                                     calculatePosition={currentScaling.calculateCylinderPosition}
                                 />
                             </div>
 
-                            {/* Imagen del camión (frente) */}
                             <Image 
                                 className={`absolute${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
                                 src={`/ui/${currentScaling.getVehicleImageName(vehiculo)}_front.png`}
                                 style={{
                                     top: currentScaling.vehiclePosition.top,
                                     left: currentScaling.vehiclePosition.left,
-                                    zIndex: 100
+                                    zIndex: 300
                                 }}
                                 alt="camion_frente" 
                                 width={currentScaling.vehicleDimensions.width} 
                                 height={currentScaling.vehicleDimensions.height}
                                 priority 
                             />
-
-                            {/* Cilindros descargados */}
+                            
                             <div className="absolute w-full">
                                 {descargados.map((item, index) => {
                                     const position = currentScaling.calculateCylinderPosition(index, false);
@@ -91,14 +90,14 @@ const VehiculoView = forwardRef<HTMLDivElement, {
                                             style={{
                                                 top: position.top,
                                                 left: position.left,
-                                                zIndex: position.zIndex
+                                                zIndex: 400 + index
                                             }}
                                             priority={false}
                                         />
                                     );
                                 })}
                             </div>
-                        </>
+                        </div>
                     )}
 
                 </>

@@ -42,7 +42,6 @@ interface CylinderPosition {
   left: number;
   width: number;
   height: number;
-  zIndex: number;
 }
 
 export const useVehicleScaling = (
@@ -113,7 +112,7 @@ export const useVehicleScaling = (
     isLoaded: boolean = true
   ): CylinderPosition => {
     if (!scalingConfig) {
-      return { top: 0, left: 0, width: 20, height: 80, zIndex: 1 };
+      return { top: 0, left: 0, width: 20, height: 80 };
     }
 
     const { vehiclePosition, vehicleDimensions, vehicleScale } = scalingConfig;
@@ -141,15 +140,14 @@ export const useVehicleScaling = (
     const absoluteTop = vehiclePosition.top + (vehicleDimensions.height * relativeTop);
 
     // Si es descargado, posicionar fuera del vehículo (izquierda)
-    const finalLeft = isLoaded ? absoluteLeft : absoluteLeft - (cylinderWidth * 2.5);
-    const finalTop = isLoaded ? absoluteTop : absoluteTop + (cylinderHeight * 0.3);
+    const finalLeft = isLoaded ? absoluteLeft : absoluteLeft + (cylinderWidth * 2.5);
+    const finalTop = isLoaded ? absoluteTop : absoluteTop + 80 + (cylinderHeight * 0.3);
 
     return {
       top: finalTop,
       left: finalLeft,
       width: cylinderWidth,
-      height: cylinderHeight,
-      zIndex: isLoaded ? 10 + index : 5 + index
+      height: cylinderHeight
     };
   }, [scalingConfig]);
 

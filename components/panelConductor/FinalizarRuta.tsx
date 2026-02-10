@@ -15,7 +15,7 @@ export default function FinalizarRuta({
     const queryClient = useQueryClient();
     const mutationFinalizarRuta = useMutation({
         mutationFn: async () => {
-            if (!rutaDespacho?._id) {
+            if (!rutaDespacho?.id) {
                 throw new Error('Missing rutaId');
             }
             const response = await fetch('/api/conductor/finalizarRuta', {
@@ -24,7 +24,7 @@ export default function FinalizarRuta({
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id
+                    rutaId: rutaDespacho.id
                 })
             });
             if (!response.ok) {
@@ -35,7 +35,7 @@ export default function FinalizarRuta({
         },
         onSuccess: (data) => {
             if (data.ok) {
-                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+                queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });
             }
         },
         onError: (error: any) => {

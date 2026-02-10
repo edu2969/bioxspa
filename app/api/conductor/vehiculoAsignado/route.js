@@ -22,11 +22,6 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: 'RutaDespacho not found' }, { status: 404 });
         }
 
-        // Access check: ensure the user is the assigned driver
-        if (String(rutaDespacho.conductor_id) !== user.id) {
-            return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
-        }
-
         if (!rutaDespacho.vehiculo_id) {
             return NextResponse.json({ ok: false, error: 'No vehicle assigned' }, { status: 400 });
         }

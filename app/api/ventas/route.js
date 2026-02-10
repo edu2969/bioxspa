@@ -131,8 +131,7 @@ export const POST = withAuthorization(
         .from("venta_historial_estados")
         .insert({
           venta_id: nuevaVenta[0].id,
-          estado: estadoInicial,
-          fecha: new Date().toISOString(),
+          estado: estadoInicial
         });
 
       if (historialError) {

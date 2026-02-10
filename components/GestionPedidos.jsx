@@ -56,7 +56,6 @@ export default function GestionPedidos() {
                 throw new Error("Failed to fetch sucursales");
             }
             const data = await response.json();
-            console.log("Fetched sucursales:", data);
             setSucursales(data.sucursales);
             if (data.sucursales.length === 1) {
                 setValue("sucursalId", data.sucursales[0]._id);
@@ -68,13 +67,11 @@ export default function GestionPedidos() {
     }, [setSucursales, setValue, fetchPedidos]);
 
     const handleOpenPedido = (pedidoData) => {
-        console.log("Abriendo pedido:", pedidoData);
         const fetchCreditoCliente = async () => {
             if (!pedidoData.cliente?._id) return;
             const res = await fetch(`/api/clientes/creditos?id=${pedidoData.cliente._id}`);
             if (res.ok) {
                 const data = await res.json();
-                console.log("CREDITO", data);
                 setCredito({ ...data });
             } else {
                 console.error("Error al obtener crédito del cliente");

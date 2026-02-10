@@ -11,9 +11,9 @@ import { FaFlagCheckered } from "react-icons/fa";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
     if(!rutaDespacho) return null;
-    const tramoActual = rutaDespacho.tramos?.find(tramo => tramo.fechaArribo == null);
-    if (!tramoActual) return null;
-    return tramoActual;
+    const destinoActual = rutaDespacho.destinos?.find(destino => destino.fecha_arribo == null);
+    if (!destinoActual) return null;
+    return destinoActual;
 };
 
 export default function SelectorDeDestino({
@@ -28,27 +28,27 @@ export default function SelectorDeDestino({
     const destinoSeleccionado = watch("direccionDestinoId");
 
     const { data: destinos, isLoading: isLoadingDestinos } = useQuery<IDestinoDisponible[]>({
-        queryKey: ['destinos-ruta-conductor', rutaDespacho._id],
+        queryKey: ['destinos-ruta-conductor', rutaDespacho.id],
         queryFn: async () => {
-            if (!rutaDespacho || !rutaDespacho._id) return [];
-            const response = await fetch(`/api/conductor/destinos?rutaId=${rutaDespacho._id}`);
+            if (!rutaDespacho || !rutaDespacho.id) return [];
+            const response = await fetch(`/api/conductor/destinos?rutaId=${rutaDespacho.id}`);
             const data = await response.json();
             console.log("Destinos disponibles para la ruta de despacho:", data.destinos);
             return data.destinos;
         },
-        enabled: !!rutaDespacho?._id,
+        enabled: !!rutaDespacho?.id,
         initialData: []
     })
 
     const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
         mutationFn: async () => {
-            if (!rutaDespacho?._id) {
+            if (!rutaDespacho?.id) {
                 throw new Error('Missing rutaId');
             }
 
             let direccionDestinoId = getValues("direccionDestinoId");
             if (!direccionDestinoId) {
-                direccionDestinoId = rutaDespacho.tramos && rutaDespacho.tramos.find(tramo => tramo.fechaArribo == null)?.cliente?.direccion?._id;
+                direccionDestinoId = rutaDespacho.destinos && rutaDespacho.destinos.find(destino => destino.fecha_arribo == null)?.direccion?.id;
             }
 
             if (!direccionDestinoId) {
@@ -61,7 +61,7 @@ export default function SelectorDeDestino({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id,
+                    rutaId: rutaDespacho.id,
                     direccionId: direccionDestinoId
                 }),
             });
@@ -74,7 +74,7 @@ export default function SelectorDeDestino({
             return response.json();
         },
         onSuccess: () => {            
-            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });
         },
         onError: (error) => {
             console.error('Error iniciando viaje:', error);
@@ -93,11 +93,11 @@ export default function SelectorDeDestino({
             <div className="flex flex-col items-center mt-1 ml-2">
                 <TbFlagCheck className="text-xl mb-4 w-6" />
 
-                {rutaDespacho && rutaDespacho.tramos?.length > 0 
-                && rutaDespacho.tramos.map((tramo, indexRuta) => (
+                {rutaDespacho && rutaDespacho.destinos?.length > 0 
+                && rutaDespacho.destinos.map((destino, indexRuta) => (
                 <div className="h-12" key={`ruta_${indexRuta}`}>
                     <div className="h-4" />
-                    {tramo.fechaArribo
+                    {destino.fecha_arribo
                         ? <TbFlagCheck className="text-xl mt-1" />
                         : <FaTruckFast className="text-xl mt-1 w-6" />}
                 </div>))}
@@ -106,7 +106,7 @@ export default function SelectorDeDestino({
             <div className="flex flex-col items-center justify-start h-full">
                 <div className="flex flex-col items-center mt-1">
                     <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
-                    {rutaDespacho.tramos?.length > 0 && rutaDespacho.tramos.map((tramo, indexRuta) => (
+                    {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (
                         <div className="w-6" key={`ruta_${indexRuta}`}>
                             <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
                             <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
@@ -118,17 +118,17 @@ export default function SelectorDeDestino({
                 <div className="w-full flex mt-1 h-12 items-center">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" /><span className="text-sm ml-2">Barros Arana</span>
                 </div>
-                {rutaDespacho.tramos?.length > 0 && rutaDespacho.tramos.map((tramo, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
+                {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" />
-                    <span className="text-xs ml-2 w-36">{tramo.cliente.direccion
-                        && tramo.cliente.direccion.nombre?.split(",").slice(0, 3).join(",")}</span>
-                    {indexRuta == rutaDespacho.tramos?.length - 1 && <button
+                    <span className="text-xs ml-2 w-36">{destino.direccion
+                        && destino.direccion.nombre?.split(",").slice(0, 3).join(",")}</span>
+                    {indexRuta == rutaDespacho.destinos?.length - 1 && <button
                         className="bg-blue-400 text-white font-bold rounded-md shadow-md w-10 h-10 pl-2"
                         onClick={() => {
-                            const destino = `${tramo.cliente.direccion && tramo.cliente.direccion.latitud},${tramo.cliente.direccion && tramo.cliente.direccion.longitud}`;
+                            const glosaDestino = `${destino.direccion && destino.direccion.latitud},${destino.direccion && destino.direccion.longitud}`;
                             // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
                             window.open(
-                                `https://www.google.com/maps/dir/?api=1&destination=${destino}&travelmode=driving`,
+                                `https://www.google.com/maps/dir/?api=1&destination=${glosaDestino}&travelmode=driving`,
                                 "_blank"
                             );
                         }}
@@ -142,13 +142,13 @@ export default function SelectorDeDestino({
         {!isLoadingDestinos && destinos && destinos.length > 1 && <Selector 
             options={destinos.map((destino: IDestinoDisponible): { label: string; value: string } => {
                 return {
-                    value: destino.direccionId,
-                    label: destino.glosaDireccion
+                    value: destino.direccion_id,
+                    label: destino.glosa_direccion
                 }
             })}
             register={register("direccionDestinoId")}
             label="Destino"
-            placeholder={rutaDespacho && rutaDespacho.tramos?.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
+            placeholder={rutaDespacho && rutaDespacho.destinos?.some(r => r.fecha_arribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
             getLabel={(option: { label: string; value: string }) => option.label}
             getValue={(option: { label: string; value: string }) => option.value}
         />}

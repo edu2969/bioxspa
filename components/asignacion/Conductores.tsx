@@ -32,7 +32,6 @@ export default function Conductores({
             if(sucursalId === undefined) return [];
             const response = await fetch(`/api/pedidos/asignacion/conductores?sucursalId=${sucursalId}`);
             const data = await response.json();
-            console.log("Conductores fetched:", data);
             return data.conductores;
         },
         enabled: !!sucursalId
@@ -44,8 +43,6 @@ export default function Conductores({
 
     // Componente individual de conductor con @dnd-kit
     const ConductorItem = ({ chofer, index }: { chofer: IConductoresResponse, index: number }) => {
-        console.log("Rendering conductor:", chofer, index);
-
         const { setNodeRef, isOver } = useDroppable({
             id: `conductor-${chofer.id}`,
             disabled: !chofer.checklist

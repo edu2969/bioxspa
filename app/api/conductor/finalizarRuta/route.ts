@@ -1,103 +1,105 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/utils/authOptions";
-import { connectMongoDB } from "@/lib/mongodb";
-import RutaDespacho from "@/models/rutaDespacho";
-import User from "@/models/user";
-import Cargo from "@/models/cargo";
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO, USER_ROLE, TIPO_ORDEN } from "@/app/utils/constants";
-import { IRutaDespacho } from "@/types/rutaDespacho";
 
-// filepath: d:/git/bioxspa/app/api/pedidos/terminarRuta/route.js
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
     try {
-        console.log("POST request received for terminarRuta.");
-        await connectMongoDB();
-        console.log("MongoDB connected.");
+        console.log("POST request received for finalizarRuta (Supabase)");
 
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user || !session.user.id) {
-            console.warn("Unauthorized access attempt.");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
+        const { user, userData } = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-        const userId = session.user.id;
         const body = await req.json();
-        const { rutaId } = body;
+        const { rutaId } = body || {};
+        if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
 
-        if (!rutaId) {
-            console.warn("rutaId is missing in the request body.");
-            return NextResponse.json({ 
-                ok: false, 
-                error: "rutaId is required" 
-            }, { status: 400 });
+        // Fetch ruta and ensure it's in 'regreso' state
+        const { data: rutaData, error: rutaErr } = await supabase
+            .from('rutas_despacho')
+            .select('id, estado, conductor_id')
+            .eq('id', rutaId)
+            .maybeSingle();
+
+        if (rutaErr) {
+            console.error('[finalizarRuta] Error fetching ruta:', rutaErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta' }, { status: 500 });
         }
 
-        // Find the rutaDespacho
-        const rutaDespacho = await RutaDespacho.findOne({
-            _id: rutaId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.regreso
-        }).populate({
-            path: 'ventaIds',
-            select: 'tipo'
-        });
-        
-        if (!rutaDespacho) {
-            console.warn(`RutaDespacho not found or not in 'regreso' state for ID: ${rutaId}`);
-            return NextResponse.json({ 
-                ok: false, 
-                error: "RutaDespacho not found or not in regreso state" 
-            }, { status: 404 });
+        if (!rutaData) return NextResponse.json({ ok: false, error: 'RutaDespacho not found' }, { status: 404 });
+
+        if (rutaData.estado !== TIPO_ESTADO_RUTA_DESPACHO.regreso) {
+            return NextResponse.json({ ok: false, error: 'Ruta not in regreso state' }, { status: 400 });
         }
 
-        // Verify the user is the driver assigned to this route
-        if (rutaDespacho.choferId.toString() !== userId) {
-            console.warn(`User ${userId} is not the assigned driver for route ${rutaId}`);
-            return NextResponse.json({ 
-                ok: false, 
-                error: "You are not authorized to complete this route" 
-            }, { status: 403 });
+        // Verify assigned driver
+        if (String(rutaData.conductor_id) !== String(user.id)) {
+            return NextResponse.json({ ok: false, error: 'You are not authorized to complete this route' }, { status: 403 });
         }
 
-        // Verify the user has the conductor role
-        const user = await User.findById(userId);
-        if (!user || !(user.role & USER_ROLE.conductor)) {
-            console.warn(`User ${userId} does not have the conductor role`);
-            return NextResponse.json({ 
-                ok: false, 
-                error: "You do not have permission to complete routes" 
-            }, { status: 403 });
+        // Verify user has conductor role (use userData.role if available)
+        const userRole = userData?.role ?? null;
+        if (!userRole || !(userRole & USER_ROLE.conductor)) {
+            return NextResponse.json({ ok: false, error: 'You do not have permission to complete routes' }, { status: 403 });
         }
 
-        // Additionally verify the user has a cargo of type conductor
-        const cargo = await Cargo.findOne({
-            userId: userId,
-            tipo: TIPO_CARGO.conductor,
-            hasta: null // Active assignment (not ended)
-        });
-
-        if (!cargo) {
-            console.warn(`User ${userId} does not have an active conductor position`);
-            return NextResponse.json({ 
-                ok: false, 
-                error: "You do not have an active position as conductor" 
-            }, { status: 403 });
+        // Verify active cargo assignment
+        const { data: cargoRow, error: cargoErr } = await supabase
+            .from('cargos')
+            .select('id, hasta')
+            .eq('usuario_id', user.id)
+            .eq('tipo', TIPO_CARGO.conductor)
+            .limit(1)
+            .maybeSingle();
+        if (cargoErr) {
+            console.error('[finalizarRuta] Error fetching cargo:', cargoErr);
+            return NextResponse.json({ ok: false, error: 'Error checking cargo' }, { status: 500 });
         }
 
-        const ventasTraslado = (rutaDespacho as IRutaDespacho).ventaIds.filter(venta => venta.tipo === TIPO_ORDEN.traslado);        
-        rutaDespacho.estado = ventasTraslado.length > 0 ? TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado : TIPO_ESTADO_RUTA_DESPACHO.terminado;
-        await rutaDespacho.save();
-        return NextResponse.json({ 
-            ok: true, 
-            message: "Ruta completada correctamente", 
-            rutaDespacho 
-        });
+        const now = new Date();
+        if (!cargoRow || (cargoRow.hasta && new Date(cargoRow.hasta) < now)) {
+            return NextResponse.json({ ok: false, error: 'User does not have an active conductor position' }, { status: 403 });
+        }
+
+        // Get ventas linked to ruta via ruta_ventas
+        const { data: rutaVentas, error: rvErr } = await supabase
+            .from('ruta_ventas')
+            .select('venta_id')
+            .eq('ruta_id', rutaId);
+        if (rvErr) console.error('[finalizarRuta] Error fetching ruta_ventas:', rvErr);
+
+        const ventaIds = (rutaVentas || []).map((r: any) => r.venta_id).filter(Boolean);
+
+        let ventasTrasladoCount = 0;
+        if (ventaIds.length > 0) {
+            const { data: ventasRows, error: ventasErr } = await supabase
+                .from('ventas')
+                .select('id, tipo')
+                .in('id', ventaIds);
+            if (ventasErr) console.error('[finalizarRuta] Error fetching ventas:', ventasErr);
+            ventasTrasladoCount = (ventasRows || []).filter((v: any) => v.tipo === TIPO_ORDEN.traslado).length;
+        }
+
+        const nuevoEstado = ventasTrasladoCount > 0 ? TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado : TIPO_ESTADO_RUTA_DESPACHO.terminado;
+
+        // Update ruta estado
+        const { error: updErr } = await supabase
+            .from('rutas_despacho')
+            .update({ estado: nuevoEstado })
+            .eq('id', rutaId);
+        if (updErr) console.error('[finalizarRuta] Error updating ruta estado:', updErr);
+
+        // Insert into ruta_historial_estados
+        const nowIso = new Date().toISOString();
+        const { error: histErr } = await supabase
+            .from('ruta_historial_estados')
+            .insert({ ruta_id: rutaId, estado: nuevoEstado, created_at: nowIso });
+        if (histErr) console.error('[finalizarRuta] Error inserting ruta_historial_estados:', histErr);
+
+        return NextResponse.json({ ok: true, message: 'Ruta completada correctamente', estado: nuevoEstado });
+
     } catch (error) {
-        console.error("ERROR", error);
-        return NextResponse.json({ 
-            ok: false, 
-            error: "Internal Server Error" 
-        }, { status: 500 });
+        console.error('ERROR in finalizarRuta:', error);
+        return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }

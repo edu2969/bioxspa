@@ -7,14 +7,13 @@ interface CylinderPosition {
   left: number;
   width: number;
   height: number;
-  zIndex: number;
 }
 
 export default function CargaCilindros({
     cargados, 
     calculatePosition
 }: {
-    cargados: Array<ICilindroView>;
+    cargados: ICilindroView[];
     calculatePosition: (index: number, isLoaded: boolean) => CylinderPosition;
 }) {
     return (
@@ -32,7 +31,7 @@ export default function CargaCilindros({
                         style={{
                             top: position.top,
                             left: position.left,
-                            zIndex: cargados.length - position.zIndex
+                            zIndex: 200 + cargados.length - index
                         }}
                         priority={false}
                     />

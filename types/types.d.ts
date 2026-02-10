@@ -1,5 +1,6 @@
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { IDireccion } from "./direccion";
+import { IVentaView } from "@/components/prefabs/types";
 
 export interface IPedidoPorAsignar {
     id: string;
@@ -175,14 +176,10 @@ export interface IItemCatalogoView extends ICilindroView {
     codigo: string;
 }
 
-export interface ITramoView {
+export interface IDestinoView {
     tipo: number; // TIPO_ORDEN
-    fecha_arribo: Date | null;    
-    cliente: {
-        nombre: string;
-        telefono: string;
-        direccion: IDireccion;
-    },
+    fecha_arribo: Date | null;
+    direccion: IDireccion;
     comentario?: string;
     quien_recibe?: string;
     rut_recibe?: string;
@@ -190,7 +187,9 @@ export interface ITramoView {
 
 export interface IRutaConductorView {
     id: string;
-    tramos: ITramoView[];
+    estado: number;
+    ventas: IVentaView[];
+    destinos: IDestinoView[];
 }
 
 export interface IVehiculoView {

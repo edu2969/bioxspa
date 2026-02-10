@@ -95,15 +95,15 @@ export async function GET(request) {
             const sub = row.subcategoria || null;
             const cat = sub?.categoria || null;
             return {
-                _id: row.id,
-                subcategoriaCatalogoId: sub?.id || "",
+                id: row.id,
+                subcategoria_catalogo_id: sub?.id || "",
                 cantidad: sub?.cantidad || 0,
                 unidad: sub?.unidad || "",
-                nombreGas: sub?.nombre || "",
-                sinSifon: sub?.sin_sifon || false,
+                nombre_gas: sub?.nombre || "",
+                sin_sifon: sub?.sin_sifon || false,
                 elemento: cat?.elemento || "",
-                esIndustrial: cat?.es_industrial || false,
-                esMedicinal: cat?.es_medicinal || false,
+                es_industrial: cat?.es_industrial || false,
+                es_medicinal: cat?.es_medicinal || false,
                 vencido: false
             };
         });

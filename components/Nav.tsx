@@ -39,7 +39,7 @@ export default function Nav() {
                     <AiFillHome size="1.7rem" className="mt-4 mr-4 text-slate-800 justify-end cursor-pointer" />
                 </Link>
             </div>
-            <div className={`w-full h-screen min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
+            <div className={`w-full md:w-96 h-screen min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
                 <AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4"
                     onClick={() => setMenuActivo(false)} />
                 <div className="mt-12 text-white space-y-6">

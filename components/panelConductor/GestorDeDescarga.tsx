@@ -11,9 +11,7 @@ import Loader from "../Loader";
 import QuienRecibeModal from "../modals/QuienRecibeModal";
 
 const getVentaActual = (ruta: IRutaConductorView) => {
-    const tramoActual = ruta.tramos[ruta.tramos.length - 1];
-    if (!tramoActual) return null;
-    return tramoActual;
+    return ruta.ventas.find(rv => rv.actual) || null;
 }
 
 export default function GestorDeDescarga({
@@ -32,13 +30,14 @@ export default function GestorDeDescarga({
     // Mutación para descargar cilindros individuales
     const mutation = useMutation({
         mutationFn: async (codigo: string) => {
+            console.log("Iniciando descarga para código:", codigo, rutaDespacho.id);            
             const response = await fetch('/api/cilindros/descargar', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id,
+                    rutaId: rutaDespacho.id,
                     codigo
                 })
             });
@@ -69,13 +68,13 @@ export default function GestorDeDescarga({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id
+                    rutaId: rutaDespacho.id
                 })
             });
         },
         onSuccess: () => {
             toast.success('Descarga confirmada correctamente');
-            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });
         },
         onError: (error: any) => {
             toast.error(error.message || 'Error al confirmar descarga');
@@ -85,7 +84,7 @@ export default function GestorDeDescarga({
     const { data: listaDeDescarga, isLoading: loadingListaDeDescarga } = useQuery<IListadoDescargaView>({
         queryKey: ['listado-descarga-vehiculo'],
         queryFn: async () => {
-            const response = await fetch(`/api/conductor/listadoDeDescarga?rutaId=${rutaDespacho._id}`);
+            const response = await fetch(`/api/conductor/listadoDeDescarga?rutaId=${rutaDespacho.id}`);
             const data = await response.json();
             console.log("DESCARGA-vehiculo", data);
             setListaDescargaLocal(data);
@@ -95,15 +94,15 @@ export default function GestorDeDescarga({
     });
 
     const isReady = () => {
-        return listaDeDescarga !== undefined && listaDeDescarga.cilindros.every((item: IItemDeCargaView) => item.restantes === 0);
+        return listaDeDescarga !== undefined && listaDeDescarga.cilindros?.every((item: IItemDeCargaView) => item.restantes === 0);
     };
 
     const loadState = () => {
         if (!listaDeDescarga) {
             return { complete: false, porcentaje: 0 };
         }
-        const totalItems = listaDeDescarga.cilindros.length;
-        const completedItems = listaDeDescarga.cilindros.filter(item => item.restantes === 0).length;
+        const totalItems = listaDeDescarga.cilindros?.length || 0;
+        const completedItems = listaDeDescarga.cilindros?.filter(item => item.restantes === 0).length || 0;
         const porcentaje = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
         return {
             complete: completedItems === totalItems,
@@ -116,8 +115,8 @@ export default function GestorDeDescarga({
 
         <div className="w-full">
             {(() => {
-                const cliente = getVentaActual(rutaDespacho)?.cliente;
                 const ventaActual = getVentaActual(rutaDespacho);
+                const cliente = ventaActual?.cliente;
                 return (
                     <div className="mx-4 flex items-center justify-between px-2 py-1 border border-gray-300 rounded-lg bg-white">
                         <div className="w-full">
@@ -148,7 +147,7 @@ export default function GestorDeDescarga({
         </div>
 
         <ul className="flex flex-wrap items-center justify-center mt-2 mb-24 pl-3 pr-2 overflow-y-scroll overflow-x-visible">
-            {!loadingListaDeDescarga && listaDescargaLocal && listaDescargaLocal.cilindros.map((item: IItemDeCargaView, idx: number) => (
+            {!loadingListaDeDescarga && listaDescargaLocal && listaDescargaLocal.cilindros?.map((item: IItemDeCargaView, idx: number) => (
                 <li
                     key={`item_${idx}`}
                     className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && listaDescargaLocal.cilindros.length != 1) ? 'rounded-t-lg' :
@@ -162,8 +161,8 @@ export default function GestorDeDescarga({
                         <div className="flex">
                             <div>
                                 <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(item.elemento)}</div>
-                                {item.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                                {item.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                                {item.es_industrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                                {item.sin_sifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
                             </div>
                             <div className="font-bold text-xl ml-2 mt-[3px]">
                                 {item.elemento && <span>
@@ -252,7 +251,7 @@ export default function GestorDeDescarga({
 
         {showModalNombreRetira && 
         <QuienRecibeModal
-            rutaId={rutaDespacho._id}
+            ventaId={getVentaActual(rutaDespacho)?.id || ''}
             onClose={() => setShowModalNombreRetira(false)}
         />}
 

@@ -344,7 +344,6 @@ html, body {
   height: 4.75px;
   top: 4px;
   left: 3.87px;
-  background-color: #ff0;
   border-radius: 50%;
   opacity: 0.9;
 }
@@ -353,7 +352,6 @@ html, body {
   position: absolute;
   width: 2.25px;
   height: 1.75px;
-  background-color: #fff;
   top: 6.625px;
   left: 6.5px;
   border-radius: 50%;
@@ -367,7 +365,6 @@ html, body {
   height: 2.85px;
   top: 2.4px;
   left: 2.325px;
-  background-color: #fff;
   border-radius: 50%;
   opacity: 0.9;
 }
@@ -376,7 +373,6 @@ html, body {
   position: absolute;
   width: 1.35px;
   height: 1.05px;
-  background-color: #fff;
   top: 3.975px;
   left: 3.9px;
   border-radius: 50%;
@@ -386,22 +382,20 @@ html, body {
 .circles li:nth-child(10)::before {
   content: "";
   position: absolute;
-  width: 33px;
-  height: 28.5px;
+  width: 21.5px;
+  height: 19px;
   top: 24px;
   left: 23.25px;
-  background-color: #fff;
   border-radius: 50%;
   opacity: 0.9;
 }
 .circles li:nth-child(10)::after {
   content: "";
   position: absolute;
-  width: 13.5px;
-  height: 10.5px;
-  background-color: #fff;
-  top: 40px;
-  left: 39px;
+  width: 9.5px;
+  height: 7px;
+  top: 43px;
+  left: 44px;
   border-radius: 50%;
   opacity: 0.9;
 }

@@ -1,25 +1,7 @@
-import mongoose from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
+import supabase from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import Cliente from "@/models/cliente"; // Asumiendo que existe el modelo Cliente
-import Direccion from "@/models/direccion";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import ItemCatalogo from "@/models/itemCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
 
 export async function GET(request) {
-    await connectMongoDB();
-
-    if (!mongoose.models.Direccion) {
-        mongoose.model("Direccion", Direccion.schema);
-    }
-    if (!mongoose.models.CategoriaCatalogo) {
-        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.SubcategoriaCatalogo) {
-        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-    }
-
     const { searchParams } = new URL(request.url);
     const clienteId = searchParams.get("id");
     if (!clienteId) {
@@ -27,39 +9,48 @@ export async function GET(request) {
     }
 
     // Busca el cliente
-    const cliente = await Cliente.findById(clienteId).lean();
-    if (!cliente) {
+    const { data: cliente, error: clienteError } = await supabase
+        .from("clientes")
+        .select("id, cliente_direcciones_despacho(direccion_id)")
+        .eq("id", clienteId)
+        .single();
+    
+    if (clienteError || !cliente) {
         return NextResponse.json({ ok: false, error: "Cliente not found" }, { status: 404 });
-    }   
+    }
 
     // Obtiene los IDs de direcciones de despacho del cliente
-    const despachoIds = cliente.direccionesDespacho?.map(d => d.direccionId) || [];
+    const despachoIds = cliente.direcciones_despacho?.map(d => d.direccion_id) || [];
 
-    // Busca items del catálogo cuya direccionId coincida con alguna dirección de despacho
-    const items = await (
-        despachoIds.length > 0
-            ? ItemCatalogo.find({ direccionId: { $in: despachoIds } })
-                .populate({
-                    path: "subcategoriaCatalogoId",
-                    select: "cantidad unidad sinSifon categoriaCatalogoId",
-                    populate: {
-                        path: "categoriaCatalogoId",
-                        select: "esIndustrial codigo elemento"
-                    }
-                })
-                .lean()
-            : []
-    );
+    // Busca items del catálogo cuya direccion_id coincida con alguna dirección de despacho
+    const { data: items, error: itemsError } = despachoIds.length > 0
+        ? await supabase
+              .from("items_catalogo")
+              .select(`
+                  id, codigo, direccion_id,
+                  subcategoria:subcategorias_catalogo(
+                      cantidad, unidad, sin_sifon,
+                      categoria:categorias_catalogo(
+                          es_industrial, elemento
+                      )
+                  )
+              `)
+              .in("direccion_id", despachoIds)
+        : { data: [], error: null };
+
+    if (itemsError) {
+        return NextResponse.json({ ok: false, error: "Error fetching items" }, { status: 500 });
+    }
 
     // Adorna los items con los datos requeridos
     const cilindros = items.map(item => ({
-        _id: item._id,
+        id: item.id,
         codigo: item.codigo,
-        elemento: item.subcategoriaCatalogoId?.categoriaCatalogoId?.elemento || null,
-        cantidad: item.subcategoriaCatalogoId?.cantidad || null,
-        unidad: item.subcategoriaCatalogoId?.unidad || null,
-        sinSifon: item.subcategoriaCatalogoId?.sinSifon || false,
-        esIndustrial: item.subcategoriaCatalogoId?.categoriaCatalogoId?.esIndustrial || false        
+        elemento: item.subcategoria?.categoria?.elemento || null,
+        cantidad: item.subcategoria?.cantidad || null,
+        unidad: item.subcategoria?.unidad || null,
+        sinSifon: item.subcategoria?.sin_sifon || false,
+        esIndustrial: item.subcategoria?.categoria?.es_industrial || false
     }));
 
     // Respuesta

@@ -11,7 +11,7 @@ import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
-    const tramoActual = rutaDespacho.tramos.find(tramo => tramo.fechaArribo == null);
+    const tramoActual = rutaDespacho.destinos.find(tramo => tramo.fecha_arribo == null);
     if (!tramoActual) return null;
     return tramoActual;
 };
@@ -46,7 +46,7 @@ export default function ConfirmacionLlegadaADestino({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id,
+                    rutaId: rutaDespacho.id,
                     ...data               
                 }),
             });
@@ -60,7 +60,7 @@ export default function ConfirmacionLlegadaADestino({
         onSuccess: () => {
             toast("Arribo confirmado con éxito");
             queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
-            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });
         },
         onError: (error) => {
             console.error('Error reportando llegada:', error);
@@ -93,7 +93,7 @@ export default function ConfirmacionLlegadaADestino({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    rutaId: rutaDespacho._id
+                    rutaId: rutaDespacho.id
                 }),
             });
             if (!response.ok) {
@@ -105,7 +105,7 @@ export default function ConfirmacionLlegadaADestino({
         onSuccess: () => {
             toast.success("Destino corregido, por favor selecciona el nuevo destino");
             queryClient.invalidateQueries({ queryKey: ['ruta-despacho-conductor'] });
-            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho._id] });
+            queryClient.invalidateQueries({ queryKey: ['estado-ruta-conductor', rutaDespacho.id] });
         },
         onError: (error) => {
             console.error('Error corrigiendo destino:', error);
@@ -136,7 +136,7 @@ export default function ConfirmacionLlegadaADestino({
                     <p className="text-center text-xl font-bold mb-4">Confirma que has llegado a</p>
                     <div className="flex bg-blue-400 text-white border-lg shadow-md rounded-lg mx-2 p-2">
                         <BsFillGeoAltFill size="1.75rem" className="inline-block mr-2" />
-                        <p className="text-xl text-center">{rutaDespacho.tramos.find(t => t.fechaArribo === null)?.cliente.direccion.nombre || "un destino"}</p>
+                        <p className="text-xl text-center">{rutaDespacho.destinos.find(t => t.fecha_arribo === null)?.direccion.nombre || "un destino"}</p>
                     </div>
 
                     <div className="w-full px-6 py-4 bg-white mx-auto">

@@ -37,8 +37,8 @@
     "scripts/ejecutar-tests-sii.ts",
     "app/api/ventas/route.ts",
     ".next/dev/types/**/*.ts",
-    "app/api/home/route.js"
-, "app/api/ventas/masDetalles/[...id]/route.js", "app/api/pedidos/despacho/route.js", "app/api/cilindros/cargar/route.js", "app/api/conductor/rutaAsignada/route.js"  ],
+    "app/api/home/route.js", 
+    "app/api/ventas/masDetalles/[...id]/route.js", "app/api/pedidos/despacho/route.js", "app/api/cilindros/cargar/route.js", "app/api/conductor/rutaAsignada/route.js", "app/api/conductor/ventasEnTransito/route.js", "app/api/cobros/route.js"  ],
   "exclude": [
     "node_modules",
     ".next/**/*"

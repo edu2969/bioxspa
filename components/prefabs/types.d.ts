@@ -23,7 +23,8 @@ export interface IVentaView {
         subcategoria_catalogo_id: ICilindroView;
         item_catalogo_ids: Array<IItemCatalogoView>;
     }>;
-    direccion_despacho_id: IDireccionView | null;            
+    direccion_despacho_id: IDireccionView | null;
+    actual: boolean;
 }
 
 export interface IDetalleVentaActual {
