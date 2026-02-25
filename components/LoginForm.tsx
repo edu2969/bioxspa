@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import Image from "next/image";
 import Loader from "./Loader";
 import { IoAlertCircle } from "react-icons/io5";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import { stat } from "fs";
 
 export default function LoginForm() {
   const router = useRouter();

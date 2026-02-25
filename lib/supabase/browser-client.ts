@@ -3,11 +3,9 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type SupabaseSchema = Record<string, never>;
+let client: SupabaseClient | null = null;
 
-let client: SupabaseClient<SupabaseSchema> | null = null;
-
-export function getSupabaseBrowserClient(): SupabaseClient<SupabaseSchema> {
+export function getSupabaseBrowserClient(): SupabaseClient {
     if(client) {
         return client;
     }
@@ -19,6 +17,6 @@ export function getSupabaseBrowserClient(): SupabaseClient<SupabaseSchema> {
         throw new Error("Supabase URL or Anon Key is not defined in environment variables");
     }
 
-    client = createBrowserClient<SupabaseSchema>(supabaseUrl, supabaseAnonKey);
+    client = createBrowserClient(supabaseUrl, supabaseAnonKey);
     return client;
 }

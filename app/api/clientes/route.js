@@ -26,7 +26,7 @@ export async function GET(req) {
                 cilindros_max,
                 activo,
                 en_quiebra,
-                direcciones_despacho:cliente_direcciones_despacho(direccion_id(id, nombre, latitud, longitud)),
+                direcciones_despacho:cliente_direcciones_despacho(direccion_id(id, direccion_cliente, latitud, longitud)),
                 documento_tributario_id,
                 credito,
                 meses_aumento

@@ -11,7 +11,7 @@ export async function GET(request) {
     // Busca el cliente
     const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
-        .select("id, cliente_direcciones_despacho(direccion_id)")
+        .select("id, direcciones_despacho:cliente_direcciones_despacho(id), direccion:direcciones(id)")
         .eq("id", clienteId)
         .single();
     
@@ -20,7 +20,10 @@ export async function GET(request) {
     }
 
     // Obtiene los IDs de direcciones de despacho del cliente
-    const despachoIds = cliente.direcciones_despacho?.map(d => d.direccion_id) || [];
+    const despachoIds = cliente.direcciones_despacho?.map(d => d.id) || [];
+    despachoIds.push(cliente.direccion?.id); // Agrega la dirección principal del cliente si existe
+
+    console.log("Despacho IDs:", despachoIds); // Debug: Verifica los IDs de despacho obtenidos
 
     // Busca items del catálogo cuya direccion_id coincida con alguna dirección de despacho
     const { data: items, error: itemsError } = despachoIds.length > 0
@@ -37,6 +40,8 @@ export async function GET(request) {
               `)
               .in("direccion_id", despachoIds)
         : { data: [], error: null };
+
+    console.log("Posible error", itemsError); // Debug: Verifica si hubo un error al obtener los items
 
     if (itemsError) {
         return NextResponse.json({ ok: false, error: "Error fetching items" }, { status: 500 });

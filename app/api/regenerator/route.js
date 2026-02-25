@@ -1,9 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import { connectMongoDB } from "@/lib/mongodb";
-import Direccion from "@/models/direccion";
-import Cliente from "@/models/cliente";
-import Sucursal from "@/models/sucursal";
-import Dependencia from "@/models/dependencia";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -11,135 +6,69 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q");
 
-    if (query === "repararSucursales") {
-        const result = await repararSucursales();
+    if (query === "repararDirecciones") {
+        const result = await repararDirecciones();
         return NextResponse.json({ ok: true, result });
     }
 
     return NextResponse.json({ ok: false, error: "Invalid query parameter" }, { status: 400 });
 }
 
-const repararSucursales = async () => {
-    await connectMongoDB();
-
-    const summary = {
-        sucursales: { processed: 0, updated: 0, missing_direccion: 0, missing_sup_direccion: 0, errors: [] },
-        dependencias: { processed: 0, updated: 0, missing_direccion: 0, missing_sup_direccion: 0, errors: [] }
-    };
-
-    // Procesar sucursales Mongo -> Supabase
+const repararDirecciones = async () => {
     try {
-        const sucursales = await Sucursal.find().lean();
-        for (const s of sucursales) {
-            summary.sucursales.processed++;
-            try {
-                if (!s.direccionId) {
-                    summary.sucursales.missing_direccion++;
-                    continue;
-                }
+        // Fetch all addresses from Supabase
+        const { data: direcciones, error: fetchError } = await supabase
+            .from("direcciones")
+            .select("*");
 
-                const direccion = await Direccion.findById(s.direccionId).lean();
-                if (!direccion || !direccion.apiId) {
-                    summary.sucursales.missing_direccion++;
-                    continue;
-                }
+        if (fetchError) throw fetchError;
 
-                const { data: supDirs, error: supDirErr } = await supabase
-                    .from("direcciones")
-                    .select("id, api_id")
-                    .eq("api_id", direccion.apiId)
-                    .limit(1);
+        // Fetch all communes for lookup
+        const { data: comunas, error: comunasError } = await supabase
+            .from("comunas")
+            .select("id, nombre");
 
-                if (supDirErr) {
-                    summary.sucursales.errors.push({ sucursal: s.nombre, error: supDirErr.message });
-                    continue;
-                }
+        if (comunasError) throw comunasError;
 
-                if (!supDirs || supDirs.length === 0) {
-                    summary.sucursales.missing_sup_direccion++;
-                    continue;
-                }
+        // Create a map for faster commune lookup
+        const comunaMap = new Map(
+            comunas.map(c => [c.nombre.toLowerCase(), c.id])
+        );
 
-                const supDireccionId = supDirs[0].id;
+        let processed = 0;
+        let skipped = 0;
 
-                const { data: updated, error: updErr } = await supabase
-                    .from("sucursales")
-                    .update({ direccion_id: supDireccionId })
-                    .eq("nombre", s.nombre)
-                    .select("id, nombre");
+        // Process each address
+        for (const dir of direcciones) {
+            const [calle, comunaName] = dir.direccion_cliente.split(",");
+            const comunaNormalized = comunaName?.trim().toLowerCase();
 
-                if (updErr) {
-                    summary.sucursales.errors.push({ sucursal: s.nombre, error: updErr.message });
-                    continue;
-                }
+            const comunaId = comunaMap.get(comunaNormalized);
 
-                if (updated && updated.length > 0) {
-                    summary.sucursales.updated += updated.length;
-                }
-            } catch (e) {
-                summary.sucursales.errors.push({ sucursal: s.nombre, error: e.message });
+            if (!comunaId) {
+                skipped++;
+                continue;
+            }
+
+            // Update address with commune_id and cleaned street
+            const { error: updateError } = await supabase
+                .from("direcciones")
+                .update({
+                    comuna_id: comunaId,
+                    direccion_cliente: calle.trim()
+                })
+                .eq("id", dir.id);
+
+            if (updateError) {
+                console.warn(`Error updating address ${dir.id}:`, updateError);
+            } else {
+                processed++;
             }
         }
-    } catch (e) {
-        summary.sucursales.errors.push({ fatal: true, error: e.message });
+
+        return { processed, skipped, total: direcciones.length };
+    } catch (error) {
+        console.error("[repararDirecciones] Error:", error);
+        throw error;
     }
-
-    // Procesar dependencias Mongo -> Supabase
-    try {
-        const deps = await Dependencia.find().lean();
-        for (const d of deps) {
-            summary.dependencias.processed++;
-            try {
-                if (!d.direccionId) {
-                    summary.dependencias.missing_direccion++;
-                    continue;
-                }
-
-                const direccion = await Direccion.findById(d.direccionId).lean();
-                if (!direccion || !direccion.apiId) {
-                    summary.dependencias.missing_direccion++;
-                    continue;
-                }
-
-                const { data: supDirs, error: supDirErr } = await supabase
-                    .from("direcciones")
-                    .select("id, api_id")
-                    .eq("api_id", direccion.apiId)
-                    .limit(1);
-
-                if (supDirErr) {
-                    summary.dependencias.errors.push({ dependencia: d.nombre, error: supDirErr.message });
-                    continue;
-                }
-
-                if (!supDirs || supDirs.length === 0) {
-                    summary.dependencias.missing_sup_direccion++;
-                    continue;
-                }
-
-                const supDireccionId = supDirs[0].id;
-
-                const { data: updated, error: updErr } = await supabase
-                    .from("dependencias")
-                    .update({ direccion_id: supDireccionId })
-                    .eq("nombre", d.nombre)
-                    .select("id, nombre");
-
-                if (updErr) {
-                    summary.dependencias.errors.push({ dependencia: d.nombre, error: updErr.message });
-                    continue;
-                }
-
-                if (updated && updated.length > 0) {
-                    summary.dependencias.updated += updated.length;
-                }
-            } catch (e) {
-                summary.dependencias.errors.push({ dependencia: d.nombre, error: e.message });
-            }
-        }
-    } catch (e) {
-        summary.dependencias.errors.push({ fatal: true, error: e.message });
-    }
-
-    return summary;
 }
