@@ -18,7 +18,7 @@ export async function GET(request) {
         // Fetch ruta with nested destinos and conductor info
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select('id, conductor_id, conductor:usuarios(id, nombre), ruta_destinos(id, direccion:direcciones(id, nombre), created_at)')
+            .select('id, conductor_id, conductor:usuarios(id, nombre), ruta_despacho_destinos(id, direccion:direcciones(id, direccion_cliente), created_at)')
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -50,7 +50,7 @@ export async function GET(request) {
         const destinos = rutaData.ruta_destinos || [];
         if (destinos.length > 0) {
             destinos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            direccionDestino = destinos[0]?.direccion?.nombre || '';
+            direccionDestino = destinos[0]?.direccion?.direccion_cliente || '';
         }
 
         const rutaEnTransito = {

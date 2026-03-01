@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import supabase from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
-export async function GET(request: NextRequest) {
+export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
         const sucursalId = searchParams.get("sucursalId");
@@ -34,15 +34,15 @@ export async function GET(request: NextRequest) {
 
         // Fetch rutas en transito using the intermediate table ruta_ventas
         const { data: rutasRelacionadas, error: rutasRelacionadasError } = await supabase
-            .from("ruta_ventas")
-            .select("ruta_id")
+            .from("ruta_despacho_ventas")
+            .select("ruta_despacho_id")
             .in("venta_id", ventaIds);
 
         if (rutasRelacionadasError) {
             return NextResponse.json({ error: rutasRelacionadasError.message }, { status: 500 });
         }
 
-        const rutaIds = rutasRelacionadas.map((relacion) => relacion.ruta_id);
+        const rutaIds = rutasRelacionadas.map((relacion) => relacion.ruta_despacho_id);
 
         if (rutaIds.length === 0) {
             return NextResponse.json({ enTransito: [] });

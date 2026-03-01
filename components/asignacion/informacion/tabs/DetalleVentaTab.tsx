@@ -14,8 +14,9 @@ export default function OperacionesTab({ ventaId } : {
         queryKey: ['venta-detalle', ventaId],
         queryFn: async () => {
             if (!ventaId) return null;
-            const response = await fetch(`/api/ventas/masDetalles/${ventaId}`);
+            const response = await fetch(`/api/ventas/masDetalles?ventaId=${ventaId}`);
             const data = await response.json();
+            console.log("Detalle de venta:", data);
             return data.venta;
         },
         enabled: ventaId !== null

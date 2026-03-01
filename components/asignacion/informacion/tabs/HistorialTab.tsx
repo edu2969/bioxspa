@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Fragment } from 'react';
+import { Fragment } from 'react';
 import { FaClock } from 'react-icons/fa';
 import { BsGeoAltFill } from 'react-icons/bs';
 import { useQuery } from '@tanstack/react-query';
@@ -46,7 +46,7 @@ export default function HistorialTab({ ventaId } : {
                             {historial.map((item, idx) => (
                                 <div key={idx} className="flex flex-col items-end justify-center h-20">
                                     <div className="flex items-center mt-8">
-                                        {item.duracion && (
+                                        {item.duracion && idx < historial.length - 1 && (
                                             <>
                                                 <FaClock className="mr-1 text-gray-400" />
                                                 <span className="text-xs">{formatDuration(item.duracion)}</span>

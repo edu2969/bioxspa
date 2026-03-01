@@ -34,9 +34,9 @@ export async function GET(request) {
 
         // Get latest carga (es_carga = true) historial
         const { data: lastHist, error: lastHistErr } = await supabase
-            .from("ruta_historial_carga")
+            .from("ruta_despacho_historial_carga")
             .select("id, fecha")
-            .eq("ruta_id", rutaId)
+            .eq("ruta_despacho_id", rutaId)
             .eq("es_carga", true)
             .order("fecha", { ascending: false })
             .limit(1)
@@ -53,9 +53,9 @@ export async function GET(request) {
 
         // Get moved items for that historial
         const { data: movedItems, error: movedErr } = await supabase
-            .from("ruta_items_movidos")
+            .from("ruta_despacho_historial_carga_items_movidos")
             .select("item_catalogo_id")
-            .eq("historial_carga_id", lastHist.id);
+            .eq("ruta_despacho_historial_carga_id", lastHist.id);
 
         if (movedErr) {
             console.error("Error fetching moved items:", movedErr);

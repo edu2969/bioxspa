@@ -14,12 +14,12 @@ export async function GET(request) {
 
         // Fetch venta ids for the ruta
         const { data: rutaVentas, error: rvErr } = await supabase
-            .from('ruta_ventas')
+            .from('ruta_despacho_ventas')
             .select('venta_id')
-            .eq('ruta_id', rutaId);
+            .eq('ruta_despacho_id', rutaId);
         if (rvErr) {
-            console.error('[ventasEnTransito] ruta_ventas error', rvErr);
-            return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
+            console.error('[ventasEnTransito] ruta_despacho_ventas error', rvErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta despacho ventas' }, { status: 500 });
         }
 
         const ventaIds = (rutaVentas || []).map((r) => r.venta_id).filter(Boolean);

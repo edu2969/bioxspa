@@ -14,30 +14,22 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE regiones (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    codigo VARCHAR(10) UNIQUE NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE comunas (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     region_id INTEGER REFERENCES regiones(id) ON DELETE CASCADE,
-    codigo VARCHAR(10) UNIQUE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Direcciones (normalizada)
 CREATE TABLE direcciones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    nombre VARCHAR(255) NOT NULL,
-    direccion_original TEXT,
+    direccion_cliente TEXT NOT NULL,
+    place_id TEXT NOT NULL,
     comuna_id INTEGER REFERENCES comunas(id),
     latitud DECIMAL(10,8),
     longitud DECIMAL(11,8),
-    es_matriz BOOLEAN DEFAULT false,
-    activa BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -263,8 +255,7 @@ CREATE TABLE ventas (
     vendedor_id UUID REFERENCES usuarios(id) NOT NULL,
     sucursal_id UUID REFERENCES sucursales(id) NOT NULL,
     dependencia_id UUID REFERENCES dependencias(id),
-    -- Optional direct relation to a ruta_despacho to allow Supabase relationship embedding
-    ruta_id UUID REFERENCES rutas_despacho(id),
+    ruta_despacho_id UUID REFERENCES rutas_despacho(id),
     fecha DATE DEFAULT CURRENT_DATE,
     estado INTEGER NOT NULL,
     por_cobrar BOOLEAN DEFAULT false,
@@ -309,22 +300,16 @@ CREATE TABLE detalle_ventas (
     temporal_id VARCHAR(50),
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     subcategoria_id UUID REFERENCES subcategorias_catalogo(id),
-    
-    -- Descripción
     glosa VARCHAR(255),
     codigo VARCHAR(100),
     codigo_producto VARCHAR(100),
     codigo_cilindro VARCHAR(100),
-    
     tipo INTEGER, -- 1: pedido, 2: retiro
     cantidad INTEGER NOT NULL,
     especifico INTEGER,
-    
-    -- Valores monetarios
     neto DECIMAL(12,2) NOT NULL,
     iva DECIMAL(12,2) NOT NULL,
-    total DECIMAL(12,2) NOT NULL,
-    
+    total DECIMAL(12,2) NOT NULL,    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -393,9 +378,9 @@ CREATE TABLE rutas_despacho (
 );
 
 -- Destinos por ruta
-CREATE TABLE ruta_destinos (
+CREATE TABLE ruta_despacho_destinos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
+    ruta_despacho_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     direccion_id UUID REFERENCES direcciones(id),
     fecha_arribo TIMESTAMPTZ,
     rut_quien_recibe VARCHAR(12),
@@ -404,28 +389,28 @@ CREATE TABLE ruta_destinos (
 );
 
 -- Ventas por ruta
-CREATE TABLE ruta_ventas (
+CREATE TABLE ruta_despacho_ventas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
+    ruta_despacho_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    UNIQUE(ruta_id, venta_id)
+    UNIQUE(ruta_despacho_id, venta_id)
 );
 
 -- Historial de estados de ruta
-CREATE TABLE ruta_historial_estados (
+CREATE TABLE ruta_despacho_historial_estados (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
+    ruta_despacho_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     estado INTEGER NOT NULL,
     usuario_id UUID REFERENCES usuarios(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Historial de carga/descarga
-CREATE TABLE ruta_historial_carga (
+CREATE TABLE ruta_despacho_historial_carga (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ruta_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
+    ruta_despacho_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     es_carga BOOLEAN NOT NULL,
     fecha TIMESTAMPTZ NOT NULL,
     usuario_id UUID REFERENCES usuarios(id),
@@ -433,9 +418,9 @@ CREATE TABLE ruta_historial_carga (
 );
 
 -- Items movidos en carga/descarga
-CREATE TABLE ruta_items_movidos (
+CREATE TABLE ruta_despacho_items_movidos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    historial_carga_id UUID REFERENCES ruta_historial_carga(id) ON DELETE CASCADE,
+    historial_carga_id UUID REFERENCES ruta_despacho_historial_carga(id) ON DELETE CASCADE,
     item_catalogo_id UUID REFERENCES items_catalogo(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -662,165 +647,7 @@ CREATE INDEX idx_vehiculos_marca_modelo ON vehiculos(marca, modelo);
 CREATE INDEX idx_vehiculo_conductores_vehiculo ON vehiculo_conductores(vehiculo_id);
 CREATE INDEX idx_vehiculo_conductores_conductor ON vehiculo_conductores(conductor_id);
 
--- Índices para BI
-CREATE INDEX idx_bi_deudas_sucursal_periodo ON bi_deudas(sucursal_id, periodo, fecha DESC);
-CREATE INDEX idx_bi_deudas_cliente_periodo ON bi_deudas(cliente_id, periodo, fecha DESC);
-CREATE INDEX idx_bi_principal_fecha ON bi_principal(fecha DESC);
-
 -- Índices para rutas
 CREATE INDEX idx_rutas_conductor_estado ON rutas_despacho(conductor_id, estado);
 CREATE INDEX idx_ruta_ventas_ruta ON ruta_ventas(ruta_id);
 
--- =========================================
--- 13. VISTAS MATERIALIZADAS PARA BI
--- =========================================
-
--- Vista materializada para dashboard de deudas
-CREATE MATERIALIZED VIEW mv_resumen_deudas_clientes AS
-SELECT 
-    c.id as cliente_id,
-    c.nombre as cliente_nombre,
-    c.rut as cliente_rut,
-    s.id as sucursal_id,
-    s.nombre as sucursal_nombre,
-    SUM(CASE WHEN bd.periodo = 'D' THEN bd.monto ELSE 0 END) as deuda_diaria,
-    SUM(CASE WHEN bd.periodo = 'S' THEN bd.monto ELSE 0 END) as deuda_semanal,
-    SUM(CASE WHEN bd.periodo = 'M' THEN bd.monto ELSE 0 END) as deuda_mensual,
-    SUM(CASE WHEN bd.periodo = 'A' THEN bd.monto ELSE 0 END) as deuda_anual,
-    SUM(bd.ventas_por_cobrar) as total_ventas_pendientes,
-    MAX(bd.fecha) as ultima_actualizacion
-FROM bi_deudas bd
-JOIN clientes c ON bd.cliente_id = c.id
-JOIN sucursales s ON bd.sucursal_id = s.id
-WHERE bd.fecha >= CURRENT_DATE - INTERVAL '90 days'
-GROUP BY c.id, c.nombre, c.rut, s.id, s.nombre;
-
--- Índice para la vista materializada
-CREATE UNIQUE INDEX idx_mv_resumen_deudas ON mv_resumen_deudas_clientes(cliente_id, sucursal_id);
-
--- Vista materializada para inventario en tiempo real
-CREATE MATERIALIZED VIEW mv_inventario_tiempo_real AS
-SELECT 
-    ic.id,
-    ic.codigo,
-    ic.estado,
-    sc.nombre as subcategoria_nombre,
-    cc.nombre as categoria_nombre,
-    cc.elemento,
-    ic.stock_actual,
-    d.nombre as ubicacion_actual,
-    c.nombre as propietario_nombre,
-    ic.updated_at as ultima_actualizacion
-FROM items_catalogo ic
-JOIN subcategorias_catalogo sc ON ic.subcategoria_id = sc.id
-JOIN categorias_catalogo cc ON sc.categoria_id = cc.id
-LEFT JOIN direcciones d ON ic.direccion_id = d.id
-LEFT JOIN clientes c ON ic.propietario_id = c.id
-WHERE ic.visible = true;
-
--- =========================================
--- 14. FUNCIONES Y TRIGGERS
--- =========================================
-
--- Función para actualizar updated_at automáticamente
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Aplicar trigger a todas las tablas relevantes
-CREATE TRIGGER update_usuarios_updated_at BEFORE UPDATE ON usuarios FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_clientes_updated_at BEFORE UPDATE ON clientes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_ventas_updated_at BEFORE UPDATE ON ventas FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_items_catalogo_updated_at BEFORE UPDATE ON items_catalogo FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_sucursales_updated_at BEFORE UPDATE ON sucursales FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_vehiculos_updated_at BEFORE UPDATE ON vehiculos FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_bi_deudas_updated_at BEFORE UPDATE ON bi_deudas FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Función para refrescar vistas materializadas
-CREATE OR REPLACE FUNCTION refresh_materialized_views()
-RETURNS void AS $$
-BEGIN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_resumen_deudas_clientes;
-    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_inventario_tiempo_real;
-END;
-$$ LANGUAGE plpgsql;
-
--- =========================================
--- 15. ROW LEVEL SECURITY (RLS) POLICIES
--- =========================================
-
--- Habilitar RLS en tablas sensibles (deshabilitado hasta integrar Auth)
--- ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE ventas ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE items_catalogo ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE rutas_despacho ENABLE ROW LEVEL SECURITY;
-
--- Políticas básicas (se refinan según roles específicos)
--- Los usuarios solo pueden ver sus propios datos (deshabilitado hasta integrar con Auth)
--- CREATE POLICY usuarios_own_data ON usuarios
---     FOR ALL USING (auth.uid() = id);
-
--- Las ventas se ven según la sucursal del usuario (deshabilitado hasta integrar con Auth)
--- CREATE POLICY ventas_by_sucursal ON ventas
---     FOR ALL USING (
---         sucursal_id IN (
---             SELECT c.sucursal_id 
---             FROM cargos c 
---             WHERE c.usuario_id = auth.uid() 
---             AND c.activo = true
---         )
---     );
-
--- Los conductores solo ven sus rutas (deshabilitado hasta integrar con Auth)
--- CREATE POLICY rutas_conductor_own ON rutas_despacho
---     FOR ALL USING (conductor_id = auth.uid());
-
--- =========================================
--- 16. DATOS MAESTROS INICIALES
--- =========================================
-
--- Insertar formas de pago básicas
-INSERT INTO formas_pago (nombre, codigo) VALUES 
-('Efectivo', 'EFEC'),
-('Transferencia', 'TRAN'),
-('Cheque', 'CHEQ'),
-('Tarjeta de Crédito', 'TCRE'),
-('Tarjeta de Débito', 'TDEB');
-
--- =========================================
--- COMENTARIOS Y DOCUMENTACIÓN
--- =========================================
-
-COMMENT ON TABLE ventas IS 'Tabla principal de ventas, cotizaciones, traslados y órdenes de trabajo';
-COMMENT ON TABLE items_catalogo IS 'Inventario físico de cilindros y productos';
-COMMENT ON TABLE bi_deudas IS 'Vista agregada de deudas por cliente, sucursal y período para BI';
-COMMENT ON TABLE rutas_despacho IS 'Rutas de despacho para conductores con seguimiento de estado';
-COMMENT ON MATERIALIZED VIEW mv_resumen_deudas_clientes IS 'Vista materializada para dashboard de cobranzas';
-
--- =========================================
--- FINALIZACIÓN
--- =========================================
-
--- Crear función para verificar integridad de datos post-migración
-CREATE OR REPLACE FUNCTION verificar_integridad_migracion()
-RETURNS TABLE (
-    tabla VARCHAR(50),
-    total_registros BIGINT,
-    registros_huerfanos BIGINT,
-    estado VARCHAR(20)
-) AS $$
-BEGIN
-    -- Implementar verificaciones de integridad
-    RETURN QUERY
-    SELECT 'ventas'::VARCHAR(50), COUNT(*)::BIGINT, 0::BIGINT, 'OK'::VARCHAR(20) FROM ventas
-    UNION ALL
-    SELECT 'clientes'::VARCHAR(50), COUNT(*)::BIGINT, 0::BIGINT, 'OK'::VARCHAR(20) FROM clientes
-    UNION ALL
-    SELECT 'items_catalogo'::VARCHAR(50), COUNT(*)::BIGINT, 0::BIGINT, 'OK'::VARCHAR(20) FROM items_catalogo;
-END;
-$$ LANGUAGE plpgsql;
