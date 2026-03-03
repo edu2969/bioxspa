@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
-export async function GET(request) {
+export async function GET() {
     try {
         const { user } = await getAuthenticatedUser();
 

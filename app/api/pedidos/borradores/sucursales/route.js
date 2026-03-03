@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 // GET all sucursales: Trae _id y nombre de las sucursales a las cuales el usuario en sessión tiene acceso.
 export const GET = migrateAuthEndpoint(async ({ user }) => {

@@ -1,11 +1,12 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET() {
     try {
         console.log("Fetching Pedidos from Supabase...");
-
+        const supabase = await getSupabaseServerClient();
+        
         const { data: ventas, error } = await supabase
             .from('ventas')
             .select(`

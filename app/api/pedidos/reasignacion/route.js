@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/apiAuthorization";
 import { TIPO_ESTADO_VENTA, ROLES } from "@/app/utils/constants";

@@ -13,17 +13,17 @@ export interface IVentaView {
         id: string;
         nombre: string;
         rut: string;
-        direcciones_despacho: Array<IDireccion>;
+        direccionesDespacho: Array<IDireccion>;
         giro: string;
         telefono: string;
     },
     detalles: Array<{
         id: string;
         multiplicador: number;
-        subcategoria_catalogo_id: ICilindroView;
-        item_catalogo_ids: Array<IItemCatalogoView>;
+        subcategoriaCatalogoId: ICilindroView;
+        itemCatalogoIds: Array<IItemCatalogoView>;
     }>;
-    direccion_despacho_id: IDireccionView | null;
+    direccionDespachoId: IDireccionView | null;
     actual: boolean;
 }
 
@@ -35,32 +35,32 @@ export interface IDetalleVentaActual {
     multiplicador: number;
     unidad: string;
     elemento?: string;
-    es_industrial?: boolean;
-    sin_sifon?: boolean;
-    es_medicinal?: boolean;
+    esIndustrial?: boolean;
+    sinSifon?: boolean;
+    esMedicinal?: boolean;
 }
 
 export interface IVentaActual {
-    nombre_cliente: string;
-    rut_cliente: string;
-    giro_cliente: string;
+    nombreCliente: string;
+    rutCliente: string;
+    giroCliente: string;
     comentario?: string;
     tipo: 'preparacion' | 'retiro_en_local' | 'ot' | 'traslado' | 'otros';
     total_cilindros: number;
     detalles: IDetalleVentaActual[];
-    porcentaje_completado: number;
+    porcentajeCompletado: number;
 }
 
 export interface IGestorDeCargaView {
     ventas: IVentaActual[];    
-    porcentaje_completado: number;
+    porcentajeCompletado: number;
 }
 
 export interface IClienteSeachResult {
     id: string;
     nombre: string;
     rut: string;
-    direcciones_despacho: Array<IDireccion>;
+    direccionesDespacho: Array<IDireccion>;
 }
 
 export interface IChecklistAnswer {
@@ -76,18 +76,18 @@ export interface IChecklistlistResult {
 
 export interface IItemCatalogoPowerScanView {
     id: string;
-    owner_id?: ICliente | null;
-    direccion_id?: IDireccion | null;
+    ownerId?: ICliente | null;
+    direccionId?: IDireccion | null;
     elemento: string;
     codigo: string;
-    subcategoria_catalogo_id: ISubcategoriaCatalogo;
-    stock_actual: number;
-    stock_minimo: number;
-    garantia_anual: number;
+    subcategoriaCatalogoId: ISubcategoriaCatalogo;
+    stockActual: number;
+    stockMinimo: number;
+    garantiaAnual: number;
     estado: number;
-    fecha_mantencion?: Date | null;
-    direccion_invalida?: boolean;
-    direccion_esperada?: {
+    fechaMantencion?: Date | null;
+    direccionInvalida?: boolean;
+    direccionEsperada?: {
         id: string;
         nombre: string;
     };

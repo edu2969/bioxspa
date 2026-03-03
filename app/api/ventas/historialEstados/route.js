@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA, ROLES, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 const getEstadoVentaNombre = (estado) => {

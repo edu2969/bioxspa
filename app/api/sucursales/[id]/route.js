@@ -1,55 +1,152 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Sucursal from "@/models/sucursal";
-import Dependencia from "@/models/dependencia";
-import Direccion from "@/models/direccion";
-import Cliente from "@/models/cliente";
-import Cargo from "@/models/cargo";
-import User from "@/models/user";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req, props) {
-    console.log(req.url);
-    const params = await props.params;
-    await connectMongoDB();
+    try {
+        console.log(req.url);
+        const params = await props.params;
+        const { user } = await getAuthenticatedUser();
 
-    const sucursal = await Sucursal.findById(params.id).lean();
-    if (!sucursal) {
-        return NextResponse.json({ error: "Sucursal not found" }, { status: 400 });
-    }
-    const dependencias = await Dependencia.find({ sucursalId: sucursal._id }).lean();
-
-    // Fetch the direccion for the sucursal
-    let direccion = null;
-    if (sucursal.direccionId) {
-        direccion = await Direccion.findById(sucursal.direccionId).lean();
-        sucursal.direccion = direccion;
-    }
-
-    // Fetch the direccion for each dependencia
-    for (const dependencia of dependencias) {
-        if (dependencia.direccionId) {
-            const dependenciaDireccion = await Direccion.findById(dependencia.direccionId).lean();
-            dependencia.direccion = dependenciaDireccion;
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
-        if (dependencia.clienteId) {
-            const cliente = await Cliente.findById(dependencia.clienteId).lean();
-            dependencia.cliente = cliente;
-        }
-        const cargos = await Cargo.find({ dependenciaId: dependencia._id }).lean();
-        for (const cargo of cargos) {
-            const user = await User.findById(cargo.userId).lean();
-            cargo.user = user;
-        }
-        dependencia.cargos = cargos;
-    }
 
-    const cargos = await Cargo.find({ sucursalId: sucursal._id }).lean();
-    for (const cargo of cargos) {
-        const user = await User.findById(cargo.userId).lean();
-        cargo.user = user;
+        // Obtener la sucursal con su dirección
+        const { data: sucursalData, error: sucursalError } = await supabase
+            .from("sucursales")
+            .select(`
+                id,
+                codigo_interno,
+                nombre,
+                visible,
+                prioridad,
+                direccion_id,
+                direccion:direcciones(
+                    id,
+                    direccion_cliente,
+                    place_id,
+                    latitud,
+                    longitud
+                ),
+                created_at,
+                updated_at
+            `)
+            .eq("id", params.id)
+            .single();
+
+        if (sucursalError || !sucursalData) {
+            return NextResponse.json({ error: "Sucursal not found" }, { status: 400 });
+        }
+
+        // Obtener las dependencias con sus direcciones, clientes y cargos
+        const { data: dependencias, error: dependenciasError } = await supabase
+            .from("dependencias")
+            .select(`
+                id,
+                nombre,
+                tipo,
+                activa,
+                direccion_id,
+                direccion:direcciones(
+                    id,
+                    direccion_cliente,
+                    place_id,
+                    latitud,
+                    longitud
+                ),
+                cliente:clientes(
+                    id,
+                    nombre,
+                    rut,
+                    telefono,
+                    email
+                ),
+                cargos:cargos(
+                    id,
+                    usuario_id,
+                    tipo,
+                    desde,
+                    hasta,
+                    activo,
+                    created_at,
+                    updated_at,
+                    usuario:usuarios(
+                        id,
+                        nombre,
+                        email
+                    )
+                ),
+                created_at,
+                updated_at
+            `)
+            .eq("sucursal_id", params.id);
+
+        if (dependenciasError) {
+            console.error("Error fetching dependencias:", dependenciasError);
+            return NextResponse.json({ error: dependenciasError.message }, { status: 500 });
+        }
+
+        // Obtener los cargos directos de la sucursal
+        const { data: cargos, error: cargosError } = await supabase
+            .from("cargos")
+            .select(`
+                id,
+                usuario_id,
+                tipo,
+                desde,
+                hasta,
+                activo,
+                created_at,
+                updated_at,
+                usuario:usuarios(
+                    id,
+                    nombre,
+                    email
+                )
+            `)
+            .eq("sucursal_id", params.id);
+
+        if (cargosError) {
+            console.error("Error fetching cargos:", cargosError);
+            return NextResponse.json({ error: cargosError.message }, { status: 500 });
+        }
+
+        // Adaptar la respuesta para mantener compatibilidad
+        const sucursal = {
+            ...sucursalData,
+            _id: sucursalData.id,
+            direccionId: sucursalData.direccion_id,
+            cargos: cargos.map(cargo => ({
+                ...cargo,
+                _id: cargo.id,
+                userId: cargo.usuario_id,
+                user: cargo.usuario
+            }))
+        };
+
+        const dependenciasFormatted = (dependencias || []).map(dep => ({
+            ...dep,
+            _id: dep.id,
+            direccionId: dep.direccion_id,
+            clienteId: dep.cliente?.id,
+            sucursalId: params.id,
+            operativa: dep.activa,
+            cargos: (dep.cargos || []).map(cargo => ({
+                ...cargo,
+                _id: cargo.id,
+                userId: cargo.usuario_id,
+                dependenciaId: dep.id,
+                user: cargo.usuario
+            }))
+        }));
+
+        return NextResponse.json({ sucursal, dependencias: dependenciasFormatted });
+
+    } catch (error) {
+        console.error("Error fetching sucursal data:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
-    sucursal.cargos = cargos;
-    return NextResponse.json({ sucursal, dependencias });
 }
 
 export async function POST(req, props) {

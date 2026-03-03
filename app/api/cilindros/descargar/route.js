@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 import { TIPO_CARGO, TIPO_ORDEN } from "@/app/utils/constants";
 

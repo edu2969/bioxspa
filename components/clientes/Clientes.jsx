@@ -14,7 +14,7 @@ import { IoChevronBack } from "react-icons/io5";
 import toast, { Toaster } from 'react-hot-toast';
 
 // Direcciones de despacho editor
-export default function Clientes() {
+export default async function Clientes() {
     const [loadingClients, setLoadingClients] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
@@ -25,7 +25,7 @@ export default function Clientes() {
     const router = useRouter();
     const scrollRef = useRef(null);
     const [saving, setSaving] = useState(false);
-    const searchParams = useSearchParams();
+    const searchParams = await useSearchParams();
     const [loadingCliente, setLoadingCliente] = useState(false);
     const clienteId = searchParams.get("id");
 

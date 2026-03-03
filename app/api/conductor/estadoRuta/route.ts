@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
     try {
@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
         if (!rutaId) {
             return NextResponse.json({ error: 'rutaId is required' }, { status: 400 });
         }
+
+        const supabase = await getSupabaseServerClient();
         
         const { data: ruta, error } = await supabase
             .from('rutas_despacho')

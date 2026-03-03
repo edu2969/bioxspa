@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET(request) {
@@ -28,13 +28,13 @@ export async function GET(request) {
 
     const pedidos = await Promise.all(
         (ventas || []).map(async (venta) => {
-            const { data: cliente, error: clienteError } = await supabase
+            const { data: cliente } = await supabase
                 .from('clientes')
                 .select('id, nombre, rut')
                 .eq('id', venta.cliente_id)
                 .single();
 
-            const { data: solicitante, error: solicitanteError } = await supabase
+            const { data: solicitante } = await supabase
                 .from('users')
                 .select('id, name, persona_id')
                 .eq('id', venta.solicitante_id || venta.vendedor_id)
@@ -42,7 +42,7 @@ export async function GET(request) {
 
             let telefono = "";
             if (solicitante && solicitante.persona_id) {
-                const { data: persona, error: personaError } = await supabase
+                const { data: persona } = await supabase
                     .from('personas')
                     .select('telefono')
                     .eq('id', solicitante.persona_id)
@@ -52,13 +52,13 @@ export async function GET(request) {
 
             const items = await Promise.all(
                 (venta.detalles || []).map(async (item) => {
-                    const { data: subcat, error: subcatError } = await supabase
+                    const { data: subcat } = await supabase
                         .from('subcategoria_catalogos')
                         .select('id, nombre, cantidad, unidad, categoria_catalogo_id')
                         .eq('id', item.subcategoria_catalogo_id)
                         .single();
 
-                    const { data: cat, error: catError } = subcat?.categoria_catalogo_id
+                    const { data: cat } = subcat?.categoria_catalogo_id
                         ? await supabase
                             .from('categoria_catalogos')
                             .select('id, nombre')

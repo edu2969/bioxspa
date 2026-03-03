@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export const GET = migrateAuthEndpoint(async ({ user }) => {
     try {

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabase';
 import { ROLE_MAPPING } from '@/lib/auth/permissions';
 
 // ===============================================
@@ -32,7 +32,7 @@ interface LegacySession {
  */
 export async function getSupabaseSession(req: NextRequest): Promise<LegacySession | null> {
   try {
-    // Obtener token del header de autorización
+    const supabase = await getSupabaseServerClient();
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -191,6 +191,7 @@ export function migrateAuthEndpoint(
  */
 export async function getUserSucursalId(userId: string): Promise<string | null> {
   try {
+    const supabase = await getSupabaseServerClient();
     const { data, error } = await supabase
       .from('usuarios')
       .select('cargos(sucursal_id)')

@@ -1,10 +1,11 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
     console.log("[GET] /api/clientes/search - Request received");
 
     try {
+        const supabase = await getSupabaseServerClient();
         const { searchParams } = req.nextUrl;
         const query = searchParams.get("q");
         console.log(`[GET] Query parameter 'q': ${query}`);

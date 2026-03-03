@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
 
 export async function GET(request) {
@@ -21,8 +21,6 @@ export async function GET(request) {
         if (conductoresEnEsperaError) {
             return NextResponse.json({ ok: false, error: conductoresEnEsperaError.message }, { status: 500 });
         }
-
-        const conductoresIds = conductoresEnEspera.map((ruta) => ruta.conductor_id);
 
         // Obtener sucursal y dependencias
         const { data: sucursal, error: sucursalError } = await supabase

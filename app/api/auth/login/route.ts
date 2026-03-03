@@ -3,9 +3,14 @@
  * Reemplaza NextAuth credentials provider
  */
 
+// Configuración del runtime para Next.js 15
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from "next/server";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
-import { APIResponse, MigrationLogger } from "@/lib/supabase-helpers";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { ResponseHelper } from "@/lib/supabase-helpers";
+import { Session } from "@supabase/supabase-js";
 
 // ===============================================
 // TIPOS DE DATOS
@@ -21,9 +26,9 @@ interface LoginResponse {
     id: string;
     email: string;
     nombre: string;
+    rol: number;
   };
-  session: any;
-  cargos?: any[];
+  session: Session;
 }
 
 // ===============================================
@@ -31,8 +36,8 @@ interface LoginResponse {
 // ===============================================
 
 async function loginWithSupabase(email: string, password: string): Promise<LoginResponse> {
-  MigrationLogger.info('Attempting login with Supabase Auth', { email });
-
+  const supabase = await getSupabaseServerClient();
+  
   // 1. Autenticar con Supabase Auth
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -40,7 +45,6 @@ async function loginWithSupabase(email: string, password: string): Promise<Login
   });
 
   if (error) {
-    MigrationLogger.error('Supabase auth failed', error);
     throw new Error('Email o contraseña incorrectos');
   }
 
@@ -48,24 +52,16 @@ async function loginWithSupabase(email: string, password: string): Promise<Login
     throw new Error('Error en la autenticación');
   }
 
+  console.log("Usuario autenticado con Supabase:", data.user);
+
   // 2. Obtener información adicional del usuario y sus cargos
   const { data: usuario, error: userError } = await supabase
     .from('usuarios')
-    .select(`
-      *,
-      cargos (
-        tipo,
-        sucursal_id,
-        dependencia_id,
-        desde,
-        hasta,
-        sucursales (nombre, codigo),
-        dependencias (nombre)
-      )
-    `)
+    .select(`*`)
     .eq('id', data.user.id)
-    .is('cargos.hasta', null) // Solo cargos activos
-    .single();
+    .maybeSingle();
+
+  console.log("Datos adicionales del usuario:", usuario, "Error:", userError);
 
   if (userError || !usuario) {
     // Si no existe en usuarios, crearlo (primera vez)
@@ -82,24 +78,20 @@ async function loginWithSupabase(email: string, password: string): Promise<Login
       .single();
 
     if (createError) {
-      MigrationLogger.error('Failed to create user record', createError);
       throw new Error('Error creando registro de usuario');
     }
 
-    MigrationLogger.success('User record created successfully');
     return newUser;
   }
-
-  MigrationLogger.success('Supabase login successful', { userId: data.user.id });
 
   return {
     user: {
       id: data.user.id,
       email: data.user.email!,
-      nombre: usuario.nombre
+      nombre: usuario.nombre,
+      rol: Number(usuario.rol)
     },
-    session: data.session,
-    cargos: usuario.cargos || []
+    session: data.session
   };
 }
 
@@ -108,40 +100,34 @@ async function loginWithSupabase(email: string, password: string): Promise<Login
 // ===============================================
 
 export async function POST(req: NextRequest) {
-  const startTime = Date.now();
-
   try {
     const body: LoginRequest = await req.json();
     const { email, password } = body;
 
     // Validación de entrada
     if (!email || !password) {
-      return APIResponse.error("Email y contraseña son requeridos");
+      return ResponseHelper.error("Email y contraseña son requeridos");
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      return APIResponse.error("Formato de email inválido");
+      return ResponseHelper.error("Formato de email inválido");
     }
 
     // Ejecutar login directamente con Supabase
     const result = await loginWithSupabase(email, password);
 
-    MigrationLogger.performance('Login operation', startTime);
-
     // Establecer cookies de sesión si es necesario
-    const response = APIResponse.success({
+    const response = ResponseHelper.success({
       user: result.user,
-      cargos: result.cargos,
       message: 'Login exitoso'
     });
 
     return response;
 
-  } catch (error: any) {
-    MigrationLogger.error('Login failed', error);
-    
-    return APIResponse.error(
-      error.message || "Error en el login",
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error en el login";
+    return ResponseHelper.error(
+      message,
       401
     );
   }
@@ -151,25 +137,21 @@ export async function POST(req: NextRequest) {
 // ENDPOINT PARA LOGOUT
 // ===============================================
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE() {
   try {
-    MigrationLogger.info('Processing logout request');
-
+    const supabase = await getSupabaseServerClient();
+    
     // Logout con Supabase
     const { error } = await supabase.auth.signOut();
     if (error) {
-      MigrationLogger.error('Supabase logout error', error);
-      return APIResponse.error("Error cerrando sesión", 500);
+      return ResponseHelper.error("Error cerrando sesión", 500);
     }
 
-    MigrationLogger.success('Logout successful');
-
-    return APIResponse.success({
+    return ResponseHelper.success({
       message: 'Logout exitoso'
     });
 
-  } catch (error) {
-    MigrationLogger.error('Logout failed', error);
-    return APIResponse.error("Error en logout", 500);
+  } catch {
+    return ResponseHelper.error("Error en logout", 500);
   }
 }

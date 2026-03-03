@@ -155,10 +155,8 @@ export const ROLE_PERMISSIONS = {
 
 export interface PermissionContext {
   userId: string;
-  sucursalId?: string;
-  dependenciaId?: string;
   resourceId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, string>;
 }
 
 // ===============================================
@@ -171,8 +169,7 @@ export interface PermissionContext {
 export function hasPermission(
   userRoles: string[],
   resource: string,
-  action: string,
-  context?: PermissionContext
+  action: string
 ): boolean {
   if (!resource || !action) {
     console.warn("Resource or action is undefined", { resource, action });
@@ -210,11 +207,10 @@ export function getUserPermissions(userRoles: string[]): string[] {
  */
 export function hasAnyPermission(
   userRoles: string[],
-  requiredPermissions: Array<{ resource: string; action: string }>,
-  context?: PermissionContext
+  requiredPermissions: Array<{ resource: string; action: string }>
 ): boolean {
   return requiredPermissions.some(({ resource, action }) => 
-    hasPermission(userRoles, resource, action, context)
+    hasPermission(userRoles, resource, action)
   );
 }
 
@@ -223,11 +219,10 @@ export function hasAnyPermission(
  */
 export function hasAllPermissions(
   userRoles: string[],
-  requiredPermissions: Array<{ resource: string; action: string }>,
-  context?: PermissionContext
+  requiredPermissions: Array<{ resource: string; action: string }>
 ): boolean {
   return requiredPermissions.every(({ resource, action }) => 
-    hasPermission(userRoles, resource, action, context)
+    hasPermission(userRoles, resource, action)
   );
 }
 
@@ -250,16 +245,15 @@ export interface ComponentPermissions {
 
 export function getComponentPermissions(
   userRoles: string[],
-  resource: string,
-  context?: PermissionContext
+  resource: string
 ): ComponentPermissions {
   return {
-    canView: hasPermission(userRoles, resource, ACTIONS.READ, context),
-    canCreate: hasPermission(userRoles, resource, ACTIONS.CREATE, context),
-    canEdit: hasPermission(userRoles, resource, ACTIONS.UPDATE, context),
-    canDelete: hasPermission(userRoles, resource, ACTIONS.DELETE, context),
-    canApprove: hasPermission(userRoles, resource, ACTIONS.APPROVE, context),
-    canAssign: hasPermission(userRoles, resource, ACTIONS.ASSIGN, context),
-    canExecute: hasPermission(userRoles, resource, ACTIONS.EXECUTE, context)
+    canView: hasPermission(userRoles, resource, ACTIONS.READ),
+    canCreate: hasPermission(userRoles, resource, ACTIONS.CREATE),
+    canEdit: hasPermission(userRoles, resource, ACTIONS.UPDATE),
+    canDelete: hasPermission(userRoles, resource, ACTIONS.DELETE),
+    canApprove: hasPermission(userRoles, resource, ACTIONS.APPROVE),
+    canAssign: hasPermission(userRoles, resource, ACTIONS.ASSIGN),
+    canExecute: hasPermission(userRoles, resource, ACTIONS.EXECUTE)
   };
 }

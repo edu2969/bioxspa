@@ -1,11 +1,16 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import ItemCatalogo from "@/models/itemCatalogo";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function POST(request) {
     try {
-        await connectMongoDB();
+        const { user } = await getAuthenticatedUser();
+
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         const { items } = await request.json();
 
         if (!Array.isArray(items)) {
@@ -17,15 +22,22 @@ export async function POST(request) {
                 throw new Error(`Invalid item data: { codigo: ${codigo}, nuevoEstado: ${nuevoEstado} }`);
             }
 
-            return ItemCatalogo.updateOne(
-                { codigo },
-                { $set: { estado: nuevoEstado } }
-            );
+            const { error } = await supabase
+                .from("items_catalogo")
+                .update({ estado: nuevoEstado })
+                .eq("codigo", codigo);
+
+            if (error) {
+                throw new Error(`Error updating item with codigo ${codigo}: ${error.message}`);
+            }
+
+            return { codigo, updated: true };
         });
 
         await Promise.all(updatePromises);
 
         return NextResponse.json({ message: "Estados actualizados correctamente." });
+
     } catch (error) {
         console.error("Error updating item states:", error);
         return NextResponse.json({ error: "Error updating item states." }, { status: 500 });

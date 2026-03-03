@@ -1,15 +1,18 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Direccion from "@/models/direccion";
-import mongoose from "mongoose";
-import Cliente from "@/models/cliente";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 // filepath: d:/git/bioxspa/app/api/ventas/direccionDespacho/route.js
 
 export async function POST(req) {
     try {
-        console.log("Conectando a MongoDB...");
-        await connectMongoDB();
+        console.log("Authenticating user...");
+        const { user } = await getAuthenticatedUser();
+
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
         console.log("Body recibido v2:", body);
 
@@ -25,49 +28,120 @@ export async function POST(req) {
         }
 
         // Buscar si ya existe la dirección por place_id
-        let direccion = await Direccion.findOne({ apiId: body.direccion.apiId });
-        console.log("Dirección encontrada:", direccion);
+        const { data: direccionExistente, error: busquedaError } = await supabase
+            .from("direcciones")
+            .select("*")
+            .eq("place_id", body.direccion.apiId)
+            .single();
+
+        if (busquedaError && busquedaError.code !== 'PGRST116') {
+            console.error("Error buscando dirección:", busquedaError);
+            return NextResponse.json({ error: "Error buscando dirección" }, { status: 500 });
+        }
+
+        console.log("Dirección encontrada:", direccionExistente);
+
+        let direccion = direccionExistente;
 
         if (!direccion) {
             // Crear nueva dirección
-            direccion = new Direccion({
-                _id: new mongoose.Types.ObjectId().toString(),
-                nombre: body.direccion.nombre,
-                apiId: body.place_id,
-                latitud: body.direccion.latitud,
-                longitud: body.direccion.longitud
-            });
-            await direccion.save();
+            const { data: nuevaDireccion, error: crearError } = await supabase
+                .from("direcciones")
+                .insert({
+                    direccion_cliente: body.direccion.nombre,
+                    place_id: body.direccion.apiId,
+                    latitud: body.direccion.latitud,
+                    longitud: body.direccion.longitud
+                })
+                .select()
+                .single();
+
+            if (crearError) {
+                console.error("Error creando dirección:", crearError);
+                return NextResponse.json({ error: "Error creando dirección" }, { status: 500 });
+            }
+
+            direccion = nuevaDireccion;
             console.log("Nueva dirección guardada:", direccion);
         } else {
             // Actualizar datos si ya existe
-            direccion.nombre = body.direccion.nombre;
-            direccion.latitud = body.direccion.latitud;
-            direccion.longitud = body.direccion.longitud;
-            await direccion.save();
+            const { data: direccionActualizada, error: actualizarError } = await supabase
+                .from("direcciones")
+                .update({
+                    direccion_cliente: body.direccion.nombre,
+                    latitud: body.direccion.latitud,
+                    longitud: body.direccion.longitud,
+                    updated_at: new Date().toISOString()
+                })
+                .eq("id", direccion.id)
+                .select()
+                .single();
+
+            if (actualizarError) {
+                console.error("Error actualizando dirección:", actualizarError);
+                return NextResponse.json({ error: "Error actualizando dirección" }, { status: 500 });
+            }
+
+            direccion = direccionActualizada;
             console.log("Dirección actualizada:", direccion);
         }
         
-        // Agregar la dirección de despacho al cliente
-        const cliente = await Cliente.findById(body.clienteId);
-        if (!cliente) {
+        // Verificar que el cliente existe
+        const { data: cliente, error: clienteError } = await supabase
+            .from("clientes")
+            .select("id")
+            .eq("id", body.clienteId)
+            .single();
+
+        if (clienteError || !cliente) {
+            console.error("Cliente no encontrado:", clienteError);
             return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
         }
 
-        // Evitar duplicados por direccionId
-        const yaExiste = cliente.direccionesDespacho.some(
-            (d) => d.direccionId.toString() === direccion._id.toString()
-        );
+        // Verificar si ya existe la relación cliente-dirección para evitar duplicados
+        const { data: relacionExistente, error: relacionError } = await supabase
+            .from("cliente_direcciones_despacho")
+            .select("id")
+            .eq("cliente_id", body.clienteId)
+            .eq("direccion_id", direccion.id)
+            .single();
 
-        if (!yaExiste) {
-            cliente.direccionesDespacho.push({
-                direccionId: direccion._id,
-                comentario: body.comentario || null
-            });
-            await cliente.save();
+        if (relacionError && relacionError.code !== 'PGRST116') {
+            console.error("Error verificando relación cliente-dirección:", relacionError);
+            return NextResponse.json({ error: "Error verificando relación" }, { status: 500 });
         }
 
-        return NextResponse.json({ ok: true, direccion });
+        // Solo agregar la relación si no existe
+        if (!relacionExistente) {
+            const { error: insertarRelacionError } = await supabase
+                .from("cliente_direcciones_despacho")
+                .insert({
+                    cliente_id: body.clienteId,
+                    direccion_id: direccion.id,
+                    comentario: body.comentario || null,
+                    activa: true
+                });
+
+            if (insertarRelacionError) {
+                console.error("Error agregando dirección al cliente:", insertarRelacionError);
+                return NextResponse.json({ error: "Error agregando dirección al cliente" }, { status: 500 });
+            }
+
+            console.log("Dirección agregada al cliente exitosamente");
+        } else {
+            console.log("La dirección ya existía para este cliente");
+        }
+
+        // Adaptar la respuesta para mantener compatibilidad con el frontend
+        const direccionRespuesta = {
+            ...direccion,
+            _id: direccion.id, // Mantener compatibilidad con frontend
+            nombre: direccion.direccion_cliente,
+            apiId: direccion.place_id
+        };
+
+        return NextResponse.json({ ok: true, direccion: direccionRespuesta });
+
     } catch (error) {
         console.error("Error registrando dirección:", error);
         return NextResponse.json({ error: "Error registrando dirección" }, { status: 500 });

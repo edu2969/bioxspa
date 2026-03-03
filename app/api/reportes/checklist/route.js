@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM } from "@/app/utils/constants";

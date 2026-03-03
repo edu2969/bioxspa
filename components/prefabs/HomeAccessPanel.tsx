@@ -192,7 +192,7 @@ export default function HomeAccessPanel() {
                         <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
                         <div className="mt-2 space-y-1">
                             <div><strong>Usuario:</strong> {auth.user?.email}</div>
-                            <div><strong>Roles:</strong> {auth.userRoles.join(', ')}</div>
+                            <div><strong>Roles:</strong>...</div>
                             <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
                         </div>
                     </details>

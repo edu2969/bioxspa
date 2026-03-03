@@ -2,6 +2,7 @@ import './globals.css';
 import { roboto, orbitron, red_hat_display } from '@/app/fonts';
 import ClientProviders from '@/components/providers/ClientProviders';
 import { UserProvider } from '@/components/providers/UserProvider';
+import { Suspense } from 'react';
 
 export const metadata = {
   title: 'BIOX',
@@ -9,23 +10,25 @@ export const metadata = {
   manifest: "/manifest.json",
   icons: {
     apple: '/icon-192x192.png'
-  }  
+  }
 };
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
-}) { 
+}) {
   return (
     <html lang="es-CL">
-      <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`} 
+      <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`}
         style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }}>
-        <UserProvider>
-          <ClientProviders>
-            {children}
-          </ClientProviders>
-        </UserProvider>
+        <Suspense>
+          <UserProvider>
+            <ClientProviders>
+              {children}
+            </ClientProviders>
+          </UserProvider>
+        </Suspense>
       </body>
     </html>
   );

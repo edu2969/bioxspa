@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LiaTimesSolid } from "react-icons/lia";
 import { useForm } from "react-hook-form";
-import { TIPO_CARGO } from "@/app/utils/constants";
+import { ROLES, TIPO_CARGO } from "@/app/utils/constants";
 import Loader from "../Loader";
 
 interface ISolicitudPrecioForm {    
@@ -121,7 +121,7 @@ export default function SolicitudPrecioModal({
                                 >
                                     <option value="">Seleccione una categoría</option>
                                     {categorias && categorias.map((categoria) => (
-                                        <option key={categoria._id} value={categoria._id}>
+                                        <option key={categoria.id} value={categoria.id}>
                                             {categoria.nombre}
                                         </option>
                                     ))}
@@ -133,7 +133,7 @@ export default function SolicitudPrecioModal({
                                     {...register("subcategoriaCatalogoId")}
                                     value={precioData?.subcategoriaCatalogoId || ""}
                                     onChange={(e) => {
-                                        const selectedSubcategoria = subcategorias?.find(sc => sc._id === e.currentTarget.value);
+                                        const selectedSubcategoria = subcategorias?.find(sc => sc.id === e.currentTarget.value);
                                         if (selectedSubcategoria) {
                                             setValue("subcategoriaCatalogoId", e.currentTarget.value);
                                         }
@@ -142,15 +142,15 @@ export default function SolicitudPrecioModal({
                                 >
                                     <option value="">Seleccione una subcategoría</option>
                                     {subcategorias &&
-                                        subcategorias.filter(sc => sc.categoriaCatalogoId._id === categoriaIdSeleccionada).map((subcategoria) => (
-                                            <option key={subcategoria._id} value={subcategoria._id}>
+                                        subcategorias.filter(sc => sc.categoriaCatalogoId.id === categoriaIdSeleccionada).map((subcategoria) => (
+                                            <option key={subcategoria.id} value={subcategoria.id}>
                                                 {subcategoria.nombre}
                                             </option>
                                         ))
                                     }
                                 </select>
                             </div>
-                            {hasRole([TIPO_CARGO.gerente, TIPO_CARGO.encargado, TIPO_CARGO.cobranza])
+                            {hasRole([ROLES.COLLECTIONS])
                                 && <div className="flex flex-col">
                                     <label htmlFor="precio" className="text-sm text-gray-500">Precio</label>
                                     <div className="flex items-center">
@@ -176,7 +176,7 @@ export default function SolicitudPrecioModal({
                             disabled={savingPrecio}
                             className={`px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${savingPrecio ? 'opacity-50 cursor-not-allowed' : ''}`}                                >
                             {savingPrecio && <div className="absolute -mt-1"><Loader texto="" /></div>}
-                            {hasRole([TIPO_CARGO.gerente, TIPO_CARGO.encargado, TIPO_CARGO.cobranza]) ? 'NUEVO' : 'SOLICITAR'} PRECIO
+                            {hasRole([ROLES.COLLECTIONS]) ? 'NUEVO' : 'SOLICITAR'} PRECIO
                         </button>
                         <button
                             onClick={handleCancel}

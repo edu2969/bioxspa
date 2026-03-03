@@ -12,7 +12,7 @@ import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './prefabs/powerScan/PowerScanView';
-import { supabase } from '@/lib/supabase';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
@@ -84,6 +84,7 @@ export default function Nav() {
                         onClick={async () => {
                             setMenuActivo(false);
                             try {
+                                const supabase = createSupabaseBrowserClient();
                                 await supabase.auth.signOut(); // Cerrar sesión con Supabase
                                 router.replace("/"); // Redirigir a la página principal
                             } catch (error) {

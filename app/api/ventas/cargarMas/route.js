@@ -1,102 +1,115 @@
-import mongoose from "mongoose";
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Vehiculo from "@/models/vehiculo";
-import Cliente from "@/models/cliente";
-import CategoriaCatalogo from "@/models/categoriaCatalogo";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import DetalleVenta from "@/models/detalleVenta";
-import Direccion from "@/models/direccion";
-import ItemCatalogo from "@/models/itemCatalogo";
-import Venta from "@/models/venta";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(request) {
-    console.log("Connecting to MongoDB...");
-    await connectMongoDB();
-    console.log("Connected to MongoDB");
+    try {
+        console.log("Authenticating user...");
+        const { user } = await getAuthenticatedUser();
 
-    if (!mongoose.models.ItemCatalogo) {
-        mongoose.model("ItemCatalogo", ItemCatalogo.schema);
-    }
-    if (!mongoose.models.Direccion) {
-        mongoose.model("Direccion", Direccion.schema);
-    }
-    if (!mongoose.models.CategoriaCatalogo) {
-        mongoose.model("CategoriaCatalogo", CategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.SubcategoriaCatalogo) {
-        mongoose.model("SubcategoriaCatalogo", SubcategoriaCatalogo.schema);
-    }
-    if (!mongoose.models.Vehiculo) {
-        mongoose.model("Vehiculo", Vehiculo.schema);
-    }
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
 
-    const { searchParams } = new URL(request.url);
-    const fecha = searchParams.get("fecha");
-    if (!fecha) {
-        return NextResponse.json({ error: "Falta el parámetro 'fecha'" }, { status: 400 });
-    }
+        const supabase = await getSupabaseServerClient();
+        const { searchParams } = new URL(request.url);
+        const fecha = searchParams.get("fecha");
+        if (!fecha) {
+            return NextResponse.json({ error: "Falta el parámetro 'fecha'" }, { status: 400 });
+        }
 
-    const ultimaFecha = new Date(fecha);
-    console.log("Fetching ventas in 'borrador' state > last date:", ultimaFecha);
+        const ultimaFecha = new Date(fecha).toISOString();
+        console.log("Fetching ventas with specified states before date:", ultimaFecha);
 
-    const ventas = await Venta.find({
-        $or: [{
-            estado: TIPO_ESTADO_VENTA.por_asignar,            
-        }, {
-            estado: {
-                $in: [
-                    TIPO_ESTADO_VENTA.pagado,
-                    TIPO_ESTADO_VENTA.entregado
-                ]
-            }
-        }],
-        fecha: { $lt: ultimaFecha }
-    })
-    .sort({ fecha: -1 }) // Ordenar por fecha descendente (más reciente primero)
-    .limit(25)
-    .lean();
-    console.log(`Fetched ${ventas.length} ventas in 'borrador' state`);
+        // Obtener ventas con sus detalles, cliente y categoría/subcategoría información
+        const { data: ventas, error: ventasError } = await supabase
+            .from("ventas")
+            .select(`
+                id,
+                comentario,
+                cliente_id,
+                estado,
+                fecha,
+                cliente:clientes(
+                    id,
+                    nombre,
+                    rut
+                ),
+                detalles:detalle_ventas(
+                    id,
+                    subcategoria_id,
+                    glosa,
+                    codigo,
+                    codigo_producto,
+                    codigo_cilindro,
+                    tipo,
+                    cantidad,
+                    especifico,
+                    neto,
+                    iva,
+                    total,
+                    subcategoria:subcategorias_catalogo(
+                        id,
+                        nombre,
+                        categoria:categorias_catalogo(
+                            id,
+                            nombre
+                        )
+                    )
+                )
+            `)
+            .or(`estado.eq.${TIPO_ESTADO_VENTA.por_asignar},estado.in.(${TIPO_ESTADO_VENTA.pagado},${TIPO_ESTADO_VENTA.entregado})`)
+            .lt("fecha", ultimaFecha)
+            .order("fecha", { ascending: false })
+            .limit(25);
 
-    const pedidos = await Promise.all(
-        ventas.map(async (venta) => {
-            // Fetch cliente details
-            const cliente = await Cliente.findById(venta.clienteId).lean();
+        if (ventasError) {
+            console.error("Error fetching ventas:", ventasError);
+            return NextResponse.json({ error: ventasError.message }, { status: 500 });
+        }
+
+        console.log(`Fetched ${ventas?.length || 0} ventas with specified states`);
+
+        // Procesar y formatear los datos para mantener compatibilidad con el frontend
+        const pedidos = (ventas || []).map((venta) => {
+            const cliente = venta.cliente;
             const clienteNombre = cliente?.nombre || "Desconocido";
             const clienteRut = cliente?.rut || "Desconocido";
 
-            // Fetch items for the venta
-            const items = await DetalleVenta.find({ ventaId: venta._id }).lean();
-            const itemsWithNames = await Promise.all(
-                items.map(async (item) => {
-                    const subcategoria = await SubcategoriaCatalogo.findById(item.subcategoriaCatalogoId).lean();
-                    const categoria = subcategoria
-                        ? await CategoriaCatalogo.findById(subcategoria.categoriaCatalogoId).lean()
-                        : null;
+            // Procesar los items del detalle de venta
+            const itemsWithNames = (venta.detalles || []).map((item) => {
+                const subcategoria = item.subcategoria;
+                const categoria = subcategoria?.categoria;
 
-                    const categoriaNombre = categoria?.nombre || "Desconocido";
-                    const subcategoriaNombre = subcategoria?.nombre || "Desconocido";
+                const categoriaNombre = categoria?.nombre || "Desconocido";
+                const subcategoriaNombre = subcategoria?.nombre || "Desconocido";
 
-                    return {
-                        ...item,
-                        nombre: `${categoriaNombre} - ${subcategoriaNombre}`,
-                    };
-                })
-            );
+                return {
+                    ...item,
+                    _id: item.id, // Mantener compatibilidad con frontend
+                    subcategoriaCatalogoId: item.subcategoria_id,
+                    ventaId: venta.id,
+                    nombre: `${categoriaNombre} - ${subcategoriaNombre}`,
+                };
+            });
 
             return {
-                _id: venta._id,
+                _id: venta.id, // Mantener compatibilidad con frontend
                 comentario: venta.comentario || "",
-                clienteId: venta.clienteId,
+                clienteId: venta.cliente_id,
                 clienteNombre,
                 clienteRut,
                 estado: venta.estado,
                 fecha: venta.fecha,
                 items: itemsWithNames
             };
-        })
-    );
-    
-    return NextResponse.json({ pedidos });
+        });
+        
+        return NextResponse.json({ pedidos });
+
+    } catch (error) {
+        console.error("Error fetching ventas data:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
 }

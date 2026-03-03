@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {

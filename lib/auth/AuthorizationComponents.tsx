@@ -6,7 +6,7 @@
 'use client';
 
 import React from 'react';
-import { useAuthorization, usePermission } from './useAuthorization';
+import { useAuthorization } from './useAuthorization';
 import { PermissionContext } from './permissions';
 
 // ===============================================
@@ -21,13 +21,23 @@ interface CanProps {
   fallback?: React.ReactNode;
 }
 
-export function Can({ resources, actions, context, children, fallback = null }: CanProps) {
-  const hasPermission = resources.some(resource =>
-    actions.some(action => {
-      const permission = usePermission(resource, action, context);      
-      return permission;
-    })
-  ); // Verifica si tiene al menos un permiso en cualquier recurso
+export function Can({ resources, actions, children, fallback = null }: CanProps) {
+  const { canAny } = useAuthorization();
+  
+  // Crear todas las combinaciones de resource/action para verificar
+  const permissions = React.useMemo(() => {
+    const combinations = [];
+    for (const resource of resources) {
+      for (const action of actions) {
+        combinations.push({ resource, action });
+      }
+    }
+    return combinations;
+  }, [resources, actions]);
+  
+  // Usar canAny para verificar si tiene al menos un permiso
+  const hasPermission = canAny(permissions);
+  
   return hasPermission ? <>{children}</> : <>{fallback}</>;
 }
 
@@ -42,9 +52,9 @@ interface CanAnyProps {
   fallback?: React.ReactNode;
 }
 
-export function CanAny({ permissions, context, children, fallback = null }: CanAnyProps) {
+export function CanAny({ permissions, children, fallback = null }: CanAnyProps) {
   const auth = useAuthorization();
-  const hasAnyPermission = auth.canAny(permissions, context);
+  const hasAnyPermission = auth.canAny(permissions);
   
   return hasAnyPermission ? <>{children}</> : <>{fallback}</>;
 }
@@ -60,9 +70,9 @@ interface CanAllProps {
   fallback?: React.ReactNode;
 }
 
-export function CanAll({ permissions, context, children, fallback = null }: CanAllProps) {
+export function CanAll({ permissions, children, fallback = null }: CanAllProps) {
   const auth = useAuthorization();
-  const hasAllPermissions = auth.canAll(permissions, context);
+  const hasAllPermissions = auth.canAll(permissions);
   
   return hasAllPermissions ? <>{children}</> : <>{fallback}</>;
 }

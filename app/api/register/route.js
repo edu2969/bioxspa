@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
@@ -39,7 +39,5 @@ export async function POST(req) {
       { message: "An error occurred while registering the user." },
       { status: 500 }
     );
-  }
-}
   }
 }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
+        const supabase = await getSupabaseServerClient();
         const { ventaId, nombreRecibe, rutRecibe } = await request.json();
 
         if (!ventaId || !nombreRecibe || !rutRecibe) {

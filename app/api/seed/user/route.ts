@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verificar si ya existe el usuario
+     const supabase = await getSupabaseServerClient();
     const { data: existingUser, error: findError } = await supabase
       .from('usuarios')
       .select('*')

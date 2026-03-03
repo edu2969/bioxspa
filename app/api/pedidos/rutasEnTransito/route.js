@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET(request) {
@@ -11,6 +11,8 @@ export async function GET(request) {
             return NextResponse.json({ error: "sucursalId es requerido" }, { status: 400 });
         }
 
+        const supabase = await getSupabaseServerClient();
+        
         // Fetch active ventas for the specified sucursal
         const { data: ventasActivas, error: ventasError } = await supabase
             .from("ventas")
@@ -67,7 +69,7 @@ export async function GET(request) {
         }));
 
         return NextResponse.json({ enTransito: enTransitoResponse });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
     }
 }

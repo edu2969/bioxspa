@@ -1,87 +1,119 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import Sucursal from '@/models/sucursal';
-import BiPrincipal from "@/models/biPrincipal";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET() {
-    await connectMongoDB();
-
     try {
-        const sucursales = await Sucursal.find({}, 'nombre _id tipoSucursal');
-        const currentDate = new Date();
-        const pastYearDate = new Date(currentDate.setFullYear(currentDate.getFullYear() - 1));
+        const { user } = await getAuthenticatedUser();
 
-        const ventas = await BiPrincipal.aggregate([
-            {
-                $match: {
-                    fecha: { $gte: pastYearDate }
-                }
-            },
-            {
-                $group: {
-                    _id: "$sucursalId",
-                    totalVentas: { $sum: "$montoVendido" },
-                    deudaTotal: { $sum: "$montoAdeudado" }
-                }
-            },
-            {
-                $project: {
-                    totalVentas: 1,
-                    deudaTotal: 1
-                }
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
+        // Obtener todas las sucursales
+        const { data: sucursales, error: sucursalesError } = await supabase
+            .from("sucursales")
+            .select(`
+                id,
+                nombre,
+                dependencia:dependencias(tipo)
+            `)
+            .eq("visible", true);
+
+        if (sucursalesError) {
+            console.error("Error fetching sucursales:", sucursalesError);
+            return NextResponse.json({ error: sucursalesError.message }, { status: 500 });
+        }
+
+        // Calcular fecha de hace un año
+        const currentDate = new Date();
+        const pastYearDate = new Date();
+        pastYearDate.setFullYear(currentDate.getFullYear() - 1);
+
+        // Obtener datos agregados de BI del último año
+        const { data: ventasData, error: ventasError } = await supabase
+            .from("bi_principal")
+            .select("sucursal_id, monto_vendido, monto_adeudado")
+            .gte("fecha", pastYearDate.toISOString().split('T')[0]);
+
+        if (ventasError) {
+            console.error("Error fetching ventas data:", ventasError);
+            return NextResponse.json({ error: ventasError.message }, { status: 500 });
+        }
+
+        // Agrupar datos por sucursal_id
+        const ventasAgrupadas = {};
+        ventasData.forEach(venta => {
+            const sucursalId = venta.sucursal_id;
+            if (!ventasAgrupadas[sucursalId]) {
+                ventasAgrupadas[sucursalId] = {
+                    totalVentas: 0,
+                    deudaTotal: 0
+                };
             }
-        ]);
+            ventasAgrupadas[sucursalId].totalVentas += venta.monto_vendido || 0;
+            ventasAgrupadas[sucursalId].deudaTotal += venta.monto_adeudado || 0;
+        });
 
         const result = await Promise.all(sucursales.map(async sucursal => {
-            const venta = ventas.find(v => v._id && v._id.equals(sucursal._id));
+            const venta = ventasAgrupadas[sucursal.id] || { totalVentas: 0, deudaTotal: 0 };
 
-            const topDeudores = await BiPrincipal.aggregate([
-                {
-                    $match: {
-                        fecha: { $gte: pastYearDate },
-                        sucursalId: sucursal._id
-                    }
-                },
-                {
-                    $group: {
-                        _id: "$clienteId",
-                        deuda: { $sum: "$montoAdeudado" }
-                    }
-                },
-                {
-                    $sort: { deuda: -1 }
-                },
-                {
-                    $limit: 5
-                },
-                {
-                    $lookup: {
-                        from: "clientes",
-                        localField: "_id",
-                        foreignField: "_id",
-                        as: "cliente"
-                    }
-                },
-                {
-                    $unwind: "$cliente"
-                },
-                {
-                    $project: {
-                        empresa: "$cliente.nombre",
-                        deuda: 1,
-                        rut: "$cliente.rut"
-                    }
+            // Obtener top 5 deudores para esta sucursal
+            const { data: topDeudoresData, error: deudoresError } = await supabase
+                .from("bi_principal")
+                .select(`
+                    cliente_id,
+                    monto_adeudado,
+                    cliente:clientes(
+                        nombre,
+                        rut
+                    )
+                `)
+                .eq("sucursal_id", sucursal.id)
+                .gte("fecha", pastYearDate.toISOString().split('T')[0]);
+
+            if (deudoresError) {
+                console.error(`Error fetching deudores for sucursal ${sucursal.id}:`, deudoresError);
+            }
+
+            // Agrupar y ordenar deudores
+            const deudoresPorCliente = {};
+            (topDeudoresData || []).forEach(item => {
+                const clienteId = item.cliente_id;
+                if (!deudoresPorCliente[clienteId]) {
+                    deudoresPorCliente[clienteId] = {
+                        empresa: item.cliente?.nombre || '',
+                        rut: item.cliente?.rut || '',
+                        deuda: 0
+                    };
                 }
-            ]);
+                deudoresPorCliente[clienteId].deuda += item.monto_adeudado || 0;
+            });
+
+            const topDeudores = Object.values(deudoresPorCliente)
+                .sort((a, b) => b.deuda - a.deuda)
+                .slice(0, 5);
+
+            // Determinar tipo de dependencia
+            let tipo = TIPO_DEPENDENCIA.sucursal;
+            if (sucursal.dependencia) {
+                const tipoDependencia = sucursal.dependencia.tipo;
+                if (tipoDependencia === 10) {
+                    tipo = TIPO_DEPENDENCIA.bodega;
+                } else if (tipoDependencia === 11) {
+                    tipo = TIPO_DEPENDENCIA.ambas;
+                } else {
+                    tipo = TIPO_DEPENDENCIA.sucursal;
+                }
+            }
 
             return {
                 nombre: sucursal.nombre,
-                _id: sucursal._id,
-                tipo: sucursal.tipoSucursal == "Sucursal" ? TIPO_DEPENDENCIA.sucursal
-                    : sucursal.tipoSucursal == "Bodega" ? TIPO_DEPENDENCIA.bodega : TIPO_DEPENDENCIA.ambas,
-                totalVentas: venta ? venta.totalVentas : 0,
-                deudaTotal: venta ? venta.deudaTotal : 0,
+                _id: sucursal.id,
+                tipo: tipo,
+                totalVentas: venta.totalVentas,
+                deudaTotal: venta.deudaTotal,
                 m3Vendidos: 0,
                 m2Envasados: 0,
                 rentabilidad: 0,
@@ -96,7 +128,9 @@ export async function GET() {
         console.log("MainPanel", result);
 
         return NextResponse.json(result);
+
     } catch (error) {
+        console.error("Error in mainPanel endpoint:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

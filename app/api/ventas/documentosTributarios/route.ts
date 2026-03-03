@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
 
     try {
         const { searchParams } = req.nextUrl;
+        const supabase = await getSupabaseServerClient();
         const venta = searchParams.get("venta") === "true";
         const compra = searchParams.get("compra") === "true";
 

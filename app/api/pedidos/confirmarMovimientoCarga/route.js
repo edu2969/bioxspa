@@ -1,22 +1,13 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/utils/authOptions";
-import User from "@/models/user";
-import Cargo from "@/models/cargo";
-import RutaDespacho from "@/models/rutaDespacho";
-import { USER_ROLE, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
-import ItemCatalogo from "@/models/itemCatalogo";
-import Venta from "@/models/venta"; 
-import DetalleVenta from "@/models/detalleVenta";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
 
 // filepath: d:\git\bioxspa\app\api\pedidos\confirmarMovimientoCarga\route.js
 
 export async function POST(request) {
     console.log("Starting confirmarMovimientoCarga process");
     try {
-        await connectMongoDB();
-
         const { rutaId } = await request.json();
         console.log("Request received with rutaId:", rutaId);
 
@@ -25,140 +16,253 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
         }
 
-        // Get user from session
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
+        // Get authenticated user from Supabase
+        const { user } = await getAuthenticatedUser();
+        if (!user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const userId = session.user.id;
+        console.log("User authenticated:", user.id);
 
-        // Verify the user is a driver (conductor)
-        const user = await User.findById(userId);
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-        }
+        // Verify the user has an active conductor cargo
+        const { data: cargo, error: cargoError } = await supabase
+            .from("cargos")
+            .select("id, tipo, usuario_id")
+            .eq("usuario_id", user.id)
+            .eq("tipo", TIPO_CARGO.conductor)
+            .lte("desde", new Date().toISOString())
+            .or("hasta.is.null,hasta.gte." + new Date().toISOString())
+            .single();
 
-        if (user.role !== USER_ROLE.conductor) {
-            return NextResponse.json({ ok: false, error: "Insufficient permissions - requires conductor role" }, { status: 403 });
-        }
-
-        // Verify the user has a conductor cargo assigned
-        const cargo = await Cargo.findOne({
-            userId: userId,
-            tipo: TIPO_CARGO.conductor,
-            hasta: null
-        });
-
-        if (!cargo) {
+        if (cargoError || !cargo) {
             return NextResponse.json({ ok: false, error: "User is not an active conductor" }, { status: 403 });
         }
 
-        // Find the rutaDespacho
-        const rutaDespacho = await RutaDespacho.findById(rutaId);
+        // Find the rutaDespacho and verify user is assigned as driver
+        const { data: rutaDespacho, error: rutaError } = await supabase
+            .from("rutas_despacho")
+            .select(`
+                id,
+                chofer_id,
+                estado,
+                dependencia_id
+            `)
+            .eq("id", rutaId)
+            .single();
 
-        if (!rutaDespacho) {
+        if (rutaError || !rutaDespacho) {
             return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
         }
 
         // Verify the user is the driver assigned to this route
-        if (rutaDespacho.choferId.toString() !== userId) {
+        if (rutaDespacho.chofer_id !== user.id) {
             return NextResponse.json({ ok: false, error: "User is not the assigned driver for this route" }, { status: 403 });
         }
 
         // Get current date
-        const now = new Date();
+        const now = new Date().toISOString();
 
-        // Encuentra la última dirección destino de la ruta
-        const lastRoute = rutaDespacho.ruta[rutaDespacho.ruta.length - 1];
-        const lastDireccionId = lastRoute.direccionDestinoId?._id || lastRoute.direccionDestinoId;
-        
-        const itemMovidoIds = rutaDespacho.cargaItemIds;
-        // Actualiza la direccionId de cada item movido
-        await ItemCatalogo.updateMany(
-            { _id: { $in: itemMovidoIds } },
-            { $set: { direccionId: lastDireccionId } }
-        );
+        // Get the last destination of the route (most recent by creation order)
+        const { data: rutaDestinos, error: destinosError } = await supabase
+            .from("ruta_destinos")
+            .select("id, direccion_destino_id, fecha_arribo")
+            .eq("ruta_id", rutaId)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-        // Busca las ventas asociadas a esa dirección de despacho en Cliente
-        // Primero, obtenemos todas las ventas de la ruta
-        const ventas = rutaDespacho.ventaIds || [];
-        let ventasEnDireccion = [];
+        if (destinosError) {
+            console.error("Error fetching route destinations:", destinosError);
+            return NextResponse.json({ ok: false, error: "Error fetching route destinations" }, { status: 500 });
+        }
 
-        if (ventas.length > 0 && lastDireccionId) {
-            // Importa el modelo Venta dinámicamente
-            // Busca las ventas de la ruta
-            const ventasDocs = await Venta.find({ _id: { $in: ventas } }).select('_id clienteId direccionDespachoId');
+        const lastDestino = rutaDestinos && rutaDestinos.length > 0 ? rutaDestinos[0] : null;
+        if (!lastDestino) {
+            return NextResponse.json({ ok: false, error: "No destination found for this route" }, { status: 400 });
+        }
 
-            // Filtra las ventas cuya direccionDespachoId coincide con lastDireccionId
-            ventasEnDireccion = ventasDocs.filter(v => v.direccionDespachoId?.toString() === lastDireccionId?.toString());
+        const lastDireccionId = lastDestino.direccion_destino_id;
 
-            const ventasEnDireccionIds = ventasEnDireccion.map(v => v._id);
-            
-            // Actualiza las ventas correspondientes: cambia estado y flag porCobrar
-            if (ventasEnDireccionIds.length > 0) {
-                for (const venta of ventasEnDireccion) {
-                    // Obtiene los detalles de la venta
-                    const detalles = await DetalleVenta.find({ ventaId: venta._id });
-                    // Verifica si todos los restantes son cero
-                    // Verifica si todos los items de cada detalle han sido escaneados
-                    const todosEscaneados = detalles.every(detalle => {
-                        // detalle.itemCatalogIds es un array de items escaneados
-                        // detalle.cantidad es la cantidad total esperada
-                        return Array.isArray(detalle.itemCatalogoIds) && detalle.itemCatalogoIds.length === detalle.cantidad;
+        // Get items currently loaded in the route (from latest carga)
+        const { data: cargaHistorial, error: cargaError } = await supabase
+            .from("ruta_historial_carga")
+            .select(`
+                id,
+                items:ruta_items_movidos(
+                    item_catalogo_id
+                )
+            `)
+            .eq("ruta_id", rutaId)
+            .eq("es_carga", true)
+            .order("fecha", { ascending: false })
+            .limit(1);
+
+        if (cargaError) {
+            console.error("Error fetching carga historial:", cargaError);
+            return NextResponse.json({ ok: false, error: "Error fetching cargo information" }, { status: 500 });
+        }
+
+        const itemMovidoIds = cargaHistorial && cargaHistorial.length > 0 
+            ? cargaHistorial[0].items.map(item => item.item_catalogo_id)
+            : [];
+
+        // Update the direccion_id of moved items
+        if (itemMovidoIds.length > 0 && lastDireccionId) {
+            const { error: updateItemsError } = await supabase
+                .from("items_catalogo")
+                .update({ direccion_id: lastDireccionId })
+                .in("id", itemMovidoIds);
+
+            if (updateItemsError) {
+                console.error("Error updating items direccion_id:", updateItemsError);
+                return NextResponse.json({ ok: false, error: "Error updating items location" }, { status: 500 });
+            }
+        }
+
+        // Get ventas associated with this route
+        const { data: rutaVentas, error: ventasRutaError } = await supabase
+            .from("ruta_ventas")
+            .select(`
+                venta:ventas(
+                    id,
+                    tipo,
+                    cliente_id,
+                    direccion_despacho_id
+                )
+            `)
+            .eq("ruta_id", rutaId);
+
+        if (ventasRutaError) {
+            console.error("Error fetching route ventas:", ventasRutaError);
+            return NextResponse.json({ ok: false, error: "Error fetching route sales" }, { status: 500 });
+        }
+
+        const ventas = rutaVentas.map(rv => rv.venta);
+
+        // Filter ventas that match the last destination
+        const ventasEnDireccion = ventas.filter(v => v.direccion_despacho_id === lastDireccionId);
+
+        if (ventasEnDireccion.length > 0) {
+            for (const venta of ventasEnDireccion) {
+                // Get detalle ventas for this venta
+                const { data: detalles, error: detallesError } = await supabase
+                    .from("detalle_ventas")
+                    .select(`
+                        id,
+                        cantidad,
+                        items:detalle_venta_items(item_catalogo_id)
+                    `)
+                    .eq("venta_id", venta.id);
+
+                if (detallesError) {
+                    console.error("Error fetching detalle ventas:", detallesError);
+                    continue;
+                }
+
+                // Check if all items have been scanned
+                const todosEscaneados = (detalles || []).every(detalle => {
+                    const itemsEscaneados = detalle.items ? detalle.items.length : 0;
+                    return itemsEscaneados === detalle.cantidad;
+                });
+
+                const tipoOrden = venta.tipo;
+                
+                // Determine new state and porCobrar
+                const nuevoEstado = tipoOrden === TIPO_ORDEN.traslado 
+                    ? TIPO_ESTADO_VENTA.retirado
+                    : (todosEscaneados ? TIPO_ESTADO_VENTA.entregado : TIPO_ESTADO_VENTA.por_asignar);
+                const nuevoPorCobrar = todosEscaneados;
+
+                // Update venta
+                const { error: updateVentaError } = await supabase
+                    .from("ventas")
+                    .update({
+                        estado: nuevoEstado,
+                        por_cobrar: nuevoPorCobrar
+                    })
+                    .eq("id", venta.id);
+
+                if (updateVentaError) {
+                    console.error("Error updating venta:", updateVentaError);
+                }
+
+                // Add to venta historial estados
+                const { error: historialVentaError } = await supabase
+                    .from("venta_historial_estados")
+                    .insert({
+                        venta_id: venta.id,
+                        estado: nuevoEstado,
+                        fecha: now,
+                        usuario_id: user.id
                     });
 
-                    const tipoOrden = venta.tipo;
-                    // Determina el nuevo estado y porCobrar                    
-                    const nuevoEstado = tipoOrden === TIPO_ORDEN.traslado 
-                        ? TIPO_ESTADO_VENTA.retirado
-                        : (todosEscaneados ? TIPO_ESTADO_VENTA.entregado : TIPO_ESTADO_VENTA.por_asignar);
-                    const nuevoPorCobrar = todosEscaneados; // @TODO: Si el cliente tiene arriendos y todosEscaneados, al parecer es true.
-
-                    await Venta.findByIdAndUpdate(
-                        venta._id,
-                        {
-                            estado: nuevoEstado,
-                            porCobrar: nuevoPorCobrar
-                        }
-                    );
-
-                    // Encuentra el índice de la dirección destino en la ruta
-                    const direccionIndex = rutaDespacho.ruta.findIndex(
-                        r => (r.direccionDestinoId?._id || r.direccionDestinoId)?.toString() === venta.direccionDespachoId?.toString()
-                    );
-                    if (direccionIndex !== -1) {
-                        // Filtra los items movidos que pertenecen a esta venta
-                        await ItemCatalogo.updateMany(
-                            { _id: { $in: itemMovidoIds } },
-                            { $set: { direccionId: rutaDespacho.ruta[direccionIndex].direccionDestinoId } }
-                        );
-                    }
+                if (historialVentaError) {
+                    console.error("Error adding venta historial:", historialVentaError);
                 }
             }
         }
 
-        // Update the route: set estado to descarga_confirmada, update historialEstado, and add to historialCarga
+        // Determine if there are any retiro (traslado) operations
         const tieneRetiro = ventasEnDireccion.some(v => v.tipo === TIPO_ORDEN.traslado);
         const estadoFinal = tieneRetiro ? TIPO_ESTADO_RUTA_DESPACHO.carga_confirmada 
-            : TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada
-        await RutaDespacho.findByIdAndUpdate(
-            rutaId,
-            {
+            : TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
+
+        // Update route status
+        const { error: updateRutaError } = await supabase
+            .from("rutas_despacho")
+            .update({ estado: estadoFinal })
+            .eq("id", rutaId);
+
+        if (updateRutaError) {
+            console.error("Error updating ruta estado:", updateRutaError);
+            return NextResponse.json({ ok: false, error: "Error updating route status" }, { status: 500 });
+        }
+
+        // Add to route historial estados
+        const { error: historialRutaError } = await supabase
+            .from("ruta_historial_estados")
+            .insert({
+                ruta_id: rutaId,
                 estado: estadoFinal,
-                $push: {
-                    historialEstado: {
-                        estado: estadoFinal,
-                        fecha: now
-                    },
-                    historialCarga: {
-                        fecha: now,
-                        itemMovidoIds: rutaDespacho.cargaItemIds,
-                        esCarga: tieneRetiro
-                    }
+                fecha: now,
+                usuario_id: user.id
+            });
+
+        if (historialRutaError) {
+            console.error("Error adding ruta historial:", historialRutaError);
+        }
+
+        // Add to historial carga (descarga record)
+        if (itemMovidoIds.length > 0) {
+            // First insert the historial_carga record
+            const { data: historialCargaRecord, error: historialCargaError } = await supabase
+                .from("ruta_historial_carga")
+                .insert({
+                    ruta_id: rutaId,
+                    fecha: now,
+                    es_carga: tieneRetiro,
+                    usuario_id: user.id
+                })
+                .select("id")
+                .single();
+
+            if (historialCargaError) {
+                console.error("Error adding historial carga:", historialCargaError);
+            } else {
+                // Then insert the individual item movements
+                const itemMovimientos = itemMovidoIds.map(itemId => ({
+                    ruta_historial_carga_id: historialCargaRecord.id,
+                    item_catalogo_id: itemId
+                }));
+
+                const { error: itemMovimientosError } = await supabase
+                    .from("ruta_items_movidos")
+                    .insert(itemMovimientos);
+
+                if (itemMovimientosError) {
+                    console.error("Error adding item movements:", itemMovimientosError);
                 }
             }
-        );
+        }
 
         return NextResponse.json({
             ok: true,

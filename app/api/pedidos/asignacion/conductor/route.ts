@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import supabase from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET(request: NextRequest) {
     try {
-        // Fetch the authenticated user
+        const supabase = await getSupabaseServerClient();
         const { data: user, error: userError } = await supabase.auth.getUser();
         if (userError || !user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch sales details for the route
         const ventas = await Promise.all(
-            rutaDespacho.ruta_ventas.map(async (venta) => {
+            rutaDespacho.ruta_ventas.map(async (venta: { venta_id: string }) => {
                 const { data: ventaData, error: ventaError } = await supabase
                     .from("ventas")
                     .select(`

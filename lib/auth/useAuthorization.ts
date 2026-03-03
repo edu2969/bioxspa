@@ -5,62 +5,60 @@
 
 'use client';
 
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { 
   hasPermission, 
   hasAnyPermission, 
   hasAllPermissions,
   getComponentPermissions,
   ComponentPermissions,
-  PermissionContext,
-  ROLES,
-  ROLE_MAPPING
+  ROLES
 } from './permissions';
 import { useMemo } from 'react';
+import { USER_ROLE } from '@/app/utils/constants';
+
+const ROLE_BY_USER_ROLE: Record<number, string> = {
+  [USER_ROLE.neo]: ROLES.SUPER_ADMIN,
+  [USER_ROLE.gerente]: ROLES.MANAGER,
+  [USER_ROLE.cobranza]: ROLES.COLLECTIONS,
+  [USER_ROLE.despacho]: ROLES.DISPATCHER,
+  [USER_ROLE.conductor]: ROLES.DRIVER,
+  [USER_ROLE.proveedor]: ROLES.SUPPLIER
+};
 
 // ===============================================
 // HOOK PRINCIPAL DE AUTORIZACIÓN
 // ===============================================
 
 export function useAuthorization() {
-  const { user, cargos } = useAuth();  
+  const { user } = useAuth();  
 
   const userRoles = useMemo(() => {
-    if (!cargos || cargos.length === 0) return [ROLES.GUEST];
-    
-    // Convertir roles legacy a roles semánticos
-    return cargos.map(cargo => {
-      const roleEntry = Object.entries(ROLE_MAPPING).find(([_, value]) => value === cargo.tipo);
-      return roleEntry ? roleEntry[0] : ROLES.GUEST;
-    });
-  }, [cargos]);  
+    if (!user || typeof user.rol !== 'number') {
+      return [] as string[];
+    }
 
-  const context: PermissionContext = useMemo(() => ({
-    userId: user?.id || '',
-    sucursalId: cargos?.[0]?.sucursal?.id,
-    dependenciaId: cargos?.[0]?.dependenciaId,
-  }), [user, cargos]);
+    const mappedRole = ROLE_BY_USER_ROLE[user.rol];
+    return mappedRole ? [mappedRole] : [];
+  }, [user]);
 
   return {
-    userRoles,
-    context,
     user,
-    cargos,
 
     // Función principal de verificación de permisos
-    can: (resource: string, action: string, customContext?: PermissionContext) => 
-      hasPermission(userRoles, resource, action, customContext || context),
+    can: (resource: string, action: string) => 
+      hasPermission(userRoles, resource, action),
 
     // Verificaciones múltiples
-    canAny: (permissions: Array<{ resource: string; action: string }>, customContext?: PermissionContext) =>
-      hasAnyPermission(userRoles, permissions, customContext || context),
+    canAny: (permissions: Array<{ resource: string; action: string }>) =>
+      hasAnyPermission(userRoles, permissions),
 
-    canAll: (permissions: Array<{ resource: string; action: string }>, customContext?: PermissionContext) =>
-      hasAllPermissions(userRoles, permissions, customContext || context),
+    canAll: (permissions: Array<{ resource: string; action: string }>) =>
+      hasAllPermissions(userRoles, permissions),
 
     // Helper para obtener permisos de componente
-    getPermissions: (resource: string, customContext?: PermissionContext): ComponentPermissions =>
-      getComponentPermissions(userRoles, resource, customContext || context),
+    getPermissions: (resource: string): ComponentPermissions =>
+      getComponentPermissions(userRoles, resource),
 
     // Verificaciones de rol específicas (para casos especiales)
     isRole: (role: string) => userRoles.includes(role),
@@ -78,12 +76,12 @@ export function useAuthorization() {
 // HOOK PARA PERMISOS DE RECURSO ESPECÍFICO
 // ===============================================
 
-export function useResourcePermissions(resource: string, customContext?: PermissionContext) {
+export function useResourcePermissions(resource: string) {
   const auth = useAuthorization();
   
   return useMemo(() => 
-    auth.getPermissions(resource, customContext), 
-    [auth, resource, customContext]
+    auth.getPermissions(resource), 
+    [auth, resource]
   );
 }
 
@@ -91,11 +89,11 @@ export function useResourcePermissions(resource: string, customContext?: Permiss
 // HOOK PARA VERIFICACIÓN SIMPLE
 // ===============================================
 
-export function usePermission(resource: string, action: string, customContext?: PermissionContext) {
+export function usePermission(resource: string, action: string) {
   const auth = useAuthorization();
   
   return useMemo(() => 
-    auth.can(resource, action, customContext),
-    [auth, resource, action, customContext]
+    auth.can(resource, action),
+    [auth, resource, action]
   );
 }

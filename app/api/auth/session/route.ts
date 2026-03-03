@@ -3,9 +3,8 @@
  * Reemplaza /api/auth/session de NextAuth
  */
 
-import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
-import { APIResponse, MigrationLogger } from "@/lib/supabase-helpers";
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 // ===============================================
 // TIPOS DE DATOS
@@ -26,13 +25,11 @@ interface SessionResponse {
 // ===============================================
 
 async function getSupabaseSession(): Promise<SessionResponse> {
-  MigrationLogger.info('Getting session from Supabase Auth');
-
   // 1. Obtener usuario actual de Supabase Auth
+  const supabase = await getSupabaseServerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    MigrationLogger.info('No active Supabase session found');
     return {
       user: null,
       authenticated: false
@@ -59,7 +56,6 @@ async function getSupabaseSession(): Promise<SessionResponse> {
     .single();
 
   if (userError || !usuario) {
-    MigrationLogger.warning('User found in auth but not in usuarios table', { userId: user.id });
     // Retornar datos básicos del auth
     return {
       user: {
@@ -71,8 +67,6 @@ async function getSupabaseSession(): Promise<SessionResponse> {
       authenticated: true
     };
   }
-
-  MigrationLogger.success('Supabase session retrieved successfully', { userId: user.id });
 
   return {
     user: {
@@ -93,22 +87,18 @@ export async function GET(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    MigrationLogger.info('Processing session request');
-
     // Obtener sesión directamente de Supabase
     const sessionData = await getSupabaseSession();
 
-    MigrationLogger.performance('Session retrieval', startTime);
-
     if (!sessionData.authenticated) {
-      return APIResponse.success({
+      return NextResponse.json({
         user: null,
         authenticated: false,
         message: 'No active session'
       });
     }
 
-    return APIResponse.success({
+    return NextResponse.json({
       user: sessionData.user,
       cargos: sessionData.cargos,
       authenticated: true,
@@ -116,13 +106,12 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error: any) {
-    MigrationLogger.error('Session retrieval failed', error);
     
-    return APIResponse.error(
-      "Error obteniendo sesión",
-      500,
-      process.env.NODE_ENV === 'development' ? error.message : undefined
-    );
+    return NextResponse.json({
+      ok: false,
+      error: "Error obteniendo sesión",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 });
   }
 }
 
@@ -132,22 +121,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    MigrationLogger.info('Processing session refresh request');
-
+    const supabase = await getSupabaseServerClient();
     const { data, error } = await supabase.auth.refreshSession();
 
     if (error) {
-      MigrationLogger.error('Session refresh failed', error);
-      return APIResponse.error("Error refrescando sesión", 401);
+      return NextResponse.json({ ok: false, error: "Error refrescando sesión" }, { status: 401 });
     }
 
     if (!data.session || !data.user) {
-      return APIResponse.error("No hay sesión para refrescar", 401);
+      return NextResponse.json({ ok: false, error: "No hay sesión para refrescar" }, { status: 401 });
     }
 
-    MigrationLogger.success('Session refreshed successfully');
-
-    return APIResponse.success({
+    return NextResponse.json({
+      ok: true,
       user: {
         id: data.user.id,
         email: data.user.email!,
@@ -157,8 +143,7 @@ export async function POST(req: NextRequest) {
       message: 'Sesión refrescada exitosamente'
     });
 
-  } catch (error) {
-    MigrationLogger.error('Session refresh error', error);
-    return APIResponse.error("Error interno en refresh", 500);
+  } catch {
+    return NextResponse.json({ ok: false, error: "Error interno en refresh" }, { status: 500 });
   }
 }

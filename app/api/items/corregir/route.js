@@ -1,69 +1,81 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/utils/authOptions";
-import Cargo from "@/models/cargo";
-import Dependencia from "@/models/dependencia";
-import Direccion from "@/models/direccion";
-import ItemCatalogo from "@/models/itemCatalogo";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function POST(request) {
     try {
-        await connectMongoDB();
-
         const { id, estado, reubicar } = await request.json();
 
         if (!id || !estado) {
             return NextResponse.json({ ok: false, error: "id, estado are required" }, { status: 400 });
         }
 
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
+        // Get authenticated user from Supabase
+        const { user } = await getAuthenticatedUser();
+        if (!user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const userId = session.user.id;
+        // Find user's current cargo (active) with dependencia and direccion info
+        const { data: cargo, error: cargoError } = await supabase
+            .from("cargos")
+            .select(`
+                id,
+                usuario_id,
+                dependencia_id,
+                sucursal_id,
+                dependencia:dependencias(
+                    id,
+                    nombre,
+                    direccion_id,
+                    direccion:direcciones(
+                        id,
+                        nombre
+                    )
+                )
+            `)
+            .eq("usuario_id", user.id)
+            .lte("desde", new Date().toISOString())
+            .or("hasta.is.null,hasta.gte." + new Date().toISOString())
+            .single();
 
-        // Find user's current cargo (active)
-        const cargo = await Cargo.findOne({
-            userId: userId,
-            hasta: null
-        }).populate({
-            path: 'dependenciaId',
-            model: Dependencia,
-            select: '_id nombre direccionId',
-            populate: {
-                path: 'direccionId',
-                model: Direccion,
-                select: '_id nombre'
-            }
-        });
-
-        if (!cargo || !cargo.dependenciaId || !cargo.dependenciaId.direccionId) {
+        if (cargoError || !cargo || !cargo.dependencia_id || !cargo.dependencia?.direccion_id) {
             return NextResponse.json({ ok: false, error: "User does not have a valid cargo or dependencia" }, { status: 403 });
         }
 
         // Prepare update object
-        const update = { estado };
+        const updateData = { estado };
         if (reubicar) {
-            update.direccionId = cargo.dependenciaId.direccionId._id;
+            updateData.direccion_id = cargo.dependencia.direccion_id;
         }
 
-        const item = await ItemCatalogo.findByIdAndUpdate(
-            id,
-            update,
-            { new: true }
-        ).populate({
-            path: 'direccionId',
-            model: Direccion,
-            select: '_id nombre'
-        });
+        // Update the item
+        const { data: updatedItem, error: updateError } = await supabase
+            .from("items_catalogo")
+            .update(updateData)
+            .eq("id", id)
+            .select(`
+                id,
+                codigo,
+                estado,
+                nombre,
+                direccion_id,
+                direccion:direcciones(
+                    id,
+                    nombre
+                )
+            `)
+            .single();
 
-        if (!item) {
-            return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
+        if (updateError) {
+            if (updateError.code === 'PGRST116') {
+                return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
+            }
+            console.error("Error updating item:", updateError);
+            return NextResponse.json({ ok: false, error: "Error updating item" }, { status: 500 });
         }
 
-        return NextResponse.json({ ok: true, item });
+        return NextResponse.json({ ok: true, item: updatedItem });
     } catch (error) {
         console.error("Error in POST /api/items/corregir:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });

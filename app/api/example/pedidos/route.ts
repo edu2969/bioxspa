@@ -4,9 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import { withAuthorization } from '@/lib/auth/apiAuthorization';
-import { RESOURCES, ACTIONS } from '@/lib/auth/permissions';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 // ===============================================
 // HANDLER CON AUTORIZACIÓN
@@ -31,6 +29,7 @@ async function pedidosHandler(req: NextRequest, user: any) {
 
 async function getPedidos(req: NextRequest, user: any) {
   try {
+    const supabase = await getSupabaseServerClient();
     let query = supabase.from('pedidos').select(`
       id,
       numero,
@@ -94,6 +93,7 @@ async function getPedidos(req: NextRequest, user: any) {
 async function createPedido(req: NextRequest, user: any) {
   try {
     const body = await req.json();
+    const supabase = await getSupabaseServerClient();
     
     // Validaciones de negocio
     if (!body.cliente_id || !body.items || body.items.length === 0) {
@@ -131,21 +131,3 @@ async function createPedido(req: NextRequest, user: any) {
     return Response.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
-
-// ===============================================
-// EXPORTS CON AUTORIZACIÓN
-// ===============================================
-
-// GET - Leer pedidos
-export const GET = withAuthorization(pedidosHandler, {
-  resource: RESOURCES.PEDIDOS,
-  action: ACTIONS.READ,
-  requireContext: true
-});
-
-// POST - Crear pedidos  
-export const POST = withAuthorization(pedidosHandler, {
-  resource: RESOURCES.PEDIDOS,
-  action: ACTIONS.CREATE,
-  requireContext: true
-});

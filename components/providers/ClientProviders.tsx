@@ -1,6 +1,6 @@
 'use client';
 
-import { AuthProvider } from '@/components/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
 import ReactQueryProvider from '@/components/providers/QueryClientProvider';
 
 interface ClientProvidersProps {

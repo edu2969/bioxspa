@@ -1,12 +1,16 @@
-import { connectMongoDB } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import SubcategoriaCatalogo from "@/models/subcategoriaCatalogo";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 // filepath: d:\git\bioxspa\app\api\catalogo\search\route.js
 
 export async function GET(req) {
     try {
-        await connectMongoDB();
+        const { user } = await getAuthenticatedUser();
+        if (!user) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
         const query = searchParams.get('q');
 
@@ -14,17 +18,33 @@ export async function GET(req) {
             return NextResponse.json({ error: "Query parameter 'q' is required" }, { status: 400 });
         }
 
-        const words = query.split(' ').filter(word => word);
-        const regexes = words.map(word => new RegExp(word, 'i'));
+        const words = query.split(' ').filter(word => word.trim());
 
-        const subcategorias = await SubcategoriaCatalogo.find({
-            $or: regexes.map(regex => ({ nombre: { $regex: regex } }))
-        }).populate('categoriaCatalogoId');
+        // Build SQL ILIKE patterns for each word
+        const searchConditions = words.map(word => `subcategorias_catalogo.nombre ILIKE '%${word.replace(/'/g, "''")}%'`);
+        const searchFilter = searchConditions.join(' OR ');
+
+        const { data: subcategorias, error } = await supabase
+            .from('subcategorias_catalogo')
+            .select(`
+                id,
+                nombre,
+                categoria:categorias_catalogo(
+                    id,
+                    nombre
+                )
+            `)
+            .or(searchFilter)
+            .order('nombre');
+
+        if (error) {
+            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        }
 
         const results = [];
 
         subcategorias.forEach(subcategoria => {
-            const originalText = `${subcategoria.categoriaCatalogoId.nombre} ${subcategoria.nombre}`;
+            const originalText = `${subcategoria.categoria?.nombre || ''} ${subcategoria.nombre}`.trim();
             const highlightedText = originalText.replace(new RegExp(words.join('|'), 'gi'), match => `<b>${match}</b>`);
 
             // Calculate match score based on the number of matching words
@@ -36,7 +56,7 @@ export async function GET(req) {
             results.push({ 
                 texto: highlightedText, 
                 original: originalText, 
-                _id: subcategoria._id, 
+                _id: subcategoria.id, // Maintain compatibility with frontend
                 matchScore 
             });
         });
@@ -46,6 +66,7 @@ export async function GET(req) {
 
         return NextResponse.json({ ok: true, results });
     } catch (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("Error in catalog search:", error);
+        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TIPO_CARGO } from "@/app/utils/constants";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
     try {
@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
         if (!itemId) {
             return NextResponse.json({ ok: false, error: "Missing itemId" }, { status: 400 });
         }
+
+        const supabase = await getSupabaseServerClient();
 
         // Campos permitidos para actualizar
         const camposPermitidos = [
