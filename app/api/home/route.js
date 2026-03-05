@@ -9,7 +9,7 @@ import {
 
 export async function GET() {   
     try {
-        const { data: user } = await getAuthenticatedUser();
+        const { data: user, userData } = await getAuthenticatedUser();
         console.log("Usuario autenticado en /home:", user);
         const userTipoCargo = user.role;
         const userId = user.id;
