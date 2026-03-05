@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 
 // Obtener todos los vehículos
 export async function GET() {
+    const supabase = getSupabaseServerClient();
     // Fetch all vehicles from Supabase
     const { data: vehiculos, error } = await supabase
         .from('vehiculos')

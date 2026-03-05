@@ -6,12 +6,12 @@ import {
     TIPO_ESTADO_RUTA_DESPACHO,
     TIPO_ORDEN
 } from "@/app/utils/constants";
-import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function GET() {   
     try {
-        const { user, userData } = await getAuthenticatedUser();
-        const userTipoCargo = userData.role;
+        const { data: user } = await getAuthenticatedUser();
+        console.log("Usuario autenticado en /home:", user);
+        const userTipoCargo = user.role;
         const userId = user.id;
 
         // COBRANZA
@@ -142,6 +142,7 @@ export async function GET() {
         // Otros roles: respuesta vacía
         return NextResponse.json({ ok: true, message: "No data for this role.", contadores: [] });
     } catch (error) {
+        console.error('❌ Error en API /home:', error);
         return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 }
