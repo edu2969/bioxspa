@@ -1,6 +1,6 @@
 "use client";
 
-import { ROLES, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CARGO } from "@/app/utils/constants";
 import { IUser } from "@/types/user";
 import { useQuery } from "@tanstack/react-query";
 import { ISucursal } from "@/types/sucursal";
@@ -37,7 +37,7 @@ export default function DatosGenerales({
             console.log("Usuarios fetched:", data);
             return data.usuarios;
         },
-        enabled: hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR])
+        enabled: hasRole([TIPO_CARGO.encargado, TIPO_CARGO.gerente, TIPO_CARGO.neo])
     });
 
     useEffect(() => {
@@ -58,7 +58,7 @@ export default function DatosGenerales({
     return (<fieldset className="border rounded-md px-4 pb-4 space-y-4">
         <legend className="font-bold text-gray-700 px-2">Datos Generales</legend>
 
-        {hasRole([ROLES.MANAGER]) &&
+        {hasRole([TIPO_CARGO.gerente]) &&
             <Selector options={usuarios || []}
                 label="Seleccione usuario*"
                 getLabel={u => u.name}

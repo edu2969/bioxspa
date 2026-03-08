@@ -50,11 +50,10 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<AuthResult<User>>;
   refreshSession: () => Promise<void>;
-  hasRole: (roleName: string) => boolean;
+  hasCargoType: (cargoType: number) => boolean;
+  hasCargo: (cargoTypes: number[]) => boolean;
   isSessionValid: () => boolean;
   validateSession: () => Promise<boolean>;
-  hasCargoType: (cargoType: keyof typeof TIPO_CARGO) => boolean;
-  hasCargo: (cargoTypes: (keyof typeof TIPO_CARGO)[]) => boolean;
   getUserCargos: () => Cargo[];
 }
 
@@ -263,20 +262,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   // ===============================================
-  // UTILIDADES ADICIONALES
+  // VALIDACIÓN DE SESIÓN
   // ===============================================
-
-  const hasRole = (roleName: string): boolean => {
-    if (!user?.supabaseUser) return false;
-    
-    const userRoles = user.supabaseUser.user_metadata?.roles || 
-                     user.supabaseUser.app_metadata?.roles || 
-                     [];
-
-    return Array.isArray(userRoles) 
-      ? userRoles.includes(roleName)
-      : userRoles === roleName;
-  };
 
   const isSessionValidLocal = (): boolean => {
     if (!sessionInfo) return false;
@@ -318,14 +305,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // UTILIDADES PARA CARGOS DEL SISTEMA BIOX
   // ===============================================
 
-  const hasCargoType = (cargoType: keyof typeof TIPO_CARGO): boolean => {
+  const hasCargoType = (cargoType: number): boolean => {
     if (!cargos || cargos.length === 0) return false;
-    
-    const cargoValue = TIPO_CARGO[cargoType];
-    return cargos.some(cargo => cargo.tipo === cargoValue);
+    return cargos.some(cargo => cargo.tipo === cargoType);
   };
 
-  const hasCargo = (cargoTypes: (keyof typeof TIPO_CARGO)[]): boolean => {
+  const hasCargo = (cargoTypes: number[]): boolean => {
     return cargoTypes.some(cargoType => hasCargoType(cargoType));
   };
 
@@ -337,25 +322,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🔄 Cargando datos del usuario:', userId);
       
-      // Obtener usuario completo con sus cargos
+      // Obtener usuario básico
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
+        .select('id, email, nombre')
+        .eq('id', userId)
+        .single();
+
+      // Obtener cargos activos por separado
+      const { data: cargosData, error: cargosError } = await supabase
+        .from('cargos')
         .select(`
           id,
-          email,
-          nombre,
-          cargos (
-            tipo,
-            sucursal_id,
-            dependencia_id,
-            desde,
-            hasta,
-            sucursales (id, nombre, codigo)
-          )
+          tipo,
+          sucursal_id,
+          dependencia_id,
+          sucursales (id, nombre, codigo)
         `)
-        .eq('id', userId)
-        .is('cargos.hasta', null) // Solo cargos activos
-        .single();
+        .eq('usuario_id', userId)
+        .eq('activo', true)
+        .is('hasta', null);
 
       // Obtener información de sesión en paralelo
       const { data: sessionData } = await supabase.auth.getSession();
@@ -416,7 +402,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Establecer cargos con información completa
       setCargos(
-        (userData.cargos || []).map((cargo: any) => ({
+        (cargosData || []).map((cargo: any) => ({
           id: cargo.id || `cargo-${cargo.tipo}-${cargo.dependencia_id}`,
           dependenciaId: cargo.dependencia_id || '',
           tipo: cargo.tipo,
@@ -574,7 +560,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         signOut: supabaseSignOut,
         signUp: supabaseSignUp,
         refreshSession,
-        hasRole,
         isSessionValid: isSessionValidLocal,
         validateSession,
         hasCargoType,

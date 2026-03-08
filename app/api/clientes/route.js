@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -40,7 +40,39 @@ export async function GET(req) {
             return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
         }
 
-        return NextResponse.json({ ok: true, cliente });
+        return NextResponse.json({
+            ok: true, cliente: {
+                id: cliente.id,
+                nombre: cliente.nombre,
+                giro: cliente.giro,
+                rut: cliente.rut,
+                direccion: {
+                    id: cliente.direccion_id,
+                    direccionCliente: cliente.direccion_id ? cliente.direccion_id.direccion_cliente : null,
+                    latitud: cliente.direccion_id ? cliente.direccion_id.latitud : null,
+                    longitud: cliente.direccion_id ? cliente.direccion_id.longitud : null,
+                    comentario: cliente.direccion_id ? cliente.direccion_id.comentario : null
+                },
+                telefono: cliente.telefono,
+                email: cliente.email,
+                emailIntercambio: cliente.email_intercambio,
+                ordenCompra: cliente.orden_compra,
+                arriendo: cliente.arriendo,
+                cilindrosMin: cliente.cilindros_min,
+                cilindrosMax: cliente.cilindros_max,
+                activo: cliente.activo,
+                enQuiebra: cliente.en_quiebra,
+                direccionesDespacho: cliente.direcciones_despacho.map(d => ({
+                    id: d.direccion_id,
+                    direccionCliente: d.direccion_cliente,
+                    latitud: d.latitud,
+                    longitud: d.longitud
+                })),
+                documentoTributarioId: cliente.documento_tributario_id,
+                credito: cliente.credito,
+                mesesAumento: cliente.meses_aumento
+            }
+        });
     } catch (error) {
         console.error("[GET] ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -49,6 +81,12 @@ export async function GET(req) {
 
 export async function POST(req) {
     try {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         const entity = await req.json();
         console.log("[POST] Datos recibidos:", entity);
 

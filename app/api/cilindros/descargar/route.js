@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ORDEN } from "@/app/utils/constants";
 
 export async function POST(request) {

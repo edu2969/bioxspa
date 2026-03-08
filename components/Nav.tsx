@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
-import { RESOURCES, ACTIONS, ROLES } from '@/lib/auth/permissions';
+import { RESOURCES, ACTIONS } from '@/lib/auth/permissions';
 import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';

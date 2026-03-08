@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function POST(request) {
@@ -8,14 +7,14 @@ export async function POST(request) {
         const { rutaId, rut, nombre } = await request.json() || {};
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
 
-        const { user } = await getAuthenticatedUser();
-        if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
         // Verify the user has an active conductor cargo
         const { data: cargo, error: cargoErr } = await supabase
             .from('cargos')
             .select('id, hasta')
-            .eq('usuario_id', user.id)
+            .eq('usuario_id', authResult.userData.id)
             .eq('tipo', TIPO_CARGO.conductor)
             .limit(1)
             .maybeSingle();
@@ -42,7 +41,7 @@ export async function POST(request) {
         }
         if (!rutaData) return NextResponse.json({ ok: false, error: 'RutaDespacho not found' }, { status: 404 });
 
-        if (String(rutaData.conductor_id) !== String(user.id)) {
+        if (String(rutaData.conductor_id) !== String(authResult.userData.id)) {
             return NextResponse.json({ ok: false, error: 'User is not the assigned driver for this route' }, { status: 403 });
         }
 

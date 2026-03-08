@@ -10,6 +10,15 @@ import { useAuthorization } from './useAuthorization';
 import { PermissionContext } from './permissions';
 
 // ===============================================
+// TIPOS COMPARTIDOS
+// ===============================================
+
+interface Permission {
+  resource: string;
+  action: string;
+}
+
+// ===============================================
 // COMPONENTE CONDICIONAL BASADO EN PERMISOS
 // ===============================================
 
@@ -25,8 +34,8 @@ export function Can({ resources, actions, children, fallback = null }: CanProps)
   const { canAny } = useAuthorization();
   
   // Crear todas las combinaciones de resource/action para verificar
-  const permissions = React.useMemo(() => {
-    const combinations = [];
+  const permissions = React.useMemo((): Permission[] => {
+    const combinations: Permission[] = [];
     for (const resource of resources) {
       for (const action of actions) {
         combinations.push({ resource, action });
@@ -36,7 +45,7 @@ export function Can({ resources, actions, children, fallback = null }: CanProps)
   }, [resources, actions]);
   
   // Usar canAny para verificar si tiene al menos un permiso
-  const hasPermission = canAny(permissions);
+  const hasPermission: boolean = canAny(permissions);
   
   return hasPermission ? <>{children}</> : <>{fallback}</>;
 }
@@ -46,7 +55,7 @@ export function Can({ resources, actions, children, fallback = null }: CanProps)
 // ===============================================
 
 interface CanAnyProps {
-  permissions: Array<{ resource: string; action: string }>;
+  permissions: Permission[];
   context?: PermissionContext;
   children: React.ReactNode;
   fallback?: React.ReactNode;
@@ -54,7 +63,7 @@ interface CanAnyProps {
 
 export function CanAny({ permissions, children, fallback = null }: CanAnyProps) {
   const auth = useAuthorization();
-  const hasAnyPermission = auth.canAny(permissions);
+  const hasAnyPermission: boolean = auth.canAny(permissions);
   
   return hasAnyPermission ? <>{children}</> : <>{fallback}</>;
 }
@@ -64,7 +73,7 @@ export function CanAny({ permissions, children, fallback = null }: CanAnyProps) 
 // ===============================================
 
 interface CanAllProps {
-  permissions: Array<{ resource: string; action: string }>;
+  permissions: Permission[];
   context?: PermissionContext;
   children: React.ReactNode;
   fallback?: React.ReactNode;
@@ -72,7 +81,7 @@ interface CanAllProps {
 
 export function CanAll({ permissions, children, fallback = null }: CanAllProps) {
   const auth = useAuthorization();
-  const hasAllPermissions = auth.canAll(permissions);
+  const hasAllPermissions: boolean = auth.canAll(permissions);
   
   return hasAllPermissions ? <>{children}</> : <>{fallback}</>;
 }
@@ -82,16 +91,16 @@ export function CanAll({ permissions, children, fallback = null }: CanAllProps) 
 // ===============================================
 
 interface HasRoleProps {
-  roles: string[];
+  cargos: number[]; // Cambio de roles string a cargos numéricos
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
-export function HasRole({ roles, children, fallback = null }: HasRoleProps) {
+export function HasRole({ cargos, children, fallback = null }: HasRoleProps) {
   const auth = useAuthorization();
-  const hasRole = auth.hasRole(roles);
+  const hasCargo: boolean = auth.hasCargo(cargos);
   
-  return hasRole ? <>{children}</> : <>{fallback}</>;
+  return hasCargo ? <>{children}</> : <>{fallback}</>;
 }
 
 // ===============================================
@@ -101,8 +110,8 @@ export function HasRole({ roles, children, fallback = null }: HasRoleProps) {
 interface WithAuthorizationOptions {
   resource?: string;
   action?: string;
-  roles?: string[];
-  permissions?: Array<{ resource: string; action: string }>;
+  cargos?: number[]; // Cambio de roles a cargos numéricos
+  permissions?: Permission[];
   requireAll?: boolean; // Para permissions array, default false (OR)
   fallback?: React.ComponentType;
   redirect?: string;
@@ -111,16 +120,16 @@ interface WithAuthorizationOptions {
 export function withAuthorization<P extends object>(
   Component: React.ComponentType<P>,
   options: WithAuthorizationOptions
-) {
-  return function AuthorizedComponent(props: P) {
+): React.ComponentType<P> {
+  return function AuthorizedComponent(props: P): React.JSX.Element | null {
     const auth = useAuthorization();
     
-    let isAuthorized = false;
+    let isAuthorized: boolean = false;
 
     if (options.resource && options.action) {
       isAuthorized = auth.can(options.resource, options.action);
-    } else if (options.roles) {
-      isAuthorized = auth.hasRole(options.roles);
+    } else if (options.cargos) {
+      isAuthorized = auth.hasCargo(options.cargos);
     } else if (options.permissions) {
       isAuthorized = options.requireAll 
         ? auth.canAll(options.permissions)

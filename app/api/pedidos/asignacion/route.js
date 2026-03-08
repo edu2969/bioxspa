@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import {
     TIPO_ESTADO_VENTA,
@@ -13,6 +13,8 @@ export async function GET(request) {
     if (!sucursalId) {
         return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
     }
+
+    const supabase = await getSupabaseServerClient();
 
     // Fetch ventas
     const { data: ventas, error: ventasError } = await supabase

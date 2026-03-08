@@ -3,6 +3,8 @@
  * Implementación de mejores prácticas de clase mundial
  */
 
+import { TIPO_CARGO } from "@/app/utils/constants";
+
 // ===============================================
 // DEFINICIÓN DE RECURSOS Y ACCIONES
 // ===============================================
@@ -31,43 +33,11 @@ export const ACTIONS = {
 } as const;
 
 // ===============================================
-// ROLES SEMÁNTICOS (Reemplaza números mágicos)
-// ===============================================
-
-export const ROLES = {
-  SUPER_ADMIN: 'super_admin',      // NeO - acceso total
-  MANAGER: 'manager',              // Gerente
-  COLLECTIONS: 'collections',      // Cobranza
-  BRANCH_MANAGER: 'branch_manager', // Encargado
-  SUPERVISOR: 'supervisor',        // Responsable
-  DISPATCHER: 'dispatcher',        // Despacho
-  DRIVER: 'driver',               // Conductor
-  SUPPLIER: 'supplier',           // Proveedor
-  GUEST: 'guest'                  // Invitado
-} as const;
-
-// ===============================================
-// MAPEO LEGACY (Para compatibilidad temporal)
-// ===============================================
-
-export const ROLE_MAPPING = {
-  [ROLES.SUPER_ADMIN]: 2969,
-  [ROLES.MANAGER]: 1,
-  [ROLES.COLLECTIONS]: 2,
-  [ROLES.BRANCH_MANAGER]: 8,
-  [ROLES.SUPERVISOR]: 9,
-  [ROLES.DISPATCHER]: 16,
-  [ROLES.DRIVER]: 32,
-  [ROLES.SUPPLIER]: 64,
-  [ROLES.GUEST]: 128
-} as const;
-
-// ===============================================
 // DEFINICIÓN DE PERMISOS POR ROL
 // ===============================================
 
 export const ROLE_PERMISSIONS = {
-  [ROLES.SUPER_ADMIN]: [
+  [TIPO_CARGO.encargado]: [
     // Acceso total a todo
     `${RESOURCES.PEDIDOS}:*`,
     `${RESOURCES.CLIENTES}:*`,
@@ -80,7 +50,7 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.PRECIOS}:*`
   ],
 
-  [ROLES.MANAGER]: [
+  [TIPO_CARGO.responsable]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.APPROVE}`,
     `${RESOURCES.CLIENTES}:${ACTIONS.READ}`,
@@ -91,7 +61,7 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.PRECIOS}:${ACTIONS.READ}` // Permitir que MANAGER lea precios
   ],
 
-  [ROLES.COLLECTIONS]: [
+  [TIPO_CARGO.cobranza]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.CREATE}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.UPDATE}`,
@@ -101,7 +71,7 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.PRECIOS}:${ACTIONS.READ}`,
   ],
 
-  [ROLES.BRANCH_MANAGER]: [
+  [TIPO_CARGO.gerente]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.CREATE}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.UPDATE}`,
@@ -114,15 +84,7 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.RUTAS}:${ACTIONS.ASSIGN}`
   ],
 
-  [ROLES.SUPERVISOR]: [
-    `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
-    `${RESOURCES.PEDIDOS}:${ACTIONS.CREATE}`,
-    `${RESOURCES.PEDIDOS}:${ACTIONS.UPDATE}`,
-    `${RESOURCES.CLIENTES}:${ACTIONS.READ}`,
-    `${RESOURCES.INVENTARIO}:${ACTIONS.READ}`
-  ],
-
-  [ROLES.DISPATCHER]: [
+  [TIPO_CARGO.despacho]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.ASSIGN}`,
     `${RESOURCES.RUTAS}:${ACTIONS.READ}`,
@@ -131,7 +93,7 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.INVENTARIO}:${ACTIONS.READ}`
   ],
 
-  [ROLES.DRIVER]: [
+  [TIPO_CARGO.conductor]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.PEDIDOS}:${ACTIONS.EXECUTE}`,
     `${RESOURCES.RUTAS}:${ACTIONS.READ}`,
@@ -139,12 +101,12 @@ export const ROLE_PERMISSIONS = {
     `${RESOURCES.FLOTA}:${ACTIONS.READ}`,
   ],
 
-  [ROLES.SUPPLIER]: [
+  [TIPO_CARGO.proveedor]: [
     `${RESOURCES.PEDIDOS}:${ACTIONS.READ}`,
     `${RESOURCES.INVENTARIO}:${ACTIONS.READ}`
   ],
 
-  [ROLES.GUEST]: [
+  [TIPO_CARGO.neo]: [
     // Solo lectura muy limitada
   ]
 } as const;
@@ -167,7 +129,7 @@ export interface PermissionContext {
  * Verifica si un usuario tiene un permiso específico
  */
 export function hasPermission(
-  userRoles: string[],
+  userRoles: number[],
   resource: string,
   action: string
 ): boolean {
@@ -177,8 +139,8 @@ export function hasPermission(
   }
 
   // Verificar permisos por rol
-  const hasRolePermission = userRoles.some(role => {
-    const rolePermissions = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
+  const hasRolePermission = userRoles.some(roleValue => {
+    const rolePermissions = ROLE_PERMISSIONS[roleValue as keyof typeof ROLE_PERMISSIONS] || [];
     return rolePermissions.some(permission => {
       const [permResource, permAction] = permission.split(':');
       return (permResource === resource && (permAction === action || permAction === '*'));
@@ -191,11 +153,11 @@ export function hasPermission(
 /**
  * Obtiene todos los permisos de un usuario
  */
-export function getUserPermissions(userRoles: string[]): string[] {
+export function getUserPermissions(userRoles: number[]): string[] {
   const permissions = new Set<string>();
   
-  userRoles.forEach(role => {
-    const rolePermissions = ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] || [];
+  userRoles.forEach(roleValue => {
+    const rolePermissions = ROLE_PERMISSIONS[roleValue as keyof typeof ROLE_PERMISSIONS] || [];
     rolePermissions.forEach(permission => permissions.add(permission));
   });
 
@@ -206,7 +168,7 @@ export function getUserPermissions(userRoles: string[]): string[] {
  * Verifica múltiples permisos
  */
 export function hasAnyPermission(
-  userRoles: string[],
+  userRoles: number[],
   requiredPermissions: Array<{ resource: string; action: string }>
 ): boolean {
   return requiredPermissions.some(({ resource, action }) => 
@@ -218,7 +180,7 @@ export function hasAnyPermission(
  * Verifica todos los permisos requeridos
  */
 export function hasAllPermissions(
-  userRoles: string[],
+  userRoles: number[],
   requiredPermissions: Array<{ resource: string; action: string }>
 ): boolean {
   return requiredPermissions.every(({ resource, action }) => 
@@ -244,7 +206,7 @@ export interface ComponentPermissions {
 }
 
 export function getComponentPermissions(
-  userRoles: string[],
+  userRoles: number[],
   resource: string
 ): ComponentPermissions {
   return {

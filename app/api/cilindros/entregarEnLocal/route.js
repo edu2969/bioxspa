@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { TIPO_CARGO } from "@/app/utils/constants";
+import { NextResponse } from "next/server";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 
-export async function POST(request: NextRequest) {
+export async function POST(request) {
     try {
         // Get authenticated user from Supabase
-        const { data: user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Usuario no autenticado" }, { status: 401 });
         }
+        const userId = user.id;
 
         const { ventaId, codigo } = await request.json();
 
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if item belongs to any subcategoria in the venta detalles
-        const subcategoriaIds = detallesVenta.map((detalle: any) => detalle.subcategoria_id);
+        const subcategoriaIds = detallesVenta.map((detalle) => detalle.subcategoria_id);
 
         if (!subcategoriaIds.includes(item.subcategoria_catalogo_id)) {
             return NextResponse.json({ ok: false, error: "El item no pertenece a ninguna subcategoría de la venta" }, { status: 400 });
@@ -108,7 +107,7 @@ export async function POST(request: NextRequest) {
 
         // Find the detalle that matches the item's subcategoria
         const detalleCorrespondiente = detallesVenta.find(
-            (detalle: any) => detalle.subcategoria_id === item.subcategoria_catalogo_id
+            (detalle) => detalle.subcategoria_id === item.subcategoria_catalogo_id
         );
 
         if (!detalleCorrespondiente) {
@@ -118,7 +117,7 @@ export async function POST(request: NextRequest) {
         // Check if item is already in the detalle_venta_items
         const itemCatalogoIds = detalleCorrespondiente.detalle_venta_items || [];
         
-        if (itemCatalogoIds.some((item_rel: any) => item_rel.item_catalogo_id === item.id)) {
+        if (itemCatalogoIds.some((item_rel) => item_rel.item_catalogo_id === item.id)) {
             return NextResponse.json({ ok: false, error: "El item ya está registrado en esta venta" }, { status: 400 });
         }
 

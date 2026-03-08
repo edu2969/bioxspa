@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { getSupabaseServerClient } from "@/lib/supabase";
 
 // GET all sucursales: Trae _id y nombre de las sucursales a las cuales el usuario en sessión tiene acceso.
-export const GET = migrateAuthEndpoint(async ({ user }) => {
+export async function GET() {
     try {
-        const userId = user.id;
+        const supabase = getSupabaseServerClient();
+        const userId = authResult.userData.id;
 
         // Fetch cargos for user with allowed roles
         const { data: cargos, error: cargosError } = await supabase
@@ -101,4 +101,4 @@ export const GET = migrateAuthEndpoint(async ({ user }) => {
         console.log(error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-});
+}

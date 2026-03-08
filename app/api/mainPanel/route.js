@@ -5,9 +5,10 @@ import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET() {
     try {
-        const { user } = await getAuthenticatedUser();
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user) {
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 

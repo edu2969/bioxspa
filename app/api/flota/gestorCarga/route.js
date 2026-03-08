@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CATEGORIA_CATALOGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 
 export async function GET() {
     try {
+        const supabase = await getSupabaseServerClient();
         console.log("GET /api/flota/gestorCarga called...");
         
         // Get authenticated user from Supabase
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 

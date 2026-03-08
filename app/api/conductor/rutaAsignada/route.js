@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET() {
     try {
+        const supabase = await getSupabaseServerClient();
         console.log("GET request received for ruta asignada.");
 
         // Authenticate user
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             console.warn("Unauthorized access attempt.");
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const userId = user.id;
+        const userId = authResult.userData.id;
         console.log(`Fetching user with ID: ${userId}`);
 
         // Verify user role

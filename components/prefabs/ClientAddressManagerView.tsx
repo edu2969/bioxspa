@@ -17,15 +17,19 @@ export default function ClientAddressManagerView({
     direcciones: IDireccion[]
 }) {
     const [showAddressManagerModal, setShowAddressManagerModal] = useState(false);
+    const [selectedDireccionId, setSelectedDireccionId] = useState<string>("");
+
+    const selectedDireccion = direcciones.find((d) => d.id === selectedDireccionId) ?? null;
 
     return (<div className="mt-4 space-y-4">
         <div className="flex">
-            <Selector getLabel={d => d.direccion_cliente || "Sin nombre"}
+            <Selector getLabel={d => d.direccionCliente || "Sin nombre"}
                 label={label}
                 placeholder="Retiro en local"
                 getValue={d => d.id}
                 options={direcciones}
                 register={register}
+                onChange={setSelectedDireccionId}
                 disableAutoSelect={true}
             />
             <button
@@ -39,7 +43,13 @@ export default function ClientAddressManagerView({
             </button>
         </div>
 
-        <ClientAddressManagerModal show={showAddressManagerModal} onClose={() => setShowAddressManagerModal(false)} />
+        {showAddressManagerModal && (
+            <ClientAddressManagerModal
+                show={showAddressManagerModal}
+                initialDireccion={selectedDireccion}
+                onClose={() => setShowAddressManagerModal(false)}
+            />
+        )}
 
     </div>);
 }

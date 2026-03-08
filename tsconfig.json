@@ -62,7 +62,7 @@
     "app/api/pedidos/asignacion/sucursales/route.js",
     "app/api/auth/login/route.ts",
     "app/api/auth/register/route.js"
-, "app/api/pedidos/asignacion/porAsignar/route.js", "app/api/pedidos/despacho/confirmarEntregaEnLocal/route.js", "app/api/usuarios/checklist/route.js"  ],
+, "app/api/pedidos/asignacion/porAsignar/route.js", "app/api/pedidos/despacho/confirmarEntregaEnLocal/route.js", "app/api/usuarios/checklist/route.js", "app/api/cilindros/entregarEnLocal/route.js"  ],
   "exclude": [
     "node_modules",
     ".next/**/*"

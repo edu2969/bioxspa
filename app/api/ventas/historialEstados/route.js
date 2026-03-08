@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { TIPO_ESTADO_VENTA, ROLES, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 const getEstadoVentaNombre = (estado) => {
   const estadosMap = {
@@ -51,6 +51,12 @@ const calcularDuracion = (fechaActual, fechaSiguiente) => {
 };
 
 export async function GET(request) {
+  const supabase = await getSupabaseServerClient();
+  const { data: authResult } = await getAuthenticatedUser();
+  if (!authResult || !authResult.userData) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  
   const { searchParams } = new URL(request.url);
   const ventaId = searchParams.get("ventaId");
   if (!ventaId) {
@@ -116,11 +122,17 @@ export async function GET(request) {
 
 export async function POST(req) {
   try {
+    const supabase = await getSupabaseServerClient();
+    const { data: authResult } = await getAuthenticatedUser();
+    if (!authResult || !authResult.userData) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
 
     const requiredFields = ["tipo", "usuario_id"];
-    const esAdmin = user.roles.some((role) =>
-      [ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR].includes(role)
+    const esAdmin = authResult.userData.cargos.some((cargo) =>
+      [TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.responsable].includes(cargo.tipo)
     );
 
     if (body.tipo === 1 || body.tipo === 4) {

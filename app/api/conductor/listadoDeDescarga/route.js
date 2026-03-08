@@ -5,8 +5,8 @@ import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 

@@ -16,12 +16,17 @@ export async function GET(req) {
 
 const repararDirecciones = async () => {
     try {
-        // Fetch all addresses from Supabase
-        const { data: direcciones, error: fetchError } = await supabase
-            .from("direcciones")
-            .select("*");
+        const supabase = await getSupabaseServerClient();
+        const BATCH_SIZE = 1000;
 
-        if (fetchError) throw fetchError;
+        // Get total addresses to process.
+        const { count: totalDirecciones, error: totalError } = await supabase
+            .from("direcciones")
+            .select("id", { count: "exact", head: true });
+
+        if (totalError) throw totalError;
+
+        const total = totalDirecciones || 0;
 
         // Fetch all communes for lookup
         const { data: comunas, error: comunasError } = await supabase
@@ -38,35 +43,57 @@ const repararDirecciones = async () => {
         let processed = 0;
         let skipped = 0;
 
-        // Process each address
-        for (const dir of direcciones) {
-            const [calle, comunaName] = dir.direccion_cliente.split(",");
-            const comunaNormalized = comunaName?.trim().toLowerCase();
+        for (let offset = 0; offset < total; offset += BATCH_SIZE) {
+            const end = Math.min(offset + BATCH_SIZE - 1, total - 1);
 
-            const comunaId = comunaMap.get(comunaNormalized);
+            // Select a safe chunk to avoid Supabase row limits.
+            const { data: direcciones, error: fetchError } = await supabase
+                .from("direcciones")
+                .select("id, direccion_cliente")
+                .order("id", { ascending: true })
+                .range(offset, end);
 
-            if (!comunaId) {
-                skipped++;
+            if (fetchError) throw fetchError;
+
+            if (!direcciones || direcciones.length === 0) {
                 continue;
             }
 
-            // Update address with commune_id and cleaned street
-            const { error: updateError } = await supabase
-                .from("direcciones")
-                .update({
-                    comuna_id: comunaId,
-                    direccion_cliente: calle.trim()
-                })
-                .eq("id", dir.id);
+            // Process each address in current chunk.
+            for (const dir of direcciones) {
+                if (!dir?.direccion_cliente || typeof dir.direccion_cliente !== "string") {
+                    skipped++;
+                    continue;
+                }
 
-            if (updateError) {
-                console.warn(`Error updating address ${dir.id}:`, updateError);
-            } else {
-                processed++;
+                const [calle, comunaName] = dir.direccion_cliente.split(",");
+                const comunaNormalized = comunaName?.trim().toLowerCase();
+
+                const comunaId = comunaMap.get(comunaNormalized);
+
+                if (!comunaId || !calle?.trim()) {
+                    skipped++;
+                    continue;
+                }
+
+                // Update address with commune_id and cleaned street.
+                const { error: updateError } = await supabase
+                    .from("direcciones")
+                    .update({
+                        comuna_id: comunaId,
+                        direccion_cliente: calle.trim()
+                    })
+                    .eq("id", dir.id);
+
+                if (updateError) {
+                    console.warn(`Error updating address ${dir.id}:`, updateError);
+                } else {
+                    processed++;
+                }
             }
         }
 
-        return { processed, skipped, total: direcciones.length };
+        return { processed, skipped, total };
     } catch (error) {
         console.error("[repararDirecciones] Error:", error);
         throw error;

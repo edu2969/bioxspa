@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { getSupabaseServerClient } from "@/lib/supabase";
 
-export const GET = migrateAuthEndpoint(async ({ user }) => {
+export async function GET() {
     try {
+        const supabase = await getSupabaseServerClient();
         console.log("Fetching last venta update from Supabase");
 
         // Buscar la venta más reciente por updated_at
@@ -27,4 +27,4 @@ export const GET = migrateAuthEndpoint(async ({ user }) => {
         console.error("Error fetching last venta update:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
-});
+}

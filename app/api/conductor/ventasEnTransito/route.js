@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase';
-import { getAuthenticatedUser } from '@/lib/supabase/supabase-auth';
+import { getSupabaseServerClient, getAuthenticatedUser } from '@/lib/supabase';
 
 export async function GET(request) {
     try {
+        const supabase = await getSupabaseServerClient();
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get('rutaId');
 
         if (!rutaId) return NextResponse.json({ ok: false, error: 'rutaId is required' }, { status: 400 });
 
-        const { user } = await getAuthenticatedUser();
-        if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
         // Fetch venta ids for the ruta
         const { data: rutaVentas, error: rvErr } = await supabase

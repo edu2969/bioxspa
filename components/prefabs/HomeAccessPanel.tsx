@@ -9,7 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import Loader from "../Loader";
 import { useState } from "react";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
-import { RESOURCES, ACTIONS, ROLES } from "@/lib/auth/permissions";
+import { RESOURCES, ACTIONS } from "@/lib/auth/permissions";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 // ===============================================
 // CONFIGURACIÓN DE MÓDULOS BASADA EN PERMISOS
@@ -22,7 +23,7 @@ const getModulesForUser = (
   const modules: IAccessButtonProps[] = [];
 
   // Módulo de Pedidos para Gestores/Supervisores
-  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.gerente, TIPO_CARGO.encargado])) {
     modules.push({
       key: "pedidos_management",
       href: "/pages/pedidos",
@@ -38,7 +39,7 @@ const getModulesForUser = (
   }
 
   // Módulo de Asignación para Encargados/Responsables
-  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.responsable])) {
     modules.push({
       key: "asignacion",
       href: "/pages/asignacion",
@@ -62,7 +63,7 @@ const getModulesForUser = (
   }
 
   // Módulo de Cobros para Cobranza
-  if (auth.hasRole([ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPER_ADMIN])) {
+  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.neo])) {
     modules.push({
       key: "cobros",
       href: "/pages/cobros",
@@ -93,7 +94,7 @@ const getModulesForUser = (
   }
 
   // Módulo específico para Conductores
-  if (auth.hasRole([ROLES.DRIVER])) {
+  if (auth.hasRole([TIPO_CARGO.conductor])) {
     modules.push({
       key: "rutas_conductor",
       href: "/pages/homeConductor/pedidos",
@@ -109,7 +110,7 @@ const getModulesForUser = (
   }
 
   // Módulo específico para Despachadores
-  if (auth.hasRole([ROLES.DISPATCHER])) {
+  if (auth.hasRole([TIPO_CARGO.despacho])) {
     modules.push({
       key: "despacho",
       href: "/pages/homeDespacho/pedidos",

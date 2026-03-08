@@ -6,9 +6,9 @@ import { IClienteSeachResult } from "./types";
 import { UseFormRegisterReturn } from "react-hook-form";
 import { useEffect, useState } from "react";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
-import { ROLES } from "@/app/utils/constants";
 import { useRouter } from "next/navigation";
 import { LiaPencilAltSolid } from "react-icons/lia";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export default function ClienteSearchView({
     titulo,
@@ -77,7 +77,7 @@ export default function ClienteSearchView({
                 {searchingClientes && <div className="absolute -right-2 top-1/2 transform -translate-y-1/2 z-10">
                     <Loader texto="" />
                 </div>}
-                {hasRole([ROLES.SUPERVISOR, ROLES.SUPERVISOR, ROLES.MANAGER])
+                {hasRole([TIPO_CARGO.encargado, TIPO_CARGO.responsable, TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.neo])
                     && <button
                         type="button"
                         className={`ml-2 flex items-center justify-center px-2 py-2 rounded-md text-sm font-semibold transition-all duration-200 ${

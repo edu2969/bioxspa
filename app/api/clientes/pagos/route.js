@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(request) {
     try {
-        const { user } = await getAuthenticatedUser();
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user) {
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 

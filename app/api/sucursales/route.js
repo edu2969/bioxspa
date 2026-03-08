@@ -1,9 +1,15 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
 // GET all sucursales
 export async function GET() {
     try {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         const { data: sucursales, error } = await supabase
             .from('sucursales')
             .select('*')

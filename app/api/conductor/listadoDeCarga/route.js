@@ -10,9 +10,9 @@ export async function GET(request) {
         const rutaId = searchParams.get('rutaId');
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId es requerido" }, { status: 400 });
 
-        const { user } = await getAuthenticatedUser();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user) {
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         } 
 

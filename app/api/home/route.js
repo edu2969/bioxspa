@@ -6,16 +6,33 @@ import {
     TIPO_ESTADO_RUTA_DESPACHO,
     TIPO_ORDEN
 } from "@/app/utils/constants";
+import { getSupabaseServerClient } from "@/lib/supabase";
+
 
 export async function GET() {   
     try {
-        const { data: user, userData } = await getAuthenticatedUser();
-        console.log("Usuario autenticado en /home:", user);
-        const userTipoCargo = user.role;
+        const supabase = await getSupabaseServerClient();
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
         const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+        console.log("Usuario autenticado en /home:", {
+            userId,
+            cargos: userCargoTypes,
+        });
 
         // COBRANZA
-        if (userTipoCargo === TIPO_CARGO.encargado || userTipoCargo === TIPO_CARGO.cobranza) {
+        if (hasCargo([TIPO_CARGO.encargado, TIPO_CARGO.cobranza])) {
 
             // Contar ventas por estado
             const { data: ventas, error: ventasError } = await supabase
@@ -55,25 +72,35 @@ export async function GET() {
         }
 
         // DESPACHO ó RESPONSABLE
-        if (userTipoCargo === TIPO_CARGO.despacho || userTipoCargo === TIPO_CARGO.responsable) {
-            // Find the user's cargo
-            const { data: userCargo, error: cargoError } = await supabase
-                .from('cargos')
-                .select('dependencia_id')
-                .eq('usuario_id', userId)
-                .in('tipo', [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
-                .is('hasta', null)
-                .single();
+        if (hasCargo([TIPO_CARGO.despacho, TIPO_CARGO.responsable])) {
+            // Prefer cargo data already loaded by auth helper to avoid extra query.
+            const userCargoFromAuth = (userData.cargos || []).find((cargo) =>
+                [TIPO_CARGO.despacho, TIPO_CARGO.responsable].includes(cargo.tipo)
+            );
 
-            if (cargoError || !userCargo) {
-                return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+            let dependenciaId = userCargoFromAuth?.dependencia_id || null;
+
+            if (!dependenciaId) {
+                const { data: userCargo, error: cargoError } = await supabase
+                    .from('cargos')
+                    .select('dependencia_id')
+                    .eq('usuario_id', userId)
+                    .in('tipo', [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
+                    .is('hasta', null)
+                    .single();
+
+                if (cargoError || !userCargo) {
+                    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+                }
+
+                dependenciaId = userCargo.dependencia_id;
             }
 
             // Find all chofer cargos in the same dependencia
             const { data: choferCargos, error: choferError } = await supabase
                 .from('cargos')
                 .select('usuario_id')
-                .eq('dependencia_id', userCargo.dependencia_id)
+                .eq('dependencia_id', dependenciaId)
                 .eq('tipo', TIPO_CARGO.conductor)
                 .is('hasta', null);
 
@@ -122,7 +149,7 @@ export async function GET() {
         }
 
         // CHOFER
-        if (userTipoCargo === TIPO_CARGO.conductor) {
+        if (hasCargo([TIPO_CARGO.conductor])) {
             const { data: unaRuta, error: rutaError } = await supabase
                 .from('rutas_despacho')
                 .select('id')

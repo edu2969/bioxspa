@@ -2,7 +2,6 @@ import { ICliente } from "@/types/cliente";
 import { UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { INuevaVentaSubmit } from "./types";
 import { useAuthorization } from '@/lib/auth/useAuthorization';
-import { ROLES } from '@/lib/auth/permissions';
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Selector } from "../prefabs/Selector";
@@ -11,6 +10,7 @@ import ClientAddressManagerView from "../prefabs/ClientAddressManagerView";
 import ClienteSearchView from "../prefabs/ClienteSearchView";
 import type { IClienteSeachResult } from "../prefabs/types";
 import Loader from "../Loader";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export default function DatosDelCliente({
     tipoOrden,
@@ -46,8 +46,8 @@ export default function DatosDelCliente({
 
     useEffect(() => {
         if (cliente && !loadingDocumentosTributarios && documentosTributarios && documentosTributarios.length > 0) {            
-            setValue("documento_tributario_id", String(cliente.documento_tributario_id));
-            setValue("cliente_id", cliente.id);
+            setValue("documentoTributarioId", String(cliente.documentoTributarioId));
+            setValue("clienteId", cliente.id);
         }
     }, [cliente, documentosTributarios, loadingDocumentosTributarios, setValue]);
 
@@ -57,24 +57,24 @@ export default function DatosDelCliente({
         {/* SELECCION DE CLIENTE */}
         {(tipoOrden == 1 || tipoOrden == 4) && <div className="w-full">
             <ClienteSearchView titulo="Seleccione al cliente" 
-                register={register("cliente_id", { required: true })}
+                register={register("clienteId", { required: true })}
                 setClienteSelected={setClienteSelected}
                 isLoading={loadingCliente} />
         </div>}
 
         {/*EDICIÓN DE DIRECCIÓN DE DESPACHO */}
         {(cliente && (tipoOrden == 1 || tipoOrden == 4) &&
-        <ClientAddressManagerView register={register("direccion_despacho_id")}
+        <ClientAddressManagerView register={register("direccionDespachoId")}
             label="Dirección de despacho"
-            direcciones={cliente.direcciones_despacho?.map(d => d.direccion_id) || []}/>)}
+            direcciones={cliente.direccionesDespacho?.map(d => d.direccionId) || []}/>)}
 
         {/* DOCUMENTO TRIBUTARIO */}
-        {auth.hasRole([ROLES.MANAGER, ROLES.COLLECTIONS, ROLES.SUPERVISOR])
+        {auth.hasRole([TIPO_CARGO.encargado, TIPO_CARGO.responsable, TIPO_CARGO.cobranza])
             && cliente && tipoOrden == 1 && 
             <Selector options={documentosTributarios || []}
                 label="Documento tributario"
                 getLabel={dt => dt.nombre} getValue={dt => String(dt.id)} 
-                register={register("documento_tributario_id", { required: true })} />}
+                register={register("documentoTributarioId", { required: true })} />}
 
             {loadingCliente && !cliente && <div className="h-40 flex items-center justify-center">
                 <Loader texto="Cargando cliente..." />

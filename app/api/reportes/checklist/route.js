@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { migrateAuthEndpoint } from "@/lib/auth/apiMigrationHelper";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM } from "@/app/utils/constants";
-// DB access migrated to Supabase; Vehiculo model no longer used
 
-export const POST = migrateAuthEndpoint(async ({ user }, req) => {
+export async function POST(req) {
     try {
+        const supabase = getSupabaseServerClient();
         console.log("Generating checklist report v0.92 (Supabase)");
 
         const body = await req.json();
@@ -218,4 +217,4 @@ export const POST = migrateAuthEndpoint(async ({ user }, req) => {
         console.error("Error generating checklist report:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
     }
-});
+}

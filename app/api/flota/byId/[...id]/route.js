@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 
 // Se obtiene el vehículo por ID y sus choferes asociados
 export async function GET(request, { params }) {

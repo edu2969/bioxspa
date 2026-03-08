@@ -11,8 +11,8 @@ export async function POST(request) {
         }
 
         // Get authenticated user from Supabase
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -34,7 +34,7 @@ export async function POST(request) {
                     )
                 )
             `)
-            .eq("usuario_id", user.id)
+            .eq("usuario_id", authResult.userData.id)
             .lte("desde", new Date().toISOString())
             .or("hasta.is.null,hasta.gte." + new Date().toISOString())
             .single();

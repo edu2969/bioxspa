@@ -1,30 +1,37 @@
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { NextResponse } from "next/server";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 // GET all sucursales: Fetches _id and nombre of sucursales accessible to the authenticated user.
 export async function GET() {
     try {
-        const { user } = await getAuthenticatedUser();
-        const userId = user.id;
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        console.log(`[GET /sucursales] Authenticated user:`, authResult);
         
-        const { data: cargos, error: cargosError } = await supabase
-            .from("cargos")
-            .select("sucursal_id, dependencia_id:sucursales(id)")
-            .eq("usuario_id", userId)
-            .in("tipo", [
-                TIPO_CARGO.gerente,
-                TIPO_CARGO.cobranza,
-                TIPO_CARGO.responsable
-            ]);
-
-        if (cargosError || !cargos || cargos.length === 0) {
-            console.warn(`[GET /sucursales] Cargos not found for user ID: ${userId}`);
-            return NextResponse.json({ ok: false, error: "Cargos not found" }, { status: 404 });
+        if (!authResult || !authResult.userData) {
+            console.warn(`[GET /sucursales] No authenticated user found.`);
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+        
+        const userId = authResult.userData.id;
+        const userCargos = authResult.userData.cargos || [];
+        
+        // Si ya tenemos los cargos del usuario, podemos usarlos directamente
+        console.log(`[GET /sucursales] User ID: ${userId}, Cargos:`, userCargos);
+        // Filtrar cargos que tienen los tipos permitidos y sucursal_id
+        const cargosPermitidos = userCargos.filter(cargo => 
+            [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.encargado].includes(cargo.tipo) &&
+            cargo.sucursal_id
+        );
+        
+        if (cargosPermitidos.length === 0) {
+            console.warn(`[GET /sucursales] No valid cargos found for user ID: ${userId}`);
+            return NextResponse.json({ ok: false, error: "No authorized sucursales found" }, { status: 404 });
         }
 
-        const sucursalIds = cargos.map((cargo) => cargo.sucursal_id);
+        const sucursalIds = cargosPermitidos.map((cargo) => cargo.sucursal_id);
 
         const { data: sucursales, error: sucursalesError } = await supabase
             .from("sucursales")

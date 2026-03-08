@@ -1,9 +1,15 @@
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { NextResponse } from 'next/server';
 
 // Configurar cliente de Supabase
 export async function GET(request) {
     try {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
+
         console.log("Conectando a Supabase...");
         // Obtener parámetros de consulta
         const { searchParams } = new URL(request.url);

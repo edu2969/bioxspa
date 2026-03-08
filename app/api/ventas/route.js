@@ -1,26 +1,27 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/apiAuthorization";
-import { TIPO_ESTADO_VENTA, ROLES } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
 
 export const POST = withAuthorization(
   async (req, user) => {
     try {
       const body = await req.json();
-
-      const requiredFields = ["tipo", "usuario_id"];
-      const esAdmin = user.roles.some((role) =>
-        [ROLES.COLLECTIONS, ROLES.MANAGER, ROLES.SUPERVISOR]
-            .includes(role)
+      const supabase = await getSupabaseServerClient();
+      
+      const requiredFields = ["tipo", "usuarioId"];
+      const esAdmin = user.cargos.some((cargoTipo) =>
+        [TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.responsable]
+            .includes(cargoTipo)
       );
 
       if (body.tipo === 1 || body.tipo === 4) {
-        requiredFields.push("cliente_id", "items");
+        requiredFields.push("clienteId", "items");
         if (esAdmin && body.tipo === 1) {
-          requiredFields.push("documento_tributario_id");
+          requiredFields.push("documentoTributarioId");
         }
       } else if (body.tipo === 2) {
-        requiredFields.push("motivo_traslado", "empresa_donde_retirar_id", "direccion_despacho_id");
+        requiredFields.push("motivoTraslado", "empresaDondeRetirarId", "direccionDespachoId");
       }
 
       for (const field of requiredFields) {
@@ -33,8 +34,8 @@ export const POST = withAuthorization(
 
       if (body.tipo === 1 || body.tipo === 4) {
         for (const item of body.items) {
-          if (!item.cantidad || !item.subcategoria_id) {
-            const errorMessage = "Each item must have 'cantidad' and 'subcategoria_id'";
+          if (!item.cantidad || !item.subcategoriaId) {
+            const errorMessage = "Each item must have 'cantidad' and 'subcategoriaId'";
             console.error("Validation Error:", errorMessage);
             return NextResponse.json({ error: errorMessage }, { status: 400 });
           }
@@ -44,7 +45,7 @@ export const POST = withAuthorization(
       const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
         .select("id, arriendo")
-        .eq("id", body.tipo === 1 || body.tipo === 4 ? body.cliente_id : body.empresa_donde_retirar_id)
+        .eq("id", body.tipo === 1 || body.tipo === 4 ? body.clienteId : body.empresaDondeRetirarId)
         .single();
 
       if (clienteError || !cliente) {
@@ -55,7 +56,7 @@ export const POST = withAuthorization(
       const { data: precios, error: preciosError } = await supabase
         .from("precios")
         .select("id, cliente_id, valor, subcategoria_catalogo_id")
-        .eq("cliente_id", body.cliente_id);
+        .eq("cliente_id", body.clienteId);
 
       if (preciosError) {
         console.error("Error fetching precios:", preciosError.message);
@@ -148,7 +149,7 @@ export const POST = withAuthorization(
   {
     resource: "pedidos",
     action: "create",
-    allowedRoles: [ROLES.COLLECTIONS],
+    allowedRoles: [TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.responsable],
     requireContext: true,
   }
 );

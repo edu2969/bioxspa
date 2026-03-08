@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { ROLES } from '@/app/utils/constants';
 import Loader from '@/components/Loader';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
@@ -17,6 +16,7 @@ import DatosDelCliente from './DatosDelCliente';
 import { useQuery } from '@tanstack/react-query';
 import Nav from '../Nav';
 import { useUser } from "@/components/providers/UserProvider";
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export default function Pedidos() {
     const router = useRouter();
@@ -173,7 +173,7 @@ export default function Pedidos() {
                             {tipoOrden == 3 && <DatosOrdenDeTrabajo register={register} />}
 
                             {/* IFORMACION EXTRA */}
-                            {hasRole([ROLES.COLLECTIONS])
+                            {hasRole([TIPO_CARGO.encargado])
                                 && cliente != null && cliente.orden_compra &&
                                 <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
                                     <legend className="font-bold text-gray-700 px-2">Orden de compra</legend>

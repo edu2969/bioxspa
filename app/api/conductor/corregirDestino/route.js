@@ -18,13 +18,13 @@ export async function POST(request) {
         }
 
         // Get authenticated user from Supabase
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             console.warn("[corregirDestino] Unauthorized access attempt");
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        console.log("[corregirDestino] User authenticated:", user.id);
+        console.log("[corregirDestino] User authenticated:", authResult.userData.id);
 
         // Verify the user has an active conductor cargo
         const { data: cargo, error: cargoError } = await supabase

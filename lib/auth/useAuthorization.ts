@@ -11,36 +11,26 @@ import {
   hasAnyPermission, 
   hasAllPermissions,
   getComponentPermissions,
-  ComponentPermissions,
-  ROLES
+  ComponentPermissions
 } from './permissions';
 import { useMemo } from 'react';
-import { USER_ROLE } from '@/app/utils/constants';
-
-const ROLE_BY_USER_ROLE: Record<number, string> = {
-  [USER_ROLE.neo]: ROLES.SUPER_ADMIN,
-  [USER_ROLE.gerente]: ROLES.MANAGER,
-  [USER_ROLE.cobranza]: ROLES.COLLECTIONS,
-  [USER_ROLE.despacho]: ROLES.DISPATCHER,
-  [USER_ROLE.conductor]: ROLES.DRIVER,
-  [USER_ROLE.proveedor]: ROLES.SUPPLIER
-};
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 // ===============================================
 // HOOK PRINCIPAL DE AUTORIZACIÓN
 // ===============================================
 
 export function useAuthorization() {
-  const { user } = useAuth();  
+  const { user, cargos, hasCargoType, hasCargo } = useAuth();  
 
   const userRoles = useMemo(() => {
-    if (!user || typeof user.rol !== 'number') {
-      return [] as string[];
+    if (!cargos || cargos.length === 0) {
+      return [] as number[];
     }
 
-    const mappedRole = ROLE_BY_USER_ROLE[user.rol];
-    return mappedRole ? [mappedRole] : [];
-  }, [user]);
+    // Retornar directamente los valores numéricos de los TIPO_CARGO del usuario
+    return cargos.map(cargo => cargo.tipo);
+  }, [cargos]);
 
   return {
     user,
@@ -60,15 +50,24 @@ export function useAuthorization() {
     getPermissions: (resource: string): ComponentPermissions =>
       getComponentPermissions(userRoles, resource),
 
-    // Verificaciones de rol específicas (para casos especiales)
-    isRole: (role: string) => userRoles.includes(role),
-    hasRole: (roles: string[]) => roles.some(role => userRoles.includes(role)),
+    // Verificaciones de rol específicas usando valores numéricos
+    isRole: (roleValue: number) => userRoles.includes(roleValue),
+    hasRole: (roleValues: number[]) => roleValues.some(role => userRoles.includes(role)),
+    hasCargoType: (cargoType: number) => hasCargoType(cargoType),
+    hasCargo: (cargoTypes: number[]) => hasCargo(cargoTypes),
 
-    // Helpers legacy para compatibilidad temporal
-    isManager: () => userRoles.includes(ROLES.MANAGER) || userRoles.includes(ROLES.SUPER_ADMIN),
-    isSuperAdmin: () => userRoles.includes(ROLES.SUPER_ADMIN),
-    isDriver: () => userRoles.includes(ROLES.DRIVER),
-    isDispatcher: () => userRoles.includes(ROLES.DISPATCHER)
+    // Helpers específicos para roles comunes
+    isGerente: () => userRoles.includes(TIPO_CARGO.gerente),
+    isNeo: () => userRoles.includes(TIPO_CARGO.neo),
+    isConductor: () => userRoles.includes(TIPO_CARGO.conductor),
+    isDespacho: () => userRoles.includes(TIPO_CARGO.despacho),
+    isCobranza: () => userRoles.includes(TIPO_CARGO.cobranza),
+    isEncargado: () => userRoles.includes(TIPO_CARGO.encargado),
+    isResponsable: () => userRoles.includes(TIPO_CARGO.responsable),
+    isProveedor: () => userRoles.includes(TIPO_CARGO.proveedor),
+
+    // Helper para obtener todos los cargos del usuario
+    getUserCargos: () => cargos || []
   };
 }
 

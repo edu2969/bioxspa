@@ -5,9 +5,9 @@ import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function POST(request) {
     try {
-        const { user } = await getAuthenticatedUser();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user) {
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -135,7 +135,7 @@ export async function POST(request) {
                     .insert({
                         venta_id: ventaId,
                         estado: TIPO_ESTADO_VENTA.preparacion,
-                        usuario_id: user.id
+                        usuario_id: authResult.userData.id
                     });
 
                 if (historialError) {
@@ -191,7 +191,7 @@ export async function POST(request) {
                         ruta_despacho_id: rutaDespachoId,
                         es_carga: true,
                         fecha: new Date().toISOString(),
-                        usuario_id: user.id
+                        usuario_id: authResult.userData.id
                     })
                     .select("id")
                     .single();

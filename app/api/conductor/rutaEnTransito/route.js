@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase';
-import { getAuthenticatedUser } from '@/lib/supabase/supabase-auth';
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { USER_ROLE } from '@/app/utils/constants';
 
 export async function GET(request) {
     try {
+        const supabase = await getSupabaseServerClient();
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get('rutaId');
 
@@ -12,8 +12,8 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
         }
 
-        const { user } = await getAuthenticatedUser();
-        if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
         // Fetch ruta with nested destinos and conductor info
         const { data: rutaData, error: rutaErr } = await supabase
@@ -30,12 +30,12 @@ export async function GET(request) {
         if (!rutaData) return NextResponse.json({ ok: false, error: 'Ruta not found' }, { status: 404 });
 
         // Permission: conductor or specific roles
-        const isConductor = String(rutaData.conductor_id) === String(user.id);
+        const isConductor = String(rutaData.conductor_id) === String(authResult.userData.id);
         if (!isConductor) {
             const { data: userRow, error: userErr } = await supabase
                 .from('usuarios')
                 .select('id, nombre, role')
-                .eq('id', user.id)
+                .eq('id', authResult.userData.id)
                 .maybeSingle();
             if (userErr) console.error('[rutaEnTransito] Error fetching user row:', userErr);
             const role = userRow?.role ?? 0;

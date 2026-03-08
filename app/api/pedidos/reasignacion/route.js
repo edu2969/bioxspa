@@ -1,10 +1,11 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/apiAuthorization";
-import { TIPO_ESTADO_VENTA, ROLES } from "@/app/utils/constants";
+import { TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
 
 export const POST = withAuthorization(
     async (req, user) => {
+        const supabase = getSupabaseServerClient();
         try {
             // Get ventaId from request
             const { ventaId } = await req.json();
@@ -15,7 +16,7 @@ export const POST = withAuthorization(
             }
 
             // Verify user has the required role (manager or supervisor)
-            if (!user.roles.some((role) => [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.COLLECTIONS].includes(role))) {
+            if (!user.roles.some((role) => [TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza].includes(role))) {
                 return NextResponse.json({
                     ok: false,
                     error: "Insufficient permissions - requires manager or supervisor role",
@@ -94,6 +95,6 @@ export const POST = withAuthorization(
     {
         resource: "pedidos",
         action: "update",
-        allowedRoles: [ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.COLLECTIONS],
+        allowedRoles: [TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza],
     }
 );

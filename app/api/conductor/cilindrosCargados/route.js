@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 
 export async function GET(request) {
     try {
+        const supabase = await getSupabaseServerClient();
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get("rutaId");
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
 
-        const { user } = await getAuthenticatedUser();
-        if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
         // Verify ruta exists and basic access: conductor or staff (cargos)
         const { data: ruta, error: rutaErr } = await supabase
@@ -25,9 +25,9 @@ export async function GET(request) {
         if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
 
         let allowed = false;
-        if (String(ruta.conductor_id) === String(user.id)) allowed = true;
+        if (String(ruta.conductor_id) === String(authResult.userData.id)) allowed = true;
         if (!allowed) {
-            const { data: cargos } = await supabase.from("cargos").select("id").eq("usuario_id", user.id).limit(1);
+            const { data: cargos } = await supabase.from("cargos").select("id").eq("usuario_id", authResult.userData.id).limit(1);
             if (cargos && cargos.length > 0) allowed = true;
         }
         if (!allowed) return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });

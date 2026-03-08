@@ -11,25 +11,29 @@ const GOOGLE_MAPS_LIBRARIES: (
   | 'drawing'
   | 'visualization'
   | 'maps'
-)[] = ['maps', 'places'];
+  | 'marker'
+)[] = ['maps', 'places', 'marker'];
 
 export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "",
     libraries: GOOGLE_MAPS_LIBRARIES,
     language: 'es',
     region: 'CL',
     version: 'weekly',
+    mapIds: [process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || ""]
   });
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (loadError) {
+      console.error('🧰 ERROR!: Error loading Google Maps API: ', loadError);
+    } else if (!isLoaded) {
       console.warn('Google Maps API is not loaded yet.');
     } else {
       console.log('Google Maps API loaded successfully: ', process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "");
     }
-  }, [isLoaded]);
+  }, [isLoaded, loadError]);
 
   return (
     <GoogleMapsContext.Provider value={{ isLoaded }}>

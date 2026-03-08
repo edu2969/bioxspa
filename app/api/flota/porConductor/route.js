@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { withAuthorization } from "@/lib/auth/apiAuthorization";
-import { ROLES, USER_ROLE } from "@/app/utils/constants";
+import { TIPO_CARGO, USER_ROLE } from "@/app/utils/constants";
 
 export const GET = withAuthorization(
     async (req, user) => {
+        const supabase = getSupabaseServerClient();
         try {
             // Verify user cargo is conductor
             const { data: cargo, error: cargoError } = await supabase
                 .from("cargos")
                 .select("tipo")
-                .eq("usuario_id", user.id)
+                .eq("usuario_id", authResult.userData.id)
                 .single();
 
             if (cargoError) {
@@ -30,7 +31,7 @@ export const GET = withAuthorization(
             const { data: vcRows, error: vcError } = await supabase
                 .from("vehiculo_conductores")
                 .select("vehiculo_id")
-                .eq("conductor_id", user.id);
+                .eq("conductor_id", authResult.userData.id);
 
             if (vcError) {
                 console.error("Error fetching vehiculo_conductores:", vcError);
@@ -68,6 +69,6 @@ export const GET = withAuthorization(
     {
         resource: "flota",
         action: "read",
-        allowedRoles: [ROLES.DRIVER],
+        allowedRoles: [TIPO_CARGO.conductor],
     }
 );

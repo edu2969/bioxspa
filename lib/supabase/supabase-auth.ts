@@ -149,9 +149,6 @@ export async function getAuthenticatedUser(
     }
 
     const userId = data.user.id;
-    console.log('✅ Usuario autenticado encontrado:', userId);
-
-    // Obtener datos completos del usuario desde la BD
     const { data: userData, error: userError } = await supabase
       .from('usuarios')
       .select(`
@@ -191,9 +188,6 @@ export async function getAuthenticatedUser(
       };
     }
 
-    console.log('✅ Datos completos del usuario obtenidos desde BD');
-
-    // Transformar datos de Supabase para que coincidan con UserData
     const transformedUserData: UserData = {
       id: userData.id,
       email: userData.email,

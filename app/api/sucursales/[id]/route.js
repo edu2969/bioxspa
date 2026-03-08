@@ -4,11 +4,12 @@ import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req, props) {
     try {
+        const supabase = await getSupabaseServerClient();
         console.log(req.url);
         const params = await props.params;
-        const { user } = await getAuthenticatedUser();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user) {
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 

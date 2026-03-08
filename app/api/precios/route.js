@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CARGO } from "@/app/utils/constants";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET() {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -14,7 +14,7 @@ export async function GET() {
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("tipo, sucursal_id, dependencia_id")
-            .eq("usuario_id", user.id)
+            .eq("usuario_id", authResult.userData.id)
             .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])
             .single();
 
@@ -99,8 +99,9 @@ export async function GET() {
 
 export async function POST(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -108,7 +109,7 @@ export async function POST(request) {
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("tipo, sucursal_id, dependencia_id")
-            .eq("usuario_id", user.id)
+            .eq("usuario_id", authResult.userData.id)
             .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])
             .single();
 
@@ -260,8 +261,9 @@ export async function POST(request) {
 
 export async function DELETE(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -269,7 +271,7 @@ export async function DELETE(request) {
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("tipo, sucursal_id, dependencia_id")
-            .eq("usuario_id", user.id)
+            .eq("usuario_id", authResult.userData.id)
             .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.encargado])
             .single();
 

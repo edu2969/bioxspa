@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        // Obtener sucursalId de los parámetros de la URL
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        console.log(`[GET /sucursales] Authenticated user:`, authResult);
+        
+        if (!authResult || !authResult.userData) {
+            console.warn(`[GET /sucursales] No authenticated user found.`);
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        }
         const { searchParams } = new URL(request.url);
         const sucursalId = searchParams.get("sucursalId");
 

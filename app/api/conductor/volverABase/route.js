@@ -7,14 +7,14 @@ import { TIPO_CARGO } from "@/app/utils/constants";
 export async function POST(req) {
     try {
         console.log("POST request received for volverABase from Supabase.");
-        const { user } = await getAuthenticatedUser();
+        const { data: authResult } = await getAuthenticatedUser();
 
-        if (!user || !user.id) {
+        if (!authResult || !authResult.userData) {
             console.warn("Unauthorized access attempt.");
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const conductorId = user.id;
+        const conductorId = authResult.userData.id;
         const body = await req.json();
         const { rutaId } = body;
 

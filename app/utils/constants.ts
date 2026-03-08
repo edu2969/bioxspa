@@ -1,11 +1,7 @@
 // ===============================================
-// IMPORTS DEL NUEVO SISTEMA DE PERMISOS
+// USER_ROLE DEL SISTEMA BIOX
 // ===============================================
-import { ROLES, ROLE_MAPPING } from '@/lib/auth/permissions';
 
-// ===============================================
-// ROLES LEGACY (Para compatibilidad hacia atrás)
-// ===============================================
 export const USER_ROLE = {
     neo: 2969,
     gerente: 1,
@@ -30,12 +26,7 @@ export const TIPO_CARGO = {
 }
 
 // ===============================================
-// NUEVOS ROLES SEMÁNTICOS (Recomendado usar estos)
-// ===============================================
-export { ROLES, ROLE_MAPPING } from '@/lib/auth/permissions';
-
-// ===============================================
-// CONSTANTES DE DEPENDENCIAS Y OTROS (Sin cambios)
+// CONSTANTES DE DEPENDENCIAS Y OTROS
 // ===============================================
 
 export const TIPO_DEPENDENCIA = {

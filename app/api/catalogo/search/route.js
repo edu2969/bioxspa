@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 
 // filepath: d:\git\bioxspa\app\api\catalogo\search\route.js
 
 export async function GET(req) {
     try {
-        const { user } = await getAuthenticatedUser();
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
         if (!user) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }

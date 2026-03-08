@@ -1,6 +1,6 @@
 # 📘 Ejemplos de Uso - Supabase Auth v2.0
 
-Este documento proporciona ejemplos prácticos de cómo usar las nuevas utilidades de autenticación en diferentes contextos del sistema BIOX.
+Este documento proporciona ejemplos prácticos de cómo usar las nuevas utilidades de autenticación en diferentes contextos del sistema BIOX usando los valores numéricos de `USER_ROLE` y `TIPO_CARGO`.
 
 ## 🚀 Uso Básico en API Routes
 
@@ -8,19 +8,17 @@ Este documento proporciona ejemplos prácticos de cómo usar las nuevas utilidad
 
 ```typescript
 // app/api/users/route.ts
-import { withAuth } from '@/lib/supabase/supabase-auth';
+import { withAuth } from '@/lib/auth/apiAuthorization';
 
 export async function GET() {
   return withAuth(async (authUser) => {
-    // authUser.userData contiene roles y cargos completos
+    // authUser contiene cargos y helpers de verificación
     return Response.json({
       ok: true,
       user: {
-        id: authUser.userData.id,
-        nombre: authUser.userData.nombre,
-        email: authUser.userData.email,
-        role: authUser.userData.role,
-        cargos: authUser.userData.cargos
+        id: authUser.id,
+        email: authUser.email,
+        cargos: authUser.cargos
       }
     });
   });
@@ -31,15 +29,16 @@ export async function GET() {
 
 ```typescript
 // app/api/admin/route.ts
-import { withRole } from '@/lib/supabase/supabase-auth';
+import { withCargo } from '@/lib/auth/apiAuthorization';
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export async function GET() {
-  return withRole(['admin', 'gerente'], async (authUser) => {
-    // Solo admins y gerentes pueden acceder
+  return withCargo([TIPO_CARGO.gerente], async (authUser) => {
+    // Solo gerentes pueden acceder
     return Response.json({
       ok: true,
       message: 'Acceso autorizado',
-      userRole: authUser.userData.role
+      cargos: authUser.cargos
     });
   });
 }
@@ -49,20 +48,16 @@ export async function GET() {
 
 ```typescript
 // app/api/despacho/route.ts
-import { withCargo } from '@/lib/supabase/supabase-auth';
+import { withCargo } from '@/lib/auth/apiAuthorization';
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export async function POST() {
-  return withCargo(['despacho', 'gerente'], async (authUser) => {
+  return withCargo([TIPO_CARGO.despacho, TIPO_CARGO.gerente], async (authUser) => {
     // Solo personal de despacho y gerentes pueden acceder
-    const cargos = authUser.userData.cargos || [];
-    
     return Response.json({
       ok: true,
       message: 'Operación de despacho autorizada',
-      cargosActivos: cargos.map(c => ({
-        tipo: c.tipo,
-        sucursal: c.sucursales?.nombre
-      }))
+      cargosUsuario: authUser.cargos
     });
   });
 }
@@ -74,28 +69,15 @@ export async function POST() {
 
 ```typescript
 // app/api/flexible/route.ts
-import { getAuthenticatedUser } from '@/lib/supabase/supabase-auth';
+import { withAuthorization } from '@/lib/auth/apiAuthorization';
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export async function POST() {
-  try {
-    const authResult = await getAuthenticatedUser({ requireAuth: true });
-    
-    if (!authResult.success || !authResult.data) {
-      return Response.json(
-        { ok: false, error: 'No autorizado' },
-        { status: 401 }
-      );
-    }
-
-    const authUser = authResult.data;
-
+  return withAuthorization(async (req, authUser) => {
     // Verificaciones complejas personalizadas
     const canManageInventory = 
-      authUser.hasRole('admin') || 
-      authUser.hasCargoType('gerente') ||
-      (authUser.hasCargoType('encargado') && authUser.userData.cargos?.some(
-        c => c.sucursales?.id === '123'
-      ));
+      authUser.hasCargoType(TIPO_CARGO.gerente) ||
+      authUser.hasCargoType(TIPO_CARGO.encargado);
 
     if (!canManageInventory) {
       return Response.json(
@@ -108,13 +90,7 @@ export async function POST() {
       ok: true,
       message: 'Acceso autorizado para gestión de inventario'
     });
-
-  } catch (error) {
-    return Response.json(
-      { ok: false, error: 'Error interno' },
-      { status: 500 }
-    );
-  }
+  });
 }
 ```
 
@@ -125,11 +101,12 @@ export async function POST() {
 ```typescript
 // components/AdminPanel.tsx
 import { useAuth } from '@/context/AuthContext';
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export function AdminPanel() {
-  const { hasCargoType, HasCargo } = useAuth();
+  const { hasCargoType, hasCargo } = useAuth();
 
-  if (!hasCargoType('gerente') && !hasCargo(['admin', 'encargado'])) {
+  if (!hasCargoType(TIPO_CARGO.gerente) && !hasCargo([TIPO_CARGO.encargado])) {
     return <div>No tienes permisos para ver este panel</div>;
   }
 
@@ -146,21 +123,31 @@ export function AdminPanel() {
 
 ```typescript
 // components/ServerProtectedComponent.tsx
-import { requireAuth, hasCargoType } from '@/lib/supabase/supabase-auth';
+import { authorize } from '@/lib/auth/apiAuthorization';
 import { redirect } from 'next/navigation';
+import { TIPO_CARGO } from '@/app/utils/constants';
+import { headers } from 'next/headers';
 
 export async function ServerProtectedComponent() {
-  const authUser = await requireAuth().catch(() => null);
+  // Crear un request mock para usar authorize
+  const headersList = headers();
+  const mockReq = {
+    headers: {
+      get: (name: string) => headersList.get(name)
+    }
+  } as any;
   
-  if (!authUser) {
+  const authResult = await authorize(mockReq);
+  
+  if (!authResult.authorized || !authResult.user) {
     redirect('/login');
   }
 
-  const canViewReports = await hasCargoType('gerente');
+  const canViewReports = authResult.user.hasCargoType(TIPO_CARGO.gerente);
   
   return (
     <div>
-      <h1>Bienvenido, {authUser.userData.nombre}</h1>
+      <h1>Bienvenido, {authResult.user.email}</h1>
       {canViewReports && (
         <div>
           <h2>Reportes Disponibles</h2>
@@ -177,23 +164,23 @@ export async function ServerProtectedComponent() {
 ```typescript
 // middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/supabase/supabase-auth';
+import { authorize } from '@/lib/auth/apiAuthorization';
+import { TIPO_CARGO } from '@/app/utils/constants';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rutas protegidas que requieren autenticación
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
-    const authResult = await getAuthenticatedUser();
+    const authResult = await authorize(request);
     
-    if (!authResult.success || !authResult.data) {
+    if (!authResult.authorized || !authResult.user) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
     // Verificar acceso a rutas de admin
     if (pathname.startsWith('/admin')) {
-      const isAdmin = authResult.data.hasRole('admin') || 
-                     authResult.data.hasCargoType('gerente');
+      const isAdmin = authResult.user.hasCargoType(TIPO_CARGO.gerente);
       
       if (!isAdmin) {
         return NextResponse.redirect(new URL('/unauthorized', request.url));
@@ -211,15 +198,16 @@ export const config = {
 
 ## 📋 Tipos Disponibles
 
-### AuthenticatedUserResult
+### AuthorizedUser (para API routes)
 
 ```typescript
-interface AuthenticatedUserResult {
-  user: User;                    // Usuario de Supabase Auth
-  userData: UserData;            // Datos extendidos desde BD
-  hasRole: (roleName: string) => boolean;
-  hasCargoType: (cargoType: keyof typeof TIPO_CARGO) => boolean;
-  hasCargo: (cargoTypes: (keyof typeof TIPO_CARGO)[]) => boolean;
+interface AuthorizedUser {
+  id: string;
+  email: string;
+  cargos: number[];           // Valores numéricos de TIPO_CARGO
+  hasCargoType: (cargoType: number) => boolean;
+  hasCargo: (cargoTypes: number[]) => boolean;
+  can: (resource: string, action: string) => boolean;
 }
 ```
 
@@ -230,10 +218,10 @@ interface UserData {
   id: string;
   email: string;
   nombre: string;
-  role?: string;
+  role?: number;              // Valor numérico del USER_ROLE
   cargos?: Array<{
     id?: string;
-    tipo: number;
+    tipo: number;             // Valor numérico del TIPO_CARGO
     sucursal_id?: string;
     dependencia_id?: string;
     desde?: string;
@@ -258,11 +246,12 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ## ⚡ Mejores Prácticas
 
 1. **Use `withAuth` para protección básica** de API routes
-2. **Use `withRole` o `withCargo`** para permisos específicos
+2. **Use `withRole` o `withCargo`** para permisos específicos con valores numéricos de `TIPO_CARGO`
 3. **Use `getBasicAuthenticatedUser`** cuando no necesite datos de BD
 4. **Use `getAuthenticatedUser`** cuando necesite acceso completo a roles y cargos
-5. **Siempre maneje errores** en las verificaciones de autenticación
-6. **Cachée resultados** cuando sea posible para mejorar performance
+5. **Importe siempre las constantes** `TIPO_CARGO` y `USER_ROLE` para usar valores numéricos correctos
+6. **Siempre maneje errores** en las verificaciones de autenticación
+7. **Cachée resultados** cuando sea posible para mejorar performance
 
 ## 🐛 Debugging
 

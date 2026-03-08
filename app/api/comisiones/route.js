@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { USER_ROLE } from "@/app/utils/constants";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 
 export async function GET() {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
         console.log("Fetching users...");
         
-        // Obtener usuarios excluyendo role neo (role_legacy != USER_ROLE.neo)
+        // Obtener usuarios excluyendo role neo (role_legacy != 2969)
         const { data: users, error: usersError } = await supabase
             .from("usuarios")
             .select("id, nombre, email, role_legacy, active")
-            .neq("role_legacy", USER_ROLE.neo)
+            .neq("role_legacy", 2969)
             .eq("active", true);
 
         if (usersError) {

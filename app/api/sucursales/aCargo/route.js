@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { USER_ROLE } from "@/app/utils/constants";
-import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(request) {
-    try {        
-        const { user } = await getAuthenticatedUser();
-        const userId = user.id;
+    try {
+        const supabase = await getSupabaseServerClient();
+        const { data: authResult } = await getAuthenticatedUser();
+        const userId = authResult?.userData?.id;
 
-        if (!userId) {
+        if (!authResult || !authResult.userData || !userId) {
             console.warn("[GET /aCargo] Missing userId parameter.");
-            return NextResponse.json({ ok: false, error: "userId is required" }, { status: 400 });
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
         console.log(`[GET /aCargo] Fetching sucursales for userId: ${userId}`);

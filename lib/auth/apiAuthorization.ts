@@ -5,15 +5,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { TIPO_CARGO } from '@/app/utils/constants';
+import { hasPermission } from './permissions';
 
 // ===============================================
 // TIPOS DE DATOS
 // ===============================================
 
+interface CargoData {
+  tipo: number;
+}
+
+interface UserData {
+  id: string;
+  email: string;
+  nombre: string;
+}
+
 interface AuthorizedUser {
   id: string;
   email: string;
-  roles: string[];
+  cargos: number[]; // Valores numéricos de TIPO_CARGO
+  hasCargoType: (cargoType: number) => boolean;
+  hasCargo: (cargoTypes: number[]) => boolean;
+  can: (resource: string, action: string) => boolean;
 }
 
 interface AuthorizedRequest extends NextRequest {
@@ -24,9 +39,15 @@ interface AuthorizedRequest extends NextRequest {
 // FUNCIÓN PRINCIPAL DE AUTORIZACIÓN
 // ===============================================
 
+interface AuthorizeResult {
+  authorized: boolean;
+  user?: AuthorizedUser;
+  error?: string;
+}
+
 export async function authorize(
   request: NextRequest
-): Promise<{ authorized: boolean; user?: AuthorizedUser; error?: string }> {
+): Promise<AuthorizeResult> {
   
   try {
     const supabase = await getSupabaseServerClient();
@@ -46,26 +67,44 @@ export async function authorize(
       return { authorized: false, error: 'Token inválido o expirado' };
     }
 
-    // 3. Obtener información del usuario y sus roles
+    // 3. Obtener información del usuario y sus cargos activos
     const { data: userData, error: userError } = await supabase
       .from('usuarios')
-      .select(`
-        id,
-        email,
-        nombre
-      `)
+      .select('id, email, nombre')
       .eq('id', user.id)
-      .is('cargos.hasta', null) // Solo cargos activos
       .single();
+
+    const { data: cargosData, error: cargosError } = await supabase
+      .from('cargos')
+      .select('tipo')
+      .eq('usuario_id', user.id)
+      .eq('activo', true)
+      .is('hasta', null);
 
     if (userError || !userData) {
       return { authorized: false, error: 'Usuario no encontrado en el sistema' };
     }
 
+    // Asegurar que userData es del tipo correcto
+    const typedUserData = userData as UserData;
+    const typedCargosData = (cargosData || []) as CargoData[];
+
     const authorizedUser: AuthorizedUser = {
-      id: userData.id,
-      email: userData.email,
-      roles: []
+      id: typedUserData.id,
+      email: typedUserData.email,
+      cargos: typedCargosData.map(cargo => cargo.tipo),
+      hasCargoType: (cargoType: number): boolean => {
+        return typedCargosData.some(cargo => cargo.tipo === cargoType);
+      },
+      hasCargo: (cargoTypes: number[]): boolean => {
+        return cargoTypes.some(cargoType => 
+          typedCargosData.some(cargo => cargo.tipo === cargoType)
+        );
+      },
+      can: (resource: string, action: string): boolean => {
+        const userCargos = typedCargosData.map(cargo => cargo.tipo);
+        return hasPermission(userCargos, resource, action);
+      }
     };    
 
     return { authorized: true, user: authorizedUser };
@@ -84,9 +123,9 @@ export async function authorize(
 
 export function withAuthorization(
   handler: (req: NextRequest, user: AuthorizedUser) => Promise<Response>
-) {
-  return async function authorizedHandler(req: NextRequest) {
-    const authResult = await authorize(req);
+): (req: NextRequest) => Promise<Response> {
+  return async function authorizedHandler(req: NextRequest): Promise<Response> {
+    const authResult: AuthorizeResult = await authorize(req);
     
     if (!authResult.authorized) {
       return NextResponse.json(
@@ -116,4 +155,75 @@ export function withAuthorization(
       );
     }
   };
+}
+
+// ===============================================
+// FUNCIONES HELPER PARA API ROUTES
+// ===============================================
+
+/**
+ * Middleware para proteger rutas que requieren cargo específico
+ */
+export function withCargo(
+  allowedCargos: number[],
+  handler: (req: NextRequest, user: AuthorizedUser) => Promise<Response>
+): (req: NextRequest) => Promise<Response> {
+  return withAuthorization(async (req: NextRequest, user: AuthorizedUser): Promise<Response> => {
+    const hasRequiredCargo: boolean = user.hasCargo(allowedCargos);
+    
+    if (!hasRequiredCargo) {
+      return NextResponse.json(
+        { 
+          ok: false, 
+          error: 'Cargo insuficiente para esta operación',
+          code: 'INSUFFICIENT_CARGO' 
+        }, 
+        { status: 403 }
+      );
+    }
+    
+    return handler(req, user);
+  });
+}
+
+/**
+ * Middleware para proteger rutas que requieren permisos específicos
+ */
+export function withPermission(
+  resource: string,
+  action: string,
+  handler: (req: NextRequest, user: AuthorizedUser) => Promise<Response>
+): (req: NextRequest) => Promise<Response> {
+  return withAuthorization(async (req: NextRequest, user: AuthorizedUser): Promise<Response> => {
+    const hasRequiredPermission: boolean = user.can(resource, action);
+    
+    if (!hasRequiredPermission) {
+      return NextResponse.json(
+        { 
+          ok: false, 
+          error: `Permisos insuficientes para ${action} en ${resource}`,
+          code: 'INSUFFICIENT_PERMISSION' 
+        }, 
+        { status: 403 }
+      );
+    }
+    
+    return handler(req, user);
+  });
+}
+
+/**
+ * Alias para withCargo para mantener compatibilidad con ejemplos
+ */
+export const withRole = withCargo;
+
+/**
+ * Middleware simple que solo requiere autenticación
+ */
+export function withAuth(
+  handler: (user: AuthorizedUser) => Promise<Response>
+): (req: NextRequest) => Promise<Response> {
+  return withAuthorization(async (req: NextRequest, user: AuthorizedUser): Promise<Response> => {
+    return handler(user);
+  });
 }

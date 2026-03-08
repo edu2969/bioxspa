@@ -10,6 +10,7 @@ export async function GET(req) {
         const clienteId = searchParams.get("clienteId");
 
         console.log(`[GET /api/clientes/precios] Search text: ${searchText}, Cliente ID: ${clienteId}`);
+        const supabase = await getSupabaseServerClient();
 
         if (clienteId) {
             console.log(`[GET /api/clientes/precios] Fetching cliente with ID: ${clienteId}`);

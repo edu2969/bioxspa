@@ -12,8 +12,8 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Missing rutaId/ventaId or codigo" }, { status: 400 });
         }
 
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 

@@ -1,10 +1,10 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, TIPO_CARGO, ROLES } from "@/app/utils/constants";
-import { IItemChecklist } from "@/types/checklist";
+import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req) {
+    const supabase = await getSupabaseServerClient();
     const { data: user, data: userData } = await getAuthenticatedUser();
 
     if (!userData || !user) {
