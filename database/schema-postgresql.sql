@@ -255,7 +255,6 @@ CREATE TABLE ventas (
     vendedor_id UUID REFERENCES usuarios(id) NOT NULL,
     sucursal_id UUID REFERENCES sucursales(id) NOT NULL,
     dependencia_id UUID REFERENCES dependencias(id),
-    ruta_despacho_id UUID REFERENCES rutas_despacho(id),
     fecha DATE DEFAULT CURRENT_DATE,
     estado INTEGER NOT NULL,
     por_cobrar BOOLEAN DEFAULT false,
@@ -393,8 +392,7 @@ CREATE TABLE ruta_despacho_ventas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ruta_despacho_id UUID REFERENCES rutas_despacho(id) ON DELETE CASCADE,
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    
+    created_at TIMESTAMPTZ DEFAULT NOW(),    
     UNIQUE(ruta_despacho_id, venta_id)
 );
 
@@ -418,10 +416,10 @@ CREATE TABLE ruta_despacho_historial_carga (
 );
 
 -- Items movidos en carga/descarga
-CREATE TABLE ruta_despacho_items_movidos (
+CREATE TABLE ruta_despacho_historial_carga_items_movidos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    historial_carga_id UUID REFERENCES ruta_despacho_historial_carga(id) ON DELETE CASCADE,
     item_catalogo_id UUID REFERENCES items_catalogo(id),
+    ruta_despacho_historial_carga_id UUID REFERENCES ruta_despacho_historial_carga(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

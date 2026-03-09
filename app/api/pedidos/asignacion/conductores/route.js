@@ -6,7 +6,6 @@ export async function GET(request) {
     try {
         const supabase = await getSupabaseServerClient();
         const { data: authResult } = await getAuthenticatedUser();
-        console.log(`[GET /sucursales] Authenticated user:`, authResult);
         
         if (!authResult || !authResult.userData) {
             console.warn(`[GET /sucursales] No authenticated user found.`);
@@ -88,14 +87,14 @@ export async function GET(request) {
 
                 let pedidos = [];
                 if (rutaDespacho) {
-                    // Obtener las ventas asociadas a la ruta desde la tabla intermedia `ruta_ventas`
+                    // Obtener las ventas asociadas a la ruta desde la tabla intermedia `ruta_despacho_ventas`
                     const { data: rutaVentas, error: rutaVentasError } = await supabase
-                        .from("ruta_ventas")
+                        .from("ruta_despacho_ventas")
                         .select("venta_id")
-                        .eq("ruta_id", rutaDespacho.id);                    
+                        .eq("ruta_despacho_id", rutaDespacho.id);                    
 
                     if (rutaVentasError) {
-                        console.error(`[GET /conductores] Error fetching ventas for ruta ID ${rutaDespacho.id}:`, rutaVentasError);
+                        console.error(`[GET /api/pedidos/asignacion/conductores] Error fetching ventas for ruta ID ${rutaDespacho.id}:`, rutaVentasError);
                     } else {
                         const ventaIds = rutaVentas.map((rv) => rv.venta_id);                        
 

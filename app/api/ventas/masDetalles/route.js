@@ -10,6 +10,7 @@ export async function GET(request) {
         }
 
         // Fetch venta with related data using Supabase joins
+        const supabase = await getSupabaseServerClient();
         const { data: venta, error: ventaError } = await supabase
             .from("ventas")
             .select(`

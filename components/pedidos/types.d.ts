@@ -1,13 +1,13 @@
 export interface IPrecioView {
     id: string;
     valor: number;
-    subcategoriasCatalogo: {
+    subcategoriaCatalogo: {
         id: string;
         nombre: string;
         unidad: string;
         cantidad: number;
-        sin_sifon: boolean;
-        categoriasCatalogo: {
+        sinSifon: boolean;
+        categoriaCatalogo: {
             id: string;
             gas: string;
             tipo: number;

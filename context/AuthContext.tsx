@@ -320,8 +320,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const loadUserData = async (userId: string): Promise<AuthResult<User>> => {
     try {
-      console.log('🔄 Cargando datos del usuario:', userId);
-      
       // Obtener usuario básico
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
@@ -427,8 +425,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
       }
 
-      console.log('✅ Datos del usuario cargados exitosamente');
-      
       return {
         success: true,
         data: enrichedUser,
@@ -476,7 +472,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        console.log('🚀 Inicializando autenticación con Supabase...');
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -485,11 +480,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (session?.user) {
-          console.log('✅ Sesión existente encontrada:', {
-            userId: session.user.id,
-            email: session.user.email,
-            expiresAt: session.expires_at
-          });
           await loadUserData(session.user.id);
         } else {
           console.log('ℹ️ No se encontró una sesión activa.');
@@ -512,12 +502,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Escuchar cambios de autenticación con logging mejorado
     const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Cambio en estado de autenticación:', {
-        event,
-        hasSession: !!session,
-        userId: session?.user?.id
-      });
-      
       setLoading(true);
       
       try {

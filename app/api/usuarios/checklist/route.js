@@ -5,22 +5,31 @@ import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req) {
     const supabase = await getSupabaseServerClient();
-    const { data: user, data: userData } = await getAuthenticatedUser();
+    const authResult = await getAuthenticatedUser();
+    const authData = authResult.data;
 
-    if (!userData || !user) {
+    if (!authData) {
         return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
     }
 
-    const userTipoCargo = userData.role;
-    const userId = user.id;
+    const userId = authData.userData.id;
     const ahora = new Date();
     const tiposChecklist = [];
+    const cargosUsuario = (authData.userData.cargos || []).map(c => c.tipo);
+    const userTipoCargo = cargosUsuario[0];
 
-    if ([TIPO_CARGO.conductor, TIPO_CARGO.encargado, TIPO_CARGO.responsable, TIPO_CARGO.despacho].includes(userTipoCargo)) {
+    const hasCargoConductor = authData.hasCargo(["conductor"]);
+    const hasCargoChecklistPersonal = authData.hasCargo(["conductor", "encargado", "responsable", "despacho"]);
+
+    console.log("User Data: ", authData);
+    console.log("User Tipo Cargo: ", userTipoCargo);
+    console.log("User Cargos: ", cargosUsuario);
+
+    if (hasCargoChecklistPersonal) {
         tiposChecklist.push(TIPO_CHECKLIST.personal);
     }
 
-    if (userTipoCargo === TIPO_CARGO.conductor) {
+    if (hasCargoConductor) {
         tiposChecklist.push(TIPO_CHECKLIST.vehiculo);
     }
 
@@ -53,18 +62,15 @@ export async function POST(req) {
     try {
         console.log("Processing checklist submission");
 
-        const { searchParams } = new URL(req.url);
         const supabase = await getSupabaseServerClient();
-        const { data: user, data: userData } = await getAuthenticatedUser();
+        const authResult = await getAuthenticatedUser();
+        const authData = authResult.data;
 
-        if (!user) {
+        if (!authData) {
             return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
         }
 
         const body = await req.json();
-        console.log("Request body:", body);
-
-        // Adaptar para aceptar formato con result y answers
         const tipo = body.tipo;
         const vehiculoId = body.vehiculoId;
         const kilometraje = body.kilometraje;
@@ -89,7 +95,7 @@ export async function POST(req) {
 
         // Crear un nuevo checklist en Supabase
         const checklistPayload = {
-            usuario_id: user.id,
+            usuario_id: authData.userData.id,
             tipo: tipo === 'personal' ? TIPO_CHECKLIST.personal : TIPO_CHECKLIST.vehiculo,
             vehiculo_id: tipo === 'vehiculo' ? vehiculoId : null,
             kilometraje: tipo === 'vehiculo' ? kilometraje : null,
@@ -97,9 +103,7 @@ export async function POST(req) {
             fecha: new Date().toISOString(),
         };
 
-        console.log("Checklist payload:", checklistPayload);
-
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('checklists')
             .insert(checklistPayload)
             .select()

@@ -50,7 +50,7 @@ export default function Asignacion() {
 
     const sucursalId = useWatch({
         control,
-        name: 'sucursal_id'
+        name: 'sucursalId'
     });
 
 
@@ -64,10 +64,10 @@ export default function Asignacion() {
             const data = await response.json();
             const localSucursalId = localStorage.getItem("sucursal_id");
             if (!localSucursalId) {
-                setValue("sucursal_id", data.sucursales[0]?.id);
+                setValue("sucursalId", data.sucursales[0]?.id);
                 localStorage.setItem("sucursal_id", String(data.sucursales[0]?.id));
             } else {
-                setValue("sucursal_id", localSucursalId);
+                setValue("sucursalId", localSucursalId);
             }
             console.log("Fetched sucursales:", data.sucursales);
             return data.sucursales;
@@ -264,8 +264,8 @@ export default function Asignacion() {
                                     `}
                                     onClick={() => {
                                         if (isActive) return;
-                                        setValue("sucursal_id", sucursal.id);
-                                        localStorage.setItem("sucursal_id", String(sucursal.id));
+                                        setValue("sucursalId", sucursal.id);
+                                        localStorage.setItem("sucursalId", String(sucursal.id));
                                     }}
                                     type="button"
                                 >

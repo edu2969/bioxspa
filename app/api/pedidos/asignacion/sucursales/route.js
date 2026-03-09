@@ -8,8 +8,6 @@ export async function GET() {
     try {
         const supabase = await getSupabaseServerClient();
         const { data: authResult } = await getAuthenticatedUser();
-        console.log(`[GET /sucursales] Authenticated user:`, authResult);
-        
         if (!authResult || !authResult.userData) {
             console.warn(`[GET /sucursales] No authenticated user found.`);
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -18,9 +16,6 @@ export async function GET() {
         const userId = authResult.userData.id;
         const userCargos = authResult.userData.cargos || [];
         
-        // Si ya tenemos los cargos del usuario, podemos usarlos directamente
-        console.log(`[GET /sucursales] User ID: ${userId}, Cargos:`, userCargos);
-        // Filtrar cargos que tienen los tipos permitidos y sucursal_id
         const cargosPermitidos = userCargos.filter(cargo => 
             [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.encargado].includes(cargo.tipo) &&
             cargo.sucursal_id

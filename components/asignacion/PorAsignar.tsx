@@ -34,7 +34,7 @@ export default function PorAsignar({
 
     const sucursalId = useWatch({
         control,
-        name: 'sucursal_id'
+        name: 'sucursalId'
     })
 
     const { data: pedidos, isLoading } = useQuery<IPedidoPorAsignar[]>({

@@ -47,11 +47,7 @@ export async function GET(req) {
                 giro: cliente.giro,
                 rut: cliente.rut,
                 direccion: {
-                    id: cliente.direccion_id,
-                    direccionCliente: cliente.direccion_id ? cliente.direccion_id.direccion_cliente : null,
-                    latitud: cliente.direccion_id ? cliente.direccion_id.latitud : null,
-                    longitud: cliente.direccion_id ? cliente.direccion_id.longitud : null,
-                    comentario: cliente.direccion_id ? cliente.direccion_id.comentario : null
+                    id: cliente.direccion_id
                 },
                 telefono: cliente.telefono,
                 email: cliente.email,
@@ -63,10 +59,10 @@ export async function GET(req) {
                 activo: cliente.activo,
                 enQuiebra: cliente.en_quiebra,
                 direccionesDespacho: cliente.direcciones_despacho.map(d => ({
-                    id: d.direccion_id,
-                    direccionCliente: d.direccion_cliente,
-                    latitud: d.latitud,
-                    longitud: d.longitud
+                    id: d.direccion_id.id,
+                    direccionCliente: d.direccion_id.direccion_cliente,
+                    latitud: d.direccion_id.latitud,
+                    longitud: d.direccion_id.longitud
                 })),
                 documentoTributarioId: cliente.documento_tributario_id,
                 credito: cliente.credito,

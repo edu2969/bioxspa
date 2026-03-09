@@ -28,12 +28,8 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (loadError) {
       console.error('🧰 ERROR!: Error loading Google Maps API: ', loadError);
-    } else if (!isLoaded) {
-      console.warn('Google Maps API is not loaded yet.');
-    } else {
-      console.log('Google Maps API loaded successfully: ', process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "");
     }
-  }, [isLoaded, loadError]);
+  }, [loadError]);
 
   return (
     <GoogleMapsContext.Provider value={{ isLoaded }}>

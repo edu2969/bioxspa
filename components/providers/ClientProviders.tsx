@@ -2,6 +2,7 @@
 
 import { AuthProvider } from '@/context/AuthContext';
 import ReactQueryProvider from '@/components/providers/QueryClientProvider';
+import { UserProvider } from '@/components/providers/UserProvider';
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -10,9 +11,11 @@ interface ClientProvidersProps {
 export default function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <AuthProvider>
-      <ReactQueryProvider>
-        {children}        
-      </ReactQueryProvider>
+      <UserProvider>
+        <ReactQueryProvider>
+          {children}
+        </ReactQueryProvider>
+      </UserProvider>
     </AuthProvider>
   );
 }

@@ -19,8 +19,6 @@ interface ServerClientOptions {
  */
 export async function createSupabaseServerClient(options: ServerClientOptions = {}): Promise<ReturnType<typeof createServerClient>> {
   try {
-    console.log("Creando cliente Supabase para servidor... ##############################");
-    // Obtener configuración de manera segura
     const config = getSupabaseConfig('server');
     
     // Obtener cookies del servidor

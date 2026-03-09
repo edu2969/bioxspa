@@ -1,74 +1,63 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
-import { withAuthorization } from "@/lib/auth/apiAuthorization";
-import { TIPO_CARGO, USER_ROLE } from "@/app/utils/constants";
+import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
-export const GET = withAuthorization(
-    async (req, user) => {
-        const supabase = getSupabaseServerClient();
-        try {
-            // Verify user cargo is conductor
-            const { data: cargo, error: cargoError } = await supabase
-                .from("cargos")
-                .select("tipo")
-                .eq("usuario_id", authResult.userData.id)
-                .single();
+export async function GET() {
+    try {
+        const supabase = await getSupabaseServerClient();
+        const authResult = await getAuthenticatedUser();
+        const authData = authResult.data;
 
-            if (cargoError) {
-                console.error("Error fetching cargo:", cargoError);
-                return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-            }
-
-            if (!cargo) {
-                return NextResponse.json({ error: "User has no assigned cargo" }, { status: 400 });
-            }
-
-            if (cargo.tipo !== USER_ROLE.conductor) {
-                return NextResponse.json({ error: "User is not a conductor" }, { status: 403 });
-            }
-
-            // Fetch vehicle IDs assigned via vehiculo_conductores relationship
-            const { data: vcRows, error: vcError } = await supabase
-                .from("vehiculo_conductores")
-                .select("vehiculo_id")
-                .eq("conductor_id", authResult.userData.id);
-
-            if (vcError) {
-                console.error("Error fetching vehiculo_conductores:", vcError);
-                return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-            }
-
-            const vehiculoIds = (vcRows || []).map((r) => r.vehiculo_id).filter(Boolean);
-
-            if (vehiculoIds.length === 0) {
-                return NextResponse.json({ vehiculos: [] });
-            }
-
-            const { data: vehiculos, error: vehError } = await supabase
-                .from("vehiculos")
-                .select("id, marca, modelo, patente")
-                .in("id", vehiculoIds);
-
-            if (vehError) {
-                console.error("Error fetching vehiculos:", vehError);
-                return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-            }
-
-            const result = (vehiculos || []).map((v) => ({
-                _id: v.id,
-                marca: v.marca,
-                modelo: v.modelo,
-                patente: v.patente,
-            }));
-
-            return NextResponse.json({ vehiculos: result });
-        } catch (error) {
-            return NextResponse.json({ error: error.message }, { status: 500 });
+        if (!authData || !authData.userData) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
-    },
-    {
-        resource: "flota",
-        action: "read",
-        allowedRoles: [TIPO_CARGO.conductor],
+
+        const userId = authData.userData.id;
+        const userCargos = (authData.userData.cargos || []).map((cargo) => cargo.tipo);
+
+        // Preferir helpers de auth basados en cargos activos.
+        const isConductor = authData.hasCargo(["conductor"]) || userCargos.includes(TIPO_CARGO.conductor);
+        if (!isConductor) {
+            return NextResponse.json({ ok: false, error: "User is not a conductor" }, { status: 403 });
+        }
+
+        // Obtener vehículos asignados por relación many-to-many.
+        const { data: vcRows, error: vcError } = await supabase
+            .from("vehiculo_conductores")
+            .select("vehiculo_id")
+            .eq("conductor_id", userId);
+
+        if (vcError) {
+            console.error("Error fetching vehiculo_conductores:", vcError);
+            return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+        }
+
+        const vehiculoIds = (vcRows || []).map((r) => r.vehiculo_id).filter(Boolean);
+        if (vehiculoIds.length === 0) {
+            return NextResponse.json({ ok: true, vehiculos: [] });
+        }
+
+        const { data: vehiculos, error: vehError } = await supabase
+            .from("vehiculos")
+            .select("id, marca, modelo, patente")
+            .in("id", vehiculoIds);
+
+        if (vehError) {
+            console.error("Error fetching vehiculos:", vehError);
+            return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+        }
+
+        const result = (vehiculos || []).map((v) => ({
+            _id: v.id,
+            marca: v.marca,
+            modelo: v.modelo,
+            patente: v.patente,
+        }));
+
+        return NextResponse.json({ ok: true, vehiculos: result });
+    } catch (error) {
+        console.error("Error in GET /api/flota/porConductor:", error);
+        return NextResponse.json({ ok: false, error: error?.message || "Internal server error" }, { status: 500 });
     }
-);
+}

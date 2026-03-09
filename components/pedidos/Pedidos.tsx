@@ -37,17 +37,17 @@ export default function Pedidos() {
 
     const clienteId = useWatch({
         control,
-        name: 'cliente_id'
+        name: 'clienteId'
     });
 
     const direccionRetiroSeleccionado = useWatch({
         control,
-        name: 'direccion_despacho_id'
+        name: 'direccionRetiroId'
     });
 
     const motivoTrasladoSeleccionado = useWatch({
         control,
-        name: 'motivo_traslado'
+        name: 'motivoTraslado'
     });
     
     const { data: cliente } = useQuery<ICliente | null>({
@@ -91,15 +91,15 @@ export default function Pedidos() {
         setCreandoOrden(true);
         const payload = {
             tipo: data.tipo,
-            usuario_id: data.usuario_id,
+            usuarioId: data.usuarioId,
             comentario: data.comentario || "",
-            cliente_id: cliente?.id,
-            documento_tributario_id: data.documento_tributario_id,
-            direccion_despacho_id: data.direccion_despacho_id,
-            sucursal_id: data.sucursal_id,
+            clienteId: cliente?.id,
+            documentoTributarioId: data.documentoTributarioId,
+            direccionDespachoId: data.direccionDespachoId,
+            sucursalId: data.sucursalId,
             items: data.precios?.filter(precio => precio.seleccionado && precio.cantidad > 0).map(precio => ({
                 cantidad: precio.cantidad,
-                subcategoria_id: precio.subcategoria_id
+                subcategoriaId: precio.subcategoriaId
             }))
         };
 
@@ -148,7 +148,7 @@ export default function Pedidos() {
 
     useEffect(() => {
         if(selectedPlace && tipoOrden == 2) {
-            setValue("direccion_retiro_id", selectedPlace.place_id || '');
+            setValue("direccionRetiroId", selectedPlace.place_id || '');
         }
     }, [selectedPlace, tipoOrden, setValue]);
 
@@ -174,7 +174,7 @@ export default function Pedidos() {
 
                             {/* IFORMACION EXTRA */}
                             {hasRole([TIPO_CARGO.encargado])
-                                && cliente != null && cliente.orden_compra &&
+                                && cliente != null && cliente.ordenCompra &&
                                 <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
                                     <legend className="font-bold text-gray-700 px-2">Orden de compra</legend>
                                     <div className="w-full flex-col mt-3 space-y-4">
@@ -182,7 +182,7 @@ export default function Pedidos() {
                                             <label htmlFor="numeroOrden" className="block text-sm font-medium text-gray-700">N° de órden</label>
                                             <input
                                                 id="numeroOrden"
-                                                {...register('numero_orden')}
+                                                {...register('numeroOrden')}
                                                 type="text"
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                 placeholder="Ingrese el número de órden"
@@ -192,7 +192,7 @@ export default function Pedidos() {
                                             <label htmlFor="codigoHES" className="block text-sm font-medium text-gray-700">Código HES</label>
                                             <input
                                                 id="codigoHES"
-                                                {...register('codigo_hes')}
+                                                {...register('codigoHes')}
                                                 type="text"
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                                 placeholder="Ingrese el código HES"

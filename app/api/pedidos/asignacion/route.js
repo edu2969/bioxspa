@@ -95,7 +95,7 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "ventaId and choferId are required" }, { status: 400 });
         }
 
-        // Fetch the chofer's cargo to get dependencia_id
+        const supabase = await getSupabaseServerClient();
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("dependencia_id")
@@ -172,9 +172,9 @@ export async function POST(request) {
 
         // Associate the venta with the new ruta
         const { error: rutaVentaError } = await supabase
-            .from("ruta_ventas")
+            .from("ruta_despacho_ventas")
             .insert({
-                ruta_id: rutaId,
+                ruta_despacho_id: rutaId,
                 venta_id: ventaId,
                 created_at: new Date()
             });
@@ -186,9 +186,9 @@ export async function POST(request) {
 
         // Log the initial state of the ruta
         const { error: historialError } = await supabase
-            .from("ruta_historial_estados")
+            .from("ruta_despacho_historial_estados")
             .insert({
-                ruta_id: rutaId,
+                ruta_despacho_id: rutaId,
                 estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
                 usuario_id: choferId
             });

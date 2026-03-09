@@ -56,7 +56,26 @@ export async function GET(req) {
             }
 
             console.log(`[GET /api/clientes/precios] Successfully fetched precios for cliente ID: ${clienteId}`);
-            return NextResponse.json({ precios });
+            return NextResponse.json({ precios: precios.map(p => ({
+                id: p.id,
+                valor: p.valor,
+                subcategoriaCatalogo: {
+                    id: p.subcategorias_catalogo.id,
+                    nombre: p.subcategorias_catalogo.nombre,
+                    cantidad: p.subcategorias_catalogo.cantidad,
+                    unidad: p.subcategorias_catalogo.unidad,
+                    sinSifon: p.subcategorias_catalogo.sin_sifon,
+                    categoriaCatalogo: {
+                        id: p.subcategorias_catalogo.categorias_catalogo.id,
+                        tipo: p.subcategorias_catalogo.categorias_catalogo.tipo,
+                        gas: p.subcategorias_catalogo.categorias_catalogo.gas,
+                        nombre: p.subcategorias_catalogo.categorias_catalogo.nombre,
+                        elemento: p.subcategorias_catalogo.categorias_catalogo.elemento,
+                        esIndustrial: p.subcategorias_catalogo.categorias_catalogo.es_industrial,
+                        esMedicinal: p.subcategorias_catalogo.categorias_catalogo.es_medicinal,
+                    }
+                }
+            })) });
         } else {
             if (!searchText) {
                 console.warn("[GET /api/clientes/precios] Missing search parameter");
@@ -136,7 +155,26 @@ export async function GET(req) {
                 clienteId: cliente.id,
                 nombre: cliente.nombre,
                 rut: cliente.rut,
-                precios: preciosPorCliente[cliente.id] || []
+                precios: preciosPorCliente[cliente.id].map((p) => ({
+                    id: p.id,
+                    valor: p.valor,
+                    subcategoriaCatalogo: {
+                        id: p.subcategorias_catalogo.id,
+                        nombre: p.subcategorias_catalogo.nombre,
+                        cantidad: p.subcategorias_catalogo.cantidad,
+                        unidad: p.subcategorias_catalogo.unidad,
+                        sinSifon: p.subcategorias_catalogo.sin_sifon,
+                        categoriaCatalogo: {
+                            id: p.subcategorias_catalogo.categorias_catalogo.id,
+                            tipo: p.subcategorias_catalogo.categorias_catalogo.tipo,
+                            gas: p.subcategorias_catalogo.categorias_catalogo.gas,
+                            nombre: p.subcategorias_catalogo.categorias_catalogo.nombre,
+                            elemento: p.subcategorias_catalogo.categorias_catalogo.elemento,
+                            esIndustrial: p.subcategorias_catalogo.categorias_catalogo.es_industrial,
+                            esMedicinal: p.subcategorias_catalogo.categorias_catalogo.es_medicinal,
+                        }
+                    }
+                })) || []
             }));
 
             console.log(`[GET /api/clientes/precios] Successfully built response with ${resultados.length} clientes`);

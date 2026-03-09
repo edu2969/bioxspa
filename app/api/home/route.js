@@ -26,10 +26,7 @@ export async function GET() {
         const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
         const hasCargo = (allowedCargoTypes) =>
             userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
-        console.log("Usuario autenticado en /home:", {
-            userId,
-            cargos: userCargoTypes,
-        });
+        
 
         // COBRANZA
         if (hasCargo([TIPO_CARGO.encargado, TIPO_CARGO.cobranza])) {

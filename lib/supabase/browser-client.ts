@@ -38,13 +38,6 @@ export function createSupabaseBrowserClient(options: BrowserClientOptions = {}):
     return clientCache;
   }
 
-  // VERIFICACIÓN DE COOKIES DEL NAVEGADOR
-  console.log('🍪 Cookies del navegador:', {
-    documentCookies: document.cookie,
-    supabaseCookies: document.cookie.split(';').filter(c => c.includes('supabase')),
-    authCookies: document.cookie.split(';').filter(c => c.includes('auth'))
-  });
-
   try {
     // Obtener configuración de manera segura
     const config = getSupabaseConfig('client');

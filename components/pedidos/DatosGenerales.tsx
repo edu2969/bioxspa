@@ -46,13 +46,13 @@ export default function DatosGenerales({
             const defaultId = stored && sucursales.some(s => s._id === stored)
                 ? stored
                 : sucursales[0]._id;
-            setValue("sucursal_id", defaultId);
+            setValue("sucursalId", defaultId);
         }
     }, [loadingSucursales, sucursales, setValue]);
 
     useEffect(() => {
         if(!user?.id) return;
-        setValue("usuario_id", user.id);
+        setValue("usuarioId", user.id);
     }, [user, setValue]);
 
     return (<fieldset className="border rounded-md px-4 pb-4 space-y-4">
@@ -63,17 +63,17 @@ export default function DatosGenerales({
                 label="Seleccione usuario*"
                 getLabel={u => u.name}
                 getValue={u => u._id || ''}
-                register={register("usuario_id", { required: true })}
+                register={register("usuarioId", { required: true })}
                 isLoading={loadingUsuarios} />}
 
         <Selector options={sucursales || []}
             label="Sucursal"
             getLabel={s => s.nombre}
             getValue={s => s._id}
-            register={register("sucursal_id", { required: true })}
+            register={register("sucursalId", { required: true })}
             onChange={val => {
-                setValue("sucursal_id", val);
-                localStorage.setItem("sucursal_id", val);
+                setValue("sucursalId", val);
+                localStorage.setItem("sucursalId", val);
             }}
             isLoading={loadingSucursales} />
 

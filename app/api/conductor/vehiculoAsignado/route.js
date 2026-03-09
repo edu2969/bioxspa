@@ -6,8 +6,6 @@ export async function GET(request) {
     try {
         const supabase = await getSupabaseServerClient();
         const { data: authResult } = await getAuthenticatedUser();
-        console.log(`[GET /sucursales] Authenticated user:`, authResult);
-        
         if (!authResult || !authResult.userData) {
             console.warn(`[GET /sucursales] No authenticated user found.`);
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });

@@ -1,7 +1,6 @@
 import './globals.css';
 import { roboto, orbitron, red_hat_display } from '@/app/fonts';
 import ClientProviders from '@/components/providers/ClientProviders';
-import { UserProvider } from '@/components/providers/UserProvider';
 import { Suspense } from 'react';
 
 export const metadata = {
@@ -23,11 +22,9 @@ export default function RootLayout({
       <body className={`${roboto} ${orbitron} ${red_hat_display} red_hat_display`}
         style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }}>
         <Suspense>
-          <UserProvider>
-            <ClientProviders>
-              {children}
-            </ClientProviders>
-          </UserProvider>
+          <ClientProviders>
+            {children}
+          </ClientProviders>
         </Suspense>
       </body>
     </html>

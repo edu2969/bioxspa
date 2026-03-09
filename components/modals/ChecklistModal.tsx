@@ -132,8 +132,6 @@ export default function ChecklistModal({ tipo, onFinish }: {
                 console.error("No hay sesión activa");
                 return [];
             }
-
-            const token = userContext.session.access_token;           
             const r = await fetch("/api/flota/porConductor", {
                 method: "GET",
                 headers: { 

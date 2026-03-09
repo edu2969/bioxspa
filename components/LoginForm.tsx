@@ -33,6 +33,7 @@ export default function LoginForm() {
       console.log('Intentando login con:', data.email);
       const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: data.password });
       if(error) {
+        console.log("ERROR", error);
         setStatus(error.message);
       } else {
         console.log('Login exitoso, redirigiendo...');

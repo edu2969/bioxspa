@@ -16,7 +16,7 @@ const VehiculoView = forwardRef<HTMLDivElement, {
     const { data: vehiculo, isLoading: loadingVehiculo } = useQuery<IVehiculoView>({
         queryKey: ['vehiculo-conductor', rutaId],
         queryFn: async () => {
-            if (rutaId === undefined) return null;
+            if (rutaId === undefined) return {};
             const response = await fetch(`/api/conductor/vehiculoAsignado?rutaId=${rutaId ?? ''}`);
             const data = await response.json();
             console.log("**************** Vehículo asignado:", data, cargados, descargados);

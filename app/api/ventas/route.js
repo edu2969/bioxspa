@@ -8,6 +8,35 @@ export const POST = withAuthorization(
     try {
       const body = await req.json();
       const supabase = await getSupabaseServerClient();
+
+      console.log("Received venta payload:", body);
+
+      // Compatibilidad camelCase/snake_case durante migración.
+      const payload = {
+        tipo: body.tipo,
+        usuarioId: body.usuarioId,
+        clienteId: body.clienteId,
+        documentoTributarioId: body.documentoTributarioId,
+        direccionDespachoId: body.direccionDespachoId,
+        sucursalId: body.sucursalId,
+        empresaDondeRetirarId: body.empresaDondeRetirarId,
+        motivoTraslado: body.motivoTraslado,
+        comentario: body.comentario,
+        items: (body.items || []).map((item) => ({
+          cantidad: item.cantidad,
+          subcategoriaId: item.subcategoriaId
+        }))
+      };
+
+      // Obtener contexto de cargo activo para dependencia/sucursal.
+      const { data: cargoActivo } = await supabase
+        .from("cargos")
+        .select("dependencia_id, sucursal_id")
+        .eq("usuario_id", user.id)
+        .eq("activo", true)
+        .is("hasta", null)
+        .limit(1)
+        .maybeSingle();
       
       const requiredFields = ["tipo", "usuarioId"];
       const esAdmin = user.cargos.some((cargoTipo) =>
@@ -25,15 +54,15 @@ export const POST = withAuthorization(
       }
 
       for (const field of requiredFields) {
-        if (!body[field] || (Array.isArray(body[field]) && body[field].length === 0)) {
+        if (!payload[field] || (Array.isArray(payload[field]) && payload[field].length === 0)) {
           const errorMessage = `Field '${field}' is required and cannot be empty`;
           console.error("Validation Error:", errorMessage);
           return NextResponse.json({ error: errorMessage }, { status: 400 });
         }
       }
 
-      if (body.tipo === 1 || body.tipo === 4) {
-        for (const item of body.items) {
+      if (payload.tipo === 1 || payload.tipo === 4) {
+        for (const item of payload.items) {
           if (!item.cantidad || !item.subcategoriaId) {
             const errorMessage = "Each item must have 'cantidad' and 'subcategoriaId'";
             console.error("Validation Error:", errorMessage);
@@ -45,7 +74,7 @@ export const POST = withAuthorization(
       const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
         .select("id, arriendo")
-        .eq("id", body.tipo === 1 || body.tipo === 4 ? body.clienteId : body.empresaDondeRetirarId)
+        .eq("id", payload.tipo === 1 || payload.tipo === 4 ? payload.clienteId : payload.empresaDondeRetirarId)
         .single();
 
       if (clienteError || !cliente) {
@@ -56,7 +85,7 @@ export const POST = withAuthorization(
       const { data: precios, error: preciosError } = await supabase
         .from("precios")
         .select("id, cliente_id, valor, subcategoria_catalogo_id")
-        .eq("cliente_id", body.clienteId);
+        .eq("cliente_id", payload.clienteId);
 
       if (preciosError) {
         console.error("Error fetching precios:", preciosError.message);
@@ -65,13 +94,16 @@ export const POST = withAuthorization(
 
       // Verificar que los precios estén cargados correctamente
       const preciosMap = precios.reduce((map, precio) => {
-        map[precio.subcategoria_catalogo_id] = precio.valor;
+        const subcategoriaKey = precio.subcategoria_id || precio.subcategoria_catalogo_id;
+        if (subcategoriaKey) {
+          map[subcategoriaKey] = precio.valor;
+        }
         return map;
       }, {});
 
       // Calcular valores netos, IVA y totales
-      const valorNeto = body.items.reduce((total, item) => {
-        const precio = preciosMap[item.subcategoria_id] || 0;
+      const valorNeto = payload.items.reduce((total, item) => {
+        const precio = preciosMap[item.subcategoriaId] || 0;
         return total + item.cantidad * precio;
       }, 0);
 
@@ -79,27 +111,27 @@ export const POST = withAuthorization(
       const valorTotal = valorNeto + valorIVA;
 
       const estadoInicial =
-        body.tipo === 1 && esAdmin
+        payload.tipo === 1 && esAdmin
           ? TIPO_ESTADO_VENTA.por_asignar
           : TIPO_ESTADO_VENTA.borrador;          
 
       const { data: nuevaVenta, error: ventaError } = await supabase
         .from("ventas")
         .insert({
-          tipo: body.tipo,
-          cliente_id: body.cliente_id,
-          vendedor_id: body.usuario_id,
-          sucursal_id: body.sucursal_id,
-          dependencia_id: user.context.dependenciaId || null,
+          tipo: payload.tipo,
+          cliente_id: payload.clienteId,
+          vendedor_id: payload.usuarioId,
+          sucursal_id: payload.sucursalId || cargoActivo?.sucursal_id || null,
+          dependencia_id: cargoActivo?.dependencia_id || null,
           fecha: new Date().toISOString(),
           estado: estadoInicial,
           valor_neto: valorNeto,
           valor_iva: valorIVA,
           valor_total: valorTotal,
           saldo: valorTotal,
-          documento_tributario_id: body.documento_tributario_id,
-          direccion_despacho_id: body.direccion_despacho_id || null,
-          comentario: body.comentario || "",
+          documento_tributario_id: payload.documentoTributarioId,
+          direccion_despacho_id: payload.direccionDespachoId || null,
+          comentario: payload.comentario || "",
         })
         .select();
 
@@ -109,13 +141,13 @@ export const POST = withAuthorization(
       }      
 
       // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
-      const detalles = body.items.map((item) => ({
+      const detalles = payload.items.map((item) => ({
         venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
-        subcategoria_id: item.subcategoria_id,
+        subcategoria_id: item.subcategoriaId,
         cantidad: item.cantidad,
-        neto: preciosMap[item.subcategoria_id] * item.cantidad,
-        iva: preciosMap[item.subcategoria_id] * item.cantidad * 0.19,
-        total: preciosMap[item.subcategoria_id] * item.cantidad * 1.19,
+        neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
+        iva: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 0.19,
+        total: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 1.19,
       }));
 
       const { error: detalleError } = await supabase
@@ -150,6 +182,6 @@ export const POST = withAuthorization(
     resource: "pedidos",
     action: "create",
     allowedRoles: [TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.responsable],
-    requireContext: true,
+    requireContext: true
   }
 );

@@ -2,7 +2,7 @@
 
 import { UseFormRegisterReturn } from "react-hook-form";
 import { IDireccion } from "@/types/direccion";
-import { MdAddLocationAlt } from "react-icons/md";
+import { MdAddLocationAlt, MdOutlineEditLocationAlt } from "react-icons/md";
 import { Selector } from "./Selector";
 import { useState } from "react";
 import { ClientAddressManagerModal } from "../modals/ClientAddressManagerModal";
@@ -17,9 +17,10 @@ export default function ClientAddressManagerView({
     direcciones: IDireccion[]
 }) {
     const [showAddressManagerModal, setShowAddressManagerModal] = useState(false);
-    const [selectedDireccionId, setSelectedDireccionId] = useState<string>("");
+    const [selectedDireccionId, setSelectedDireccionId] = useState<string | null>();
 
     const selectedDireccion = direcciones.find((d) => d.id === selectedDireccionId) ?? null;
+    console.log("Selected direccion:", selectedDireccion);
 
     return (<div className="mt-4 space-y-4">
         <div className="flex">
@@ -36,10 +37,20 @@ export default function ClientAddressManagerView({
                 type="button"
                 className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
                 onClick={() => {
+                    setSelectedDireccionId(null);
                     setShowAddressManagerModal(true);
                 }}
             >
-                <MdAddLocationAlt size="1.8rem" />
+                <MdAddLocationAlt size="1.8rem" />                
+            </button>
+            <button
+                type="button"
+                className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
+                onClick={() => {
+                    setShowAddressManagerModal(true);
+                }}
+            >
+                <MdOutlineEditLocationAlt size="1.8rem" />                
             </button>
         </div>
 

@@ -112,9 +112,6 @@ export async function getAuthenticatedUser(
   options: { requireAuth?: boolean; includeRoles?: boolean } = {}
 ): Promise<AuthResult<AuthenticatedUserResult>> {
   try {
-    console.log('🔍 Obteniendo usuario autenticado...');
-    
-    // Crear cliente con service role key para acceso completo
     const supabase = await createServiceRoleClient();
     const { data, error }: UserResponse = await supabase.auth.getUser();
     

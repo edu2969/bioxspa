@@ -20,7 +20,7 @@ export default function Conductores({
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
     const sucursalId = useWatch({
-        name: 'sucursal_id',
+        name: 'sucursalId',
         control
     });
 

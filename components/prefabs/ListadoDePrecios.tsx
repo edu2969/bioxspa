@@ -39,7 +39,7 @@ export default function ListadoDePrecios({
             console.log("Precios obtenidos:", data);
             return data.precios;
         },
-        enabled: clienteId != null,
+        enabled: !!clienteId,
     });
 
     return <div className="mt-6">
@@ -88,7 +88,7 @@ export default function ListadoDePrecios({
                                     const checked = e.target.checked;                                    
                                     setValue(`precios.${index}.seleccionado`, checked, { shouldValidate:true, shouldDirty:true });
                                     setValue(`precios.${index}.cantidad`, checked ? 1 : 0);
-                                    setValue(`precios.${index}.subcategoria_id`, checked ? precio.subcategorias_catalogo?.id || "" : "");
+                                    setValue(`precios.${index}.subcategoriaId`, checked ? precio.subcategoriaCatalogo?.id || "" : "");
                                 }}
                             />
                             <input
@@ -102,17 +102,17 @@ export default function ListadoDePrecios({
                         </div>
                     </div>
                     <div className={`${hasRole([TIPO_CARGO.encargado, TIPO_CARGO.gerente, TIPO_CARGO.neo]) ? 'w-3/12' : 'w-9/12'} flex space-x-2`}>
-                        {precio.subcategorias_catalogo?.categorias_catalogo?.elemento ? <div className='w-full'>
-                            <p className="font-bold text-lg">{precio.subcategorias_catalogo?.categorias_catalogo?.elemento}</p>
-                            <span className="relative -top-1">{precio.subcategorias_catalogo?.cantidad} {precio.subcategorias_catalogo?.unidad}</span>
+                        {precio.subcategoriaCatalogo?.categoriaCatalogo?.elemento ? <div className='w-full'>
+                            <p className="font-bold text-lg">{precio.subcategoriaCatalogo?.categoriaCatalogo?.elemento}</p>
+                            <span className="relative -top-1">{precio.subcategoriaCatalogo?.cantidad} {precio.subcategoriaCatalogo?.unidad}</span>
                         </div> : <div className='w-full'>
-                            <p className="font-bold text-lg">{precio.subcategorias_catalogo?.categorias_catalogo?.nombre}</p>
-                            <span className="relative -top-1">{precio.subcategorias_catalogo?.nombre}</span>
+                            <p className="font-bold text-lg">{precio.subcategoriaCatalogo?.categoriaCatalogo?.nombre}</p>
+                            <span className="relative -top-1">{precio.subcategoriaCatalogo?.nombre}</span>
                         </div>}
-                        {precio.subcategorias_catalogo?.categorias_catalogo?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
-                            {precio.subcategorias_catalogo?.categorias_catalogo?.es_medicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
-                            {precio.subcategorias_catalogo?.sin_sifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
-                            {precio.subcategorias_catalogo?.categorias_catalogo?.es_industrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
+                        {precio.subcategoriaCatalogo?.categoriaCatalogo?.elemento && <div className="w-full flex items-end justify-end text-xs space-x-1">
+                            {precio.subcategoriaCatalogo?.categoriaCatalogo?.esMedicinal && <span className="text-white bg-green-600 rounded px-2 h-4">MED</span>}
+                            {precio.subcategoriaCatalogo?.sinSifon && <span className="text-white bg-gray-600 rounded px-2 h-4">S/S</span>}
+                            {precio.subcategoriaCatalogo?.categoriaCatalogo?.esIndustrial && <span className="text-white bg-blue-600 rounded px-2 h-4">IND</span>}
                         </div>}
                     </div>
                     <Can actions={['read']} resources={['precios']}>

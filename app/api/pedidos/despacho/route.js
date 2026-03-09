@@ -4,51 +4,57 @@ import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ORDEN, TIPO_ESTADO_VENTA } 
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET() {
-    try {
-        const { user } = await getAuthenticatedUser();
+    const authResult = await getAuthenticatedUser({ requireAuth: true });
 
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
+    if (!authResult.success || !authResult.data) {
+        return NextResponse.json(
+            { ok: false, error: authResult.message || "Usuario no autenticado" },
+            { status: 401 }
+        );
+    }
+    const { user } = authResult.data;
+    const userId = user.id;
 
-        const { data: cargo, error: cargoError } = await supabase
-            .from("cargos")
-            .select(`id, sucursal_id, dependencia_id`)
-            .eq("usuario_id", user.id)
-            .in("tipo", [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
+    const supabase = await getSupabaseServerClient();
+
+    const { data: cargo, error: cargoError } = await supabase
+        .from("cargos")
+        .select(`id, sucursal_id, dependencia_id`)
+        .eq("usuario_id", userId)
+        .in("tipo", [TIPO_CARGO.despacho, TIPO_CARGO.responsable])
+        .single();
+
+    if (cargoError || !cargo) {
+        return NextResponse.json({ ok: false, error: "User has no assigned cargo" }, { status: 400 });
+    }
+
+    // Determinar la sucursal_id para filtrar rutas
+    let sucursalId = null;
+    if (cargo.sucursal_id) {
+        sucursalId = cargo.sucursal_id;
+    } else if (cargo.dependencia_id) {
+        const { data: dependencias } = await supabase
+            .from("dependencias")
+            .select("sucursal_id")
+            .eq("id", cargo.dependencia_id)
             .single();
-
-        if (cargoError || !cargo) {
-            return NextResponse.json({ ok: false, error: "User has no assigned cargo" }, { status: 400 });
+        if (dependencias) {
+            sucursalId = dependencias.sucursal_id;
         }
+    }
 
-        // Determinar la sucursal_id para filtrar rutas
-        let sucursalId = null;
-        if (cargo.sucursal_id) {
-            sucursalId = cargo.sucursal_id;
-        } else if (cargo.dependencia_id) {
-            const { data: dependencias } = await supabase
-                .from("dependencias")
-                .select("sucursal_id")
-                .eq("id", cargo.dependencia_id)
-                .single();
-            if (dependencias) {
-                sucursalId = dependencias.sucursal_id;
-            }
-        }
+    if (!sucursalId) {
+        return NextResponse.json({ ok: false, error: "No valid sucursal found for user cargo" }, { status: 400 });
+    }
 
-        if (!sucursalId) {
-            return NextResponse.json({ ok: false, error: "No valid sucursal found for user cargo" }, { status: 400 });
-        }
-
-        const { data: rutasDespacho, error: rutasError } = await supabase
-            .from("rutas_despacho")
-            .select(`
+    const { data: rutasDespacho, error: rutasError } = await supabase
+        .from("rutas_despacho")
+        .select(`
                 id,
                 estado,
                 vehiculo:vehiculos(patente),
                 conductor:usuarios(nombre),
-                ventas:ruta_ventas(
+                ventas:ruta_despacho_ventas(
                     venta:ventas(
                         id,
                         tipo,
@@ -59,7 +65,7 @@ export async function GET() {
                             rut,
                             telefono
                         ),
-                        direccion_despacho:direcciones(id, nombre, latitud, longitud),
+                        direccion_despacho:direcciones(id, direccion_cliente, latitud, longitud),
                         detalles:detalle_ventas(
                             cantidad,
                             subcategoria:subcategorias_catalogo(
@@ -86,112 +92,113 @@ export async function GET() {
                     )
                 )
             `)
-            .eq("dependencia_id", cargo.dependencia_id)
-            .in("estado", [
-                TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                TIPO_ESTADO_RUTA_DESPACHO.descarga,
-                TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
-            ]);
+        .eq("dependencia_id", cargo.dependencia_id)
+        .in("estado", [
+            TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+            TIPO_ESTADO_RUTA_DESPACHO.descarga,
+            TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
+        ]);
 
-        if (rutasError) {
-            return NextResponse.json({ ok: false, error: rutasError.message }, { status: 500 });
-        }
+    if (rutasError) {
+        console.log("Error fetching rutas_despacho:", rutasError);
+        return NextResponse.json({ ok: false, error: rutasError.message }, { status: 500 });
+    }
 
-        // Obtener carga_item_ids para cada ruta
-        const cargaItemsPromises = rutasDespacho.map(async (ruta) => {
-            const { data: cargaHistorial } = await supabase
-                .from("ruta_historial_carga")
-                .select(`
+    // Obtener carga_item_ids para cada ruta
+    const cargaItemsPromises = rutasDespacho.map(async (ruta) => {
+        const { data: cargaHistorial } = await supabase
+            .from("ruta_historial_carga")
+            .select(`
                     items:ruta_items_movidos(
                         item_catalogo:items_catalogo(id, subcategoria_id)
                     )
                 `)
-                .eq("ruta_id", ruta.id)
-                .eq("es_carga", true);
-            const items = cargaHistorial?.flatMap(h => h.items.map(i => ({
-                id: i.item_catalogo.id,
-                subcategoria_catalogo_id: i.item_catalogo.subcategoria_id
-            }))) || [];
-            return { rutaId: ruta.id, items };
-        });
+            .eq("ruta_id", ruta.id)
+            .eq("es_carga", true);
+        const items = cargaHistorial?.flatMap(h => h.items.map(i => ({
+            id: i.item_catalogo.id,
+            subcategoria_catalogo_id: i.item_catalogo.subcategoria_id
+        }))) || [];
+        return { rutaId: ruta.id, items };
+    });
 
-        const cargaItemsResults = await Promise.all(cargaItemsPromises);
-        const cargaItemsMap = Object.fromEntries(cargaItemsResults.map(r => [r.rutaId, r.items]));
+    const cargaItemsResults = await Promise.all(cargaItemsPromises);
+    const cargaItemsMap = Object.fromEntries(cargaItemsResults.map(r => [r.rutaId, r.items]));
 
-        const cargamentos = rutasDespacho.map((ruta) => {
-            const ventas = ruta.ventas.map((rv) => {
-                const venta = rv.venta;
-                return {
-                    venta_id: venta.id,
-                    tipo: venta.tipo,
-                    fecha: venta.fecha,
-                    comentario: venta.comentario,
-                    cliente: {
-                        nombre: venta.cliente?.nombre || null,
-                        rut: venta.cliente?.rut || null,
-                        direccion: venta.cliente?.direccion_principal?.direccion || null,
-                        telefono: venta.cliente?.telefono || null,
-                        direcciones_despacho: venta.direcciones_despacho?.map(dd => ({
-                            nombre: dd.direccion?.nombre || null,
-                            direccion_id: dd.direccion_id || null,
-                            latitud: dd.direccion?.latitud || null,
-                            longitud: dd.direccion?.longitud || null
-                        })) || []
-                    },
-                    detalles: venta.detalles.map((det) => ({
-                        multiplicador: det.cantidad,
-                        restantes: det.cantidad - (cargaItemsMap[ruta.id] || []).filter(i => i.subcategoria_catalogo_id === det.subcategoria?.id).length,
-                        subcategoria_catalogo_id: {
-                            id: det.subcategoria?.id,
-                            nombre: det.subcategoria?.nombre,
-                            unidad: det.subcategoria?.unidad,
-                            cantidad: det.subcategoria?.cantidad,
-                            categoria_catalogo_id: {
-                                id: det.subcategoria?.categoria?.id,
-                                nombre: det.subcategoria?.categoria?.nombre,
-                                tipo: det.subcategoria?.categoria?.tipo,
-                                gas: det.subcategoria?.categoria?.gas,
-                                elemento: det.subcategoria?.categoria?.elemento,
-                                es_industrial: det.subcategoria?.categoria?.es_industrial
-                            }
-                        }
-                    })),
-                    entregas_en_local: venta.entregas?.map(e => ({
-                        nombre_recibe: e.nombre_recibe,
-                        rut_recibe: e.rut_recibe,
-                        created_at: e.created_at
-                    })) || []
-                };
-            });
-
-            const fecha_venta_mas_reciente = ventas.length > 0 ? new Date(Math.max(...ventas.map(v => new Date(v.fecha)))) : null;
-
-            const retiro_en_local = ventas.some(v => v.entregas_en_local.length > 0);
-
+    const cargamentos = rutasDespacho.map((ruta) => {
+        const ventas = ruta.ventas.map((rv) => {
+            const venta = rv.venta;
             return {
-                ruta_id: ruta.id,
-                ventas,
-                nombre_chofer: ruta.conductor?.nombre || null,
-                patente_vehiculo: ruta.vehiculo?.patente || null,
-                fecha_venta_mas_reciente,
-                carga_item_ids: cargaItemsMap[ruta.id] || [],
-                estado: ruta.estado,
-                retiro_en_local
+                venta_id: venta.id,
+                tipo: venta.tipo,
+                fecha: venta.fecha,
+                comentario: venta.comentario,
+                cliente: {
+                    nombre: venta.cliente?.nombre || null,
+                    rut: venta.cliente?.rut || null,
+                    direccion: venta.cliente?.direccion_principal?.direccion || null,
+                    telefono: venta.cliente?.telefono || null,
+                    direcciones_despacho: venta.direcciones_despacho?.map(dd => ({
+                        nombre: dd.direccion?.nombre || null,
+                        direccion_id: dd.direccion_id || null,
+                        latitud: dd.direccion?.latitud || null,
+                        longitud: dd.direccion?.longitud || null
+                    })) || []
+                },
+                detalles: venta.detalles.map((det) => ({
+                    multiplicador: det.cantidad,
+                    restantes: det.cantidad - (cargaItemsMap[ruta.id] || []).filter(i => i.subcategoria_catalogo_id === det.subcategoria?.id).length,
+                    subcategoria_catalogo_id: {
+                        id: det.subcategoria?.id,
+                        nombre: det.subcategoria?.nombre,
+                        unidad: det.subcategoria?.unidad,
+                        cantidad: det.subcategoria?.cantidad,
+                        categoria_catalogo_id: {
+                            id: det.subcategoria?.categoria?.id,
+                            nombre: det.subcategoria?.categoria?.nombre,
+                            tipo: det.subcategoria?.categoria?.tipo,
+                            gas: det.subcategoria?.categoria?.gas,
+                            elemento: det.subcategoria?.categoria?.elemento,
+                            es_industrial: det.subcategoria?.categoria?.es_industrial
+                        }
+                    }
+                })),
+                entregas_en_local: venta.entregas?.map(e => ({
+                    nombre_recibe: e.nombre_recibe,
+                    rut_recibe: e.rut_recibe,
+                    created_at: e.created_at
+                })) || []
             };
         });
 
-        return NextResponse.json({ ok: true, cargamentos });
-    } catch (error) {
-        console.error("Error fetching despacho data:", error);
-        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
-    }
+        const fecha_venta_mas_reciente = ventas.length > 0 ? new Date(Math.max(...ventas.map(v => new Date(v.fecha)))) : null;
+
+        const retiro_en_local = ventas.some(v => v.entregas_en_local.length > 0);
+
+        return {
+            ruta_id: ruta.id,
+            ventas,
+            nombre_chofer: ruta.conductor?.nombre || null,
+            patente_vehiculo: ruta.vehiculo?.patente || null,
+            fecha_venta_mas_reciente,
+            carga_item_ids: cargaItemsMap[ruta.id] || [],
+            estado: ruta.estado,
+            retiro_en_local
+        };
+    });
+
+    return NextResponse.json({ ok: true, cargamentos });
 }
 
 export async function POST(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
 
         const { ruta_id } = await request.json();
@@ -199,12 +206,13 @@ export async function POST(request) {
             return NextResponse.json({ error: "ruta_id is required" }, { status: 400 });
         }
 
-        console.log("[despacho.POST] User", user.id, "confirming carga for ruta", ruta_id);
+        console.log("[despacho.POST] User", userId, "confirming carga for ruta", ruta_id);
+        const supabase = await getSupabaseServerClient();
 
         // Obtener la ruta y sus ventas
         const { data: rutaData, error: rutaError } = await supabase
             .from("rutas_despacho")
-            .select("id, ruta_ventas(venta_id)")
+            .select("id, ruta_despacho_ventas(venta_id)")
             .eq("id", ruta_id)
             .single();
         if (rutaError || !rutaData) {
@@ -212,7 +220,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "RutaDespacho not found" }, { status: 404 });
         }
 
-        const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
 
         // Obtener detalles de las ventas
         const { data: detallesVentas, error: detallesError } = await supabase
@@ -226,20 +234,20 @@ export async function POST(request) {
 
         // Tomar la carga más reciente (es_carga = true)
         const { data: cargas, error: cargasError } = await supabase
-            .from("ruta_historial_carga")
+            .from("ruta_despacho_historial_carga")
             .select(`
                 id,
-                items:ruta_items_movidos(
+                items:ruta_despacho_items_movidos(
                     item_catalogo:items_catalogo(id, subcategoria_id)
                 ),
                 fecha
             `)
-            .eq("ruta_id", ruta_id)
+            .eq("ruta_despacho_id", ruta_id)
             .eq("es_carga", true)
             .order("fecha", { ascending: false })
             .limit(1);
         if (cargasError) {
-            console.error("[despacho.POST] error fetching ruta_historial_carga", cargasError);
+            console.error("[despacho.POST] error fetching ruta_despacho_historial_carga", cargasError);
             return NextResponse.json({ ok: false, error: cargasError.message }, { status: 500 });
         }
 
@@ -303,10 +311,10 @@ export async function POST(request) {
 
         // Insertar historial de estado
         const { error: histEstadoError } = await supabase
-            .from("ruta_historial_estados")
-            .insert({ ruta_id: ruta_id, estado: nuevoEstado, usuario_id: user.id });
+            .from("ruta_despacho_historial_estados")
+            .insert({ ruta_despacho_id: ruta_id, estado: nuevoEstado, usuario_id: userId });
         if (histEstadoError) {
-            console.error("[despacho.POST] error inserting ruta_historial_estados", histEstadoError);
+            console.error("[despacho.POST] error inserting ruta_despacho_historial_estados", histEstadoError);
         }
 
         // Si todas son traslado, marcar ventas como entregado y agregar historial de ventas
@@ -320,7 +328,7 @@ export async function POST(request) {
             }
 
             // Insertar historial de estado para cada venta
-            const ventaHistorialRows = (ventaIds || []).map(vid => ({ venta_id: vid, estado: TIPO_ESTADO_VENTA.entregado, usuario_id: user.id }));
+            const ventaHistorialRows = (ventaIds || []).map(vid => ({ venta_id: vid, estado: TIPO_ESTADO_VENTA.entregado, usuario_id: userId }));
             const { error: insertVentaHistError } = await supabase
                 .from("venta_historial_estados")
                 .insert(ventaHistorialRows);
@@ -332,12 +340,12 @@ export async function POST(request) {
         console.log("[despacho.POST] carga confirmada for ruta", ruta_id, "items", itemCatalogoIds.length);
 
         return NextResponse.json({ ok: true });
-        
+
     } catch (error) {
         console.error("Error updating item states:", error);
-        return NextResponse.json({ 
+        return NextResponse.json({
             error: "Error updating item states.",
-            details: error.message 
+            details: error.message
         }, { status: 500 });
     }
 }

@@ -1,8 +1,8 @@
-import { IDireccion } from "./direccion";
-
 export interface IDireccionDespacho {
+    id: string;
+    latitud: number;
+    longitud: number;
     comentario?: string;
-    direccionId: IDireccion;
 }
 
 export interface ICliente {

@@ -7,23 +7,35 @@ import { usePathname, useRouter } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
+import { useAuth } from '@/context/AuthContext';
 import { RESOURCES, ACTIONS } from '@/lib/auth/permissions';
 import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './prefabs/powerScan/PowerScanView';
-import { createSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
     const path = usePathname();
     const auth = useAuthorization();
+    const { signOut } = useAuth();
     const [scanMode, setScanMode] = useState(false);
     const router = useRouter();
 
     const activateSuperScanMode = () => {
         setScanMode(true);
         setMenuActivo(false);
+    }
+
+    const handleLogout = async () => {
+        setMenuActivo(false);
+        try {
+            await signOut();
+            router.replace("/");
+            router.refresh();
+        } catch (error) {
+            console.error("Error al cerrar sesión:", error);
+        }
     }
 
     return (
@@ -81,16 +93,7 @@ export default function Nav() {
                         </div>
                     </Link>
                     <div className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md px-2 m-0 bg-slate-500 shadow-sm"
-                        onClick={async () => {
-                            setMenuActivo(false);
-                            try {
-                                const supabase = createSupabaseBrowserClient();
-                                await supabase.auth.signOut(); // Cerrar sesión con Supabase
-                                router.replace("/"); // Redirigir a la página principal
-                            } catch (error) {
-                                console.error("Error al cerrar sesión:", error);
-                            }
-                        }}>
+                        onClick={handleLogout}>
                         <AiOutlineLogout size="4rem" />
                         <p className="text-2xl mx-6 my-4">Cerrar sesión</p>
                     </div>

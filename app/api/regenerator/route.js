@@ -11,7 +11,158 @@ export async function GET(req) {
         return NextResponse.json({ ok: true, result });
     }
 
+    if (query === "resetVentas") {
+        const result = await resetVentas();
+        return NextResponse.json({ ok: true, result });
+    }
+
     return NextResponse.json({ ok: false, error: "Invalid query parameter" }, { status: 400 });
+}
+
+const resetVentas = async () => {
+    const supabase = await getSupabaseServerClient();
+    const summary = {
+        deleted: {},
+        skippedMissingTables: [],
+        warnings: []
+    };
+
+    const isMissingRelationError = (error) => {
+        const msg = String(error?.message || "").toLowerCase();
+        return error?.code === "42P01" || msg.includes("relation") && msg.includes("does not exist");
+    };
+
+    const registerDeletedCount = (tableName, count) => {
+        summary.deleted[tableName] = (summary.deleted[tableName] || 0) + (count || 0);
+    };
+
+    const deleteAllRows = async (tableName, idColumn = "id") => {
+        const { error, count } = await supabase
+            .from(tableName)
+            .delete({ count: "exact" })
+            .not(idColumn, "is", null);
+
+        if (error) {
+            if (isMissingRelationError(error)) {
+                summary.skippedMissingTables.push(tableName);
+                return { ok: false, missing: true };
+            }
+            throw new Error(`[resetVentas] Error deleting from ${tableName}: ${error.message}`);
+        }
+
+        registerDeletedCount(tableName, count);
+        return { ok: true, tableName, count: count || 0 };
+    };
+
+    const deleteFromFirstExistingTable = async (tableNames, idColumn = "id") => {
+        for (const tableName of tableNames) {
+            const result = await deleteAllRows(tableName, idColumn);
+            if (result.ok) {
+                return result;
+            }
+        }
+        return { ok: false, missing: true };
+    };
+
+    const countVentasRemaining = async () => {
+        const { count, error } = await supabase
+            .from("ventas")
+            .select("id", { count: "exact", head: true });
+
+        if (error) {
+            throw new Error(`[resetVentas] Error contando ventas restantes: ${error.message}`);
+        }
+
+        return count || 0;
+    };
+
+    const tryNullifyBiDeudasUltimaVenta = async () => {
+        const { error } = await supabase
+            .from("bi_deudas")
+            .update({ ultima_venta_id: null })
+            .not("ultima_venta_id", "is", null);
+
+        if (!error) return;
+
+        if (isMissingRelationError(error) || error.code === "42703") {
+            summary.warnings.push("No existe bi_deudas.ultima_venta_id en este entorno. Se omite nullify.");
+            return;
+        }
+
+        throw new Error(`[resetVentas] Error limpiando bi_deudas.ultima_venta_id: ${error.message}`);
+    };
+
+    try {
+        // 1) Limpiar tablas hijas de detalle de venta e historial de ventas.
+        await deleteAllRows("detalle_venta_items");
+        await deleteAllRows("detalle_ventas");
+        await deleteAllRows("venta_historial_estados");
+
+        // También limpiar entregas locales vinculadas a ventas.
+        await deleteAllRows("entrega_local_items");
+        await deleteAllRows("venta_entregas_local");
+
+        // También limpiar comentarios de cobro si existen en la tabla actual.
+        await deleteAllRows("venta_comentarios_cobro");
+
+        // Limpiar dependencias que referencian ventas sin ON DELETE CASCADE.
+        await deleteAllRows("pagos");
+        await deleteAllRows("registro_comisiones");
+        await tryNullifyBiDeudasUltimaVenta();
+
+        // 2) Limpiar relaciones e historial de rutas (compatibilidad nombres nuevos/legacy).
+        await deleteFromFirstExistingTable([
+            "ruta_despacho_historial_carga_items_movidos",
+            "ruta_despacho_items_movidos",
+            "ruta_items_movidos"
+        ]);
+
+        await deleteFromFirstExistingTable([
+            "ruta_despacho_historial_carga",
+            "ruta_historial_carga"
+        ]);
+
+        await deleteFromFirstExistingTable([
+            "ruta_despacho_historial_estados",
+            "ruta_historial_estados"
+        ]);
+
+        await deleteFromFirstExistingTable([
+            "ruta_despacho_destinos",
+            "ruta_destinos"
+        ]);
+
+        await deleteFromFirstExistingTable([
+            "ruta_despacho_ventas",
+            "ruta_ventas"
+        ]);
+
+        // 3) No se eliminan ventas (por RLS); se reporta cuántas quedan pendientes.
+        const ventasPendientesEliminar = await countVentasRemaining();
+
+        // 4) Finalmente borrar rutas de despacho.
+        try {
+            await deleteAllRows("rutas_despacho");
+        } catch (error) {
+            const isFkError = error?.message?.includes("23503") || error?.message?.toLowerCase?.().includes("foreign key");
+            if (!isFkError) {
+                throw error;
+            }
+
+            // Reintentar una vez más tras limpiar relaciones de ruta.
+            await deleteFromFirstExistingTable(["ruta_despacho_ventas", "ruta_ventas"]);
+            await deleteAllRows("rutas_despacho");
+        }
+
+        return {
+            message: "Reset de relaciones de ventas/rutas completado. Las ventas no se eliminan en este proceso.",
+            ventasPendientesEliminar,
+            ...summary
+        };
+    } catch (error) {
+        console.error("[resetVentas] Error:", error);
+        throw error;
+    }
 }
 
 const repararDirecciones = async () => {

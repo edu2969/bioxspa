@@ -16,7 +16,7 @@ export default function DatosDeTraslado({ register }: { register: UseFormRegiste
             <label htmlFor="motivoTraslado" className="block text-sm font-medium text-gray-700">Motivo de traslado</label>
             <select
                 id="motivoTraslado"
-                {...register("motivo_traslado", { required: true, valueAsNumber: true })}
+                {...register("motivoTraslado", { required: true, valueAsNumber: true })}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
             >
                 <option value={0}>Seleccione motivo</option>
@@ -28,12 +28,12 @@ export default function DatosDeTraslado({ register }: { register: UseFormRegiste
 
         {/* EMPRESA PARA RETIRO */}
         <div className="w-full">
-            <ClienteSearchView titulo="Empresa donde se retira" register={register('empresa_donde_retirar')}
+            <ClienteSearchView titulo="Empresa donde se retira" register={register('empresaDondeRetirar')}
             setClienteSelected={setClienteSelected}/>
         </div>
 
         {/*DIRECCIÓN DONDE RETIRAR */}
-        <ClientAddressManagerView label="Dirección de retiro" register={register('direccion_retiro_id')} 
+        <ClientAddressManagerView label="Dirección de retiro" register={register('direccionRetiroId')} 
             direcciones={clienteSelected?.direccionesDespacho || []}/>
     </fieldset>);
 }
