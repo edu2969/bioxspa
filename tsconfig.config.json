@@ -9,5 +9,5 @@
         "noEmit": false,
         "isolatedModules": false
     },
-    "include": ["server.mts"]        
+    "include": ["server.js"]        
 }
