@@ -5,7 +5,7 @@ import { TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
 
 export const POST = withAuthorization(
     async (req, user) => {
-        const supabase = getSupabaseServerClient();
+        const supabase = await getSupabaseServerClient();
         try {
             // Get ventaId from request
             const { ventaId } = await req.json();
@@ -16,7 +16,7 @@ export const POST = withAuthorization(
             }
 
             // Verify user has the required role (manager or supervisor)
-            if (!user.roles.some((role) => [TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza].includes(role))) {
+            if (!user.hasCargo([TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza])) {
                 return NextResponse.json({
                     ok: false,
                     error: "Insufficient permissions - requires manager or supervisor role",
@@ -25,52 +25,38 @@ export const POST = withAuthorization(
 
             // Find the ruta_ventas entry that contains this venta
             const { data: rutaVenta, error: rutaVentaError } = await supabase
-                .from("ruta_ventas")
-                .select("id, ruta_id")
+                .from("ruta_despacho_ventas")
+                .select("id, ruta_despacho_id")
                 .eq("venta_id", ventaId)
                 .single();
 
-            if (rutaVentaError) {
+            if (rutaVentaError || !rutaVenta) {
                 console.error("Error fetching ruta_ventas entry:", rutaVentaError);
                 return NextResponse.json({ ok: false, error: "Error fetching ruta_ventas entry" }, { status: 500 });
             }
+        
+            console.log("Eliminando asignación de venta ID:", ventaId, "de ruta_despacho.id:", rutaVenta.id, "RutaDespacho ID:", rutaVenta.ruta_despacho_id);
+            // Delete the ruta_ventas entry
+            const { error: deleteError } = await supabase
+                .from("ruta_despacho_ventas")
+                .delete()
+                .eq("id", rutaVenta.id);
 
-            if (rutaVenta) {
-                // Delete the ruta_ventas entry
-                const { error: deleteError } = await supabase
-                    .from("ruta_ventas")
-                    .delete()
-                    .eq("id", rutaVenta.id);
-
-                if (deleteError) {
-                    console.error("Error deleting ruta_ventas entry:", deleteError);
-                    return NextResponse.json({ ok: false, error: "Error deleting ruta_ventas entry" }, { status: 500 });
-                }
-
-                // Check if the ruta_despacho has any remaining ventas
-                const { data: remainingVentas, error: remainingVentasError } = await supabase
-                    .from("ruta_ventas")
-                    .select("id")
-                    .eq("ruta_id", rutaVenta.ruta_id);
-
-                if (remainingVentasError) {
-                    console.error("Error checking remaining ventas for ruta_despacho:", remainingVentasError);
-                    return NextResponse.json({ ok: false, error: "Error checking remaining ventas for ruta_despacho" }, { status: 500 });
-                }
-
-                if (remainingVentas.length === 0) {
-                    // Delete the ruta_despacho if it has no remaining ventas
-                    const { error: deleteRutaError } = await supabase
-                        .from("rutas_despacho")
-                        .delete()
-                        .eq("id", rutaVenta.ruta_id);
-
-                    if (deleteRutaError) {
-                        console.error("Error deleting ruta_despacho:", deleteRutaError);
-                        return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho" }, { status: 500 });
-                    }
-                }
+            if (deleteError) {
+                console.error("Error deleting ruta_ventas entry:", deleteError);
+                return NextResponse.json({ ok: false, error: "Error deleting ruta_ventas entry" }, { status: 500 });
             }
+
+            const { error: deleteRutaError } = await supabase
+                .from("rutas_despacho")
+                .delete()
+                .eq("id", rutaVenta.ruta_despacho_id);
+
+            if (deleteRutaError) {
+                console.error("Error deleting ruta_despacho:", deleteRutaError);
+                return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho" }, { status: 500 });
+            }
+            
 
             // Update the venta status back to "por_asignar"
             const { error: ventaError } = await supabase
@@ -95,6 +81,6 @@ export const POST = withAuthorization(
     {
         resource: "pedidos",
         action: "update",
-        allowedRoles: [TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza],
+        allowedRoles: [TIPO_CARGO.gerente, TIPO_CARGO.responsable, TIPO_CARGO.cobranza, TIPO_CARGO.encargado],
     }
 );

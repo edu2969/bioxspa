@@ -89,6 +89,6 @@ export interface IItemCatalogoPowerScanView {
     direccionInvalida?: boolean;
     direccionEsperada?: {
         id: string;
-        nombre: string;
+        direccionCliente: string;
     };
 }

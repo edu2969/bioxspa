@@ -1,6 +1,5 @@
 export interface IDireccion {
     id: string;
-    nombre?: string;
     direccionCliente?: string;
     placeId?: string;
     latitud?: number;

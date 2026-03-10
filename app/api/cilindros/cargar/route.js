@@ -12,16 +12,23 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Missing rutaId/ventaId or codigo" }, { status: 400 });
         }
 
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
 
-        // Determine user's workplace address via cargos -> dependencia/sucursal -> direcciones
+        const { user } = authResult.data;
+        const userId = user.id;        
+
+        const supabase = await getSupabaseServerClient();
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("id, sucursal_id, dependencia_id")
-            .eq("usuario_id", user.id)
+            .eq("usuario_id", userId)
             .maybeSingle();
 
         if (cargoError || !cargo) {
@@ -66,7 +73,7 @@ export async function POST(request) {
                 stock_minimo,
                 stock_actual,
                 fecha_mantencion,
-                direccion:direcciones(id, nombre),
+                direccion:direcciones(id, direccion_cliente),
                 propietario:clientes(id, nombre, rut),
                 subcategoria:subcategorias_catalogo(id, nombre, cantidad, unidad, sin_sifon, categoria:categorias_catalogo(id, nombre, elemento, es_industrial))
             `)
@@ -86,7 +93,7 @@ export async function POST(request) {
         // Fetch expected direccion details for helpful response
         const { data: expectedDireccion } = await supabase
             .from("direcciones")
-            .select("id, nombre")
+            .select("id, direccion_cliente")
             .eq("id", direccionId)
             .maybeSingle();
 
@@ -95,34 +102,31 @@ export async function POST(request) {
             const cat = sub?.categoria || null;
             return {
                 id: row.id,
-                owner_id: row.propietario ? { id: row.propietario.id, nombre: row.propietario.nombre, rut: row.propietario.rut } : null,
-                direccion_id: row.direccion ? { id: row.direccion.id, nombre: row.direccion.nombre } : null,
+                ownerId: row.propietario ? { id: row.propietario.id, nombre: row.propietario.nombre, rut: row.propietario.rut } : null,
+                direccionId: row.direccion ? { id: row.direccion.id, direccionCliente: row.direccion.direccion_cliente } : null,
                 elemento: (cat && cat.elemento) || (sub && sub.nombre) || "",
                 codigo: row.codigo,
-                subcategoria_catalogo_id: sub ? {
-                    _id: sub.id,
-                    temporal_id: undefined,
+                subcategoriaCatalogoId: sub ? {
+                    id: sub.id,
+                    temporalId: undefined,
                     nombre: sub.nombre,
-                    categoria_catalogo_id: cat ? {
+                    categoriaCatalogoId: cat ? {
                         id: cat.id,
                         nombre: cat.nombre,
                         elemento: cat.elemento,
-                        es_industrial: cat.es_industrial
+                        esIndustrial: cat.es_industrial
                     } : null,
                     cantidad: sub.cantidad,
                     unidad: sub.unidad,
-                    sin_sifon: sub.sin_sifon,
-                    url_imagen: null,
-                    created_at: null,
-                    updated_at: null
+                    sinSifon: sub.sin_sifon                    
                 } : null,
-                stock_actual: row.stock_actual,
-                stock_minimo: row.stock_minimo,
-                garantia_anual: row.garantia_anual,
+                stockActual: row.stock_actual,
+                stockMinimo: row.stock_minimo,
+                garantiaAnual: row.garantia_anual,
                 estado: row.estado,
-                fecha_mantencion: row.fecha_mantencion,
-                direccion_invalida: String(row.direccion?.id) !== String(direccionId),
-                direccion_esperada: expectedDireccion ? { id: expectedDireccion.id, nombre: expectedDireccion.nombre } : null
+                fechaMantencion: row.fecha_mantencion,
+                direccionInvalida: String(row.direccion?.id) !== String(direccionId),
+                direccionEsperada: expectedDireccion ? { id: expectedDireccion.id, direccionCliente: expectedDireccion.direccion_cliente } : null
             };
         };
 
@@ -134,9 +138,9 @@ export async function POST(request) {
         // Helper: ensure a carga historial exists (latest) and return its id
         async function ensureLatestCargaHistorial(ruta_id) {
             const { data: lastHist, error: lastErr } = await supabase
-                .from("ruta_historial_carga")
+                .from("ruta_despacho_historial_carga")
                 .select("id, es_carga")
-                .eq("ruta_id", ruta_id)
+                .eq("ruta_despacho_id", ruta_id)
                 .order("fecha", { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -149,8 +153,8 @@ export async function POST(request) {
 
             // create new historial carga
             const { data: created, error: createErr } = await supabase
-                .from("ruta_historial_carga")
-                .insert({ ruta_id, es_carga: true, fecha: new Date().toISOString(), usuario_id: user.id, created_at: new Date().toISOString() })
+                .from("ruta_despacho_historial_carga")
+                .insert({ ruta_despacho_id, es_carga: true, fecha: new Date().toISOString(), usuario_id: userId, created_at: new Date().toISOString() })
                 .select("id")
                 .maybeSingle();
 
@@ -170,9 +174,9 @@ export async function POST(request) {
 
             // Verify if the item's subcategoria.id is part of the subcategorias in the venta details of the ruta
             const { data: rutaVentas, error: rutaVentasErr } = await supabase
-                .from("ruta_ventas")
+                .from("ruta_despacho_ventas")
                 .select("venta_id")
-                .eq("ruta_id", rutaId);
+                .eq("ruta_despacho_id", rutaId);
 
             if (rutaVentasErr) {
                 console.error("Error fetching ruta_ventas:", rutaVentasErr);
@@ -206,7 +210,7 @@ export async function POST(request) {
 
             // Check if item already moved in that historial
             const { data: existing, error: existingErr } = await supabase
-                .from("ruta_items_movidos")
+                .from("ruta_despacho_items_movidos")
                 .select("id")
                 .eq("historial_carga_id", historialId)
                 .eq("item_catalogo_id", itemRow.id)

@@ -122,7 +122,12 @@ export async function authorize(
 // ===============================================
 
 export function withAuthorization(
-  handler: (req: NextRequest, user: AuthorizedUser) => Promise<Response>
+  handler: (req: NextRequest, user: AuthorizedUser) => Promise<Response>,
+  options?: {
+    resource?: string;
+    action?: string;
+    allowedRoles?: number[];
+  }
 ): (req: NextRequest) => Promise<Response> {
   return async function authorizedHandler(req: NextRequest): Promise<Response> {
     const authResult: AuthorizeResult = await authorize(req);
@@ -140,9 +145,39 @@ export function withAuthorization(
     
     // Agregar información del usuario al request para uso en el handler
     (req as AuthorizedRequest).user = authResult.user;
+
+    const authorizedUser = authResult.user!;
+
+    if (options?.allowedRoles && options.allowedRoles.length > 0) {
+      const hasAllowedCargo = authorizedUser.hasCargo(options.allowedRoles);
+      if (!hasAllowedCargo) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'Cargo insuficiente para esta operación',
+            code: 'INSUFFICIENT_CARGO'
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (options?.resource && options?.action) {
+      const hasRequiredPermission = authorizedUser.can(options.resource, options.action);
+      if (!hasRequiredPermission) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Permisos insuficientes para ${options.action} en ${options.resource}`,
+            code: 'INSUFFICIENT_PERMISSION'
+          },
+          { status: 403 }
+        );
+      }
+    }
     
     try {
-      return await handler(req, authResult.user!);
+      return await handler(req, authorizedUser);
     } catch (error) {
       console.error('Error en handler autorizado:', error);
       return NextResponse.json(
