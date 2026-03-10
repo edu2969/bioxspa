@@ -43,9 +43,9 @@ export default function DatosGenerales({
     useEffect(() => {
         if (!loadingSucursales && sucursales && sucursales.length > 0) {
             const stored = typeof window !== "undefined" ? localStorage.getItem("sucursalId") : null;
-            const defaultId = stored && sucursales.some(s => s._id === stored)
+            const defaultId = stored && sucursales.some(s => s.id === stored)
                 ? stored
-                : sucursales[0]._id;
+                : sucursales[0].id;
             setValue("sucursalId", defaultId);
         }
     }, [loadingSucursales, sucursales, setValue]);
@@ -62,14 +62,14 @@ export default function DatosGenerales({
             <Selector options={usuarios || []}
                 label="Seleccione usuario*"
                 getLabel={u => u.name}
-                getValue={u => u._id || ''}
+                getValue={u => u.id || ''}
                 register={register("usuarioId", { required: true })}
                 isLoading={loadingUsuarios} />}
 
         <Selector options={sucursales || []}
             label="Sucursal"
             getLabel={s => s.nombre}
-            getValue={s => s._id}
+            getValue={s => s.id}
             register={register("sucursalId", { required: true })}
             onChange={val => {
                 setValue("sucursalId", val);

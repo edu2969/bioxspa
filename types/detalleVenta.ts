@@ -1,11 +1,10 @@
-import { Types } from "mongoose";
 import { ISubcategoriaCatalogo } from "./subcategoriaCatalogo";
 import { IItemCatalogo } from "./itemCatalogo";
 
 export interface IDetalleVenta {
-    _id: Types.ObjectId;
+    id: string;
     temporalId?: string;
-    ventaId: Types.ObjectId;
+    ventaId: string;
     glosa?: string;
     codigo?: string;
     codigoProducto?: string;

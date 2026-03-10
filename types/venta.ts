@@ -1,5 +1,3 @@
-// types/venta.ts
-import { Types } from "mongoose";
 import { IDetalleVenta } from "./detalleVenta";
 import { ICliente } from "./cliente";
 import { IUser } from "./user";
@@ -17,7 +15,7 @@ export interface IComentarioCobro {
 }
 
 export interface IVenta {
-    _id: Types.ObjectId;
+    id: string;
     temporalId?: string;
     tipo: number;
     clienteId?: ICliente;
@@ -57,7 +55,7 @@ export interface IVenta {
     entregasEnLocal?: {
         nombreRecibe: string;
         rutRecibe: string;
-        itemCargadoIds: Types.ObjectId[];
+        itemCargadoIds: string[];
         createdAt?: Date;
         updatedAt?: Date;
     }[];
@@ -67,7 +65,7 @@ export interface IVenta {
 }
 
 export interface IDetalleVentaView {
-    _id: Types.ObjectId;
+    id: string;
     fecha?: Date;
     estado: number;
     porCobrar?: boolean;
@@ -75,12 +73,12 @@ export interface IDetalleVentaView {
     valorIva?: number;
     valorTotal?: number;
     vendedor?: {
-        _id?: Types.ObjectId;
+        id?: string;
         nombre?: string;
         email?: string;
     };
     cliente?: {
-        _id?: Types.ObjectId;
+        id?: string;
         nombre?: string;
         giro?: string;
         email?: string;
@@ -90,25 +88,25 @@ export interface IDetalleVentaView {
     entregasEnLocal?: {
         nombreRecibe: string;
         rutRecibe: string;
-        itemCargadoIds: Types.ObjectId[];
+        itemCargadoIds: string[];
         createdAt?: Date;
         updatedAt?: Date;
     }[];
     detalles?: {
-        _id: Types.ObjectId;
+        id: string;
         glosa?: string;
         codigo?: string;
         codigoCilindro?: string;
         estado: 'Entregado' | 'Pendiente' | 'Devuelto';
         subcategoriaCatalogoId?: {
-            _id: Types.ObjectId;
+            id: string;
             nombre?: string;
             cantidad?: number;
             unidad?: string;
             sinSifon?: boolean;
             urlImagen?: string;
             categoriaCatalogoId?: {
-                _id: Types.ObjectId;
+                id: string;
                 nombre?: string;
                 tipo?: string;
                 elemento?: string;
@@ -117,7 +115,7 @@ export interface IDetalleVentaView {
             } | null;
         } | null;
         itemCatalogoIds?: {
-            _id: Types.ObjectId;
+            id: string;
             codigo?: string;
             estado?: number;
         }[];

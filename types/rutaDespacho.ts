@@ -1,9 +1,7 @@
-import { Types } from "mongoose";
 import { IVenta } from "./venta";
 import { IVehiculo } from "./vehiculo";
 import { IUser } from "./user";
 import { IDependencia } from "./dependencia";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 import { IDireccion } from "./direccion";
 import { IItemCatalogo } from "./itemCatalogo";
 
@@ -24,7 +22,7 @@ export interface ICargaHistorial {
 }
 
 export interface IRutaDespacho {
-  _id: Types.ObjectId;
+  id: string;
   vehiculoId?: IVehiculo;
   choferId: IUser;
   horaInicio?: Date;

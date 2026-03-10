@@ -1,10 +1,9 @@
-import { Types } from 'mongoose';
 import { ISubcategoriaCatalogo } from './subcategoriaCatalogo';
 import { IDireccion } from './direccion';
 import { ICliente } from './cliente';
 
 export interface IItemCatalogo {
-    id?: Types.ObjectId;
+    id: string;
     temporal_id?: string;
     codigo?: string;
     estado?: number;

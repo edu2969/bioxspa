@@ -6,7 +6,7 @@ export interface IPosicionActual {
 }
 
 export interface IVehiculo {
-    _id?: string;
+    id?: string;
     temporalId?: string;
     patente: string;
     marca: string;

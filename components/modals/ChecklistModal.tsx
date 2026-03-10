@@ -160,7 +160,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
                 items,
             };
             if (tipo === 'vehiculo') {
-                data.vehiculoId = vehiculos?.length === 1 ? vehiculos[0]._id : formValues.vehiculoId;
+                data.vehiculoId = vehiculos?.length === 1 ? vehiculos[0].id : formValues.vehiculoId;
                 data.kilometraje = formValues.kilometros;
             }
             console.log("DATA", data);
@@ -228,7 +228,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
                                 >
                                     <option>Selecciona un vehículo</option>
                                     {vehiculos?.map((vehiculo) => (
-                                        <option key={vehiculo._id} value={vehiculo._id}>
+                                        <option key={vehiculo.id} value={vehiculo.id}>
                                             {vehiculo.patente} - {vehiculo.marca}
                                         </option>
                                     ))}
