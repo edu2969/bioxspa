@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import dayjs from "dayjs";
 import 'dayjs/locale/es';
 dayjs.locale('es');
@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import GestorDeCargaView from "./prefabs/GestorDeCargaView";
 import PowerScanView from "./prefabs/powerScan/PowerScanView";
 import Nav from "./Nav";
-import { useUser } from "@/components/providers/UserProvider";
+import { UserProvider, useUser } from "@/components/providers/UserProvider";
 import { ICargaDespachoView } from "@/types/types";
 import SoundPlayerProvider from "./context/SoundPlayerContext";
 
@@ -25,16 +25,17 @@ export default function JefaturaDespacho() {
 
   const queryClient = useQueryClient();
   const userContext = useUser();
+  const hasActiveSession = !!userContext.session?.access_token;
+  const isAuthContextReady = !userContext.loading;
 
   const { data: cargamentos, isLoading } = useQuery<ICargaDespachoView[]>({
     queryKey: ['cargamentos-despacho'],
     queryFn: async () => {
-      if (!userContext || !userContext.session) {
-        console.error("No active session");
-        throw new Error("User not authenticated");
+      const token = userContext.session?.access_token;
+      if (!token) {
+        return [];
       }
 
-      const token = userContext.session.access_token;
       const response = await fetch("/api/pedidos/despacho", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -50,6 +51,7 @@ export default function JefaturaDespacho() {
       console.log("CARGAMENTOS DE DESPACHO:", data);
       return data.cargamentos;
     },
+    enabled: isAuthContextReady && hasActiveSession,
   });
 
   const handleShowNext = () => {
@@ -72,11 +74,11 @@ export default function JefaturaDespacho() {
       // Actualizar rutaId/ventaId basado en el nuevo primer cargamento
       if (nuevosCargamentos.length > 0) {
         const newFirstCarga = nuevosCargamentos[0];
-        if (!newFirstCarga.ruta_id) {
-          setVentaId(newFirstCarga.ventas[0]?.venta_id || null);
+        if (!newFirstCarga.rutaDespachoId) {
+          setVentaId(newFirstCarga.ventas[0]?.ventaId || null);
           setRutaId(null);
         } else {
-          setRutaId(newFirstCarga.ruta_id);
+          setRutaId(newFirstCarga.rutaDespachoId);
           setVentaId(null);
         }
       }
@@ -90,30 +92,30 @@ export default function JefaturaDespacho() {
   useEffect(() => {
     if (cargamentos && cargamentos.length > 0) {
       const firstCarga = cargamentos[0];
-      if (!firstCarga.ruta_id) {
-        setVentaId(firstCarga.ventas[0]?.venta_id || null);
+      if (!firstCarga.rutaDespachoId) {
+        setVentaId(firstCarga.ventas[0]?.ventaId || null);
         setRutaId(null);
       } else {
-        setRutaId(firstCarga.ruta_id);
+        setRutaId(firstCarga.rutaDespachoId);
         setVentaId(null);
       }
     }
   }, [cargamentos?.length]); // Solo ejecutar cuando cambie la cantidad de cargamentos
 
-  return (
+  return (<UserProvider>
     <div className="w-full h-screen text-center" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
-      {scanMode && 
-      <SoundPlayerProvider>
-        <PowerScanView setScanMode={setScanMode}  
-          scanMode={scanMode}
-          rutaId={rutaId} ventaId={ventaId}
-          operacion={`${rutaId ? 'cargar' : 'entregarEnLocal'}`}/>
-      </SoundPlayerProvider>}
+      {scanMode &&
+        <SoundPlayerProvider>
+          <PowerScanView setScanMode={setScanMode}
+            scanMode={scanMode}
+            rutaId={rutaId} ventaId={ventaId}
+            operacion={`${rutaId ? 'cargar' : 'entregarEnLocal'}`} />
+        </SoundPlayerProvider>}
 
       <div className="w-full">
         {!isLoading && cargamentos && cargamentos.map((cargamento, index) => (
-          <div key={`cargamento_${cargamento.ruta_id || cargamento.ventas[0]?.venta_id}_${index}`} 
-               className="flex flex-col h-full overflow-y-hidden">
+          <div key={`cargamento_${cargamento.rutaDespachoId || cargamento.ventas[0]?.ventaId}_${index}`}
+            className="flex flex-col h-full overflow-y-hidden">
             <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg py-1 ${animating ? "transition-all duration-500" : ""}`}
               style={{
                 top: `${animating && index > 0 ? (index - 1) * 10 + 52 : index * 10 + 52}px`,
@@ -124,12 +126,12 @@ export default function JefaturaDespacho() {
                 opacity: animating && index == 0 ? 0 : 1,
               }}
             >
-              {index <= 1 && 
-              <GestorDeCargaView 
-                cargamentos={[cargamento]}
-                setScanMode={setScanMode}
-                index={index}
-              />}
+              {index <= 1 &&
+                <GestorDeCargaView
+                  cargamentos={[cargamento]}
+                  setScanMode={setScanMode}
+                  index={index}
+                />}
             </div>
           </div>
         ))}
@@ -139,7 +141,7 @@ export default function JefaturaDespacho() {
             <Loader texto="Cargando pedidos" />
           </div>
         )}
-        
+
         {!isLoading && cargamentos?.length === 0 &&
           <div className="w-full h-screen py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
             <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
@@ -162,6 +164,7 @@ export default function JefaturaDespacho() {
       <Toaster />
       <Nav />
     </div>
+  </UserProvider>
   );
 }
 

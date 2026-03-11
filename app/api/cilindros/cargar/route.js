@@ -154,7 +154,12 @@ export async function POST(request) {
             // create new historial carga
             const { data: created, error: createErr } = await supabase
                 .from("ruta_despacho_historial_carga")
-                .insert({ ruta_despacho_id, es_carga: true, fecha: new Date().toISOString(), usuario_id: userId, created_at: new Date().toISOString() })
+                .insert({ 
+                    ruta_despacho_id: ruta_id, 
+                    es_carga: true, 
+                    fecha: new Date().toISOString(), 
+                    usuario_id: userId
+                })
                 .select("id")
                 .maybeSingle();
 
@@ -210,9 +215,9 @@ export async function POST(request) {
 
             // Check if item already moved in that historial
             const { data: existing, error: existingErr } = await supabase
-                .from("ruta_despacho_items_movidos")
+                .from("ruta_despacho_historial_carga_items_movidos")
                 .select("id")
-                .eq("historial_carga_id", historialId)
+                .eq("ruta_despacho_historial_carga_id", historialId)
                 .eq("item_catalogo_id", itemRow.id)
                 .limit(1);
 
@@ -227,8 +232,8 @@ export async function POST(request) {
 
             // Insert ruta_items_movidos
             const { error: insertErr } = await supabase
-                .from("ruta_items_movidos")
-                .insert({ historial_carga_id: historialId, item_catalogo_id: itemRow.id, created_at: new Date().toISOString() });
+                .from("ruta_despacho_historial_carga_items_movidos")
+                .insert({ ruta_despacho_historial_carga_id: historialId, item_catalogo_id: itemRow.id });
 
             if (insertErr) {
                 console.error("Error inserting ruta_items_movidos:", insertErr);
@@ -237,8 +242,8 @@ export async function POST(request) {
 
             // Build carga_item_ids for response: get all items moved in carga historials
             const { data: cargaHistorials } = await supabase
-                .from("ruta_historial_carga")
-                .select(`items:ruta_items_movidos(item_catalogo_id)`)
+                .from("ruta_despacho_historial_carga")
+                .select(`items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)`)
                 .eq("ruta_id", rutaId)
                 .eq("es_carga", true);
 
@@ -264,8 +269,8 @@ export async function POST(request) {
             }
 
             const { data: rutaVenta, error: rutaVentaErr } = await supabase
-                .from("ruta_ventas")
-                .select("ruta_id")
+                .from("ruta_despacho_ventas")
+                .select("ruta_despacho_id")
                 .eq("venta_id", ventaId)
                 .limit(1);
 
@@ -283,9 +288,9 @@ export async function POST(request) {
 
             // Check duplicate
             const { data: existing2, error: existingErr2 } = await supabase
-                .from("ruta_items_movidos")
+                .from("ruta_despacho_historial_carga_items_movidos")
                 .select("id")
-                .eq("historial_carga_id", historialId)
+                .eq("ruta_despacho_historial_carga_id", historialId)
                 .eq("item_catalogo_id", itemRow.id)
                 .limit(1);
 
@@ -299,11 +304,11 @@ export async function POST(request) {
             }
 
             const { error: insertErr2 } = await supabase
-                .from("ruta_items_movidos")
-                .insert({ historial_carga_id: historialId, item_catalogo_id: itemRow.id, created_at: new Date().toISOString() });
+                .from("ruta_despacho_historial_carga_items_movidos")
+                .insert({ ruta_despacho_historial_carga_id: historialId, item_catalogo_id: itemRow.id });
 
             if (insertErr2) {
-                console.error("Error inserting ruta_items_movidos:", insertErr2);
+                console.error("Error inserting ruta_despacho_historial_carga_items_movidos:", insertErr2);
                 return NextResponse.json({ ok: false, error: "Failed to record moved item" }, { status: 500 });
             }
 

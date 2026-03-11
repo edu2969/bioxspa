@@ -107,17 +107,17 @@ export async function GET() {
     // Obtener carga_item_ids para cada ruta
     const cargaItemsPromises = rutasDespacho.map(async (ruta) => {
         const { data: cargaHistorial } = await supabase
-            .from("ruta_historial_carga")
+            .from("ruta_despacho_historial_carga")
             .select(`
-                    items:ruta_items_movidos(
+                    items:ruta_despacho_historial_carga_items_movidos(
                         item_catalogo:items_catalogo(id, subcategoria_id)
                     )
                 `)
-            .eq("ruta_id", ruta.id)
+            .eq("ruta_despacho_id", ruta.id)
             .eq("es_carga", true);
         const items = cargaHistorial?.flatMap(h => h.items.map(i => ({
             id: i.item_catalogo.id,
-            subcategoria_catalogo_id: i.item_catalogo.subcategoria_id
+            subcategoriaCatalogoId: i.item_catalogo.subcategoria_id
         }))) || [];
         return { rutaId: ruta.id, items };
     });
@@ -129,7 +129,7 @@ export async function GET() {
         const ventas = ruta.ventas.map((rv) => {
             const venta = rv.venta;
             return {
-                venta_id: venta.id,
+                ventaId: venta.id,
                 tipo: venta.tipo,
                 fecha: venta.fecha,
                 comentario: venta.comentario,
@@ -138,52 +138,52 @@ export async function GET() {
                     rut: venta.cliente?.rut || null,
                     direccion: venta.cliente?.direccion_principal?.direccion || null,
                     telefono: venta.cliente?.telefono || null,
-                    direcciones_despacho: venta.direcciones_despacho?.map(dd => ({
+                    direccionesDespacho: venta.direcciones_despacho?.map(dd => ({
                         nombre: dd.direccion?.nombre || null,
-                        direccion_id: dd.direccion_id || null,
+                        direccionId: dd.direccion_id || null,
                         latitud: dd.direccion?.latitud || null,
                         longitud: dd.direccion?.longitud || null
                     })) || []
                 },
                 detalles: venta.detalles.map((det) => ({
                     multiplicador: det.cantidad,
-                    restantes: det.cantidad - (cargaItemsMap[ruta.id] || []).filter(i => i.subcategoria_catalogo_id === det.subcategoria?.id).length,
-                    subcategoria_catalogo_id: {
+                    restantes: det.cantidad - (cargaItemsMap[ruta.id] || []).filter(i => i.subcategoriaCatalogoId === det.subcategoria?.id).length,
+                    subcategoriaCatalogoId: {
                         id: det.subcategoria?.id,
                         nombre: det.subcategoria?.nombre,
                         unidad: det.subcategoria?.unidad,
                         cantidad: det.subcategoria?.cantidad,
-                        categoria_catalogo_id: {
+                        categoriaCatalogoId: {
                             id: det.subcategoria?.categoria?.id,
                             nombre: det.subcategoria?.categoria?.nombre,
                             tipo: det.subcategoria?.categoria?.tipo,
                             gas: det.subcategoria?.categoria?.gas,
                             elemento: det.subcategoria?.categoria?.elemento,
-                            es_industrial: det.subcategoria?.categoria?.es_industrial
+                            esIndustrial: det.subcategoria?.categoria?.es_industrial
                         }
                     }
                 })),
-                entregas_en_local: venta.entregas?.map(e => ({
-                    nombre_recibe: e.nombre_recibe,
-                    rut_recibe: e.rut_recibe,
-                    created_at: e.created_at
+                entregasEnLocal: venta.entregas?.map(e => ({
+                    nombreRecibe: e.nombre_recibe,
+                    rutRecibe: e.rut_recibe,
+                    createdAt: e.created_at
                 })) || []
             };
         });
 
-        const fecha_venta_mas_reciente = ventas.length > 0 ? new Date(Math.max(...ventas.map(v => new Date(v.fecha)))) : null;
+        const fechaVentaMasReciente = ventas.length > 0 ? new Date(Math.max(...ventas.map(v => new Date(v.fecha)))) : null;
 
-        const retiro_en_local = ventas.some(v => v.entregas_en_local.length > 0);
+        const retiroEnLocal = ventas.some(v => v.entregasEnLocal.length > 0);
 
         return {
-            ruta_id: ruta.id,
+            rutaDespachoId: ruta.id,
             ventas,
-            nombre_chofer: ruta.conductor?.nombre || null,
-            patente_vehiculo: ruta.vehiculo?.patente || null,
-            fecha_venta_mas_reciente,
-            carga_item_ids: cargaItemsMap[ruta.id] || [],
+            nombreChofer: ruta.conductor?.nombre || null,
+            patenteVehiculo: ruta.vehiculo?.patente || null,
+            fechaVentaMasReciente: fechaVentaMasReciente ? fechaVentaMasReciente.toISOString() : null,
+            cargaItemIds: cargaItemsMap[ruta.id] || [],
             estado: ruta.estado,
-            retiro_en_local
+            retiroEnLocal: retiroEnLocal
         };
     });
 
@@ -200,20 +200,22 @@ export async function POST(request) {
                 { status: 401 }
             );
         }
+        const { user } = authResult.data;
+        const userId = user.id;
 
-        const { ruta_id } = await request.json();
-        if (!ruta_id) {
-            return NextResponse.json({ error: "ruta_id is required" }, { status: 400 });
+        const { rutaId } = await request.json();
+        if (!rutaId) {
+            return NextResponse.json({ error: "rutaId is required" }, { status: 400 });
         }
 
-        console.log("[despacho.POST] User", userId, "confirming carga for ruta", ruta_id);
+        console.log("[despacho.POST] User", userId, "confirming carga for ruta", rutaId);
         const supabase = await getSupabaseServerClient();
 
         // Obtener la ruta y sus ventas
         const { data: rutaData, error: rutaError } = await supabase
             .from("rutas_despacho")
             .select("id, ruta_despacho_ventas(venta_id)")
-            .eq("id", ruta_id)
+            .eq("id", rutaId)
             .single();
         if (rutaError || !rutaData) {
             console.error("[despacho.POST] ruta not found", rutaError);
@@ -237,12 +239,12 @@ export async function POST(request) {
             .from("ruta_despacho_historial_carga")
             .select(`
                 id,
-                items:ruta_despacho_items_movidos(
+                items:ruta_despacho_historial_carga_items_movidos(
                     item_catalogo:items_catalogo(id, subcategoria_id)
                 ),
                 fecha
             `)
-            .eq("ruta_despacho_id", ruta_id)
+            .eq("ruta_despacho_id", rutaId)
             .eq("es_carga", true)
             .order("fecha", { ascending: false })
             .limit(1);
@@ -279,7 +281,7 @@ export async function POST(request) {
         });
 
         if (!cargaCompleta) {
-            console.warn("[despacho.POST] carga incompleta", { ruta_id, ventaIds });
+            console.warn("[despacho.POST] carga incompleta", { rutaId, ventaIds });
             return NextResponse.json({
                 error: "La carga no está complete. Faltan elementos por cargar.",
                 message: "No se puede confirmar la carga hasta que todos los pedidos estén cubiertos."
@@ -303,7 +305,7 @@ export async function POST(request) {
         const { error: updateRutaError } = await supabase
             .from("rutas_despacho")
             .update({ estado: nuevoEstado })
-            .eq("id", ruta_id);
+            .eq("id", rutaId);
         if (updateRutaError) {
             console.error("[despacho.POST] error updating ruta estado", updateRutaError);
             return NextResponse.json({ ok: false, error: updateRutaError.message }, { status: 500 });
@@ -312,7 +314,7 @@ export async function POST(request) {
         // Insertar historial de estado
         const { error: histEstadoError } = await supabase
             .from("ruta_despacho_historial_estados")
-            .insert({ ruta_despacho_id: ruta_id, estado: nuevoEstado, usuario_id: userId });
+            .insert({ ruta_despacho_id: rutaId, estado: nuevoEstado, usuario_id: userId });
         if (histEstadoError) {
             console.error("[despacho.POST] error inserting ruta_despacho_historial_estados", histEstadoError);
         }
@@ -337,7 +339,7 @@ export async function POST(request) {
             }
         }
 
-        console.log("[despacho.POST] carga confirmada for ruta", ruta_id, "items", itemCatalogoIds.length);
+        console.log("[despacho.POST] carga confirmada for ruta", rutaId, "items", itemCatalogoIds.length);
 
         return NextResponse.json({ ok: true });
 

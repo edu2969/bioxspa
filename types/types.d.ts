@@ -92,28 +92,28 @@ export interface ISubcategoriaCatalogoPoblado {
     nombre: string;
     unidad?: string;
     cantidad?: number;
-    sin_sifon?: boolean;
-    categoria_catalogo_id: {
+    sinSifon?: boolean;
+    categoriaCatalogoId: {
         id?: string;
         nombre: string;
         tipo?: number;
         gas?: string;
         elemento?: string;
-        es_industrial?: boolean;
+        esIndustrial?: boolean;
     };
 }
 
 export interface ICargaDespachoView {
-    ruta_id: string | null;
+    rutaDespachoId: string | null;
     ventas: Array<{
-        venta_id: string;
+        ventaId: string;
         tipo: number;
         fecha: Date;
         detalles: Array<{
             multiplicador: number;
             restantes: number;
-            item_catalogo_ids: string[];
-            subcategoria_catalogo_id: ISubcategoriaCatalogoPoblado;
+            itemCatalogoIds: string[];
+            subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
         }>;
         comentario: string | null;
         cliente: {
@@ -121,28 +121,28 @@ export interface ICargaDespachoView {
             rut?: string | null;
             direccion?: string | null;
             telefono?: string | null;
-            direcciones_despacho: Array<{
-                nombre: string | null;
-                direccion_id: string | null;
+            direccionesDespacho: Array<{
+                id: string | null;
+                direccionCliente: string | null;
                 latitud: number | null;
                 longitud: number | null;
             }>;
         };
-        entregas_en_local: Array<{
-            nombre_recibe: string | null;
-            rut_recibe: string | null;
-            created_at: Date;
+        entregasEnLocal: Array<{
+            nombreRecibe: string | null;
+            rutRecibe: string | null;
+            createdAt: Date;
         }>;
     }>;
-    nombre_chofer: string | null;
-    patente_vehiculo: string | null;
-    fecha_venta_mas_reciente: Date | null;
-    carga_item_ids: Array<{
+    nombreChofer: string | null;
+    patenteVehiculo: string | null;
+    fechaVentaMasReciente: Date | null;
+    cargaItemIds: Array<{
         id: string;
-        subcategoria_catalogo_id: string;
+        subcategoriaCatalogoId: string;
     }>;
     estado: number | null;
-    retiro_en_local?: boolean;
+    retiroEnLocal?: boolean;
 }
 
 export interface IListadoDeCargaView {
@@ -161,14 +161,14 @@ export interface IItemDeCargaView extends ICilindroView {
 
 export interface ICilindroView {
     id: string;
-    subcategoria_catalogo_id: string;
+    subcategoriaCatalogoId: string;
     cantidad: number;
     unidad: string;
-    nombre_gas: string;
-    sin_sifon: boolean;
+    nombreGas: string;
+    sinSifon: boolean;
     elemento: string;
-    es_industrial: boolean;
-    es_medicinal: boolean;
+    esIndustrial: boolean;
+    esMedicinal: boolean;
     vencido: boolean;
 }
 
@@ -178,11 +178,11 @@ export interface IItemCatalogoView extends ICilindroView {
 
 export interface IDestinoView {
     tipo: number; // TIPO_ORDEN
-    fecha_arribo: Date | null;
+    fechaArribo: Date | null;
     direccion: IDireccion;
     comentario?: string;
-    quien_recibe?: string;
-    rut_recibe?: string;
+    quienRecibe?: string;
+    rutRecibe?: string;
 }
 
 export interface IRutaConductorView {
@@ -193,14 +193,14 @@ export interface IRutaConductorView {
 }
 
 export interface IVehiculoView {
-    vehiculo_id: string;
+    vehiculoId: string;
     patente: string;
     marca: string;
     modelo: string;
 }
 
 export interface IDestinoDisponible {
-    direccion_id: string;
-    nombre_cliente: string;
-    glosa_direccion: string;
+    direccionId: string;
+    nombreCliente: string;
+    glosaDireccion: string;
 }

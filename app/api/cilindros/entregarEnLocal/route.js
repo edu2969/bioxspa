@@ -4,10 +4,15 @@ import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 export async function POST(request) {
     try {
         // Get authenticated user from Supabase
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            return NextResponse.json({ ok: false, error: "Usuario no autenticado" }, { status: 401 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
+        const { user } = authResult.data;
         const userId = user.id;
 
         const { ventaId, codigo } = await request.json();

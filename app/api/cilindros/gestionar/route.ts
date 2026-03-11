@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TIPO_CARGO } from "@/app/utils/constants";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { getCampoSubase } from "@/lib/nomenclatura-utils";
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,26 +22,27 @@ export async function POST(request: NextRequest) {
             'estado',
             'nombre',
             'descripcion',
-            'descripcion_corta',
-            'ficha_tecnica',
-            'url_ficha_tecnica',
-            'url_imagen',
-            'garantia_anual',
+            'descripcionCorta',
+            'fichaTecnica',
+            'urlFichaTecnica',
+            'urlImagen',
+            'garantiaAnual',
             'destacado',
-            'stock_minimo',
-            'stock_actual',
+            'stockMinimo',
+            'stockActual',
             'visible',
-            'fecha_mantencion',
-            'direccion_id',
+            'fechaMantencion',
+            'direccionId',
         ];
 
         const datosActualizacion: Record<string, any> = {};
         for (const campo of camposPermitidos) {
+            const campoSupabase = getCampoSubase(campo);
             if (updateData.hasOwnProperty(campo)) {
-                if(campo === 'fecha_mantencion' && updateData[campo] === '') {
+                if(campo === 'fechaMantencion' && updateData[campo] === '') {
                     continue;
-                }
-                datosActualizacion[campo] = updateData[campo];                
+                }                
+                datosActualizacion[campoSupabase] = updateData[campo];                
             }
         }
 

@@ -80,8 +80,8 @@ export default function InformacionDeCarga({
                         {listaDeCarga && listaDeCarga.cilindros.map((item, idx) => (
                             <div key={idx} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1">
                                 <b>{item.multiplicador}</b>x {item.elemento.toUpperCase()} {item.cantidad}{item.unidad}
-                                {item.sin_sifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
-                                {item.es_industrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                {item.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
+                                {item.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
                             </div>
                         ))}
                     </div>

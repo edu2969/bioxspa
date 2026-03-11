@@ -11,7 +11,7 @@ import { FaFlagCheckered } from "react-icons/fa";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
     if(!rutaDespacho) return null;
-    const destinoActual = rutaDespacho.destinos?.find(destino => destino.fecha_arribo == null);
+    const destinoActual = rutaDespacho.destinos?.find(destino => destino.fechaArribo == null);
     if (!destinoActual) return null;
     return destinoActual;
 };
@@ -48,7 +48,7 @@ export default function SelectorDeDestino({
 
             let direccionDestinoId = getValues("direccionDestinoId");
             if (!direccionDestinoId) {
-                direccionDestinoId = rutaDespacho.destinos && rutaDespacho.destinos.find(destino => destino.fecha_arribo == null)?.direccion?.id;
+                direccionDestinoId = rutaDespacho.destinos && rutaDespacho.destinos.find(destino => destino.fechaArribo == null)?.direccion?.id;
             }
 
             if (!direccionDestinoId) {
@@ -97,7 +97,7 @@ export default function SelectorDeDestino({
                 && rutaDespacho.destinos.map((destino, indexRuta) => (
                 <div className="h-12" key={`ruta_${indexRuta}`}>
                     <div className="h-4" />
-                    {destino.fecha_arribo
+                    {destino.fechaArribo
                         ? <TbFlagCheck className="text-xl mt-1" />
                         : <FaTruckFast className="text-xl mt-1 w-6" />}
                 </div>))}
@@ -142,13 +142,13 @@ export default function SelectorDeDestino({
         {!isLoadingDestinos && destinos && destinos.length > 1 && <Selector 
             options={destinos.map((destino: IDestinoDisponible): { label: string; value: string } => {
                 return {
-                    value: destino.direccion_id,
-                    label: destino.glosa_direccion
+                    value: destino.direccionId,
+                    label: destino.glosaDireccion
                 }
             })}
             register={register("direccionDestinoId")}
             label="Destino"
-            placeholder={rutaDespacho && rutaDespacho.destinos?.some(r => r.fecha_arribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
+            placeholder={rutaDespacho && rutaDespacho.destinos?.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
             getLabel={(option: { label: string; value: string }) => option.label}
             getValue={(option: { label: string; value: string }) => option.value}
         />}

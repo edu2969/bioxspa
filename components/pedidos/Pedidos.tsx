@@ -117,32 +117,31 @@ export default function Pedidos() {
     };
 
     const formInvalid = () => {
-        // Validación adicional para precios seleccionados
         const precios = getValues('precios');
-
-        if(!precios || precios.length == 0) {            
+        if(!precios || precios.length == 0) {
             return true;
         }
 
         const noSeleccionados = precios.every(precio => !precio.seleccionado);
-        if(noSeleccionados) {            
+        if(noSeleccionados) {
             return true;
         }
 
         if (precios && Array.isArray(precios)) {
+            const selectedItems = precios.filter(precio => precio.seleccionado);
             const hasSelectedWithoutQuantity = precios.some(precio => 
                 precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
             );
-            if (hasSelectedWithoutQuantity) {                
+            if (hasSelectedWithoutQuantity) {
+                const selectedWithoutQuantity = precios.filter(precio =>
+                    precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
+                );
                 return true;
             }
         }
-
-        // Validación básica del formulario
-        if (!formState.isValid || formState.isSubmitting || redirecting) {            
+        if (!formState.isValid || formState.isSubmitting || redirecting) {
             return true;
         }
-
         return false;
     }
 
