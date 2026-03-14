@@ -54,28 +54,6 @@ const resetVentas = async () => {
         return { ok: true, tableName, count: count || 0 };
     };
 
-    const deleteFromFirstExistingTable = async (tableNames, idColumn = "id") => {
-        for (const tableName of tableNames) {
-            const result = await deleteAllRows(tableName, idColumn);
-            if (result.ok) {
-                return result;
-            }
-        }
-        return { ok: false, missing: true };
-    };
-
-    const countVentasRemaining = async () => {
-        const { count, error } = await supabase
-            .from("ventas")
-            .select("id", { count: "exact", head: true });
-
-        if (error) {
-            throw new Error(`[resetVentas] Error contando ventas restantes: ${error.message}`);
-        }
-
-        return count || 0;
-    };
-
     const tryNullifyBiDeudasUltimaVenta = async () => {
         const { error } = await supabase
             .from("bi_deudas")
@@ -110,35 +88,16 @@ const resetVentas = async () => {
         await deleteAllRows("registro_comisiones");
         await tryNullifyBiDeudasUltimaVenta();
 
-        // 2) Limpiar relaciones e historial de rutas (compatibilidad nombres nuevos/legacy).
-        await deleteFromFirstExistingTable([
-            "ruta_despacho_historial_carga_items_movidos",
-            "ruta_despacho_items_movidos",
-            "ruta_items_movidos"
-        ]);
+        // 2) Limpiar relaciones e historial de rutas.
+        await deleteAllRows("ruta_despacho_historial_carga_items_movidos");
+        await deleteAllRows("ruta_despacho_historial_carga");
+        await deleteAllRows("ruta_despacho_historial_estados");
+        await deleteAllRows("ruta_despacho_destinos");
+        await deleteAllRows("ruta_despacho_ventas");
 
-        await deleteFromFirstExistingTable([
-            "ruta_despacho_historial_carga",
-            "ruta_historial_carga"
-        ]);
-
-        await deleteFromFirstExistingTable([
-            "ruta_despacho_historial_estados",
-            "ruta_historial_estados"
-        ]);
-
-        await deleteFromFirstExistingTable([
-            "ruta_despacho_destinos",
-            "ruta_destinos"
-        ]);
-
-        await deleteFromFirstExistingTable([
-            "ruta_despacho_ventas",
-            "ruta_ventas"
-        ]);
-
-        // 3) No se eliminan ventas (por RLS); se reporta cuántas quedan pendientes.
-        const ventasPendientesEliminar = await countVentasRemaining();
+        // 3) Eliminar ventas.
+        const ventasEliminadasResult = await deleteAllRows("ventas");
+        const ventasEliminadas = ventasEliminadasResult.count || 0;
 
         // 4) Finalmente borrar rutas de despacho.
         try {
@@ -150,13 +109,13 @@ const resetVentas = async () => {
             }
 
             // Reintentar una vez más tras limpiar relaciones de ruta.
-            await deleteFromFirstExistingTable(["ruta_despacho_ventas", "ruta_ventas"]);
+            await deleteAllRows("ruta_despacho_ventas");
             await deleteAllRows("rutas_despacho");
         }
 
         return {
-            message: "Reset de relaciones de ventas/rutas completado. Las ventas no se eliminan en este proceso.",
-            ventasPendientesEliminar,
+            message: "Reset completo de ventas y rutas finalizado.",
+            ventasEliminadas,
             ...summary
         };
     } catch (error) {

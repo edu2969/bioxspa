@@ -47,6 +47,7 @@ export async function GET(request) {
 
     try {
         // Fetch client details
+        const supabase = await getSupabaseServerClient();
         const { data: cliente, error: clienteError } = await supabase
             .from('clientes')
             .select('id, nombre, rut, credito')
@@ -64,7 +65,7 @@ export async function GET(request) {
                 id, fecha, valor_total, codigo,
                 vendedor:usuarios(nombre),
                 documento:documentos_tributarios(nombre),
-                direccion_despacho_id:direcciones(id, nombre)
+                direccion_despacho_id:direcciones(id, direccion_cliente)
             `)
             .eq('cliente_id', clienteId)
             .eq('por_cobrar', true)
@@ -118,7 +119,7 @@ export async function GET(request) {
         return NextResponse.json({
             ok: true,
             cliente: {
-                _id: cliente.id,
+                id: cliente.id,
                 nombre: cliente.nombre,
                 rut: cliente.rut,
                 credito: cliente.credito || 0,

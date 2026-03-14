@@ -3,9 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import SoundPlayerProvider from "./context/SoundPlayerContext";
 import { ChecklistProvider } from "./context/ChecklistContext";
-import { ICilindroView, IRutaConductorView, IVehiculoView } from "@/types/types";
+import { ICilindroView, IRutaConductorView } from "@/types/types";
 import Nav from "./Nav";
-import { Suspense, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import Loader from "./Loader";
 import InformacionDeCarga from "./prefabs/InformacionDeCarga";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
@@ -18,24 +18,45 @@ import { FaClipboardCheck } from "react-icons/fa";
 import { Toaster } from "react-hot-toast";
 import VolverABase from "./panelConductor/VolverABase";
 import FinalizarRuta from "./panelConductor/FinalizarRuta";
+import { useUser } from "./providers/UserProvider";
+import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 
-export default function PanelConductor() {
+function PanelConductorContent() {
     const [scanMode, setScanMode] = useState(false);
     const vehicleContainerRef = useRef<HTMLDivElement>(null);
+    const { user, loading: loadingUser } = useUser();
+    const userId = user?.id || null;
+
+    useRealtimeQuery({
+        channelName: `rutas-despacho-conductor-${userId || 'sin-usuario'}`,
+        schema: 'public',
+        table: 'rutas_despacho',
+        event: '*',
+        filter: userId ? `conductor_id=eq.${userId}` : undefined,
+        queryKeys: [
+            ['ruta-despacho-conductor', userId],
+            ['estado-ruta-conductor', userId],
+            ['carga-vehiculo', userId],
+            ['descarga-vehiculo', userId],
+        ],
+        enabled: !!userId,
+    });
 
     const { data: ruta, isLoading: isLoadingRuta } = useQuery<IRutaConductorView | null>({
-        queryKey: ['ruta-despacho-conductor'],
+        queryKey: ['ruta-despacho-conductor', userId],
         queryFn: async () => {
-            const response = await fetch(`/api/conductor/rutaAsignada`);
+            if (!userId) return null;
+            const response = await fetch(`/api/conductor/rutaAsignada?userId=${userId}`);
             const data = await response.json();
             console.log("Ruta de despacho del conductor:", data);
             if (!data.ruta) return null;
             return data.ruta;
-        }
+        },
+        enabled: !!userId
     });
 
     const { data: estado, isLoading: loadingEstado } = useQuery<number>({
-        queryKey: ['estado-ruta-conductor', ruta?.id],
+        queryKey: ['estado-ruta-conductor', userId, ruta?.id],
         queryFn: async () => {
             if (!ruta || !ruta.id) return 0;
             const response = await fetch(`/api/conductor/estadoRuta?rutaId=${ruta.id}`);
@@ -43,33 +64,39 @@ export default function PanelConductor() {
             console.log("Estado de la ruta de despacho:", data.estado);
             return data.estado;
         },
-        enabled: !!ruta,
+        enabled: !!userId && !!ruta,
         initialData: -1
     });
 
     const { data: cargados } = useQuery<ICilindroView[]>({
-        queryKey: ['carga-vehiculo', ruta?.id],
+        queryKey: ['carga-vehiculo', userId, ruta?.id],
         queryFn: async () => {
             if (!ruta || !ruta.id) return [];
             const response = await fetch(`/api/conductor/cilindrosCargados?rutaId=${ruta.id}`);
             const data = await response.json();
             return data.cilindrosCargados;
         },
-        enabled: !!ruta
+        enabled: !!userId && !!ruta
     });
 
     const { data: descarga, isLoading: loadingDescarga } = useQuery<ICilindroView[]>({
-        queryKey: ['descarga-vehiculo', ruta?.id],
+        queryKey: ['descarga-vehiculo', userId, ruta?.id],
         queryFn: async () => {
             if (!ruta || !ruta.id) return [];
             const response = await fetch(`/api/conductor/cilindrosDescargados?rutaId=${ruta.id}`);
             const data = await response.json();
             return data.cilindrosDescargados;
         },
-        enabled: !!ruta
+        enabled: !!userId && !!ruta
     });
 
-    return (<Suspense fallback={<Loader texto="Cargando panel" />}>
+    if (loadingUser) {
+        return <div className="w-full flex flex-col h-screen items-center justify-center">
+            <Loader texto="Cargando sesión" />
+        </div>;
+    }
+
+    return (<>
         <ChecklistProvider tipo="vehiculo">
             <SoundPlayerProvider>
                 {ruta && (
@@ -144,5 +171,9 @@ export default function PanelConductor() {
         </ChecklistProvider>
         <Nav />
         <Toaster />
-    </Suspense>);
+    </>);
+}
+
+export default function PanelConductor() {
+    return <PanelConductorContent />;
 }

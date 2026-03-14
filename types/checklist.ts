@@ -6,7 +6,7 @@ export interface IItemChecklist {
 }
 
 export interface IChecklist {
-    _id?: string;
+    id?: string;
     tipo: number;
     userId: string;
     vehiculoId?: string;

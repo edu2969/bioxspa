@@ -64,9 +64,9 @@ export async function POST(request) {
 
         // Get the last destination of the route (most recent by creation order)
         const { data: rutaDestinos, error: destinosError } = await supabase
-            .from("ruta_destinos")
+            .from("ruta_despacho_destinos")
             .select("id, direccion_destino_id, fecha_arribo")
-            .eq("ruta_id", rutaId)
+            .eq("ruta_despacho_id", rutaId)
             .order("created_at", { ascending: false })
             .limit(1);
 
@@ -84,14 +84,14 @@ export async function POST(request) {
 
         // Get items currently loaded in the route (from latest carga)
         const { data: cargaHistorial, error: cargaError } = await supabase
-            .from("ruta_historial_carga")
+            .from("ruta_despacho_historial_carga_historial_carga")
             .select(`
                 id,
-                items:ruta_items_movidos(
+                items:ruta_despacho_historial_carga_items_movidos(
                     item_catalogo_id
                 )
             `)
-            .eq("ruta_id", rutaId)
+            .eq("ruta_despacho_id", rutaId)
             .eq("es_carga", true)
             .order("fecha", { ascending: false })
             .limit(1);
@@ -120,7 +120,7 @@ export async function POST(request) {
 
         // Get ventas associated with this route
         const { data: rutaVentas, error: ventasRutaError } = await supabase
-            .from("ruta_ventas")
+            .from("ruta_despacho_ventas")
             .select(`
                 venta:ventas(
                     id,
@@ -129,7 +129,7 @@ export async function POST(request) {
                     direccion_despacho_id
                 )
             `)
-            .eq("ruta_id", rutaId);
+            .eq("ruta_despacho_id", rutaId);
 
         if (ventasRutaError) {
             console.error("Error fetching route ventas:", ventasRutaError);
@@ -219,9 +219,9 @@ export async function POST(request) {
 
         // Add to route historial estados
         const { error: historialRutaError } = await supabase
-            .from("ruta_historial_estados")
+            .from("ruta_despacho_historial_estados")
             .insert({
-                ruta_id: rutaId,
+                ruta_despacho_id: rutaId,
                 estado: estadoFinal,
                 fecha: now,
                 usuario_id: user.id
@@ -235,9 +235,9 @@ export async function POST(request) {
         if (itemMovidoIds.length > 0) {
             // First insert the historial_carga record
             const { data: historialCargaRecord, error: historialCargaError } = await supabase
-                .from("ruta_historial_carga")
+                .from("ruta_despacho_historial_carga")
                 .insert({
-                    ruta_id: rutaId,
+                    ruta_despacho_id: rutaId,
                     fecha: now,
                     es_carga: tieneRetiro,
                     usuario_id: user.id
@@ -250,12 +250,12 @@ export async function POST(request) {
             } else {
                 // Then insert the individual item movements
                 const itemMovimientos = itemMovidoIds.map(itemId => ({
-                    ruta_historial_carga_id: historialCargaRecord.id,
+                    ruta_despacho_historial_carga_id: historialCargaRecord.id,
                     item_catalogo_id: itemId
                 }));
 
                 const { error: itemMovimientosError } = await supabase
-                    .from("ruta_items_movidos")
+                    .from("ruta_despacho_historial_carga_items_movidos")
                     .insert(itemMovimientos);
 
                 if (itemMovimientosError) {

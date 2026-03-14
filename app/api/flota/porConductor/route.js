@@ -49,7 +49,7 @@ export async function GET() {
         }
 
         const result = (vehiculos || []).map((v) => ({
-            _id: v.id,
+            id: v.id,
             marca: v.marca,
             modelo: v.modelo,
             patente: v.patente,

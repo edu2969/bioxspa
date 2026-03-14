@@ -10,30 +10,30 @@ export async function GET(request) {
         const rutaId = searchParams.get('rutaId');
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId es requerido" }, { status: 400 });
 
-        const { data: authResult } = await getAuthenticatedUser();
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
 
-        if (!authResult || !authResult.userData) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        } 
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
 
-        const { data: userData, error: userError } = await supabase
-            .from("usuarios")
-            .select("role")
-            .eq("id", user.id)
-            .single();
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
 
-        if (userError || !userData) {
-            console.warn(`User not found for ID: ${user.id}`);
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-        } else if (userData.role !== USER_ROLE.conductor) {
-            console.warn(`User ${user.id} is not a conductor. Role: ${userData.role}`);
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
             return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
         }
 
-        // Obtener la ruta y sus ventas (join table ruta_ventas)
+        const supabase = await getSupabaseServerClient();
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select('id, conductor_id, dependencia_id, ruta_ventas(venta_id)')
+            .select('id, conductor_id, dependencia_id, ruta_despacho_ventas(venta_id)')
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -44,7 +44,7 @@ export async function GET(request) {
         if (!rutaData) return NextResponse.json({ ok: false, error: 'Ruta no encontrada' }, { status: 404 });
 
 
-        const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length === 0) {
             return NextResponse.json({ encargado: '', cilindros: [] });
         }

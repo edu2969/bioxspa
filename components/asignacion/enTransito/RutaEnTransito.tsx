@@ -4,6 +4,7 @@ import useVehicleScaling from "@/components/uix/useVehicleScaling";
 import { ICilindroView, IRutaEnTransito, IRutasEnTransitoResponse, IVentaEnTransito } from "@/types/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
+import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { BsGeoAltFill } from "react-icons/bs";
 import { FaRegCheckCircle } from "react-icons/fa";
 import { FaTruckFast } from "react-icons/fa6";
@@ -25,6 +26,8 @@ export default function RutaEnTransito({
     
     // Hook de escalado para el vehículo
     const vehicleScaling = useVehicleScaling(vehicleContainerRef);
+
+    
 
     // Obtener datos del vehículo para el scaling
     const { data: vehiculo } = useQuery({
@@ -86,7 +89,39 @@ export default function RutaEnTransito({
         enabled: !!rutaId
     });
 
-    return (<div className="w-full border rounded-lg bg-gray-100 shadow-md mb-4 pt-4" key={`ruta_${index}`}>
+    const ventasIds = (ventasEnTransito || []).map((venta) => venta.venta_id).filter(Boolean);
+    const ventasFilter = ventasIds.length ? `id=in.(${ventasIds.join(',')})` : undefined;
+
+    useRealtimeQuery({
+        channelName: `ruta-en-transito-${rutaId || 'sin-ruta'}`,
+        schema: 'public',
+        table: 'rutas_despacho',
+        event: 'UPDATE',
+        filter: rutaId ? `id=eq.${rutaId}` : undefined,
+        queryKeys: [
+            ['ruta-en-transito', rutaId],
+            ['carga-vehiculo', rutaId],
+            ['descarga-vehiculo', rutaId],
+            ['ventas-en-transito', rutaId],
+        ],
+        enabled: !!rutaId,
+    });
+
+    useRealtimeQuery({
+        channelName: `ventas-en-transito-${rutaId || 'sin-ruta'}`,
+        schema: 'public',
+        table: 'ventas',
+        event: 'UPDATE',
+        filter: ventasFilter,
+        queryKeys: [
+            ['ventas-en-transito', rutaId],
+            ['ruta-en-transito', rutaId],
+            ['rutas-en-transito'],
+        ],
+        enabled: !!rutaId && !!ventasFilter,
+    });
+
+    return rutaId && (<div className="w-full border rounded-lg bg-gray-100 shadow-md mb-4 pt-4" key={`ruta_${index}`}>
         <div className="flex">
             <div className="flex-1" 
                 ref={vehicleContainerRef}
@@ -102,7 +137,7 @@ export default function RutaEnTransito({
                 />
                 <div className="flex mb-2 mt-2">
                     <BsGeoAltFill size="1.25rem" className="text-gray-700 ml-2" />
-                    <p className="text-xs text-gray-500 ml-2 truncate">{rutaEnTransito?.direccion_destino}</p>
+                    <p className="text-xs text-gray-500 ml-2 truncate">{rutaEnTransito?.direccion_destino || 'Seleccionando destino...'}</p>
                 </div>
             </div>
 

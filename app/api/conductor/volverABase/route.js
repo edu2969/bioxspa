@@ -26,7 +26,7 @@ export async function POST(req) {
             }, { status: 400 });
         }
 
-        // Find the rutaDespacho using Supabase
+        const supabase = await getSupabaseServerClient();
         const { data: rutaDespacho, error: rutaError } = await supabase
             .from('rutas_despacho')
             .select('*')
@@ -90,11 +90,11 @@ export async function POST(req) {
             fecha: null
         };
         
-        // Insert the new destination into the ruta_destinos table
+        // Insert the new destination into the ruta_despacho_destinos table
         const { error: insertError } = await supabase
-            .from('ruta_destinos')
+            .from('ruta_despacho_destinos')
             .insert({
-                ruta_id: rutaId,
+                ruta_despacho_id: rutaId,
                 direccion_id: direccionId,
                 fecha_arribo: null,
                 rut_quien_recibe: null,
@@ -103,10 +103,10 @@ export async function POST(req) {
             });
 
         if (insertError) {
-            console.error('Error inserting new destination into ruta_destinos:', insertError);
+            console.error('Error inserting new destination into ruta_despacho_destinos:', insertError);
             return NextResponse.json({ 
                 ok: false, 
-                error: "Error adding new destination to ruta_destinos" 
+                error: "Error adding new destination to ruta_despacho_destinos" 
             }, { status: 500 });
         }
 

@@ -1,23 +1,37 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get("rutaId");
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId es requerido" }, { status: 400 });
 
-        // Obtener la ruta con ventas y destinos
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select(`id, estado, conductor_id, dependencia_id, ruta_ventas(venta_id), ruta_destinos(id, direccion_id, created_at)`) 
+            .select(`id, estado, conductor_id, dependencia_id, ruta_despacho_ventas(venta_id), ruta_despacho_destinos(id, direccion_id, created_at)`) 
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -37,7 +51,7 @@ export async function GET(request) {
         }
 
         // Determinar último destino por created_at
-        const destinos = rutaData.ruta_destinos || [];
+        const destinos = rutaData.ruta_despacho_destinos || [];
         destinos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         const ultimoDestino = destinos[0];
         if (!ultimoDestino) return NextResponse.json({ ok: false, error: 'La ruta no tiene destinos definidos' }, { status: 400 });
@@ -45,7 +59,7 @@ export async function GET(request) {
         const direccionDestinoId = ultimoDestino.direccion_id;
 
         // Buscar ventas asociadas a la ruta
-        const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length === 0) return NextResponse.json({ ok: false, error: 'No hay ventas asociadas a la ruta' }, { status: 404 });
 
         const { data: ventas, error: ventasErr } = await supabase

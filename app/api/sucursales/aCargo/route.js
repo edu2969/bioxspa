@@ -34,7 +34,7 @@ export async function GET(request) {
         const sucursales = cargos
             .filter((cargo) => cargo.sucursales?.visible === true)
             .map((cargo) => ({
-                _id: cargo.sucursales.id,
+                id: cargo.sucursales.id,
                 nombre: cargo.sucursales.nombre,
             }));
 

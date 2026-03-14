@@ -119,11 +119,7 @@ export default function ChecklistModal({ tipo, onFinish }: {
         control,
         name: "kilometros"
     });
-    const totalSteps = checklistItems.length + 1;    
-
-    useEffect(() => {
-        console.log("Kilometros changed:", kilometros);
-    }, [kilometros]);
+    const totalSteps = checklistItems.length + 1;
     
     const { data: vehiculos, isLoading } = useQuery<IVehiculo[]>({
         queryKey: ["vehiculos-conductor"],

@@ -31,7 +31,8 @@ export default function Conductores({
         queryFn: async (): Promise<IConductoresResponse[]> => {
             if(sucursalId === undefined) return [];
             const response = await fetch(`/api/pedidos/asignacion/conductores?sucursalId=${sucursalId}`);
-            const data = await response.json();
+            const data = await response.json();            
+            console.log("Data: conductores", data);
             return data.conductores;
         },
         enabled: !!sucursalId

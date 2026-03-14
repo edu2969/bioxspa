@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
     try {
+        const supabase = await getSupabaseServerClient();
         const { data: formasPago, error } = await supabase
             .from('formas_pago')
             .select('*')

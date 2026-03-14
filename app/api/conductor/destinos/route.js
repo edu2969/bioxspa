@@ -1,19 +1,36 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_CARGO, TIPO_ORDEN } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const supabase = await getSupabaseServerClient();
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get('rutaId');
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
 
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+        
+        const supabase = await getSupabaseServerClient();
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select('id, estado, conductor_id, dependencia_id, ruta_destinos(id, direccion_id, fecha_arribo), ruta_ventas(venta_id)')
+            .select('id, estado, conductor_id, dependencia_id, ruta_despacho_destinos(id, direccion_id, fecha_arribo), ruta_despacho_ventas(venta_id)')
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -36,10 +53,10 @@ export async function GET(request) {
         }
 
         // Direcciones ya asignadas sin fecha de arribo
-        const asignadas = (rutaData.ruta_destinos || []).filter(d => d.fecha_arribo === null).map(d => String(d.direccion_id));
+        const asignadas = (rutaData.ruta_despacho_destinos || []).filter(d => d.fecha_arribo === null).map(d => String(d.direccion_id));
 
         // Ventas asociadas a la ruta
-        const ventaIds = (rutaData.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length === 0) return NextResponse.json({ ok: false, error: 'No hay ventas asociadas a la ruta' }, { status: 404 });
 
         const { data: ventas, error: ventasErr } = await supabase
@@ -83,7 +100,7 @@ export async function GET(request) {
 
         const { data: direcciones, error: dirErr } = await supabase
             .from('direcciones')
-            .select('id, nombre')
+            .select('id, direccion_cliente, latitud, longitud')
             .in('id', direccionIds);
 
         if (dirErr) {
@@ -107,8 +124,15 @@ export async function GET(request) {
         for (const cd of (cliDirsAll || [])) direccionToCliente[cd.direccion_id] = cd.cliente_id;
 
         const destinos = (direcciones || []).map(d => ({
-            direccionId: d.id,
-            glosaDireccion: d.nombre || '',
+            tipo: TIPO_ORDEN.venta,
+            fechaArribo: null,
+            direccion: {
+                id: d.id,
+                direccionCliente: d.direccion_cliente || '',
+                latitud: d.latitud || 0,
+                longitud: d.longitud || 0,
+            },
+            comentario: d.comentario || '',            
             nombreCliente: clienteNombreMap[direccionToCliente[d.id]] || ''
         }));
 

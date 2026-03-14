@@ -34,7 +34,7 @@ export async function GET(request) {
             return NextResponse.json({ enTransito: [] });
         }
 
-        // Fetch rutas en transito using the intermediate table ruta_ventas
+        // Fetch rutas en transito using the intermediate table ruta_despacho_ventas
         const { data: rutasRelacionadas, error: rutasRelacionadasError } = await supabase
             .from("ruta_despacho_ventas")
             .select("ruta_despacho_id")

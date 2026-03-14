@@ -18,17 +18,6 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: "sucursalId is required" }, { status: 400 });
         }
 
-        // Obtener choferes en ruta
-        const { data: conductoresEnEspera, error: conductoresEnEsperaError } = await supabase
-            .from("rutas_despacho")
-            .select("conductor_id")
-            .eq("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion);
-
-        if (conductoresEnEsperaError) {
-            return NextResponse.json({ ok: false, error: conductoresEnEsperaError.message }, { status: 500 });
-        }
-
-        // Obtener sucursal y dependencias
         const { data: sucursal, error: sucursalError } = await supabase
             .from("sucursales")
             .select("id")
@@ -61,9 +50,6 @@ export async function GET(request) {
             return NextResponse.json({ ok: false, error: cargosError.message }, { status: 500 });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
         // Obtener datos de los conductores
         const conductores = await Promise.all(
             cargosChoferes.map(async (cargo) => {
@@ -77,11 +63,13 @@ export async function GET(request) {
                     return null;
                 }
 
+                const userId = usuario.id;
+
                 // Obtener ruta de despacho para el conductor
                 const { data: rutaDespacho } = await supabase
                     .from("rutas_despacho")
                     .select("id")
-                    .eq("conductor_id", usuario.id)
+                    .eq("conductor_id", userId)
                     .eq("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
                     .single();
 
@@ -148,18 +136,25 @@ export async function GET(request) {
                     }
                 }
 
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+                const startOfTomorrow = new Date(startOfToday);
+                startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+        
                 // Verificar si existe un checklist para hoy
-                const { data: checklistExists } = await supabase
+                const { data: checklistExists, error: checklistError } = await supabase
                     .from("checklists")
                     .select("id")
-                    .eq("usuario_id", usuario.id)
+                    .eq("usuario_id", userId)
                     .eq("tipo", TIPO_CHECKLIST.vehiculo)
-                    .gte("fecha", today.toISOString())
-                    .lt("fecha", new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString())
-                    .single();
+                    .gte("created_at", startOfToday.toISOString())
+                    .lt("created_at", startOfTomorrow.toISOString())
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
 
                 return {
-                    id: usuario.id,
+                    id: userId,
                     nombre: usuario.nombre,
                     pedidos,
                     checklist: !!checklistExists

@@ -4,22 +4,30 @@ import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 
 export async function POST() {
     try {
-        console.log("[CONFIRMAR ORDEN] Iniciando proceso de confirmación de orden (Supabase)");
-
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
-            console.warn("[CONFIRMAR ORDEN] Usuario no autenticado");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
 
-        const choferId = user.id;
-        console.log(`[CONFIRMAR ORDEN] Usuario autenticado: ${choferId}`);
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
 
-        // Verificar que el usuario tenga cargo de chofer activo
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: cargoChofer, error: cargoErr } = await supabase
             .from('cargos')
             .select('id, hasta')
-            .eq('usuario_id', choferId)
+            .eq('usuario_id', userId)
             .eq('tipo', TIPO_CARGO.conductor)
             .limit(1)
             .maybeSingle();
@@ -31,15 +39,15 @@ export async function POST() {
 
         const now = new Date();
         if (!cargoChofer || (cargoChofer.hasta && new Date(cargoChofer.hasta) < now)) {
-            console.warn(`[CONFIRMAR ORDEN] Usuario ${choferId} no tiene cargo de chofer activo`);
+            console.warn(`[CONFIRMAR ORDEN] Usuario ${userId} no tiene cargo de chofer activo`);
             return NextResponse.json({ ok: false, error: 'No autorizado: no es chofer activo' }, { status: 403 });
         }
 
         // Buscar la ruta asociada al chofer en estado orden_cargada
         const { data: rutaDespacho, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select('id, estado, ruta_ventas(venta_id)')
-            .eq('conductor_id', choferId)
+            .select('id, estado, ruta_despacho_ventas(venta_id)')
+            .eq('conductor_id', userId)
             .eq('estado', TIPO_ESTADO_RUTA_DESPACHO.orden_cargada)
             .maybeSingle();
 
@@ -49,7 +57,7 @@ export async function POST() {
         }
 
         if (!rutaDespacho) {
-            console.warn(`[CONFIRMAR ORDEN] No se encontró ruta en estado 'orden_cargada' para chofer ${choferId}`);
+            console.warn(`[CONFIRMAR ORDEN] No se encontró ruta en estado 'orden_cargada' para chofer ${userId}`);
             return NextResponse.json({ ok: false, error: "No hay ruta en estado 'orden_cargada' para este chofer" }, { status: 404 });
         }
 
@@ -66,15 +74,19 @@ export async function POST() {
 
         // Insertar historial de estado
         const { error: histErr } = await supabase
-            .from('ruta_historial_estados')
-            .insert({ ruta_id: rutaDespacho.id, estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada });
+            .from('ruta_despacho_historial_estados')
+            .insert({ 
+                ruta_despacho_id: rutaDespacho.id, 
+                estado: TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
+                usuario_id: userId
+            });
 
         if (histErr) {
             console.error('[CONFIRMAR ORDEN] Error insertando historial de estado:', histErr);
         }
 
         // Si la ruta tiene exactamente una venta, intentar agregar destino si el cliente tiene una sola dirección de despacho
-        const ventaIds = (rutaDespacho.ruta_ventas || []).map(r => r.venta_id).filter(Boolean);
+        const ventaIds = (rutaDespacho.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length === 1) {
             const ventaId = ventaIds[0];
             const { data: venta, error: ventaErr } = await supabase
@@ -98,19 +110,23 @@ export async function POST() {
 
                     // Verificar si ya existe ese destino en la ruta
                     const { data: existingDestino, error: exErr } = await supabase
-                        .from('ruta_destinos')
+                        .from('ruta_despacho_destinos')
                         .select('id')
-                        .eq('ruta_id', rutaDespacho.id)
+                        .eq('ruta_despacho_id', rutaDespacho.id)
                         .eq('direccion_id', direccionId)
                         .limit(1);
 
-                    if (exErr) console.error('[CONFIRMAR ORDEN] Error checking ruta_destinos:', exErr);
+                    if (exErr) console.error('[CONFIRMAR ORDEN] Error checking ruta_despacho_destinos:', exErr);
 
                     if (!existingDestino || existingDestino.length === 0) {
                         const { error: insErr } = await supabase
-                            .from('ruta_destinos')
-                            .insert({ ruta_id: rutaDespacho.id, direccion_id: direccionId, fecha_arribo: null });
-                        if (insErr) console.error('[CONFIRMAR ORDEN] Error inserting ruta_destinos:', insErr);
+                            .from('ruta_despacho_destinos')
+                            .insert({ 
+                                ruta_despacho_id: rutaDespacho.id, 
+                                direccion_id: direccionId, 
+                                fecha_arribo: null 
+                            });
+                        if (insErr) console.error('[CONFIRMAR ORDEN] Error inserting ruta_despacho_destinos:', insErr);
 
                         // Actualizar estado a seleccion_destino
                         const { error: upd2Err } = await supabase

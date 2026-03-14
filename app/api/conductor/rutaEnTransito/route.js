@@ -47,7 +47,7 @@ export async function GET(request) {
 
         // Determine latest destino by created_at
         let direccionDestino = '';
-        const destinos = rutaData.ruta_destinos || [];
+        const destinos = rutaData.ruta_despacho_destinos || [];
         if (destinos.length > 0) {
             destinos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             direccionDestino = destinos[0]?.direccion?.direccion_cliente || '';

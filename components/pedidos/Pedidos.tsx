@@ -91,7 +91,7 @@ export default function Pedidos() {
         setCreandoOrden(true);
         const payload = {
             tipo: data.tipo,
-            usuarioId: data.usuarioId,
+            usuarioId: hasRole([TIPO_CARGO.gerente]) ? data.usuarioId : user.id,
             comentario: data.comentario || "",
             clienteId: cliente?.id,
             documentoTributarioId: data.documentoTributarioId,
@@ -123,19 +123,15 @@ export default function Pedidos() {
         }
 
         const noSeleccionados = precios.every(precio => !precio.seleccionado);
-        if(noSeleccionados) {
+        if(noSeleccionados) {            
             return true;
         }
 
         if (precios && Array.isArray(precios)) {
-            const selectedItems = precios.filter(precio => precio.seleccionado);
             const hasSelectedWithoutQuantity = precios.some(precio => 
                 precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
             );
             if (hasSelectedWithoutQuantity) {
-                const selectedWithoutQuantity = precios.filter(precio =>
-                    precio.seleccionado && (!precio.cantidad || precio.cantidad <= 0)
-                );
                 return true;
             }
         }

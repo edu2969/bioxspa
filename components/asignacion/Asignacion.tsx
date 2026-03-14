@@ -16,6 +16,8 @@ import Nav from '../Nav';
 import CommentModal from '../modals/CommentModal';
 import { IPedidoPorAsignar, IConductoresResponse } from '@/types/types';
 import { useUser } from "@/components/providers/UserProvider";
+import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
+import { TIPO_CHECKLIST } from '@/app/utils/constants';
 
 interface ISucursalSelectable {
     id: string;
@@ -53,6 +55,25 @@ export default function Asignacion() {
         name: 'sucursalId'
     });
 
+    useRealtimeQuery({
+        channelName: `checklists-vehiculo-${sucursalId || 'sin-sucursal'}`,
+        schema: 'public',
+        table: 'checklists',
+        event: 'INSERT',
+        filter: `tipo=eq.${TIPO_CHECKLIST.vehiculo}`,
+        queryKeys: [['conductores', sucursalId]],
+        enabled: !!sucursalId,
+    });
+
+    useRealtimeQuery({
+        channelName: `rutas-despacho-en-transito-${sucursalId || 'sin-sucursal'}`,
+        schema: 'public',
+        table: 'rutas_despacho',
+        event: 'UPDATE',
+        filter: `id=eq.{rutaId}`,
+        queryKeys: [['rutas-en-transito', sucursalId]],
+        enabled: !!sucursalId,
+    });
 
     const { data: sucursales, isLoading } = useQuery<ISucursalSelectable[]>({
         queryKey: ['sucursales'],

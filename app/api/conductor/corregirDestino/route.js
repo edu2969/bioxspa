@@ -68,9 +68,9 @@ export async function POST(request) {
 
         // Find the last ruta destination with null fechaArribo
         const { data: rutaDestinos, error: destinosError } = await supabase
-            .from("ruta_destinos")
+            .from("ruta_despacho_destinos")
             .select("id, direccion_destino_id, fecha_arribo")
-            .eq("ruta_id", rutaId)
+            .eq("ruta_despacho_id", rutaId)
             .order("created_at", { ascending: true });
 
         if (destinosError) {
@@ -111,9 +111,9 @@ export async function POST(request) {
 
         // 2. Add to historial de estados
         const { error: historialError } = await supabase
-            .from("ruta_historial_estados")
+            .from("ruta_despacho_historial_estados")
             .insert({
-                ruta_id: rutaId,
+                ruta_despacho_id: rutaId,
                 estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino,
                 fecha: now,
                 usuario_id: user.id
@@ -126,7 +126,7 @@ export async function POST(request) {
 
         // 3. Reset the fecha_arribo to null for the last destination
         const { error: resetDestinoError } = await supabase
-            .from("ruta_destinos")
+            .from("ruta_despacho_destinos")
             .update({ fecha_arribo: null })
             .eq("id", lastPendingDestino.id);
 

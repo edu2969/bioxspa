@@ -470,8 +470,13 @@ export default function DetalleDeudas({ clienteId }) {
                             <TbMoneybag className="mr-2" size={22} />{pagosSeleccionados.size ? `Pagar ${Array.from(pagosSeleccionados).reduce((acc, curr) => acc + curr.total, 0).toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : `Seleccione ventas`}
                         </button>
                     </div>
-                    {tabSelected == 0 &&<div className="overflow-x-auto">
-                        <div className="min-w-full text-md border">
+                    {tabSelected == 0 &&<div className="overflow-x-auto text-md">
+                        <div className="min-w-full border">
+                            <div className="flex bg-gray-100 pr-4 font-bold">
+                                <div className="w-full p-2 border">Arriendos</div>                                
+                            </div>
+                        </div>
+                        <div className="min-w-full border">                            
                             <div className="flex bg-gray-100 pr-4 font-bold">
                                 <div className="w-2/12 p-2 border">Sel / Fecha</div>
                                 <div className="w-1/5 p-2 border">Total</div>

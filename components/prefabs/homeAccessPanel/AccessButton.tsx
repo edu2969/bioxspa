@@ -1,6 +1,7 @@
 import Loader from "@/components/Loader";
 import Link from "next/link";
 import { IAccessButtonProps } from "./types";
+import { PiWarningOctagonBold } from "react-icons/pi";
 
 const colors = ["bg-blue-500", "bg-green-500", "bg-yellow-500", "bg-orange-500", "bg-purple-500"];
 
@@ -20,7 +21,12 @@ export default function AccessButton({ props, routingIndex, setRoutingIndex }
                     </div>))}
                 </div>
             </div>
-            {props.warningMessage}
+            {props.warningMessage && (
+                <div className="absolute top-2 left-2 flex items-center bg-red-100 text-red-700 px-2 py-1 rounded shadow z-20">
+                    <PiWarningOctagonBold className="mr-2 text-red-600" />
+                    <span className="text-xs font-semibold">{props.warningMessage}</span>
+                </div>
+            )}
         </Link>
         {routingIndex == props.index && <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="w-full h-full flex items-center justify-center">

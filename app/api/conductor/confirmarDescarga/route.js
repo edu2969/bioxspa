@@ -1,20 +1,35 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
-import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
-import { generateBIDeudaForMultipleVentas } from "@/lib/bi/deudaGenerator";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
 
 export async function POST(req) {
     try {
         console.log("POST request received for confirmarDescarga (Supabase)");
-
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
         const body = await req.json();
         const { rutaId } = body || {};
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId es requerido" }, { status: 400 });
 
-        // Fetch ruta and validate
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: rutaData, error: rutaErr } = await supabase
             .from("rutas_despacho")
             .select("id, estado, conductor_id")
@@ -32,7 +47,7 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: 'La ruta no está en estado de descarga' }, { status: 400 });
         }
 
-        if (String(rutaData.conductor_id) !== String(user.id)) {
+        if (rutaData.conductor_id !== userId) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
@@ -46,28 +61,33 @@ export async function POST(req) {
             .eq('id', rutaId);
         if (updRutaErr) console.error('[confirmarDescarga] Error updating ruta estado:', updRutaErr);
 
-        // Insert ruta_historial_estados
+        // Insert ruta_despacho_historial_estados
         const { error: histErr } = await supabase
-            .from('ruta_historial_estados')
-            .insert({ ruta_id: rutaId, estado: nuevoEstado, created_at: nowIso });
-        if (histErr) console.error('[confirmarDescarga] Error inserting ruta_historial_estados:', histErr);
+            .from('ruta_despacho_historial_estados')
+            .insert({ 
+                ruta_despacho_id: rutaId, 
+                estado: nuevoEstado,
+                usuario_id: userId
+            });
+        if (histErr) console.error('[confirmarDescarga] Error inserting ruta_despacho_historial_estados:', histErr);
 
-        // Get ventas for this ruta via ruta_ventas
+        // Get ventas for this ruta via ruta_despacho_ventas
         const { data: rutaVentas, error: rvErr } = await supabase
-            .from('ruta_ventas')
+            .from('ruta_despacho_ventas')
             .select('venta_id')
-            .eq('ruta_id', rutaId);
-        if (rvErr) console.error('[confirmarDescarga] Error fetching ruta_ventas:', rvErr);
+            .eq('ruta_despacho_id', rutaId);
+        if (rvErr) console.error('[confirmarDescarga] Error fetching ruta_despacho_ventas:', rvErr);
 
         const ventaIds = (rutaVentas || []).map((r) => r.venta_id).filter(Boolean);
-
-        let ventasToGenerateBI = [];
 
         if (ventaIds.length > 0) {
             // Update ventas estado and por_cobrar
             const { error: updVentasErr } = await supabase
                 .from('ventas')
-                .update({ estado: TIPO_ESTADO_VENTA.entregado, por_cobrar: true })
+                .update({ 
+                    estado: TIPO_ESTADO_VENTA.entregado, 
+                    por_cobrar: true 
+                })
                 .in('id', ventaIds);
             if (updVentasErr) console.error('[confirmarDescarga] Error updating ventas:', updVentasErr);
 
@@ -84,14 +104,6 @@ export async function POST(req) {
                 .select('id, direccion_despacho_id, cliente_id, sucursal_id, valor_total, fecha')
                 .in('id', ventaIds);
             if (ventasFetchErr) console.error('[confirmarDescarga] Error fetching ventas data:', ventasFetchErr);
-
-            ventasToGenerateBI = (ventasRows || []).map((v) => ({
-                _id: v.id,
-                clienteId: v.cliente_id,
-                sucursalId: v.sucursal_id,
-                valorTotal: v.valor_total,
-                fecha: v.fecha
-            }));
 
             // For each venta, update item_catalogos direccion if venta has direccion_despacho_id
             for (const venta of ventasRows || []) {
@@ -124,19 +136,7 @@ export async function POST(req) {
                 if (updItemsErr) console.error('[confirmarDescarga] Error updating item_catalogos direccion:', updItemsErr);
             }
         }
-
-        // Generate BI records using existing Mongo-based generator (requires Mongo connection)
-        if (ventasToGenerateBI.length > 0) {
-            try {
-                await connectMongoDB();
-                await generateBIDeudaForMultipleVentas(ventasToGenerateBI);
-            } catch (err) {
-                console.error('[confirmarDescarga] Error generating BI records:', err);
-            }
-        }
-
         return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado });
-
     } catch (error) {
         console.error('ERROR in confirmarDescarga:', error);
         return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });

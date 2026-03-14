@@ -23,7 +23,7 @@ export const POST = withAuthorization(
                 }, { status: 403 });
             }
 
-            // Find the ruta_ventas entry that contains this venta
+            // Find the ruta_despacho_ventas entry that contains this venta
             const { data: rutaVenta, error: rutaVentaError } = await supabase
                 .from("ruta_despacho_ventas")
                 .select("id, ruta_despacho_id")
@@ -31,20 +31,20 @@ export const POST = withAuthorization(
                 .single();
 
             if (rutaVentaError || !rutaVenta) {
-                console.error("Error fetching ruta_ventas entry:", rutaVentaError);
-                return NextResponse.json({ ok: false, error: "Error fetching ruta_ventas entry" }, { status: 500 });
+                console.error("Error fetching ruta_despacho_ventas entry:", rutaVentaError);
+                return NextResponse.json({ ok: false, error: "Error fetching ruta_despacho_ventas entry" }, { status: 500 });
             }
         
             console.log("Eliminando asignación de venta ID:", ventaId, "de ruta_despacho.id:", rutaVenta.id, "RutaDespacho ID:", rutaVenta.ruta_despacho_id);
-            // Delete the ruta_ventas entry
+            // Delete the ruta_despacho_ventas entry
             const { error: deleteError } = await supabase
                 .from("ruta_despacho_ventas")
                 .delete()
                 .eq("id", rutaVenta.id);
 
             if (deleteError) {
-                console.error("Error deleting ruta_ventas entry:", deleteError);
-                return NextResponse.json({ ok: false, error: "Error deleting ruta_ventas entry" }, { status: 500 });
+                console.error("Error deleting ruta_despacho_ventas entry:", deleteError);
+                return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho_ventas entry" }, { status: 500 });
             }
 
             const { error: deleteRutaError } = await supabase

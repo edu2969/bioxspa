@@ -1,36 +1,30 @@
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
+import { TIPO_CHECKLIST, TIPO_CHECKLIST_ITEM } from "@/app/utils/constants";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req) {
     const supabase = await getSupabaseServerClient();
-    const authResult = await getAuthenticatedUser();
+    const authResult = await getAuthenticatedUser({ requireAuth: true });
     const authData = authResult.data;
 
     if (!authData) {
-        return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+        return NextResponse.json({ ok: false, error: authResult.message || "Unauthorized" }, { status: 401 });
     }
 
     const userId = authData.userData.id;
     const ahora = new Date();
     const tiposChecklist = [];
-    const cargosUsuario = (authData.userData.cargos || []).map(c => c.tipo);
-    const userTipoCargo = cargosUsuario[0];
 
     const hasCargoConductor = authData.hasCargo(["conductor"]);
     const hasCargoChecklistPersonal = authData.hasCargo(["conductor", "encargado", "responsable", "despacho"]);
-
-    console.log("User Data: ", authData);
-    console.log("User Tipo Cargo: ", userTipoCargo);
-    console.log("User Cargos: ", cargosUsuario);
 
     if (hasCargoChecklistPersonal) {
         tiposChecklist.push(TIPO_CHECKLIST.personal);
     }
 
     if (hasCargoConductor) {
-        tiposChecklist.push(TIPO_CHECKLIST.vehiculo);
+        tiposChecklist.push(TIPO_CHECKLIST.vehiculo);        
     }
 
     if (tiposChecklist.length === 0) {
@@ -41,11 +35,11 @@ export async function GET(req) {
 
     const { data: checklists, error: checklistError } = await supabase
         .from('checklists')
-        .select('tipo, passed, fecha')
+        .select('tipo, passed, created_at')
         .eq('usuario_id', userId)
         .in('tipo', tiposChecklist)
         .eq('passed', true)
-        .gte('fecha', startOfDay.toISOString());
+        .gte('created_at', startOfDay.toISOString());
 
     if (checklistError) {
         return NextResponse.json({ ok: false, error: "Error fetching checklists" }, { status: 500 });
@@ -63,11 +57,11 @@ export async function POST(req) {
         console.log("Processing checklist submission");
 
         const supabase = await getSupabaseServerClient();
-        const authResult = await getAuthenticatedUser();
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
         const authData = authResult.data;
 
         if (!authData) {
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+            return NextResponse.json({ ok: false, error: authResult.message || "Unauthorized" }, { status: 401 });
         }
 
         const body = await req.json();
@@ -76,6 +70,10 @@ export async function POST(req) {
         const kilometraje = body.kilometraje;
         const items = [];
         let passed = true;
+
+        if(tipo === 'vehiculo' && (!vehiculoId || !kilometraje)) {
+            return NextResponse.json({ ok: false, error: "vehiculoId and kilometraje are required for vehiculo checklists" }, { status: 400 });
+        }       
 
         // Modo legacy: procesar como antes
         Object.entries(TIPO_CHECKLIST_ITEM)
@@ -100,7 +98,7 @@ export async function POST(req) {
             vehiculo_id: tipo === 'vehiculo' ? vehiculoId : null,
             kilometraje: tipo === 'vehiculo' ? kilometraje : null,
             passed,
-            fecha: new Date().toISOString(),
+            created_at: new Date().toISOString(),
         };
 
         const { error } = await supabase

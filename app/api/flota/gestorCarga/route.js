@@ -61,7 +61,7 @@ export async function GET() {
             .select(`
                 id,
                 estado,
-                ventas:ruta_ventas(
+                ventas:ruta_despacho_ventas(
                     venta:ventas(
                         id,
                         tipo,
@@ -94,16 +94,16 @@ export async function GET() {
         for (const ruta of rutasDespacho) {
             // Get carga items for this ruta
             const { data: cargaHistorial, error: cargaError } = await supabase
-                .from("ruta_historial_carga")
+                .from("ruta_despacho_historial_carga")
                 .select(`
-                    items:ruta_items_movidos(
+                    items:ruta_despacho_historial_carga_items_movidos(
                         item_catalogo:items_catalogo(
                             id,
                             subcategoria_id
                         )
                     )
                 `)
-                .eq("ruta_id", ruta.id)
+                .eq("ruta_despacho_id", ruta.id)
                 .eq("es_carga", true)
                 .order("fecha", { ascending: false })
                 .limit(1);

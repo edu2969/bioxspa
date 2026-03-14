@@ -1,52 +1,54 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
-import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 
-export async function GET() {
+export async function GET(request) {
     try {
-        const supabase = await getSupabaseServerClient();
-        console.log("GET request received for ruta asignada.");
+        const { searchParams } = new URL(request.url);
+        const requestedUserId = searchParams.get("userId");
 
-        // Authenticate user
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            console.warn("Unauthorized access attempt.");
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        if (!requestedUserId) {
+            return NextResponse.json({ ok: false, error: "userId is required" }, { status: 400 });
         }
 
-        const userId = authResult.userData.id;
-        console.log(`Fetching user with ID: ${userId}`);
-
-        // Verify user role
-        const { data: userData, error: userError } = await supabase
-            .from("usuarios")
-            .select("role")
-            .eq("id", userId)
-            .single();
-
-        if (userError || !userData) {
-            console.warn(`User not found for ID: ${userId}`);
-            return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
 
-        if (userData.role !== USER_ROLE.conductor) {
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+
+        if (requestedUserId !== userId) {
+            return NextResponse.json(
+                { ok: false, error: "Access denied. userId does not match session user" },
+                { status: 403 }
+            );
+        }
+
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor])) {
             console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
             return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
         }
-
-        console.log(`Fetching active rutaDespacho for conductor: ${userId}`);
-
-        // Fetch active rutaDespacho for the conductor
+        
+        const supabase = await getSupabaseServerClient();
         const { data: rutaDespacho, error: rutaError } = await supabase
             .from("rutas_despacho")
             .select(`
                 id,
                 estado,
-                ruta_destinos(
+                ruta_despacho_destinos(
                     id,
                     direccion:direcciones(
                         id,
-                        nombre,
+                        direccion_cliente,
                         latitud,
                         longitud
                     ),
@@ -55,7 +57,7 @@ export async function GET() {
                     nombre_quien_recibe,
                     created_at
                 ),
-                ruta_ventas(
+                ruta_despacho_ventas(
                     venta:ventas(
                         id,
                         tipo,
@@ -68,7 +70,7 @@ export async function GET() {
                     )
                 )
             `)
-            .eq("conductor_id", userId)
+            .eq("conductor_id", requestedUserId)
             .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
             .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado)
             .maybeSingle();        
@@ -78,34 +80,39 @@ export async function GET() {
             return NextResponse.json({
                 ok: true,
                 rutaId: null,
-                message: "No hay ruta activa asignada"
+                message: "No hay ruta activa asignada" + (rutaError ? ` - Error: ${rutaError.message}` : "")
             });
         }        
 
-        const ultimaDireccion = rutaDespacho.ruta_destinos.length > 0 ? rutaDespacho.ruta_destinos[rutaDespacho.ruta_destinos.length - 1].direccion.id : null;
-        const cliente = ultimaDireccion ? rutaDespacho.ruta_ventas.find(rv => rv.venta.direcciones_despacho?.some(d => d.id === ultimaDireccion))?.cliente : null;
+        const ultimaDireccion = rutaDespacho.ruta_despacho_destinos.length > 0 ? rutaDespacho.ruta_despacho_destinos[rutaDespacho.ruta_despacho_destinos.length - 1].direccion.id : null;
+        const cliente = ultimaDireccion ? rutaDespacho.ruta_despacho_ventas.find(rv => rv.venta.direcciones_despacho?.some(d => d.id === ultimaDireccion))?.cliente : null;
 
         // Build response
         const rutaConductorView = {
             id: rutaDespacho.id,
             estado: rutaDespacho.estado,
-            destinos: (rutaDespacho.ruta_destinos || []).map((destino) => {
+            destinos: (rutaDespacho.ruta_despacho_destinos || []).map((destino) => {
                 return {
                     id: destino.id,
-                    direccion: destino.direccion || { id: "", nombre: "", latitud: 0, longitud: 0 },
-                    fecha_arribo: destino.fecha_arribo || null,
-                    rut_quien_recibe: destino.rut_quien_recibe || null,
-                    nombre_quien_recibe: destino.nombre_quien_recibe || null,
-                    created_at: destino.created_at || null
+                    direccion: {
+                        id: destino.direccion.id,
+                        direccionCliente: destino.direccion.direccion_cliente,
+                        latitud: destino.direccion.latitud,
+                        longitud: destino.direccion.longitud
+                    },
+                    fechaArribo: destino.fecha_arribo || null,
+                    rutQuienRecibe: destino.rut_quien_recibe || null,
+                    nombreQuienRecibe: destino.nombre_quien_recibe || null,
+                    createdAt: destino.created_at || null
                 };
             }),
-            ventas: (rutaDespacho.ruta_ventas || []).map((rv) => {
+            ventas: (rutaDespacho.ruta_despacho_ventas || []).map((rv) => {
                 const venta = rv.venta || null;
                 return {
                     id: venta?.id || null,
                     tipo: venta?.tipo || 0,
                     comentario: venta?.comentario || "",
-                    cliente: venta?.cliente || { nombre: "Cliente no encontrado", telefono: "" },
+                    cliente: venta?.cliente || { nombre: "Cliente no encontrado", telefono: "", direccion_cliente: "" },
                     actual: !cliente ? true :  venta?.cliente.id === cliente?.id                    
                 };
             })

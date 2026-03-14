@@ -1,17 +1,33 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const supabase = await getSupabaseServerClient();
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get("rutaId");
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
+        
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
 
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
 
-        // Verify ruta exists and basic access: conductor or staff (cargos)
+        if (!hasCargo([TIPO_CARGO.conductor, TIPO_CARGO.cobranza])) {
+            console.warn(`User ${userId} is not a conductor o encargado. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+        
+        const supabase = await getSupabaseServerClient();
         const { data: ruta, error: rutaErr } = await supabase
             .from("rutas_despacho")
             .select("id, conductor_id")
@@ -22,48 +38,58 @@ export async function GET(request) {
             console.error("Error fetching ruta:", rutaErr);
             return NextResponse.json({ ok: false, error: "Error fetching ruta" }, { status: 500 });
         }
-        if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
+        if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });        
 
-        let allowed = false;
-        if (String(ruta.conductor_id) === String(authResult.userData.id)) allowed = true;
-        if (!allowed) {
-            const { data: cargos } = await supabase.from("cargos").select("id").eq("usuario_id", authResult.userData.id).limit(1);
-            if (cargos && cargos.length > 0) allowed = true;
-        }
-        if (!allowed) return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
-
-        // Get latest carga (es_carga = true) historial
-        const { data: lastHist, error: lastHistErr } = await supabase
+        // Recalcular cilindros actualmente cargados:
+        // +1 por movimiento de carga, -1 por movimiento de descarga.
+        // El resultado neto > 0 representa cilindros que siguen en el camión.
+        const { data: historialList, error: historialErr } = await supabase
             .from("ruta_despacho_historial_carga")
-            .select("id, fecha")
+            .select("id, es_carga, fecha")
             .eq("ruta_despacho_id", rutaId)
-            .eq("es_carga", true)
-            .order("fecha", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .order("fecha", { ascending: true });
 
-        if (lastHistErr) {
-            console.error("Error fetching historial carga:", lastHistErr);
+        if (historialErr) {
+            console.error("Error fetching historial carga:", historialErr);
             return NextResponse.json({ ok: false, error: "Error fetching historial" }, { status: 500 });
         }
 
-        if (!lastHist) {
+        if (!historialList || historialList.length === 0) {
             return NextResponse.json({ ok: true, cilindrosCargados: [], total: 0 });
         }
 
-        // Get moved items for that historial
-        const { data: movedItems, error: movedErr } = await supabase
-            .from("ruta_despacho_historial_carga_items_movidos")
-            .select("item_catalogo_id")
-            .eq("ruta_despacho_historial_carga_id", lastHist.id);
+        const historialIds = historialList.map((h) => h.id);
+        const tipoPorHistorial = new Map(historialList.map((h) => [String(h.id), !!h.es_carga]));
 
-        if (movedErr) {
-            console.error("Error fetching moved items:", movedErr);
+        const { data: historialMovimientos, error: historialMovErr } = await supabase
+            .from("ruta_despacho_historial_carga_items_movidos")
+            .select("ruta_despacho_historial_carga_id, item_catalogo_id")
+            .in("ruta_despacho_historial_carga_id", historialIds);
+
+        if (historialMovErr) {
+            console.error("Error fetching moved items:", historialMovErr);
             return NextResponse.json({ ok: false, error: "Error fetching moved items" }, { status: 500 });
         }
 
-        const itemIds = (movedItems || []).map((r) => r.item_catalogo_id).filter(Boolean);
-        if (itemIds.length === 0) return NextResponse.json({ ok: true, cilindrosCargados: [], total: 0 });
+        const balancePorItem = new Map();
+        for (const mov of historialMovimientos || []) {
+            const itemId = mov.item_catalogo_id;
+            const historialId = String(mov.ruta_despacho_historial_carga_id);
+            if (!itemId) continue;
+
+            const esCarga = tipoPorHistorial.get(historialId);
+            const delta = esCarga ? 1 : -1;
+            balancePorItem.set(itemId, (balancePorItem.get(itemId) || 0) + delta);
+            console.log("itemId", itemId, "esCarga", esCarga);
+        }
+
+        const itemIds = [...balancePorItem.entries()]
+            .filter(([, balance]) => balance > 0)
+            .map(([id]) => id);
+
+        if (itemIds.length === 0) {
+            return NextResponse.json({ ok: true, cilindrosCargados: [], total: 0 });
+        }
 
         // Fetch items with subcategory and category info
         const { data: items, error: itemsErr } = await supabase

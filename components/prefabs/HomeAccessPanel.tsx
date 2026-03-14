@@ -10,20 +10,21 @@ import Loader from "../Loader";
 import { useState } from "react";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { RESOURCES, ACTIONS } from "@/lib/auth/permissions";
-import { TIPO_CARGO } from "@/app/utils/constants";
-
-// ===============================================
-// CONFIGURACIÓN DE MÓDULOS BASADA EN PERMISOS
-// ===============================================
+import { TIPO_CARGO, TIPO_CHECKLIST } from "@/app/utils/constants";
+import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
+import { useChecklist } from "@/components/context/ChecklistContext";
 
 const getModulesForUser = (
   auth: ReturnType<typeof useAuthorization>,
-  contadores: number[]
+  contadores: number[],
+  sessionRoles: number[],
+  conductorWarningMessage?: React.ReactNode
 ): IAccessButtonProps[] => {
   const modules: IAccessButtonProps[] = [];
+  const hasSessionRole = (roles: number[]) => roles.some((role) => sessionRoles.includes(role));
 
   // Módulo de Pedidos para Gestores/Supervisores
-  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.gerente, TIPO_CARGO.encargado])) {
+  if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.gerente, TIPO_CARGO.encargado])) {
     modules.push({
       key: "pedidos_management",
       href: "/pages/pedidos",
@@ -39,7 +40,7 @@ const getModulesForUser = (
   }
 
   // Módulo de Asignación para Encargados/Responsables
-  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.responsable])) {
+  if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.responsable])) {
     modules.push({
       key: "asignacion",
       href: "/pages/asignacion",
@@ -63,7 +64,7 @@ const getModulesForUser = (
   }
 
   // Módulo de Cobros para Cobranza
-  if (auth.hasRole([TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.neo])) {
+  if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.neo])) {
     modules.push({
       key: "cobros",
       href: "/pages/cobros",
@@ -94,7 +95,7 @@ const getModulesForUser = (
   }
 
   // Módulo específico para Conductores
-  if (auth.hasRole([TIPO_CARGO.conductor])) {
+  if (hasSessionRole([TIPO_CARGO.conductor])) {
     modules.push({
       key: "rutas_conductor",
       href: "/pages/homeConductor/pedidos",
@@ -105,12 +106,13 @@ const getModulesForUser = (
         color: "bg-green-500",
         value: contadores[0] > 999999 ? '999999+' : (contadores[0] ?? 0),
         text: "x ACTIVOS"
-      }]
+      }],
+      warningMessage: conductorWarningMessage
     });
   }
 
   // Módulo específico para Despachadores
-  if (auth.hasRole([TIPO_CARGO.despacho])) {
+  if (hasSessionRole([TIPO_CARGO.despacho])) {
     modules.push({
       key: "despacho",
       href: "/pages/homeDespacho/pedidos",
@@ -129,76 +131,100 @@ const getModulesForUser = (
 };
 
 export default function HomeAccessPanel() {
-    const [routingIndex, setRoutingIndex] = useState(-1);
-    const auth = useAuthorization();
+  const [routingIndex, setRoutingIndex] = useState(-1);
+  const auth = useAuthorization();
+  const { hasApprovedChecklist, isLoadingChecklist } = useChecklist();
+  const sessionRoles = auth.getUserCargos().map((cargo) => cargo.tipo);
 
-    const { data: homeCounters, isLoading } = useQuery<Array<number>>({
-        queryKey: ['home-counters'],
-        queryFn: async () => {
-            const response = await fetch('/api/home', {
-                method: 'GET',
-                credentials: 'include'
-            });
-            const resp = await response.json();
-            console.log("Home counters data:", resp);
-            return resp.data || [];
-        },
-        enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
-    });
+  const conductorNeedsPersonal = !hasApprovedChecklist(TIPO_CHECKLIST.personal);
+  const conductorNeedsVehiculo = !hasApprovedChecklist(TIPO_CHECKLIST.vehiculo);
+  const conductorWarningMessage = conductorNeedsPersonal || conductorNeedsVehiculo ? "Falta checklist" : undefined;
 
-    // Mostrar loader mientras carga la autenticación o los datos
-    if (!auth.user || isLoading || !homeCounters) {
-        return (
-            <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
-                <Loader />
-            </main>
-        );
-    }
+  useRealtimeQuery({
+    channelName: `home-counters-ventas-${auth.user?.id || 'anon'}`,
+    schema: 'public',
+    table: 'ventas',
+    event: '*',
+    queryKeys: [['home-counters']],
+    enabled: !!auth.user,
+  });
 
-    const userModules = getModulesForUser(auth, homeCounters);
+  useRealtimeQuery({
+    channelName: `home-counters-rutas-${auth.user?.id || 'anon'}`,
+    schema: 'public',
+    table: 'rutas_despacho',
+    event: '*',
+    queryKeys: [['home-counters']],
+    enabled: !!auth.user,
+  });  
 
-    // Si no hay módulos disponibles para el usuario
-    if (userModules.length === 0) {
-        return (
-            <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
-                <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Bienvenido</h2>
-                    <p className="text-gray-600">
-                        Tu cuenta está configurada pero aún no tienes acceso a ningún módulo.
-                        <br />
-                        Contacta al administrador para obtener los permisos necesarios.
-                    </p>
-                </div>
-            </main>
-        );
-    }
+  const { data: homeCounters, isLoading } = useQuery<Array<number>>({
+    queryKey: ['home-counters'],
+    queryFn: async () => {
+      const response = await fetch('/api/home', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      const resp = await response.json();
+      console.log("Home counters data:", resp);
+      return resp.data || [];
+    },
+    enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
+  });
 
+  // Mostrar loader mientras carga la autenticación o los datos
+  if (!auth.user || isLoading || isLoadingChecklist || !homeCounters) {
     return (
-        <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                {userModules.map((mod, idx) => (
-                    <AccessButton 
-                        key={mod.key} 
-                        props={mod} 
-                        routingIndex={routingIndex} 
-                        setRoutingIndex={setRoutingIndex} 
-                    />
-                ))}            
-            </div>
-            
-            {/* Debug info en desarrollo */}
-            {process.env.NODE_ENV === 'development' && (
-                <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs">
-                    <details>
-                        <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
-                        <div className="mt-2 space-y-1">
-                            <div><strong>Usuario:</strong> {auth.user?.email}</div>
-                            <div><strong>Roles:</strong>...</div>
-                            <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
-                        </div>
-                    </details>
-                </div>
-            )}
-        </main>
+      <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+        <Loader />
+      </main>
     );
+  }
+
+  const userModules = getModulesForUser(auth, homeCounters, sessionRoles, conductorWarningMessage);
+
+  // Si no hay módulos disponibles para el usuario
+  if (userModules.length === 0) {
+    return (
+      <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Bienvenido</h2>
+          <p className="text-gray-600">
+            Tu cuenta está configurada pero aún no tienes acceso a ningún módulo.
+            <br />
+            Contacta al administrador para obtener los permisos necesarios.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        {userModules.map((mod, idx) => (
+          <AccessButton
+            key={mod.key}
+            props={mod}
+            routingIndex={routingIndex}
+            setRoutingIndex={setRoutingIndex}
+          />
+        ))}
+      </div>
+
+      {/* Debug info en desarrollo */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs">
+          <details>
+            <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
+            <div className="mt-2 space-y-1">
+              <div><strong>Usuario:</strong> {auth.user?.email}</div>
+              <div><strong>Roles:</strong>...</div>
+              <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
+            </div>
+          </details>
+        </div>
+      )}
+    </main>
+  );
 }

@@ -423,6 +423,41 @@ CREATE TABLE ruta_despacho_historial_carga_items_movidos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Habilitar payload completo para Realtime en rutas de despacho
+ALTER TABLE rutas_despacho REPLICA IDENTITY FULL;
+
+-- Publicar rutas_despacho en Supabase Realtime
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_publication
+        WHERE pubname = 'supabase_realtime'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE rutas_despacho;
+    END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+-- RLS para lectura de rutas propias y operación logística
+ALTER TABLE rutas_despacho ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY rutas_despacho_select_policy ON rutas_despacho
+    FOR SELECT
+    TO authenticated
+    USING (
+        conductor_id = auth.uid()
+        OR EXISTS (
+            SELECT 1
+            FROM cargos
+            WHERE cargos.usuario_id = auth.uid()
+              AND cargos.activo = true
+              AND cargos.hasta IS NULL
+              AND cargos.tipo IN (1, 8, 9, 16)
+        )
+    );
+
 -- =========================================
 -- 7. BUSINESS INTELLIGENCE & REPORTES
 -- =========================================
@@ -618,13 +653,57 @@ FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id);
 CREATE TABLE checklists (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tipo INTEGER NOT NULL, -- 'personal', 'vehiculo', etc.
-    usuario_id UUID REFERENCES usuarios(id),
-    vehiculo_id UUID REFERENCES vehiculos(id),
-    ruta_id UUID REFERENCES rutas_despacho(id),
-    fecha DATE NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
+    passed BOOLEAN NOT NULL,
+    vehiculo_id UUID REFERENCES vehiculos(id) ON DELETE SET NULL,
+    kilometraje INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_checklists_usuario_tipo_fecha ON checklists(usuario_id, tipo, created_at DESC);
+CREATE INDEX idx_checklists_tipo_fecha ON checklists(tipo, created_at DESC);
+
+-- Habilitar payload completo para Realtime en INSERT/UPDATE/DELETE
+ALTER TABLE checklists REPLICA IDENTITY FULL;
+
+-- Publicar checklists en Supabase Realtime
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_publication
+        WHERE pubname = 'supabase_realtime'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE checklists;
+    END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+-- RLS para permitir escritura propia y lectura operativa/realtime
+ALTER TABLE checklists ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY checklists_select_policy ON checklists
+    FOR SELECT
+    TO authenticated
+    USING (
+        usuario_id = auth.uid()
+        OR EXISTS (
+            SELECT 1
+            FROM cargos
+            WHERE cargos.usuario_id = auth.uid()
+              AND cargos.activo = true
+              AND cargos.hasta IS NULL
+              AND cargos.tipo IN (1, 8, 9, 16, 32)
+        )
+    );
+
+CREATE POLICY checklists_insert_policy ON checklists
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        usuario_id = auth.uid()
+    );
 
 -- =========================================
 -- 13. ÍNDICES PARA PERFORMANCE
@@ -647,5 +726,5 @@ CREATE INDEX idx_vehiculo_conductores_conductor ON vehiculo_conductores(conducto
 
 -- Índices para rutas
 CREATE INDEX idx_rutas_conductor_estado ON rutas_despacho(conductor_id, estado);
-CREATE INDEX idx_ruta_ventas_ruta ON ruta_ventas(ruta_id);
+CREATE INDEX idx_ruta_despacho_ventas_ruta ON ruta_despacho_ventas(ruta_id);
 

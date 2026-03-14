@@ -8,7 +8,7 @@ export async function GET(request) {
         return NextResponse.json({ ok: false, error: "Missing clienteId" }, { status: 400 });
     }
 
-    // Busca el cliente
+    const supabase = await getSupabaseServerClient();
     const { data: cliente, error: clienteError } = await supabase
         .from("clientes")
         .select("id, direcciones_despacho:cliente_direcciones_despacho(id), direccion:direcciones(id)")

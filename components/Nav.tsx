@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
@@ -16,11 +16,16 @@ import PowerScanView from './prefabs/powerScan/PowerScanView';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const path = usePathname();
     const auth = useAuthorization();
     const { signOut } = useAuth();
     const [scanMode, setScanMode] = useState(false);
-    const router = useRouter();
+
+    const menuItemClass = "w-full min-h-20 rounded-md bg-slate-500 shadow-sm text-white hover:bg-white hover:text-[#313A46] transition-colors flex flex-col justify-center items-center";
+    const menuItemContentClass = "h-full w-full px-4 py-3 flex items-center gap-4 text-left";
+    const menuLabelClass = "text-xl font-semibold leading-tight";
+    const menuIconClass = "shrink-0";
 
     const activateSuperScanMode = () => {
         setScanMode(true);
@@ -28,13 +33,26 @@ export default function Nav() {
     }
 
     const handleLogout = async () => {
+        if (isLoggingOut) return;
+
+        setIsLoggingOut(true);
         setMenuActivo(false);
+
         try {
+            // Cierra sesión server-side para limpiar cookies httpOnly si existen.
+            await fetch('/api/auth/login', {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            // Limpia sesión en cliente y estado local de auth.
             await signOut();
-            router.replace("/");
-            router.refresh();
+
+            // Navegación dura para asegurar estado limpio en toda la app.
+            window.location.href = '/';
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
+            setIsLoggingOut(false);
         }
     }
 
@@ -54,49 +72,65 @@ export default function Nav() {
             <div className={`w-full md:w-96 h-screen min-w-2xl min-h-full z-50 absolute transition-all bg-[#313A46] p-6 ${menuActivo ? 'left-0' : '-left-full'}`}>
                 <AiOutlineClose size="2rem" className="text-white m-auto cursor-pointer absolute top-4 right-4"
                     onClick={() => setMenuActivo(false)} />
-                <div className="mt-12 text-white space-y-6">
+                <div className="mt-12 grid grid-cols-1 gap-3 text-white">
                     <Can resources={[RESOURCES.CONFIGURACION]} actions={[ACTIONS.READ]}>
                         <Link href="/pages/configuraciones" onClick={() => setMenuActivo(false)}>
-                            <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
-                                <IoSettingsSharp size="4rem" />
-                                <p className="text-2xl mx-6 mt-4">CONFIGURACIONES</p>
+                            <div className={menuItemClass}>
+                                <div className={menuItemContentClass}>
+                                    <IoSettingsSharp size="2.25rem" className={menuIconClass} />
+                                    <p className={menuLabelClass}>CONFIGURACIONES</p>
+                                </div>
                             </div>
                         </Link>
                     </Can>
                     
                     <Can resources={[RESOURCES.INVENTARIO]} actions={[ACTIONS.READ]}>
                         <Link href="/pages/operacion" onClick={() => setMenuActivo(false)}>
-                            <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
-                                <MdOutlinePropaneTank size="4rem" />
-                                <p className="text-2xl mx-6 mt-4">OPERACIÓN</p>
+                            <div className={menuItemClass}>
+                                <div className={menuItemContentClass}>
+                                    <MdOutlinePropaneTank size="2.25rem" className={menuIconClass} />
+                                    <p className={menuLabelClass}>OPERACION</p>
+                                </div>
                             </div>
                         </Link>
                     </Can>
                     <Link href="/pages/pedidos/nuevo" onClick={() => setMenuActivo(false)}>
-                        <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm">
-                            <MdSell size="4rem" />
-                            <p className="text-2xl mx-6 mt-4">VENTA</p>
+                        <div className={menuItemClass}>
+                            <div className={menuItemContentClass}>
+                                <MdSell size="2.25rem" className={menuIconClass} />
+                                <p className={menuLabelClass}>VENTA</p>
+                            </div>
                         </div>
                     </Link>
 
                     <button onClick={() => {
                         activateSuperScanMode();
                     }}
-                        className="w-full flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm mt-2">
-                        <BsQrCodeScan size="4rem" />
-                        <p className="text-2xl mx-6 mt-4">Power Scan</p>
+                        className={menuItemClass}>
+                        <div className={menuItemContentClass}>
+                            <BsQrCodeScan size="2rem" className={menuIconClass} />
+                            <p className={menuLabelClass}>POWER SCAN</p>
+                        </div>
                     </button>
                     <Link href="/pages/about" onClick={() => setMenuActivo(false)}>
-                        <div className="flex hover:bg-white hover:text-[#313A46] rounded-md p-2 cursor-pointer bg-slate-500 shadow-sm mt-2">
-                            <AiFillAliwangwang size="4rem" />
-                            <p className="text-2xl mx-6 mt-4">Acerca de...</p>
+                        <div className={menuItemClass}>
+                            <div className={menuItemContentClass}>
+                                <AiFillAliwangwang size="2.5rem" className={menuIconClass} />
+                                <p className={menuLabelClass}>ACERCA DE</p>
+                            </div>
                         </div>
                     </Link>
-                    <div className="min-w-2xl flex hover:bg-white hover:text-[#9cb6dd] rounded-md px-2 m-0 bg-slate-500 shadow-sm"
-                        onClick={handleLogout}>
-                        <AiOutlineLogout size="4rem" />
-                        <p className="text-2xl mx-6 my-4">Cerrar sesión</p>
-                    </div>
+                    <button
+                        type="button"
+                        disabled={isLoggingOut}
+                        className={`${menuItemClass} disabled:opacity-60 disabled:cursor-not-allowed`}
+                        onClick={handleLogout}
+                    >
+                        <div className={menuItemContentClass}>
+                            <AiOutlineLogout size="2.25rem" className={menuIconClass} />
+                            <p className={menuLabelClass}>{isLoggingOut ? 'CERRANDO SESION...' : 'CERRAR SESION'}</p>
+                        </div>
+                    </button>
                 </div>
                 {auth.user && (
                     <div className="absolute bottom-6 right-6 flex flex-col items-end space-y-2">

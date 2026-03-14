@@ -6,10 +6,28 @@ export async function POST(request) {
     try {
         const body = await request.json();
         const { rutaId, codigo } = body || {};
-
         if (!rutaId || !codigo) return NextResponse.json({ ok: false, error: "Missing rutaId or codigo" }, { status: 400 });
 
-        // Fetch item by codigo with subcategoria->categoria
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: itemRow, error: itemErr } = await supabase
             .from('items_catalogo')
             .select(`id, codigo, subcategoria:subcategorias_catalogo(id, nombre, cantidad, unidad, sin_sifon, categoria:categorias_catalogo(id, nombre, elemento))`)
@@ -24,9 +42,9 @@ export async function POST(request) {
 
         // Get last destination for the ruta
         const { data: ultimoDestino, error: ultimoDestinoErr } = await supabase
-            .from('ruta_destinos')
+            .from('ruta_despacho_destinos')
             .select('id, direccion_id')
-            .eq('ruta_id', rutaId)
+            .eq('ruta_despacho_id', rutaId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -36,7 +54,8 @@ export async function POST(request) {
         }
 1
         // ventas asociadas a la ruta
-        const { data: rutaVentas } = await supabase.from('ruta_ventas').select('venta_id').eq('ruta_id', rutaId);
+        const { data: rutaVentas } = await supabase.from('ruta_despacho_ventas')
+        .select('venta_id').eq('ruta_despacho_id', rutaId);
         const ventaIds = (rutaVentas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length === 0) return NextResponse.json({ ok: false, error: 'No hay ventas asociadas a la ruta' }, { status: 404 });
 
@@ -75,9 +94,9 @@ export async function POST(request) {
 
         // Compute currently loaded items (from carga historials)
         const { data: cargaHist, error: cargaErr } = await supabase
-            .from('ruta_historial_carga')
-            .select('id, items:ruta_items_movidos(item_catalogo_id)')
-            .eq('ruta_id', rutaId)
+            .from('ruta_despacho_historial_carga')
+            .select('id, items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
+            .eq('ruta_despacho_id', rutaId)
             .eq('es_carga', true);
 
         if (cargaErr) console.error('[descargar] Error fetching carga historials:', cargaErr);
@@ -149,31 +168,64 @@ export async function POST(request) {
             const { error: insItemErr } = await supabase.from('detalle_venta_items').insert({ detalle_venta_id: detalleId, item_catalogo_id: itemRow.id });
             if (insItemErr) console.error('[descargar] Error inserting detalle_venta_items:', insItemErr);
 
-            // Record descarga in ruta_historial_carga / ruta_items_movidos
-            // Try reuse last historial with es_carga = false
-            const { data: lastHist } = await supabase.from('ruta_historial_carga').select('id, es_carga').eq('ruta_id', rutaId).order('fecha', { ascending: false }).limit(1).maybeSingle();
+            const { data: lastHist } = await supabase
+                .from('ruta_despacho_historial_carga')
+                .select('id, es_carga')
+                .eq('ruta_despacho_id', rutaId)
+                .order('fecha', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
             let historialId;
             if (lastHist && lastHist.es_carga === false) {
                 historialId = lastHist.id;
             } else {
-                const { data: created, error: createErr } = await supabase.from('ruta_historial_carga').insert({ ruta_id: rutaId, es_carga: false, fecha: new Date().toISOString(), created_at: new Date().toISOString() }).select('id').maybeSingle();
+                const { data: created, error: createErr } = await supabase
+                    .from('ruta_despacho_historial_carga')
+                    .insert({ 
+                        ruta_despacho_id: rutaId, 
+                        es_carga: false,
+                        usuario_id: userId, 
+                        fecha: new Date().toISOString()
+                    })
+                    .select('id').maybeSingle();
+
                 if (createErr) console.error('[descargar] Error creating historial descarga:', createErr);
                 historialId = created?.id;
             }
 
             if (historialId) {
-                const { error: insMovErr } = await supabase.from('ruta_items_movidos').insert({ historial_carga_id: historialId, item_catalogo_id: itemRow.id, created_at: new Date().toISOString() });
-                if (insMovErr) console.error('[descargar] Error inserting ruta_items_movidos:', insMovErr);
+                const { error: insMovErr } = await supabase
+                    .from('ruta_despacho_historial_carga_items_movidos')
+                    .insert({ 
+                        historial_carga_id: historialId, 
+                        item_catalogo_id: itemRow.id
+                    });
+                if (insMovErr) console.error('[descargar] Error inserting ruta_despacho_historial_carga_items_movidos:', insMovErr);
             }
 
             // Recompute remaining carga items
-            const { data: cargaAll } = await supabase.from('ruta_historial_carga').select('items:ruta_items_movidos(item_catalogo_id)').eq('ruta_id', rutaId).eq('es_carga', true);
+            const { data: cargaAll } = await supabase
+                .from('ruta_despacho_historial_carga')
+                .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
+                .eq('ruta_despacho_id', rutaId)
+                .eq('es_carga', true);
+
             const cargaAllIds = (cargaAll || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
-            const { data: descargaAll } = await supabase.from('ruta_historial_carga').select('items:ruta_items_movidos(item_catalogo_id)').eq('ruta_id', rutaId).eq('es_carga', false);
+            const { data: descargaAll } = await supabase
+                .from('ruta_despacho_historial_carga')
+                .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
+                .eq('ruta_despacho_id', rutaId)
+                .eq('es_carga', false);
+
             const descargaAllIds = (descargaAll || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
             const remaining = cargaAllIds.filter(id => !descargaAllIds.includes(id));
             if (remaining.length === 0) {
-                const { error: updVentaErr } = await supabase.from('ventas').update({ estado: 99 }).eq('id', ventaDestino.id);
+                const { error: updVentaErr } = await supabase
+                    .from('ventas')
+                    .update({ estado: 99 })
+                    .eq('id', ventaDestino.id);
+
                 if (updVentaErr) console.error('[descargar] Error updating venta estado:', updVentaErr);
             }
 
@@ -198,31 +250,68 @@ export async function POST(request) {
         if (!detalleDisponible) return NextResponse.json({ ok: false, error: 'No hay espacio en los detalles de la venta para este item' }, { status: 400 });
 
         // Insert detalle_venta_items
-        const { error: insErr } = await supabase.from('detalle_venta_items').insert({ detalle_venta_id: detalleDisponible.id, item_catalogo_id: itemRow.id });
+        const { error: insErr } = await supabase
+            .from('detalle_venta_items')
+            .insert({ 
+                detalle_venta_id: detalleDisponible.id, 
+                item_catalogo_id: itemRow.id 
+            });
         if (insErr) console.error('[descargar] Error inserting detalle_venta_items:', insErr);
 
         // Record descarga similar to above
-        const { data: lastHist2 } = await supabase.from('ruta_historial_carga').select('id, es_carga').eq('ruta_id', rutaId).order('fecha', { ascending: false }).limit(1).maybeSingle();
+        const { data: lastHist2 } = await supabase
+            .from('ruta_despacho_historial_carga')
+            .select('id, es_carga')
+            .eq('ruta_despacho_id', rutaId)
+            .order('fecha', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
         let historialId2;
         if (lastHist2 && lastHist2.es_carga === false) historialId2 = lastHist2.id;
         else {
-            const { data: created2, error: createErr2 } = await supabase.from('ruta_historial_carga').insert({ ruta_id: rutaId, es_carga: false, fecha: new Date().toISOString(), created_at: new Date().toISOString() }).select('id').maybeSingle();
+            const { data: created2, error: createErr2 } = await supabase
+                .from('ruta_despacho_historial_carga')
+                .insert({ 
+                    ruta_despacho_id: rutaId, 
+                    es_carga: false, 
+                    fecha: new Date().toISOString()
+                })
+                .select('id')
+                .maybeSingle();
             if (createErr2) console.error('[descargar] Error creating historial descarga:', createErr2);
             historialId2 = created2?.id;
         }
         if (historialId2) {
-            const { error: insMovErr2 } = await supabase.from('ruta_items_movidos').insert({ historial_carga_id: historialId2, item_catalogo_id: itemRow.id, created_at: new Date().toISOString() });
-            if (insMovErr2) console.error('[descargar] Error inserting ruta_items_movidos:', insMovErr2);
+            const { error: insMovErr2 } = await supabase
+                .from('ruta_despacho_historial_carga_items_movidos')
+                .insert({ 
+                    ruta_despacho_historial_carga_id: historialId2, 
+                    item_catalogo_id: itemRow.id
+                });
+            if (insMovErr2) console.error('[descargar] Error inserting ruta_despacho_historial_carga_items_movidos:', insMovErr2);
         }
 
         // Recompute remaining carga items
-        const { data: cargaAll2 } = await supabase.from('ruta_historial_carga').select('items:ruta_items_movidos(item_catalogo_id)').eq('ruta_id', rutaId).eq('es_carga', true);
+        const { data: cargaAll2 } = await supabase
+            .from('ruta_despacho_historial_carga')
+            .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
+            .eq('ruta_despacho_id', rutaId)
+            .eq('es_carga', true);
+
         const cargaAllIds2 = (cargaAll2 || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
-        const { data: descargaAll2 } = await supabase.from('ruta_historial_carga').select('items:ruta_items_movidos(item_catalogo_id)').eq('ruta_id', rutaId).eq('es_carga', false);
+        const { data: descargaAll2 } = await supabase
+            .from('ruta_despacho_historial_carga')
+            .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
+            .eq('ruta_despacho_id', rutaId)
+            .eq('es_carga', false);
         const descargaAllIds2 = (descargaAll2 || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
         const remaining2 = cargaAllIds2.filter(id => !descargaAllIds2.includes(id));
         if (remaining2.length === 0) {
-            const { error: updVentaErr2 } = await supabase.from('ventas').update({ estado: 99 }).eq('id', ventaDestino.id);
+            const { error: updVentaErr2 } = await supabase
+                .from('ventas')
+                .update({ estado: 99 })
+                .eq('id', ventaDestino.id);
             if (updVentaErr2) console.error('[descargar] Error updating venta estado:', updVentaErr2);
         }
 

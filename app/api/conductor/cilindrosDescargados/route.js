@@ -1,22 +1,36 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const supabase = await getSupabaseServerClient();
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            console.warn(`[GET /sucursales] No authenticated user found.`);
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
         const { searchParams } = new URL(request.url);
         const rutaId = searchParams.get("rutaId");
         if (!rutaId) return NextResponse.json({ ok: false, error: "rutaId is required" }, { status: 400 });
 
-        // Verify ruta exists and basic access: conductor or staff (cargos)
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.conductor, TIPO_CARGO.cobranza])) {
+            console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: ruta, error: rutaErr } = await supabase
             .from("rutas_despacho")
-            .select("id, conductor_id")
+            .select("id, estado, conductor_id")
             .eq("id", rutaId)
             .maybeSingle();
 
@@ -26,13 +40,9 @@ export async function GET(request) {
         }
         if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
 
-        let allowed = false;
-        if (String(ruta.conductor_id) === String(authResult.userData.id)) allowed = true;
-        if (!allowed) {
-            const { data: cargos } = await supabase.from("cargos").select("id").eq("usuario_id", authResult.userData.id).limit(1);
-            if (cargos && cargos.length > 0) allowed = true;
+        if(ruta.estado !== TIPO_ESTADO_RUTA_DESPACHO.descarga) {
+            return NextResponse.json({ ok: true, cilindrosDescargados: [], total: 0 });
         }
-        if (!allowed) return NextResponse.json({ ok: false, error: "Access denied" }, { status: 403 });
 
         // Get latest descarga (es_carga = false) historial
         const { data: lastHist, error: lastHistErr } = await supabase

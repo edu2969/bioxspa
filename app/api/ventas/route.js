@@ -9,9 +9,6 @@ export const POST = withAuthorization(
       const body = await req.json();
       const supabase = await getSupabaseServerClient();
 
-      console.log("Received venta payload:", body);
-
-      // Compatibilidad camelCase/snake_case durante migración.
       const payload = {
         tipo: body.tipo,
         usuarioId: body.usuarioId,

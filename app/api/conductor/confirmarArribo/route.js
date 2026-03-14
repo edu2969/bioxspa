@@ -10,11 +10,12 @@ export async function POST(request) {
         const { data: authResult } = await getAuthenticatedUser();
         if (!authResult || !authResult.userData) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-        // Verify the user has an active conductor cargo
+        const userId = authResult.userData.id;
+        const supabase = await getSupabaseServerClient();
         const { data: cargo, error: cargoErr } = await supabase
             .from('cargos')
             .select('id, hasta')
-            .eq('usuario_id', authResult.userData.id)
+            .eq('usuario_id', userId)
             .eq('tipo', TIPO_CARGO.conductor)
             .limit(1)
             .maybeSingle();
@@ -45,18 +46,18 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: 'User is not the assigned driver for this route' }, { status: 403 });
         }
 
-        // Find the latest ruta_destinos without fecha_arribo
+        // Find the latest ruta_despacho_destinos without fecha_arribo
         const { data: destino, error: destErr } = await supabase
-            .from('ruta_destinos')
+            .from('ruta_despacho_destinos')
             .select('id')
-            .eq('ruta_id', rutaId)
+            .eq('ruta_despacho_id', rutaId)
             .is('fecha_arribo', null)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
         if (destErr) {
-            console.error('[confirmarArribo] Error fetching ruta_destinos:', destErr);
+            console.error('[confirmarArribo] Error fetching ruta_despacho_destinos:', destErr);
             return NextResponse.json({ ok: false, error: 'Error fetching ruta destinos' }, { status: 500 });
         }
 
@@ -68,7 +69,7 @@ export async function POST(request) {
         if (nombre) updatePayload.nombre_quien_recibe = nombre;
 
         const { error: updDestErr } = await supabase
-            .from('ruta_destinos')
+            .from('ruta_despacho_destinos')
             .update(updatePayload)
             .eq('id', destino.id);
 
@@ -80,14 +81,20 @@ export async function POST(request) {
         // Update ruta estado to descarga
         const { error: updRutaErr } = await supabase
             .from('rutas_despacho')
-            .update({ estado: TIPO_ESTADO_RUTA_DESPACHO.descarga })
+            .update({ 
+                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga 
+            })
             .eq('id', rutaId);
         if (updRutaErr) console.error('[confirmarArribo] Error updating ruta estado:', updRutaErr);
 
         // Insert historial estado
         const { error: histErr } = await supabase
-            .from('ruta_historial_estados')
-            .insert({ ruta_id: rutaId, estado: TIPO_ESTADO_RUTA_DESPACHO.descarga, created_at: now.toISOString() });
+            .from('ruta_despacho_historial_estados')
+            .insert({ 
+                ruta_despacho_id: rutaId,
+                usuario_id: userId, 
+                estado: TIPO_ESTADO_RUTA_DESPACHO.descarga 
+            });
         if (histErr) console.error('[confirmarArribo] Error inserting historial estado:', histErr);
 
         return NextResponse.json({ ok: true, message: 'Route arrival confirmed successfully' });

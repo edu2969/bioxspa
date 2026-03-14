@@ -1,7 +1,5 @@
 import Loader from "@/components/Loader";
 import { InputEvent, useEffect, useRef, useState } from "react";
-import { BsQrCodeScan } from "react-icons/bs";
-import { useOnVisibilityChange } from "@/components/uix/useOnVisibilityChange";
 
 export default function InputManualCodeView(props: {
     onCodeSubmit: (code: string) => void,
@@ -12,18 +10,21 @@ export default function InputManualCodeView(props: {
     const [inputTemporalVisible, setInputTemporalVisible] = useState(false);
     const hiddenInputRef = useRef<HTMLInputElement>(null);
     const visibleInputRef = useRef<HTMLInputElement>(null);
-    
-    // Hook para manejar cuando la aplicación vuelve a ser visible
-    useOnVisibilityChange(() => {
-        if (scanMode && !inputTemporalVisible) {
-            // Mantener el foco en el input oculto cuando volvemos a la aplicación
-            setTimeout(() => {
-                if (hiddenInputRef.current) {
-                    hiddenInputRef.current.focus();
-                }
-            }, 100);
+
+    useEffect(() => {
+        if (inputTemporalVisible) {
+            // Focus after render to ensure the visible input exists and is focusable.
+            const rafId = requestAnimationFrame(() => {
+                visibleInputRef.current?.focus();
+            });
+
+            return () => cancelAnimationFrame(rafId);
         }
-    });
+
+        if (scanMode) {
+            hiddenInputRef.current?.focus();
+        }
+    }, [inputTemporalVisible, scanMode]);
     
     useEffect(() => {
         const handleTextInput = (e: Event) => {
@@ -33,10 +34,6 @@ export default function InputManualCodeView(props: {
                 const codigo = inputEvent.data ? inputEvent.data.trim() : '';
                 if (codigo === "x") {
                     setInputTemporalVisible(true);
-                    setTimeout(() => {
-                        if (visibleInputRef.current)
-                            visibleInputRef.current.focus();
-                    }, 100);
                     return;
                 }
 
@@ -77,6 +74,12 @@ export default function InputManualCodeView(props: {
                 className="opacity-0 h-0 w-0 absolute"
                 inputMode="none"
                 onKeyDown={(e) => {                    
+                    if (e.key.toLowerCase() === 'x') {
+                        e.preventDefault();
+                        setInputTemporalVisible(true);
+                        return;
+                    }
+
                     if (e.key === 'Escape') {
                         setInputTemporalVisible(false);
                         setScanMode(false);
@@ -89,6 +92,7 @@ export default function InputManualCodeView(props: {
             <input
                 ref={visibleInputRef}
                 className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+                autoFocus
                 onKeyDown={(e) => {
                     console.log("event key:", e.key);
                     if (e.key === 'Enter') {

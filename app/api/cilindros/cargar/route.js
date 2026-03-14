@@ -36,8 +36,6 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Cargo for user not found" }, { status: 404 });
         }
 
-        console.log("CARGO!?", cargo);
-
         let direccionId = null;
         if (cargo.dependencia_id) {
             console.log("Fetching direccion from dependencia:", cargo.dependencia_id);
@@ -46,7 +44,6 @@ export async function POST(request) {
                 .select("direccion_id")
                 .eq("id", cargo.dependencia_id)
                 .maybeSingle();
-            console.log("Dependencia data:", dependencia);
             direccionId = dependencia?.direccion_id || null;
         }
         if (!direccionId && cargo.sucursal_id) {
@@ -184,7 +181,7 @@ export async function POST(request) {
                 .eq("ruta_despacho_id", rutaId);
 
             if (rutaVentasErr) {
-                console.error("Error fetching ruta_ventas:", rutaVentasErr);
+                console.error("Error fetching ruta_despacho_ventas:", rutaVentasErr);
                 return NextResponse.json({ ok: false, error: "Error fetching ruta ventas" }, { status: 500 });
             }
 
@@ -222,7 +219,7 @@ export async function POST(request) {
                 .limit(1);
 
             if (existingErr) {
-                console.error("Error checking existing ruta_items_movidos:", existingErr);
+                console.error("Error checking existing ruta_despacho_historial_carga_items_movidos:", existingErr);
                 return NextResponse.json({ ok: false, error: "Error checking item movement" }, { status: 500 });
             }
 
@@ -230,13 +227,13 @@ export async function POST(request) {
                 return NextResponse.json({ ok: false, error: "El item ya fue cargado en el último historial" }, { status: 400 });
             }
 
-            // Insert ruta_items_movidos
+            // Insert ruta_despacho_historial_carga_items_movidos
             const { error: insertErr } = await supabase
                 .from("ruta_despacho_historial_carga_items_movidos")
                 .insert({ ruta_despacho_historial_carga_id: historialId, item_catalogo_id: itemRow.id });
 
             if (insertErr) {
-                console.error("Error inserting ruta_items_movidos:", insertErr);
+                console.error("Error inserting ruta_despacho_historial_carga_items_movidos:", insertErr);
                 return NextResponse.json({ ok: false, error: "Failed to record moved item" }, { status: 500 });
             }
 
@@ -244,7 +241,7 @@ export async function POST(request) {
             const { data: cargaHistorials } = await supabase
                 .from("ruta_despacho_historial_carga")
                 .select(`items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)`)
-                .eq("ruta_id", rutaId)
+                .eq("ruta_despacho_id", rutaId)
                 .eq("es_carga", true);
 
             const carga_item_ids = (cargaHistorials || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
@@ -252,7 +249,7 @@ export async function POST(request) {
             return NextResponse.json({ ok: true, item: buildItemView(itemRow), carga_item_ids });
         }
 
-        // If ventaId provided: find ruta via ruta_ventas
+        // If ventaId provided: find ruta via ruta_despacho_ventas
         if (ventaId) {
             const { data: venta, error: ventaErr } = await supabase
                 .from("ventas")
@@ -275,7 +272,7 @@ export async function POST(request) {
                 .limit(1);
 
             if (rutaVentaErr) {
-                console.error("Error fetching ruta_ventas:", rutaVentaErr);
+                console.error("Error fetching ruta_despacho_ventas:", rutaVentaErr);
                 return NextResponse.json({ ok: false, error: "Error fetching ruta for venta" }, { status: 500 });
             }
 
@@ -283,7 +280,7 @@ export async function POST(request) {
                 return NextResponse.json({ ok: false, error: "No ruta associated with venta" }, { status: 404 });
             }
 
-            const rutaIdFound = rutaVenta[0].ruta_id;
+            const rutaIdFound = rutaVenta[0].ruta_despacho_id;
             const historialId = await ensureLatestCargaHistorial(rutaIdFound);
 
             // Check duplicate
@@ -295,7 +292,7 @@ export async function POST(request) {
                 .limit(1);
 
             if (existingErr2) {
-                console.error("Error checking existing ruta_items_movidos:", existingErr2);
+                console.error("Error checking existing ruta_despacho_historial_carga_items_movidos:", existingErr2);
                 return NextResponse.json({ ok: false, error: "Error checking item movement" }, { status: 500 });
             }
 

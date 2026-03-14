@@ -41,7 +41,7 @@ export async function GET(request) {
             id, codigo, fecha, valor_total, saldo, 
             vendedor:usuarios(id, nombre),
             documento:documentos_tributarios(nombre),
-            direccion_despacho_id:direcciones(id, nombre)
+            direccion_despacho_id:direcciones(id, direccion_cliente)
         `)
         .eq("cliente_id", clienteId)
         .eq("por_cobrar", true)
@@ -49,8 +49,6 @@ export async function GET(request) {
         .gt("valor_total", 0)
         .in("documento_tributario_id", documentoIds)
         .order("fecha", { ascending: false });
-
-    console.log("Ventas output:", ventas, ventasError);
 
     if (ventasError) {
         return NextResponse.json({ ok: false, error: "Error fetching ventas" }, { status: 500 });
@@ -87,7 +85,10 @@ export async function GET(request) {
             saldo: v.saldo ?? 0,
             vendedor: v.vendedor?.name || "",
             documento: v.documento?.nombre || "",
-            direccion: v.direccion?.direccion || "",
+            direccion: {
+                id: v.direccion_despacho_id?.id || null,
+                direccionCliente: v.direccion_despacho_id?.direccion_cliente || ""
+            },
             detalles: detallesVenta.map(d => ({
                 glosa: `${d.subcategoria?.categoria?.elemento || ""} ${d.subcategoria?.cantidad || 0}${d.subcategoria?.unidad || ""}`,
                 cantidad: d.cantidad,

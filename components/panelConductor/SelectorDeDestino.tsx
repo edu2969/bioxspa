@@ -1,5 +1,5 @@
 import { TbFlagCheck } from "react-icons/tb";
-import { IDestinoDisponible, IRutaConductorView } from "@/types/types";
+import { IDestinoDisponible, IDestinoView, IRutaConductorView } from "@/types/types";
 import { TIPO_ORDEN } from "@/app/utils/constants";
 import { FaMapLocationDot, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
@@ -8,6 +8,7 @@ import { Selector } from "../prefabs/Selector";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Loader from "../Loader";
 import { FaFlagCheckered } from "react-icons/fa";
+import CheckPoint from "./CheckPoint";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
     if(!rutaDespacho) return null;
@@ -27,7 +28,7 @@ export default function SelectorDeDestino({
     // Observar cambios en la selección de destino
     const destinoSeleccionado = watch("direccionDestinoId");
 
-    const { data: destinos, isLoading: isLoadingDestinos } = useQuery<IDestinoDisponible[]>({
+    const { data: destinos, isLoading: isLoadingDestinos } = useQuery<IDestinoView[]>({
         queryKey: ['destinos-ruta-conductor', rutaDespacho.id],
         queryFn: async () => {
             if (!rutaDespacho || !rutaDespacho.id) return [];
@@ -41,14 +42,14 @@ export default function SelectorDeDestino({
     })
 
     const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
-        mutationFn: async () => {
+        mutationFn: async () => {            
             if (!rutaDespacho?.id) {
                 throw new Error('Missing rutaId');
             }
 
             let direccionDestinoId = getValues("direccionDestinoId");
             if (!direccionDestinoId) {
-                direccionDestinoId = rutaDespacho.destinos && rutaDespacho.destinos.find(destino => destino.fechaArribo == null)?.direccion?.id;
+                direccionDestinoId = rutaDespacho.destinos?.length && rutaDespacho.destinos[rutaDespacho.destinos.length - 1].direccion.id;
             }
 
             if (!direccionDestinoId) {
@@ -95,7 +96,7 @@ export default function SelectorDeDestino({
 
                 {rutaDespacho && rutaDespacho.destinos?.length > 0 
                 && rutaDespacho.destinos.map((destino, indexRuta) => (
-                <div className="h-12" key={`ruta_${indexRuta}`}>
+                <div className="h-12" key={`ruta_iconos_${indexRuta}`}>
                     <div className="h-4" />
                     {destino.fechaArribo
                         ? <TbFlagCheck className="text-xl mt-1" />
@@ -107,7 +108,7 @@ export default function SelectorDeDestino({
                 <div className="flex flex-col items-center mt-1">
                     <div className="w-6 h-6 rounded-full bg-blue-300 border-4 border-blue-400" />
                     {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (
-                        <div className="w-6" key={`ruta_${indexRuta}`}>
+                        <div className="w-6" key={`ruta_segmento_${indexRuta}`}>
                             <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
                             <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
                         </div>))}
@@ -118,32 +119,17 @@ export default function SelectorDeDestino({
                 <div className="w-full flex mt-1 h-12 items-center">
                     <BsFillGeoAltFill size="1.1rem" className="w-4" /><span className="text-sm ml-2">Barros Arana</span>
                 </div>
-                {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (<div key={`ruta_${indexRuta}`} className="flex mt-1 h-12 items-center overflow-hidden">
-                    <BsFillGeoAltFill size="1.1rem" className="w-4" />
-                    <span className="text-xs ml-2 w-36">{destino.direccion
-                        && destino.direccion.direccionCliente?.split(",").slice(0, 3).join(",")}</span>
-                    {indexRuta == rutaDespacho.destinos?.length - 1 && <button
-                        className="bg-blue-400 text-white font-bold rounded-md shadow-md w-10 h-10 pl-2"
-                        onClick={() => {
-                            const glosaDestino = `${destino.direccion && destino.direccion.latitud},${destino.direccion && destino.direccion.longitud}`;
-                            // Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=lat,lng
-                            window.open(
-                                `https://www.google.com/maps/dir/?api=1&destination=${glosaDestino}&travelmode=driving`,
-                                "_blank"
-                            );
-                        }}
-                    >
-                        <FaMapLocationDot className="w-7 -ml-0.5" size="1.5rem" />
-                    </button>}
-                </div>))}
+                {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (
+                    <CheckPoint key={`check_point_${indexRuta}`} index={indexRuta} isLast={false} destino={destino} />
+                ))}
             </div>
         </div>
         
         {!isLoadingDestinos && destinos && destinos.length > 1 && <Selector 
-            options={destinos.map((destino: IDestinoDisponible): { label: string; value: string } => {
+            options={destinos.map((destino: IDestinoView): { label: string; value: string } => {
                 return {
-                    value: destino.direccionId,
-                    label: destino.glosaDireccion
+                    value: destino.direccion.id,
+                    label: destino.direccion.direccionCliente || "?? - ??"
                 }
             })}
             register={register("direccionDestinoId")}
@@ -167,9 +153,9 @@ export default function SelectorDeDestino({
                                 <p className="text-sm text-amber-600">Selecciona un destino para continuar</p>
                             </div>
                         )}
-                        <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${isLoading || (!destinoSeleccionado && destinos.length === 1) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <button className={`flex w-full justify-center h-10 bg-green-400 text-white font-bold rounded-lg shadow-md cursor-pointer ${isLoading || (!destinoSeleccionado && destinos.length > 1) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             onClick={() => iniciarViaje()}
-                            disabled={isLoading || (!destinoSeleccionado && destinos.length === 1)}>
+                            disabled={isLoading || (!destinoSeleccionado && destinos.length > 1)}>
                             {isLoading ? <div className="mt-1">
                                 <Loader texto="INICIANDO" />
                             </div> :

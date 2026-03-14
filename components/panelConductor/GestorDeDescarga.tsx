@@ -62,7 +62,7 @@ export default function GestorDeDescarga({
     // Metación para confirmar la descarga completa
     const confirmarDescargaMutation = useMutation({
         mutationFn: async () => {
-            const response = await fetch('/api/conductor/confirmarDescarga', {
+            await fetch('/api/conductor/confirmarDescarga', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -49,8 +49,8 @@ export async function GET(request) {
             despacho_en_local: !venta.direccion_despacho_id,
             fecha: venta.fecha,
             items: items.map((item) => ({
-            ...item,
-            nombre: `${item.categoria_nombre || "Desconocido"} - ${item.subcategoria_nombre || "Desconocido"}`
+                ...item,
+                nombre: `${item.categoria_nombre || "Desconocido"} - ${item.subcategoria_nombre || "Desconocido"}`
             }))
         };
         });
@@ -133,14 +133,16 @@ export async function POST(request) {
             .select("vehiculo_id")
             .eq("usuario_id", choferId)
             .eq("tipo", TIPO_CHECKLIST.vehiculo)
-            .gte("fecha", startOfToday.toISOString())
-            .order("fecha", { ascending: false })
+            .gte("created_at", startOfToday.toISOString())
+            .order("created_at", { ascending: false })
             .limit(1)
-            .maybeSingle();
+            .single();
 
-        if (checklistError) {
-            return NextResponse.json({ ok: false, error: "Error fetching checklist" }, { status: 500 });
+        if (checklistError || !todayChecklist) {
+            return NextResponse.json({ ok: false, error: checklistError ? "Error fetching checklist: " + checklistError.message : "No checklist found for today" }, { status: 500 });
         }
+
+        console.log("DATA checklist:", todayChecklist, checklistError);
 
         const vehiculoIdToAssign = todayChecklist && todayChecklist.vehiculo_id ? todayChecklist.vehiculo_id : null;
 

@@ -183,6 +183,7 @@ export interface IDestinoView {
     comentario?: string;
     quienRecibe?: string;
     rutRecibe?: string;
+    nombreCliente?: string;
 }
 
 export interface IRutaConductorView {
@@ -202,5 +203,5 @@ export interface IVehiculoView {
 export interface IDestinoDisponible {
     direccionId: string;
     nombreCliente: string;
-    glosaDireccion: string;
+    direccionCliente: string;
 }

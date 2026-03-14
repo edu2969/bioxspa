@@ -22,8 +22,8 @@ export async function GET(request: NextRequest) {
                 hora_destino,
                 dependencia_id,
                 vehiculo_id,
-                ruta_ventas(venta_id),
-                ruta_historial_estados(estado, usuario_id, created_at)
+                ruta_despacho_ventas(venta_id),
+                ruta_despacho_historial_estados(estado, usuario_id, created_at)
             `)
             .eq("conductor_id", choferId)
             .gt("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch sales details for the route
         const ventas = await Promise.all(
-            rutaDespacho.ruta_ventas.map(async (venta: { venta_id: string }) => {
+            rutaDespacho.ruta_despacho_ventas.map(async (venta: { venta_id: string }) => {
                 const { data: ventaData, error: ventaError } = await supabase
                     .from("ventas")
                     .select(`
@@ -82,15 +82,21 @@ export async function GET(request: NextRequest) {
         const response = {
             id: rutaDespacho.id,
             estado: rutaDespacho.estado,
-            hora_inicio: rutaDespacho.hora_inicio,
-            hora_destino: rutaDespacho.hora_destino,
-            dependencia_id: rutaDespacho.dependencia_id,
+            horaInicio: rutaDespacho.hora_inicio,
+            horaDestino: rutaDespacho.hora_destino,
+            dependenciaId: rutaDespacho.dependencia_id,
             vehiculo,
             ventas: ventas.filter(Boolean), // Remove null entries
-            historial_estados: rutaDespacho.ruta_historial_estados
+            historialEstados: rutaDespacho.ruta_despacho_historial_estados.map((hist: { 
+                estado: number; usuario_id: string; created_at: string 
+            }) => ({
+                estado: hist.estado,
+                usuarioId: hist.usuario_id,
+                timestamp: hist.created_at
+            }))
         };
 
-        return NextResponse.json({ ok: true, ruta_despacho: response });
+        return NextResponse.json({ ok: true, rutaDespacho: response });
     } catch (error) {
         console.error("GET /conductor - Internal Server Error:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });
