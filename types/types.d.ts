@@ -6,16 +6,16 @@ export interface IPedidoPorAsignar {
     id: string;
     tipo: number;
     comentario: string;
-    cliente_id: string;
-    cliente_nombre: string;
-    cliente_rut: string;
+    clienteId: string;
+    clienteNombre: string;
+    clienteRut: string;
     estado: number;
-    despacho_en_local: boolean;
+    despachoEnLocal: boolean;
     fecha: Date;
     items: Array<{
         id: string;
-        venta_id: string;
-        subcategoria_catalogo_id: string;
+        ventaId: string;
+        subcategoriaCatalogoId: string;
         cantidad: number;
         precio: number;
         nombre: string;
@@ -27,14 +27,14 @@ export interface IPedidoConductor {
     tipo: number;
     estado: number;
     fecha: Date;
-    nombre_cliente: string;
-    rut_cliente: string;
+    nombreCliente: string;
+    rutCliente: string;
     comentario: string;
-    retiro_en_local?: boolean;
+    retiroEnLocal?: boolean;
     items: {
         id: string;
-        venta_id: string;
-        subcategoria_catalogo_id: string;
+        ventaId: string;
+        subcategoriaCatalogoId: string;
         cantidad: number;
         precio: number;
         nombre: string;
@@ -49,32 +49,32 @@ export interface IConductoresResponse {
 }
 
 export interface IRutasEnTransitoResponse {    
-    ruta_id: string;
+    rutaId: string;
     estado: number;
 }
 
 export interface IRutaEnTransito {
-    ruta_id: string;
-    direccion_destino: string;
-    nombre_chofer: string;
+    rutaId: string;
+    direccionDestino: string;
+    nombreChofer: string;
 }
 
 export interface IVentaEnTransito {
-    venta_id: string;
+    ventaId: string;
     tipo: number;
     estado: number;
     fecha: Date;
-    nombre_cliente: string;
-    telefono_cliente: string;
+    nombreCliente: string;
+    telefonoCliente: string;
     comentario?: string;
     detalles: Array<{
         multiplicador: number;
         cantidad: number;
         elemento: string;
         unidad: string;
-        es_industrial: boolean;
-        es_medicinal: boolean;
-        sin_sifon: boolean;
+        esIndustrial: boolean;
+        esMedicinal: boolean;
+        sinSifon: boolean;
     }>
 }
 
@@ -103,37 +103,43 @@ export interface ISubcategoriaCatalogoPoblado {
     };
 }
 
+export interface ICargaDespachoVentaView {
+    ventaId: string;
+    tipo: number;
+    fecha: Date;
+    detalles: Array<{
+        multiplicador: number;
+        restantes: number;
+        itemCatalogoIds: string[];
+        subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
+    }>;
+    comentario: string | null;
+    direccionesDespacho: Array<{
+        id: string | null;
+        direccionCliente: string | null;
+        latitud: number | null;
+        longitud: number | null;
+    }>;
+    entregasEnLocal: Array<{
+        nombreRecibe: string | null;
+        rutRecibe: string | null;
+        createdAt: Date;
+    }>;
+}
+
+export interface ICargaDespachoClienteView {
+    cliente: {
+        id: string | null;
+        nombre: string | null;
+        rut?: string | null;
+        telefono?: string | null;
+    };
+    ventas: ICargaDespachoVentaView[];
+}
+
 export interface ICargaDespachoView {
     rutaDespachoId: string | null;
-    ventas: Array<{
-        ventaId: string;
-        tipo: number;
-        fecha: Date;
-        detalles: Array<{
-            multiplicador: number;
-            restantes: number;
-            itemCatalogoIds: string[];
-            subcategoriaCatalogoId: ISubcategoriaCatalogoPoblado;
-        }>;
-        comentario: string | null;
-        cliente: {
-            nombre: string | null;
-            rut?: string | null;
-            direccion?: string | null;
-            telefono?: string | null;
-            direccionesDespacho: Array<{
-                id: string | null;
-                direccionCliente: string | null;
-                latitud: number | null;
-                longitud: number | null;
-            }>;
-        };
-        entregasEnLocal: Array<{
-            nombreRecibe: string | null;
-            rutRecibe: string | null;
-            createdAt: Date;
-        }>;
-    }>;
+    clientes: ICargaDespachoClienteView[];
     nombreChofer: string | null;
     patenteVehiculo: string | null;
     fechaVentaMasReciente: Date | null;

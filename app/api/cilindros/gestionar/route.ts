@@ -7,9 +7,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { itemId, ...updateData } = body;
 
-        console.log("Received update request for itemId:", itemId);
-        console.log("Update data:", updateData);
-
         if (!itemId) {
             return NextResponse.json({ ok: false, error: "Missing itemId" }, { status: 400 });
         }

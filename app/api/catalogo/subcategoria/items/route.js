@@ -60,7 +60,7 @@ export async function GET(request) {
                     )
                 )
             `)
-            .eq("subcategoria_id", id);
+            .eq("subcategoria_catalogo_id", id);
 
         if (itemsError) {
             console.error("Error fetching items catalogo:", itemsError);

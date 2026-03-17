@@ -38,7 +38,7 @@ export async function GET(request) {
             console.error("Error fetching ruta:", rutaErr);
             return NextResponse.json({ ok: false, error: "Error fetching ruta" }, { status: 500 });
         }
-        if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });
+        if (!ruta) return NextResponse.json({ ok: true, cilindrosDescargados: [], total: 0 });
 
         if(ruta.estado !== TIPO_ESTADO_RUTA_DESPACHO.descarga) {
             return NextResponse.json({ ok: true, cilindrosDescargados: [], total: 0 });

@@ -25,6 +25,7 @@ export function useRealtimeQuery({
   const queryClient = useQueryClient();
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const queryKeysRef = useRef(queryKeys);
+  const lastStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     queryKeysRef.current = queryKeys;
@@ -35,6 +36,7 @@ export function useRealtimeQuery({
       return;
     }
 
+    lastStatusRef.current = null;
     const normalizedFilter = filter?.trim();
 
     const channel = supabase
@@ -54,7 +56,25 @@ export function useRealtimeQuery({
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (lastStatusRef.current === status) {
+          return;
+        }
+
+        lastStatusRef.current = status;
+
+        if (status === "SUBSCRIBED") {
+          // Sync inicial/reconexion para evitar UI stale si hubo eventos perdidos.
+          queryKeysRef.current.forEach((key) => {
+            queryClient.invalidateQueries({ queryKey: key });
+          });
+          return;
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[Realtime] Channel ${channelName} status: ${status}`);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);

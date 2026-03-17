@@ -25,10 +25,16 @@ export async function POST(request) {
         const userId = user.id;        
 
         const supabase = await getSupabaseServerClient();
+        const nowIso = new Date().toISOString();
+
         const { data: cargo, error: cargoError } = await supabase
             .from("cargos")
             .select("id, sucursal_id, dependencia_id")
             .eq("usuario_id", userId)
+            .lte("desde", nowIso)
+            .or(`hasta.is.null,hasta.gte.${nowIso}`)
+            .order("desde", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (cargoError || !cargo) {
@@ -87,12 +93,16 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
         }
 
-        // Fetch expected direccion details for helpful response
-        const { data: expectedDireccion } = await supabase
+        // Fetch expected direccion details for helpful response in modal
+        const { data: expectedDireccion, error: expectedDireccionError } = await supabase
             .from("direcciones")
             .select("id, direccion_cliente")
             .eq("id", direccionId)
             .maybeSingle();
+
+        if (expectedDireccionError || !expectedDireccion) {
+            return NextResponse.json({ ok: false, error: "No workplace address details found for user" }, { status: 400 });
+        }
 
         const buildItemView = (row) => {
             const sub = row.subcategoria || null;
@@ -122,13 +132,15 @@ export async function POST(request) {
                 garantiaAnual: row.garantia_anual,
                 estado: row.estado,
                 fechaMantencion: row.fecha_mantencion,
-                direccionInvalida: String(row.direccion?.id) !== String(direccionId),
-                direccionEsperada: expectedDireccion ? { id: expectedDireccion.id, direccionCliente: expectedDireccion.direccion_cliente } : null
+                direccionInvalida: String(row.direccion?.id) !== String(expectedDireccion?.id),
+                direccionEsperada: expectedDireccion
+                    ? { id: expectedDireccion.id, direccionCliente: expectedDireccion.direccion_cliente }
+                    : null
             };
         };
 
         // If item is not located at user's workplace, return a helpful error with item view
-        if (String(itemRow.direccion?.id) !== String(direccionId)) {
+        if (String(itemRow.direccion?.id) !== String(expectedDireccion?.id)) {
             return NextResponse.json({ ok: false, item: buildItemView(itemRow), error: "El item no está donde se esperaba" }, { status: 400 });
         }
 
@@ -189,7 +201,7 @@ export async function POST(request) {
             if (ventaIds.length > 0) {
                 const { data: ventaDetails, error: ventaDetailsErr } = await supabase
                     .from("detalle_ventas")
-                    .select("subcategoria_id")
+                    .select("subcategoria_catalogo_id")
                     .in("venta_id", ventaIds);
 
                 if (ventaDetailsErr) {
@@ -197,7 +209,7 @@ export async function POST(request) {
                     return NextResponse.json({ ok: false, error: "Error verifying venta details" }, { status: 500 });
                 }
 
-                const allowedSubcategorias = (ventaDetails || []).map(d => d.subcategoria_id);
+                const allowedSubcategorias = (ventaDetails || []).map(d => d.subcategoria_catalogo_id);
                 if (!allowedSubcategorias.includes(itemRow.subcategoria?.id)) {
                     return NextResponse.json({
                         ok: false,
@@ -247,10 +259,7 @@ export async function POST(request) {
             const carga_item_ids = (cargaHistorials || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
 
             return NextResponse.json({ ok: true, item: buildItemView(itemRow), carga_item_ids });
-        }
-
-        // If ventaId provided: find ruta via ruta_despacho_ventas
-        if (ventaId) {
+        } else if (ventaId) {
             const { data: venta, error: ventaErr } = await supabase
                 .from("ventas")
                 .select("id, estado, direccion_despacho_id")

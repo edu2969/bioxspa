@@ -52,7 +52,7 @@ export default function PedidoEnConductor({ pedido, choferId, onShowDetalle, onS
         >
             <div className="flex w-full" key={`pedido_chofer_${choferId}_${indexPedido}`}>
                 <div className='w-full'>
-                    <p className="font-md uppercase font-bold text-nowrap overflow-hidden text-ellipsis whitespace-nowrap w-11/12">{pedido.nombre_cliente}</p>
+                    <p className="font-md uppercase font-bold text-nowrap overflow-hidden text-ellipsis whitespace-nowrap w-11/12">{pedido.nombreCliente}</p>
                     {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-xs text-green-800 rounded-sm bg-green-200 px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}                    
                 </div>
                 <div className={`${pedido.comentario ? 'text-green-300' : 'text-green-800'} w-1/12`}>

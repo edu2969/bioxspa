@@ -154,8 +154,8 @@ export async function POST(req) {
 
     if (body.tipo === 1 || body.tipo === 4) {
       for (const item of body.items) {
-        if (!item.cantidad || !item.subcategoria_id) {
-          const errorMessage = "Each item must have 'cantidad' and 'subcategoria_id'";
+        if (!item.cantidad || !item.subcategoria_catalogo_id) {
+          const errorMessage = "Each item must have 'cantidad' and 'subcategoria_catalogo_id'";
           console.error("Validation Error:", errorMessage);
           return NextResponse.json({ error: errorMessage }, { status: 400 });
         }
@@ -189,7 +189,7 @@ export async function POST(req) {
     }, {});
 
     const valorNeto = body.items.reduce((total, item) => {
-      const precio = preciosMap[item.subcategoria_id] || 0;
+      const precio = preciosMap[item.subcategoria_catalogo_id] || 0;
       return total + item.cantidad * precio;
     }, 0);
 
@@ -228,11 +228,11 @@ export async function POST(req) {
 
     const detalles = body.items.map((item) => ({
       venta_id: nuevaVenta[0].id,
-      subcategoria_id: item.subcategoria_id,
+      subcategoria_catalogo_id: item.subcategoria_catalogo_id,
       cantidad: item.cantidad,
-      neto: preciosMap[item.subcategoria_id] * item.cantidad,
-      iva: preciosMap[item.subcategoria_id] * item.cantidad * 0.19,
-      total: preciosMap[item.subcategoria_id] * item.cantidad * 1.19,
+      neto: preciosMap[item.subcategoria_catalogo_id] * item.cantidad,
+      iva: preciosMap[item.subcategoria_catalogo_id] * item.cantidad * 0.19,
+      total: preciosMap[item.subcategoria_catalogo_id] * item.cantidad * 1.19,
     }));
 
     const { error: detalleError } = await supabase

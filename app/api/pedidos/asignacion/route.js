@@ -113,6 +113,102 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "No valid dependencia_id found for chofer" }, { status: 400 });
         }
 
+        // Si la venta ya está asociada a alguna ruta, no duplicar.
+        const { data: rutaVentaExistente, error: rutaVentaExistenteError } = await supabase
+            .from("ruta_despacho_ventas")
+            .select("ruta_despacho_id")
+            .eq("venta_id", ventaId)
+            .maybeSingle();
+
+        if (rutaVentaExistenteError) {
+            console.log("POST /asignacion - Error checking existing ruta venta:", { ventaId, error: rutaVentaExistenteError.message });
+            return NextResponse.json({ ok: false, error: "Failed to validate venta assignment" }, { status: 500 });
+        }
+
+        if (rutaVentaExistente) {
+            return NextResponse.json({ ok: true, rutaId: rutaVentaExistente.ruta_despacho_id, reusedRoute: true, alreadyAssigned: true });
+        }
+
+        // Buscar ruta activa existente del chofer (no crear una nueva si ya existe).
+        const { data: rutaActiva, error: rutaActivaError } = await supabase
+            .from("rutas_despacho")
+            .select("id")
+            .eq("conductor_id", choferId)
+            .eq("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (rutaActivaError) {
+            console.log("POST /asignacion - Error checking active ruta:", { choferId, error: rutaActivaError.message });
+            return NextResponse.json({ ok: false, error: "Failed to validate active route" }, { status: 500 });
+        }
+
+        let rutaId = rutaActiva?.id || null;
+        let reusedRoute = Boolean(rutaId);
+
+        if (!rutaId) {
+            // Solo si no existe ruta activa: buscar checklist y crear ruta.
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+
+            const { data: todayChecklist, error: checklistError } = await supabase
+                .from("checklists")
+                .select("vehiculo_id")
+                .eq("usuario_id", choferId)
+                .eq("tipo", TIPO_CHECKLIST.vehiculo)
+                .gte("created_at", startOfToday.toISOString())
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .single();
+
+            if (checklistError || !todayChecklist) {
+                return NextResponse.json({ ok: false, error: checklistError ? "Error fetching checklist: " + checklistError.message : "No checklist found for today" }, { status: 500 });
+            }
+
+            const vehiculoIdToAssign = todayChecklist.vehiculo_id || null;
+
+            const insertPayload = {
+                conductor_id: choferId,
+                dependencia_id: dependenciaId,
+                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                hora_inicio: new Date(),
+                hora_destino: null,
+                created_at: new Date(),
+                updated_at: new Date()
+            };
+
+            if (vehiculoIdToAssign) insertPayload.vehiculo_id = vehiculoIdToAssign;
+
+            const { data: nuevaRuta, error: createRutaError } = await supabase
+                .from("rutas_despacho")
+                .insert(insertPayload)
+                .select("id")
+                .single();
+
+            if (createRutaError || !nuevaRuta) {
+                console.log("POST /asignacion - Error creating ruta:", { choferId, error: createRutaError?.message });
+                return NextResponse.json({ ok: false, error: "Failed to create RutaDespacho" }, { status: 500 });
+            }
+
+            rutaId = nuevaRuta.id;
+            reusedRoute = false;
+
+            // Historial inicial solo cuando se crea la ruta.
+            const { error: historialError } = await supabase
+                .from("ruta_despacho_historial_estados")
+                .insert({
+                    ruta_despacho_id: rutaId,
+                    estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
+                    usuario_id: choferId
+                });
+
+            if (historialError) {
+                console.log("POST /asignacion - Error logging initial ruta state:", { rutaId, error: historialError.message });
+                return NextResponse.json({ ok: false, error: "Failed to log initial RutaDespacho state" }, { status: 500 });
+            }
+        }
+
         // Update venta state
         const { error: ventaError } = await supabase
             .from("ventas")
@@ -124,55 +220,6 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: ventaError.message }, { status: 500 });
         }
 
-        // Look for today's checklist (from 00:00) of type 'vehiculo' for this conductor
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-
-        const { data: todayChecklist, error: checklistError } = await supabase
-            .from("checklists")
-            .select("vehiculo_id")
-            .eq("usuario_id", choferId)
-            .eq("tipo", TIPO_CHECKLIST.vehiculo)
-            .gte("created_at", startOfToday.toISOString())
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
-
-        if (checklistError || !todayChecklist) {
-            return NextResponse.json({ ok: false, error: checklistError ? "Error fetching checklist: " + checklistError.message : "No checklist found for today" }, { status: 500 });
-        }
-
-        console.log("DATA checklist:", todayChecklist, checklistError);
-
-        const vehiculoIdToAssign = todayChecklist && todayChecklist.vehiculo_id ? todayChecklist.vehiculo_id : null;
-
-        // Create a new ruta, assigning vehiculo_id when available
-        const insertPayload = {
-            conductor_id: choferId,
-            dependencia_id: dependenciaId,
-            estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-            hora_inicio: new Date(),
-            hora_destino: null,
-            created_at: new Date(),
-            updated_at: new Date()
-        };
-
-        if (vehiculoIdToAssign) insertPayload.vehiculo_id = vehiculoIdToAssign;
-
-        const { data: nuevaRuta, error: createRutaError } = await supabase
-            .from("rutas_despacho")
-            .insert(insertPayload)
-            .select("id")
-            .single();
-
-        if (createRutaError || !nuevaRuta) {
-            console.log("POST /asignacion - Error creating ruta:", { choferId, error: createRutaError?.message });
-            return NextResponse.json({ ok: false, error: "Failed to create RutaDespacho" }, { status: 500 });
-        }
-
-        const rutaId = nuevaRuta.id;
-
-        // Associate the venta with the new ruta
         const { error: rutaVentaError } = await supabase
             .from("ruta_despacho_ventas")
             .insert({
@@ -186,21 +233,7 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Failed to associate venta with RutaDespacho" }, { status: 500 });
         }
 
-        // Log the initial state of the ruta
-        const { error: historialError } = await supabase
-            .from("ruta_despacho_historial_estados")
-            .insert({
-                ruta_despacho_id: rutaId,
-                estado: TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                usuario_id: choferId
-            });
-
-        if (historialError) {
-            console.log("POST /asignacion - Error logging initial ruta state:", { rutaId, error: historialError.message });
-            return NextResponse.json({ ok: false, error: "Failed to log initial RutaDespacho state" }, { status: 500 });
-        }
-
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, rutaId, reusedRoute });
     } catch (error) {
         console.error("Error in POST /asignacion:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });

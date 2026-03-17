@@ -2,6 +2,49 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_RUTA_DESPACHO, TIPO_CHECKLIST } from "@/app/utils/constants";
 
+function mapPedidoConductor(venta) {
+    const cliente = Array.isArray(venta?.cliente)
+        ? venta.cliente[0]
+        : venta?.cliente;
+
+    const items = Array.isArray(venta?.detalles)
+        ? venta.detalles.map((detalle) => {
+            const subcategoria = detalle?.subcategoria;
+            const categoria = subcategoria?.categoria;
+
+            return {
+                id: String(detalle?.id || ""),
+                ventaId: String(venta?.id || ""),
+                subcategoriaCatalogoId: String(subcategoria?.id || ""),
+                cantidad: Number(detalle?.cantidad || 0),
+                precio: Number(detalle?.neto || 0),
+                nombre: `${categoria?.nombre || ""} - ${subcategoria?.nombre || ""}`.trim()
+            };
+        })
+        : [];
+
+    return {
+        id: String(venta?.id || ""),
+        tipo: Number(venta?.tipo || 0),
+        estado: Number(venta?.estado || 0),
+        fecha: venta?.fecha || null,
+        nombreCliente: String(cliente?.nombre || ""),
+        rutCliente: String(cliente?.rut || ""),
+        comentario: String(venta?.comentario || ""),
+        retiroEnLocal: venta?.direccion_despacho_id == null,
+        items: items.filter((item) => item.id && item.ventaId)
+    };
+}
+
+function mapConductor(conductor) {
+    return {
+        id: String(conductor?.id || ""),
+        nombre: String(conductor?.nombre || ""),
+        pedidos: Array.isArray(conductor?.pedidos) ? conductor.pedidos : [],
+        checklist: Boolean(conductor?.checklist)
+    };
+}
+
 export async function GET(request) {
     try {
         const supabase = await getSupabaseServerClient();
@@ -52,7 +95,7 @@ export async function GET(request) {
 
         // Obtener datos de los conductores
         const conductores = await Promise.all(
-            cargosChoferes.map(async (cargo) => {
+            (cargosChoferes || []).map(async (cargo) => {
                 const { data: usuario, error: userError } = await supabase
                     .from("usuarios")
                     .select("id, nombre")
@@ -103,33 +146,8 @@ export async function GET(request) {
                                 `)
                                 .in("id", ventaIds); // Ensure ventaIds is passed as an array
 
-                            pedidos = ventas
-                                ? ventas.map((venta) => {
-                                    const cliente = venta.cliente;                                                 
-                                    const items = venta.detalles?.map((detalle) => {
-                                        const subcategoria = detalle.subcategoria;
-                                        const categoria = subcategoria?.categoria;
-                                        return {
-                                            id: detalle.id,
-                                            venta_id: venta.id,
-                                            subcategoria_catalogo_id: subcategoria?.id,
-                                            cantidad: detalle.cantidad,
-                                            precio: detalle.neto,
-                                            nombre: `${categoria?.nombre} - ${subcategoria?.nombre}`
-                                        }
-                                    })
-                                    return {
-                                        id: venta.id,
-                                        tipo: venta.tipo,
-                                        estado: venta.estado,
-                                        fecha: venta.fecha,
-                                        nombre_cliente: cliente.nombre,
-                                        rut_cliente: cliente.rut,
-                                        comentario: venta.comentario || "",
-                                        retiro_en_local: venta.direccion_despacho_id == null,
-                                        items: items || []
-                                    };
-                                })
+                            pedidos = Array.isArray(ventas)
+                                ? ventas.map(mapPedidoConductor)
                                 : [];
 
                         }
@@ -142,7 +160,7 @@ export async function GET(request) {
                 startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
         
                 // Verificar si existe un checklist para hoy
-                const { data: checklistExists, error: checklistError } = await supabase
+                const { data: checklistExists } = await supabase
                     .from("checklists")
                     .select("id")
                     .eq("usuario_id", userId)
@@ -163,7 +181,10 @@ export async function GET(request) {
         );
 
         return NextResponse.json({
-            conductores: conductores.filter((c) => c !== null)
+            conductores: conductores
+                .filter((c) => c !== null)
+                .map(mapConductor)
+                .filter((c) => c.id)
         });
     } catch (error) {
         console.error("[GET /conductores] Internal Server Error:", error);

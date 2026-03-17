@@ -53,21 +53,21 @@ export async function GET(request) {
         }
 
         const ventasEnTransito = (ventasRows || []).map((v) => ({
-            venta_id: v.id,
+            ventaId: v.id,
             tipo: v.tipo,
             estado: v.estado,
             fecha: v.fecha,
-            nombre_cliente: v.cliente?.nombre || '',
-            telefono_cliente: v.cliente?.telefono || '',
+            nombreCliente: v.cliente?.nombre || '',
+            telefonoCliente: v.cliente?.telefono || '',
             comentario: v.comentario,
             detalles: (detallesMap[v.id] || []).map((d) => ({
                 multiplicador: d.cantidad,
                 cantidad: d.subcategoria?.cantidad || 0,
                 elemento: d.subcategoria?.categoria?.elemento || '',
                 unidad: d.subcategoria?.unidad || '',
-                es_industrial: d.subcategoria?.categoria?.es_industrial || false,
-                es_medicinal: d.subcategoria?.categoria?.es_medicinal || false,
-                sin_sifon: d.subcategoria?.sin_sifon || false,
+                esIndustrial: d.subcategoria?.categoria?.es_industrial || false,
+                esMedicinal: d.subcategoria?.categoria?.es_medicinal || false,
+                sinSifon: d.subcategoria?.sin_sifon || false,
             })),
         }));
 

@@ -38,7 +38,7 @@ export async function GET(request) {
             console.error("Error fetching ruta:", rutaErr);
             return NextResponse.json({ ok: false, error: "Error fetching ruta" }, { status: 500 });
         }
-        if (!ruta) return NextResponse.json({ ok: false, error: "RutaDespacho not found" }, { status: 404 });        
+        if (!ruta) return NextResponse.json({ ok: true, cilindrosCargados: [], total: 0 });
 
         // Recalcular cilindros actualmente cargados:
         // +1 por movimiento de carga, -1 por movimiento de descarga.
@@ -79,8 +79,7 @@ export async function GET(request) {
 
             const esCarga = tipoPorHistorial.get(historialId);
             const delta = esCarga ? 1 : -1;
-            balancePorItem.set(itemId, (balancePorItem.get(itemId) || 0) + delta);
-            console.log("itemId", itemId, "esCarga", esCarga);
+            balancePorItem.set(itemId, (balancePorItem.get(itemId) || 0) + delta);            
         }
 
         const itemIds = [...balancePorItem.entries()]

@@ -21,7 +21,7 @@ export async function POST(request) {
         // Busca el item y su subcategoría
         const { data: item, error: itemError } = await supabase
             .from("items_catalogo")
-            .select("id, subcategoria_id, stock_actual")
+            .select("id, subcategoria_catalogo_id, stock_actual")
             .eq("id", itemId)
             .single();
             
@@ -33,7 +33,7 @@ export async function POST(request) {
         const { data: subcategoria, error: subcategoriaError } = await supabase
             .from("subcategorias_catalogo")
             .select("id")
-            .eq("id", item.subcategoria_id)
+            .eq("id", item.subcategoria_catalogo_id)
             .single();
             
         if (subcategoriaError || !subcategoria) {
@@ -57,7 +57,7 @@ export async function POST(request) {
             // Busca los detalles de la venta
             const { data: detalles, error: detallesError } = await supabase
                 .from("detalle_ventas")
-                .select("id, subcategoria_id, cantidad")
+                .select("id, subcategoria_catalogo_id, cantidad")
                 .eq("venta_id", ventaId);
 
             if (detallesError) {
@@ -67,7 +67,7 @@ export async function POST(request) {
 
             // Busca el detalle con la misma subcategoría
             const detalleCoincidente = detalles.find(detalle =>
-                detalle.subcategoria_id === item.subcategoria_id
+                detalle.subcategoria_catalogo_id === item.subcategoria_catalogo_id
             );
             
             if (!detalleCoincidente) {

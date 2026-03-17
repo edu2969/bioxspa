@@ -73,11 +73,11 @@ export async function GET(request) {
                 id: venta.id,
                 tipo: venta.tipo,
                 comentario: venta.comentario || "",
-                cliente_id: cliente.id,
-                cliente_nombre: cliente.nombre,
-                cliente_rut: cliente.rut,
+                clienteId: cliente.id,
+                clienteNombre: cliente.nombre,
+                clienteRut: cliente.rut,
                 estado: venta.estado,
-                despacho_en_local: !venta.direccion_despacho_id,
+                despachoEnLocal: !venta.direccion_despacho_id,
                 fecha: venta.fecha,
                 items: itemsWithNames
             };

@@ -1,16 +1,30 @@
 import { useState, useEffect, useCallback, RefObject } from 'react';
 import type { IVehiculoView } from '@/types/types';
 
+const DEFAULT_CYLINDER_LAYOUT = {
+  baseTop: -0.2,
+  baseLeft: 0.2,
+  maxCylindersPerLine: 8,
+  blockOffsetHorizontal: 0.22,
+  blockOffsetVertical: 0.01,
+};
+
 // Configuración base para diferentes modelos de vehículos
 const VEHICLE_CONFIGS = {
-  "hyundai_porter": { baseWidth: 247, baseHeight: 173, aspectRatio: 1.427, m2: 4.2, pesoMax: 1000 },
-  "ford_ranger": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 5.3, pesoMax: 1200 },
-  "mitsubishi_l200": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.7, pesoMax: 1100 },
-  "volkswagen_constellation": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 12, pesoMax: 6000 },
-  "volkswagen_delivery": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 10, pesoMax: 4500 },
-  "kia_frontier": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.5, pesoMax: 1150 },
-  "ford_transit": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 9, pesoMax: 3500 },
-  "default": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 5, pesoMax: 1500 }
+  "hyundai_porter": { baseWidth: 247, baseHeight: 173, aspectRatio: 1.427, m2: 4.2, pesoMax: 1000, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "ford_ranger": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 5.3, pesoMax: 1200, cylinderLayout: {
+    baseTop: -0.30,
+    baseLeft: 0.5,
+    maxCylindersPerLine: 6,
+    blockOffsetHorizontal: 0.25,
+    blockOffsetVertical: 0.02
+  } },
+  "mitsubishi_l200": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.7, pesoMax: 1100, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "volkswagen_constellation": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 12, pesoMax: 6000, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "volkswagen_delivery": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 10, pesoMax: 4500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "kia_frontier": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.5, pesoMax: 1150, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "ford_transit": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 9, pesoMax: 3500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "default": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 5, pesoMax: 1500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT }
 };
 
 // Posiciones base para cilindros (como porcentajes del contenedor)
@@ -35,6 +49,13 @@ interface ScalingConfig {
   vehicleScale: number;
   vehiclePosition: { top: number; left: number };
   vehicleDimensions: { width: number; height: number };
+  cylinderLayout: {
+    baseTop: number;
+    baseLeft: number;
+    maxCylindersPerLine: number;
+    blockOffsetHorizontal: number;
+    blockOffsetVertical: number;
+  };
 }
 
 interface CylinderPosition {
@@ -102,7 +123,8 @@ export const useVehicleScaling = (
       containerSize,
       vehicleScale: scale,
       vehiclePosition: { top: vehicleTop, left: vehicleLeft },
-      vehicleDimensions: { width: scaledWidth, height: scaledHeight }
+      vehicleDimensions: { width: scaledWidth, height: scaledHeight },
+      cylinderLayout: vehicleConfig.cylinderLayout || DEFAULT_CYLINDER_LAYOUT,
     });
   }, [containerSize, vehiculo, getVehicleConfig]);
 
@@ -115,23 +137,28 @@ export const useVehicleScaling = (
       return { top: 0, left: 0, width: 20, height: 80 };
     }
 
-    const { vehiclePosition, vehicleDimensions, vehicleScale } = scalingConfig;
+    const { vehiclePosition, vehicleDimensions, vehicleScale, cylinderLayout } = scalingConfig;
     
     // Tamaño base del cilindro escalado
     const cylinderWidth = 1.3 * 14 * vehicleScale;
     const cylinderHeight = 1.3 * 78 * vehicleScale;
     
-    // Posiciones dentro del área del vehículo
-    const row = Math.floor(index / 2);
-    const col = index % 2;
+    // Posiciones dentro del área del vehículo, limitando la cantidad de cilindros por bloque.
+    const maxCylindersPerLine = Math.max(cylinderLayout.maxCylindersPerLine, 1);
+    const block = Math.floor(index / maxCylindersPerLine);
+    const indexInBlock = index % maxCylindersPerLine;
+    const row = Math.floor(indexInBlock / 2);
+    const col = indexInBlock % 2;
     
     // Calcular posición relativa dentro del vehículo (ajustada al sistema anterior)
-    const relativeLeft = CYLINDER_BASE_POSITIONS.baseLeft + 
+    const relativeLeft = cylinderLayout.baseLeft + 
+      (block * cylinderLayout.blockOffsetHorizontal) +
       (col * CYLINDER_BASE_POSITIONS.spacing.horizontal) + 
       (row * CYLINDER_BASE_POSITIONS.spacing.depth);
       
     // Ajuste más preciso para la posición vertical basado en el sistema anterior
-    const relativeTop = CYLINDER_BASE_POSITIONS.baseTop - 
+    const relativeTop = cylinderLayout.baseTop +
+      (block * cylinderLayout.blockOffsetVertical) -
       (row * CYLINDER_BASE_POSITIONS.spacing.vertical) + 
       (col * CYLINDER_BASE_POSITIONS.spacing.vertical * 0.3); // Reducido el factor
 

@@ -47,14 +47,28 @@ export const POST = withAuthorization(
                 return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho_ventas entry" }, { status: 500 });
             }
 
-            const { error: deleteRutaError } = await supabase
-                .from("rutas_despacho")
-                .delete()
-                .eq("id", rutaVenta.ruta_despacho_id);
+            // Eliminar la ruta solo si ya no tiene ventas asociadas.
+            const { data: ventasRestantes, error: ventasRestantesError } = await supabase
+                .from("ruta_despacho_ventas")
+                .select("id")
+                .eq("ruta_despacho_id", rutaVenta.ruta_despacho_id)
+                .limit(1);
 
-            if (deleteRutaError) {
-                console.error("Error deleting ruta_despacho:", deleteRutaError);
-                return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho" }, { status: 500 });
+            if (ventasRestantesError) {
+                console.error("Error checking remaining ventas in ruta_despacho_ventas:", ventasRestantesError);
+                return NextResponse.json({ ok: false, error: "Error checking remaining ventas in route" }, { status: 500 });
+            }
+
+            if (!ventasRestantes || ventasRestantes.length === 0) {
+                const { error: deleteRutaError } = await supabase
+                    .from("rutas_despacho")
+                    .delete()
+                    .eq("id", rutaVenta.ruta_despacho_id);
+
+                if (deleteRutaError) {
+                    console.error("Error deleting ruta_despacho:", deleteRutaError);
+                    return NextResponse.json({ ok: false, error: "Error deleting ruta_despacho" }, { status: 500 });
+                }
             }
             
 

@@ -5,7 +5,7 @@ import SoundPlayerProvider from "./context/SoundPlayerContext";
 import { ChecklistProvider } from "./context/ChecklistContext";
 import { ICilindroView, IRutaConductorView } from "@/types/types";
 import Nav from "./Nav";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Loader from "./Loader";
 import InformacionDeCarga from "./prefabs/InformacionDeCarga";
 import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
@@ -21,23 +21,22 @@ import FinalizarRuta from "./panelConductor/FinalizarRuta";
 import { useUser } from "./providers/UserProvider";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 
-function PanelConductorContent() {
+export default function PanelConductor() {
     const [scanMode, setScanMode] = useState(false);
     const vehicleContainerRef = useRef<HTMLDivElement>(null);
     const { user, loading: loadingUser } = useUser();
     const userId = user?.id || null;
 
     useRealtimeQuery({
-        channelName: `rutas-despacho-conductor-${userId || 'sin-usuario'}`,
+        channelName: `rutas-despacho-conductores`,
         schema: 'public',
         table: 'rutas_despacho',
         event: '*',
-        filter: userId ? `conductor_id=eq.${userId}` : undefined,
         queryKeys: [
             ['ruta-despacho-conductor', userId],
             ['estado-ruta-conductor', userId],
             ['carga-vehiculo', userId],
-            ['descarga-vehiculo', userId],
+            ['descarga-vehiculo', userId]
         ],
         enabled: !!userId,
     });
@@ -46,13 +45,14 @@ function PanelConductorContent() {
         queryKey: ['ruta-despacho-conductor', userId],
         queryFn: async () => {
             if (!userId) return null;
-            const response = await fetch(`/api/conductor/rutaAsignada?userId=${userId}`);
+            const response = await fetch(`/api/conductor/rutaAsignada?usuarioId=${userId}`);
             const data = await response.json();
             console.log("Ruta de despacho del conductor:", data);
-            if (!data.ruta) return null;
-            return data.ruta;
+            if (!response.ok || !data?.ok) return null;
+            if (!data?.ruta) return null;
+            return data.ruta as IRutaConductorView;
         },
-        enabled: !!userId
+        enabled: !loadingUser && !!userId
     });
 
     const { data: estado, isLoading: loadingEstado } = useQuery<number>({
@@ -64,7 +64,7 @@ function PanelConductorContent() {
             console.log("Estado de la ruta de despacho:", data.estado);
             return data.estado;
         },
-        enabled: !!userId && !!ruta,
+        enabled: !loadingUser && !!userId && !!ruta?.id,
         initialData: -1
     });
 
@@ -76,7 +76,7 @@ function PanelConductorContent() {
             const data = await response.json();
             return data.cilindrosCargados;
         },
-        enabled: !!userId && !!ruta
+        enabled: !loadingUser && !!userId && !!ruta?.id
     });
 
     const { data: descarga, isLoading: loadingDescarga } = useQuery<ICilindroView[]>({
@@ -87,93 +87,90 @@ function PanelConductorContent() {
             const data = await response.json();
             return data.cilindrosDescargados;
         },
-        enabled: !!userId && !!ruta
+        enabled: !loadingUser && !!userId && !!ruta?.id
     });
 
-    if (loadingUser) {
-        return <div className="w-full flex flex-col h-screen items-center justify-center">
-            <Loader texto="Cargando sesión" />
-        </div>;
-    }
+    useEffect(() => {
+        console.log("loadingUser", loadingUser);
+    }, [loadingUser]);
 
     return (<>
         <ChecklistProvider tipo="vehiculo">
-            <SoundPlayerProvider>
-                {ruta && (
-                    <div
-                        ref={vehicleContainerRef}
-                        className="fixed top-4 right-4 w-80 z-10"
-                        style={{ maxHeight: '300px' }}
-                    >
-                        <VehiculoView
-                            rutaId={ruta.id}
-                            cargados={cargados || []}
-                            descargados={descarga || []}
+            {loadingUser ? <div className="w-full flex flex-col h-screen items-center justify-center">
+                <Loader texto="Cargando sesión" />
+            </div> :
+                <SoundPlayerProvider>
+                    {ruta && (
+                        <div
                             ref={vehicleContainerRef}
-                        />
+                            className="fixed top-4 right-4 w-80 z-10"
+                            style={{ maxHeight: '300px' }}
+                        >
+                            <VehiculoView
+                                rutaId={ruta.id}
+                                cargados={cargados || []}
+                                descargados={descarga || []}
+                                ref={vehicleContainerRef}
+                            />
+                        </div>
+                    )}
+
+                    <div className="w-full flex flex-col items-end fixed bottom-0 rounded-t-lg pt-3" style={{ zIndex: 101 }}>
+
+                        {!isLoadingRuta && ruta && scanMode &&
+                            <PowerScanView
+                                setScanMode={setScanMode}
+                                scanMode={scanMode}
+                                rutaId={String(ruta.id)}
+                                ventaId={ruta.id}
+                                operacion="descargar" />}
+
+                        {!loadingEstado && !isLoadingRuta && ruta && estado != -1 && <div className="w-full h-screen flex flex-col justify-end -mb-1 space-y-4">
+
+                            {(estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion ||
+                                estado === TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && ruta &&
+                                <InformacionDeCarga rutaDespacho={ruta}
+                                    estado={estado} />}
+
+                            {(estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
+                                || estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino) &&
+                                <SelectorDeDestino rutaDespacho={ruta} />}
+
+                            {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta &&
+                                <ConfirmacionLlegadaADestino
+                                    rutaDespacho={ruta}
+                                    estado={estado} />}
+
+                            {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && (isLoadingRuta ? <Loader texto="Cargando ruta..." /> :
+                                <GestorDeDescarga
+                                    rutaDespacho={ruta}
+                                    setScanMode={setScanMode} />)}
+
+                            {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada &&
+                                <VolverABase rutaDespacho={ruta} />
+                            }
+
+                            {(estado === TIPO_ESTADO_RUTA_DESPACHO.regreso
+                                || estado === TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado)
+                                &&
+                                <FinalizarRuta
+                                    rutaDespacho={ruta}
+                                    estado={estado} />}
+
+                        </div>}
                     </div>
-                )}
-
-                <div className="w-full flex flex-col items-end fixed bottom-0 rounded-t-lg pt-3" style={{ zIndex: 101 }}>
-
-                    {!isLoadingRuta && ruta && scanMode &&
-                        <PowerScanView
-                            setScanMode={setScanMode}
-                            scanMode={scanMode}
-                            rutaId={String(ruta.id)}
-                            ventaId={ruta.id}
-                            operacion="descargar" />}
-
-                    {!loadingEstado && !isLoadingRuta && ruta && estado != -1 && <div className="w-full h-screen flex flex-col justify-end -mb-1 space-y-4">
-
-                        {(estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion ||
-                            estado === TIPO_ESTADO_RUTA_DESPACHO.orden_cargada) && ruta &&
-                            <InformacionDeCarga rutaDespacho={ruta}
-                                estado={estado} />}
-
-                        {(estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                            || estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino) &&
-                            <SelectorDeDestino rutaDespacho={ruta} />}
-
-                        {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta &&
-                            <ConfirmacionLlegadaADestino
-                                rutaDespacho={ruta}
-                                estado={estado} />}
-
-                        {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga && (isLoadingRuta ? <Loader texto="Cargando ruta..." /> :
-                            <GestorDeDescarga
-                                rutaDespacho={ruta}
-                                setScanMode={setScanMode} />)}
-
-                        {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada &&
-                            <VolverABase rutaDespacho={ruta} />
-                        }
-
-                        {(estado === TIPO_ESTADO_RUTA_DESPACHO.regreso
-                            || estado === TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado)
-                            &&
-                            <FinalizarRuta
-                                rutaDespacho={ruta}
-                                estado={estado} />}
-
+                    {isLoadingRuta && <div className="w-full flex flex-col h-screen items-center justify-center">
+                        <Loader texto="Cargando información" />
                     </div>}
-                </div>
-                {isLoadingRuta && <div className="w-full flex flex-col h-screen items-center justify-center">
-                    <Loader texto="Cargando información" />
-                </div>}
 
-                {!isLoadingRuta && !loadingDescarga && !ruta && <div className="w-full h-screen py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
-                    <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
-                    <p className="text-center text-2xl font-bold mb-4">¡TODO EN ORDEN!</p>
-                </div>}
+                    {!isLoadingRuta && !loadingDescarga && !ruta && <div className="w-full h-screen py-6 px-12 bg-white mx-auto flex flex-col justify-center items-center">
+                        <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />
+                        <p className="text-center text-2xl font-bold mb-4">¡TODO EN ORDEN!</p>
+                    </div>}
 
-            </SoundPlayerProvider>
+                </SoundPlayerProvider>}
         </ChecklistProvider>
         <Nav />
         <Toaster />
     </>);
-}
-
-export default function PanelConductor() {
-    return <PanelConductorContent />;
 }

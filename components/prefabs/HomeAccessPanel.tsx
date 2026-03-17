@@ -13,6 +13,7 @@ import { RESOURCES, ACTIONS } from "@/lib/auth/permissions";
 import { TIPO_CARGO, TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useChecklist } from "@/components/context/ChecklistContext";
+import { PiWarningOctagonBold } from "react-icons/pi";
 
 const getModulesForUser = (
   auth: ReturnType<typeof useAuthorization>,
@@ -135,41 +136,46 @@ export default function HomeAccessPanel() {
   const auth = useAuthorization();
   const { hasApprovedChecklist, isLoadingChecklist } = useChecklist();
   const sessionRoles = auth.getUserCargos().map((cargo) => cargo.tipo);
+  const userId = auth.user?.id || null;
 
   const conductorNeedsPersonal = !hasApprovedChecklist(TIPO_CHECKLIST.personal);
   const conductorNeedsVehiculo = !hasApprovedChecklist(TIPO_CHECKLIST.vehiculo);
-  const conductorWarningMessage = conductorNeedsPersonal || conductorNeedsVehiculo ? "Falta checklist" : undefined;
+  const conductorWarningMessage = conductorNeedsPersonal || conductorNeedsVehiculo ? 
+    (<div className="absolute top-2 left-2 flex items-center bg-red-100 text-red-700 px-2 py-1 rounded shadow z-20">
+        <PiWarningOctagonBold className="mr-2 text-red-600" />
+        <span className="text-xs font-semibold">Falta checklist</span>
+    </div>) : undefined;
 
   useRealtimeQuery({
-    channelName: `home-counters-ventas-${auth.user?.id || 'anon'}`,
+    channelName: `home-counters-ventas-${userId || 'sin-usuario'}`,
     schema: 'public',
     table: 'ventas',
     event: '*',
-    queryKeys: [['home-counters']],
-    enabled: !!auth.user,
+    queryKeys: [['home-counters', userId]],
+    enabled: !!userId,
   });
 
   useRealtimeQuery({
-    channelName: `home-counters-rutas-${auth.user?.id || 'anon'}`,
+    channelName: `home-counters-rutas-${userId || 'sin-usuario'}`,
     schema: 'public',
     table: 'rutas_despacho',
     event: '*',
-    queryKeys: [['home-counters']],
-    enabled: !!auth.user,
+    queryKeys: [['home-counters', userId]],
+    enabled: !!userId,
   });  
 
   const { data: homeCounters, isLoading } = useQuery<Array<number>>({
-    queryKey: ['home-counters'],
+    queryKey: ['home-counters', userId],
     queryFn: async () => {
       const response = await fetch('/api/home', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
+        cache: 'no-store',
       });
       const resp = await response.json();
-      console.log("Home counters data:", resp);
       return resp.data || [];
     },
-    enabled: !!auth.user // Solo ejecutar si hay usuario autenticado
+    enabled: !!userId // Solo ejecutar si hay usuario autenticado
   });
 
   // Mostrar loader mientras carga la autenticación o los datos

@@ -154,7 +154,7 @@ export async function POST(request) {
                 // create new detalle_ventas
                 const { data: newDet, error: newDetErr } = await supabase
                     .from('detalle_ventas')
-                    .insert({ venta_id: ventaDestino.id, glosa: `Retiro de ${itemRow.subcategoria?.nombre || 'cilindro'}`, codigo: itemRow.codigo, subcategoria_id: itemRow.subcategoria?.id, tipo: ventaDestino.tipo, cantidad: 1, neto: 0, iva: 0, total: 0 })
+                    .insert({ venta_id: ventaDestino.id, glosa: `Retiro de ${itemRow.subcategoria?.nombre || 'cilindro'}`, codigo: itemRow.codigo, subcategoria_catalogo_id: itemRow.subcategoria?.id, tipo: ventaDestino.tipo, cantidad: 1, neto: 0, iva: 0, total: 0 })
                     .select('id')
                     .maybeSingle();
                 if (newDetErr) {
@@ -274,6 +274,7 @@ export async function POST(request) {
                 .from('ruta_despacho_historial_carga')
                 .insert({ 
                     ruta_despacho_id: rutaId, 
+                    usuario_id: userId,
                     es_carga: false, 
                     fecha: new Date().toISOString()
                 })
@@ -290,29 +291,6 @@ export async function POST(request) {
                     item_catalogo_id: itemRow.id
                 });
             if (insMovErr2) console.error('[descargar] Error inserting ruta_despacho_historial_carga_items_movidos:', insMovErr2);
-        }
-
-        // Recompute remaining carga items
-        const { data: cargaAll2 } = await supabase
-            .from('ruta_despacho_historial_carga')
-            .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
-            .eq('ruta_despacho_id', rutaId)
-            .eq('es_carga', true);
-
-        const cargaAllIds2 = (cargaAll2 || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
-        const { data: descargaAll2 } = await supabase
-            .from('ruta_despacho_historial_carga')
-            .select('items:ruta_despacho_historial_carga_items_movidos(item_catalogo_id)')
-            .eq('ruta_despacho_id', rutaId)
-            .eq('es_carga', false);
-        const descargaAllIds2 = (descargaAll2 || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
-        const remaining2 = cargaAllIds2.filter(id => !descargaAllIds2.includes(id));
-        if (remaining2.length === 0) {
-            const { error: updVentaErr2 } = await supabase
-                .from('ventas')
-                .update({ estado: 99 })
-                .eq('id', ventaDestino.id);
-            if (updVentaErr2) console.error('[descargar] Error updating venta estado:', updVentaErr2);
         }
 
         return NextResponse.json({ ok: true, item: itemRow });

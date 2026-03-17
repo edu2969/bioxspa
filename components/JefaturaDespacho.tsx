@@ -16,6 +16,11 @@ import Nav from "./Nav";
 import { ICargaDespachoView } from "@/types/types";
 import SoundPlayerProvider from "./context/SoundPlayerContext";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
+import { useAuthorization } from "@/hooks/useAuth";
+
+function getFirstVentaId(cargamento: ICargaDespachoView | null | undefined) {
+  return cargamento?.clientes?.flatMap((cliente) => cliente.ventas)?.[0]?.ventaId || null;
+}
 
 export default function JefaturaDespacho() {
   const [scanMode, setScanMode] = useState(false);
@@ -23,39 +28,53 @@ export default function JefaturaDespacho() {
   const [ventaId, setVentaId] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
 
+  const auth = useAuthorization();
+  const userId = auth.user?.id || null;
+
   const queryClient = useQueryClient();
 
-    useRealtimeQuery({
-      channelName: `cargamentos-despacho-ruta-${rutaId || 'sin-ruta'}`,
-      schema: 'public',
-      table: 'rutas_despacho',
-      event: 'UPDATE',
-      filter: rutaId ? `id=eq.${rutaId}` : undefined,
-      queryKeys: [['cargamentos-despacho']],
-      enabled: !!rutaId
-    });
+  useRealtimeQuery({
+    channelName: `cargamentos-despacho-ruta-${userId || 'sin-usuario'}`,
+    schema: 'public',
+    table: 'rutas_despacho',
+    event: '*',
+    queryKeys: [['cargamentos-despacho', userId]],
+    enabled: !!userId
+  });
 
-    useRealtimeQuery({
-      channelName: `cargamentos-despacho-venta-${ventaId || 'sin-venta'}`,
-      schema: 'public',
-      table: 'ventas',
-      event: 'UPDATE',
-      filter: ventaId ? `id=eq.${ventaId}` : undefined,
-      queryKeys: [['cargamentos-despacho']],
-      enabled: !!ventaId
-    });
+  useRealtimeQuery({
+    channelName: `cargamentos-despacho-ruta-${userId || 'sin-usuario'}`,
+    schema: 'public',
+    table: 'ventas',
+    event: '*',
+    queryKeys: [['cargamentos-despacho', userId]],
+    enabled: !!userId
+  });
+
+  useRealtimeQuery({
+    channelName: `cargamentos-despacho-venta-${userId || 'sin-usuario'}`,
+    schema: 'public',
+    table: 'ruta_despacho_ventas',
+    event: '*',
+    queryKeys: [['cargamentos-despacho', userId]],
+    enabled: !!userId
+  });
 
   const { data: cargamentos, isLoading } = useQuery<ICargaDespachoView[]>({
-    queryKey: ['cargamentos-despacho'],
+    queryKey: ['cargamentos-despacho', userId],
     queryFn: async () => {
-      const response = await fetch("/api/pedidos/despacho");
+      const response = await fetch(`/api/pedidos/despacho?usuarioId=${userId}`, {
+        cache: 'no-store'
+      });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to fetch cargamentos");
       }
       const data = await response.json();
+      console.log("Cargamentos de despacho:", data);
       return data.cargamentos || [];
-    }
+    },
+    enabled: !!userId
   });
 
   const handleShowNext = () => {
@@ -73,13 +92,13 @@ export default function JefaturaDespacho() {
       }
 
       // Actualizar la query data con el nuevo orden
-      queryClient.setQueryData(['cargamentos-despacho'], nuevosCargamentos);
+      queryClient.setQueryData(['cargamentos-despacho', userId], nuevosCargamentos);
 
       // Actualizar rutaId/ventaId basado en el nuevo primer cargamento
       if (nuevosCargamentos.length > 0) {
         const newFirstCarga = nuevosCargamentos[0];
         if (!newFirstCarga.rutaDespachoId) {
-          setVentaId(newFirstCarga.ventas[0]?.ventaId || null);
+          setVentaId(getFirstVentaId(newFirstCarga));
           setRutaId(null);
         } else {
           setRutaId(newFirstCarga.rutaDespachoId);
@@ -97,7 +116,7 @@ export default function JefaturaDespacho() {
     if (cargamentos && cargamentos.length > 0) {
       const firstCarga = cargamentos[0];
       if (!firstCarga.rutaDespachoId) {
-        setVentaId(firstCarga.ventas[0]?.ventaId || null);
+        setVentaId(getFirstVentaId(firstCarga));
         setRutaId(null);
       } else {
         setRutaId(firstCarga.rutaDespachoId);
@@ -120,7 +139,7 @@ export default function JefaturaDespacho() {
       </div>
     }
 
-    {!isLoading && (rutaId != null || ventaId != null) && (
+    {!isLoading && !!cargamentos?.length && (
       <div className="w-full h-screen text-center" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden", overflowY: "hidden" }}>
         {scanMode &&
           <SoundPlayerProvider>
@@ -132,7 +151,7 @@ export default function JefaturaDespacho() {
 
         <div className="w-full">
           {!isLoading && cargamentos && cargamentos.map((cargamento, index) => (
-            <div key={`cargamento_${cargamento.rutaDespachoId || cargamento.ventas[0]?.ventaId}_${index}`}
+            <div key={`cargamento_${cargamento.rutaDespachoId || getFirstVentaId(cargamento) || index}_${index}`}
               className="flex flex-col h-full overflow-y-hidden">
               <div className={`absolute w-11/12 md:w-9/12 h-[calc(100vh-114px)] bg-gray-100 shadow-lg rounded-lg py-1 ${animating ? "transition-all duration-500" : ""}`}
                 style={{
@@ -167,8 +186,8 @@ export default function JefaturaDespacho() {
         </div>}
 
       </div>)}
-      <Toaster />
-      <Nav />
+    <Toaster />
+    <Nav />
 
   </>;
 }

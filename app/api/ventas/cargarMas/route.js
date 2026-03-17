@@ -36,7 +36,7 @@ export async function GET(request) {
                 ),
                 detalles:detalle_ventas(
                     id,
-                    subcategoria_id,
+                    subcategoria_catalogo_id,
                     glosa,
                     codigo,
                     codigo_producto,
@@ -86,7 +86,7 @@ export async function GET(request) {
                 return {
                     ...item,
                     _id: item.id, // Mantener compatibilidad con frontend
-                    subcategoriaCatalogoId: item.subcategoria_id,
+                    subcategoriaCatalogoId: item.subcategoria_catalogo_id,
                     ventaId: venta.id,
                     nombre: `${categoriaNombre} - ${subcategoriaNombre}`,
                 };

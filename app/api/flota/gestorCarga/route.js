@@ -99,7 +99,7 @@ export async function GET() {
                     items:ruta_despacho_historial_carga_items_movidos(
                         item_catalogo:items_catalogo(
                             id,
-                            subcategoria_id
+                            subcategoria_catalogo_id
                         )
                     )
                 `)
@@ -113,7 +113,7 @@ export async function GET() {
             if (cargaHistorial && cargaHistorial.length > 0) {
                 const latestCarga = cargaHistorial[0];
                 (latestCarga.items || []).forEach(item => {
-                    const subcatId = item.item_catalogo.subcategoria_id;
+                    const subcatId = item.item_catalogo.subcategoria_catalogo_id;
                     contadoresSubcategoriasCarga[subcatId] = (contadoresSubcategoriasCarga[subcatId] || 0) + 1;
                 });
             }
@@ -131,7 +131,7 @@ export async function GET() {
                         glosa,
                         tipo,
                         cantidad,
-                        subcategoria_id,
+                        subcategoria_catalogo_id,
                         subcategoria:subcategorias_catalogo(
                             id,
                             nombre,
@@ -159,7 +159,7 @@ export async function GET() {
                 // Count items by subcategoria in venta
                 const contadoresSubcategoriasVenta = {};
                 (detallesVenta || []).forEach(detalle => {
-                    contadoresSubcategoriasVenta[detalle.subcategoria_id] = (contadoresSubcategoriasVenta[detalle.subcategoria_id] || 0) + detalle.cantidad;
+                    contadoresSubcategoriasVenta[detalle.subcategoria_catalogo_id] = (contadoresSubcategoriasVenta[detalle.subcategoria_catalogo_id] || 0) + detalle.cantidad;
                 });
 
                 const detalles = [];
@@ -173,8 +173,8 @@ export async function GET() {
                     const multiplicador = detalle.subcategoria?.multiplicador || 1;
 
                     const procesados = entregaEnLocal 
-                        ? contadoresSubcategoriasVenta[detalle.subcategoria_id] || 0
-                        : contadoresSubcategoriasCarga[detalle.subcategoria_id] || 0;
+                        ? contadoresSubcategoriasVenta[detalle.subcategoria_catalogo_id] || 0
+                        : contadoresSubcategoriasCarga[detalle.subcategoria_catalogo_id] || 0;
 
                     const restantes = multiplicador - procesados;
                     

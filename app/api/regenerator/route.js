@@ -77,7 +77,6 @@ const resetVentas = async () => {
         await deleteAllRows("venta_historial_estados");
 
         // También limpiar entregas locales vinculadas a ventas.
-        await deleteAllRows("entrega_local_items");
         await deleteAllRows("venta_entregas_local");
 
         // También limpiar comentarios de cobro si existen en la tabla actual.

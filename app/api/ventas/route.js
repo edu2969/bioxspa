@@ -91,7 +91,7 @@ export const POST = withAuthorization(
 
       // Verificar que los precios estén cargados correctamente
       const preciosMap = precios.reduce((map, precio) => {
-        const subcategoriaKey = precio.subcategoria_id || precio.subcategoria_catalogo_id;
+        const subcategoriaKey = precio.subcategoria_catalogo_id || precio.subcategoria_catalogo_id;
         if (subcategoriaKey) {
           map[subcategoriaKey] = precio.valor;
         }
@@ -140,7 +140,7 @@ export const POST = withAuthorization(
       // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
       const detalles = payload.items.map((item) => ({
         venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
-        subcategoria_id: item.subcategoriaId,
+        subcategoria_catalogo_id: item.subcategoriaId,
         cantidad: item.cantidad,
         neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
         iva: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 0.19,

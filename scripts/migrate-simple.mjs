@@ -433,7 +433,7 @@ async function migrateItems(db) {
                 temporal_id: item.temporalId,
                 codigo: item.codigo,
                 estado: item.estado || 0,
-                subcategoria_id: item.subcategoriaCatalogoId ? idMappings.subcategorias.get(item.subcategoriaCatalogoId.toString()) : null,
+                subcategoria_catalogo_id: item.subcategoriaCatalogoId ? idMappings.subcategorias.get(item.subcategoriaCatalogoId.toString()) : null,
                 nombre: item.nombre,
                 descripcion: item.descripcion,
                 stock_actual: item.stockActual || 0,

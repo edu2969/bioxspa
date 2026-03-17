@@ -1,4 +1,4 @@
-import React, { forwardRef, RefObject, useEffect } from "react";
+import { forwardRef, RefObject } from "react";
 import Image from "next/image";
 import type { ICilindroView, IVehiculoView } from "@/types/types";
 import CargaCilindros from "./CargaCilindros";

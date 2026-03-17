@@ -54,9 +54,9 @@ export async function GET(request) {
         }
 
         const rutaEnTransito = {
-            ruta_id: rutaData.id,
-            direccion_destino: direccionDestino,
-            nombre_chofer: rutaData.conductor?.nombre || 'Desconocido'
+            rutaId: rutaData.id,
+            direccionDestino: direccionDestino,
+            nombreChofer: rutaData.conductor?.nombre || 'Desconocido'
         };
 
         return NextResponse.json({ ok: true, rutaEnTransito });

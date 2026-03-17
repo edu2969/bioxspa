@@ -126,7 +126,7 @@ CREATE TABLE categorias_catalogo (
 -- Subcategorías de productos
 CREATE TABLE subcategorias_catalogo (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    categoria_id UUID REFERENCES categorias_catalogo(id) ON DELETE CASCADE,
+    categoria_catalogo_id UUID REFERENCES categorias_catalogo(id) ON DELETE CASCADE,
     temporal_id VARCHAR(50),
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
@@ -143,7 +143,7 @@ CREATE TABLE items_catalogo (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     temporal_id VARCHAR(50),
     codigo VARCHAR(100) UNIQUE,
-    subcategoria_id UUID REFERENCES subcategorias_catalogo(id) ON DELETE CASCADE,
+    subcategoria_catalogo_id UUID REFERENCES subcategorias_catalogo(id) ON DELETE CASCADE,
     estado INTEGER DEFAULT 0,
     nombre VARCHAR(255),
     descripcion TEXT,
@@ -298,7 +298,7 @@ CREATE TABLE detalle_ventas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     temporal_id VARCHAR(50),
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
-    subcategoria_id UUID REFERENCES subcategorias_catalogo(id),
+    subcategoria_catalogo_id UUID REFERENCES subcategorias_catalogo(id),
     glosa VARCHAR(255),
     codigo VARCHAR(100),
     codigo_producto VARCHAR(100),
@@ -348,14 +348,6 @@ CREATE TABLE venta_entregas_local (
     venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
     nombre_recibe VARCHAR(255) NOT NULL,
     rut_recibe VARCHAR(12) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Items entregados en local
-CREATE TABLE entrega_local_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entrega_id UUID REFERENCES venta_entregas_local(id) ON DELETE CASCADE,
-    item_catalogo_id UUID REFERENCES items_catalogo(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -425,6 +417,8 @@ CREATE TABLE ruta_despacho_historial_carga_items_movidos (
 
 -- Habilitar payload completo para Realtime en rutas de despacho
 ALTER TABLE rutas_despacho REPLICA IDENTITY FULL;
+ALTER TABLE ruta_despacho_ventas REPLICA IDENTITY FULL;
+ALTER TABLE ventas REPLICA IDENTITY FULL;
 
 -- Publicar rutas_despacho en Supabase Realtime
 DO $$
@@ -435,6 +429,8 @@ BEGIN
         WHERE pubname = 'supabase_realtime'
     ) THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE rutas_despacho;
+        ALTER PUBLICATION supabase_realtime ADD TABLE ruta_despacho_ventas;
+        ALTER PUBLICATION supabase_realtime ADD TABLE ventas;
     END IF;
 EXCEPTION
     WHEN duplicate_object THEN NULL;
@@ -454,7 +450,7 @@ CREATE POLICY rutas_despacho_select_policy ON rutas_despacho
             WHERE cargos.usuario_id = auth.uid()
               AND cargos.activo = true
               AND cargos.hasta IS NULL
-              AND cargos.tipo IN (1, 8, 9, 16)
+              AND cargos.tipo IN (1, 2, 8, 9, 16)
         )
     );
 
@@ -537,7 +533,7 @@ CREATE TABLE bi_cilindros (
 
 CREATE TABLE precios (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    subcategoria_id UUID REFERENCES subcategorias_catalogo(id) ON DELETE CASCADE,
+    subcategoria_catalogo_id UUID REFERENCES subcategorias_catalogo(id) ON DELETE CASCADE,
     cliente_id UUID REFERENCES clientes(id), -- NULL para precio general
     sucursal_id UUID REFERENCES sucursales(id),
     tipo INTEGER NOT NULL, -- 1: mayorista, 2: minorista
@@ -559,7 +555,7 @@ CREATE TABLE comisiones (
     tipo INTEGER NOT NULL, -- 1: chofer, 2: retiro, 3: entrega, 4: nuevo cliente, 8: punto venta
     unidad INTEGER NOT NULL, -- 1: porcentaje, 2: monto
     valor DECIMAL(10,2) NOT NULL,
-    subcategoria_id UUID REFERENCES subcategorias_catalogo(id),
+    subcategoria_catalogo_id UUID REFERENCES subcategorias_catalogo(id),
     sucursal_id UUID REFERENCES sucursales(id),
     fecha_desde DATE NOT NULL,
     fecha_hasta DATE,
@@ -694,7 +690,7 @@ CREATE POLICY checklists_select_policy ON checklists
             WHERE cargos.usuario_id = auth.uid()
               AND cargos.activo = true
               AND cargos.hasta IS NULL
-              AND cargos.tipo IN (1, 8, 9, 16, 32)
+              AND cargos.tipo IN (1, 2, 8, 9, 16, 32)
         )
     );
 

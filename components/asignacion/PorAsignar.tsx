@@ -58,7 +58,7 @@ export default function PorAsignar({
     const PedidoItem = memo(function PedidoItem({ pedido, index }: { pedido: IPedidoPorAsignar, index: number }) {
         // const isExpanded = !!expandido[index];
         const items = pedido.items || [];
-        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despacho_en_local;                
+        const isArrastrable = pedido.estado === TIPO_ESTADO_VENTA.por_asignar && !pedido.despachoEnLocal;                
 
         // Hook de @dnd-kit para hacer el elemento draggable
         const {
@@ -110,9 +110,9 @@ export default function PorAsignar({
                 onClick={handleClick}
             >
                 <div className="w-full">
-                    <p className="text-md font-bold uppercase w-full -mb-1">{pedido.cliente_nombre}</p>
+                    <p className="text-md font-bold uppercase w-full -mb-1">{pedido.clienteNombre}</p>
                     {pedido.tipo === TIPO_ORDEN.traslado && <span className="text-teal-100 text-xs bg-neutral-900 rounded px-2 ml-2 font-bold">RETIRO DE CILINDROS</span>}
-                    {pedido.despacho_en_local && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
+                    {pedido.despachoEnLocal && <span className="text-teal-800 text-xs bg-white rounded-sm px-2 ml-2 font-bold">RETIRO EN LOCAL</span>}
                     <p className={`text-xs ${pedido.estado === TIPO_ESTADO_VENTA.por_asignar ? 'text-gray-200' : 'text-teal-500'} ml-2`}>
                         {dayjs(pedido.fecha).format('DD/MM/YYYY HH:mm')} {dayjs(pedido.fecha).fromNow()}
                     </p>

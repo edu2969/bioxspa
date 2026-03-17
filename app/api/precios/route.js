@@ -38,7 +38,7 @@ export async function GET() {
                     fecha_hasta,
                     activo,
                     tipo,
-                    subcategoria_id,
+                    subcategoria_catalogo_id,
                     subcategoria:subcategorias_catalogo (
                         id,
                         nombre,
@@ -65,7 +65,7 @@ export async function GET() {
                 fechaHasta: precio.fecha_hasta,
                 activo: precio.activo,
                 tipo: precio.tipo,
-                subcategoriaCatalogoId: precio.subcategoria_id,
+                subcategoriaCatalogoId: precio.subcategoria_catalogo_id,
                 categoriaId: precio.subcategoria?.categoria?.id || null,
                 subcategoria: precio.subcategoria ? {
                     _id: precio.subcategoria.id,
@@ -180,7 +180,7 @@ export async function POST(request) {
                     fecha_hasta,
                     activo,
                     tipo,
-                    subcategoria_id,
+                    subcategoria_catalogo_id,
                     cliente_id,
                     sucursal_id
                 `)
@@ -202,7 +202,7 @@ export async function POST(request) {
                 .from('precios')
                 .select('id')
                 .eq('cliente_id', clienteId)
-                .eq('subcategoria_id', subcategoriaCatalogoId)
+                .eq('subcategoria_catalogo_id', subcategoriaCatalogoId)
                 .eq('tipo', tipo)
                 .eq('activo', true)
                 .single();
@@ -219,7 +219,7 @@ export async function POST(request) {
                 .from('precios')
                 .insert({
                     cliente_id: clienteId,
-                    subcategoria_id: subcategoriaCatalogoId,
+                    subcategoria_catalogo_id: subcategoriaCatalogoId,
                     sucursal_id: sucursalId,
                     tipo: tipo,
                     precio: valor,
@@ -233,7 +233,7 @@ export async function POST(request) {
                     fecha_hasta,
                     activo,
                     tipo,
-                    subcategoria_id,
+                    subcategoria_catalogo_id,
                     cliente_id,
                     sucursal_id
                 `)

@@ -18,11 +18,7 @@ export async function GET(request: NextRequest) {
             .eq('id', rutaId)
             .single();
         
-        if (error || !ruta) {
-            return NextResponse.json({ error: 'Ruta not found' }, { status: 404 });
-        }
-        
-        return NextResponse.json({ estado: ruta.estado });
+        return NextResponse.json({ estado: ruta ? ruta.estado : -1 });
         
     } catch (error) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

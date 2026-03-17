@@ -40,7 +40,7 @@ export default function Asignacion() {
     const [comentarioActual, setComentarioActual] = useState<string | null>(null);
     const [onSaveComment, setOnSaveComment] = useState<() => void>(() => () => { });
     const [selectedChofer, setSelectedChofer] = useState<{ id: string, nombre: string } | null>(null);
-    const [selectedVenta, setSelectedVenta] = useState<{ id: string, cliente_nombre?: string, comentario: string | null } | null>(null);
+    const [selectedVenta, setSelectedVenta] = useState<{ id: string, clienteNombre?: string, comentario: string | null } | null>(null);
     
     const [isSaving, setIsSaving] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -69,9 +69,17 @@ export default function Asignacion() {
         channelName: `rutas-despacho-en-transito-${sucursalId || 'sin-sucursal'}`,
         schema: 'public',
         table: 'rutas_despacho',
-        event: 'UPDATE',
-        filter: `id=eq.{rutaId}`,
+        event: '*',
         queryKeys: [['rutas-en-transito', sucursalId]],
+        enabled: !!sucursalId,
+    });
+
+    useRealtimeQuery({
+        channelName: `ruta-ventas-por-asignar-${sucursalId || 'sin-sucursal'}`,
+        schema: 'public',
+        table: 'ruta_despacho_ventas',
+        event: '*',
+        queryKeys: [['pedidos-por-asignar', sucursalId], ['rutas-en-transito', sucursalId]],
         enabled: !!sucursalId,
     });
 
@@ -118,7 +126,6 @@ export default function Asignacion() {
         },
         enabled: !!sucursalId
     });
-
     
 
     // Función para manejar la apertura del modal de detalle de orden
@@ -127,7 +134,7 @@ export default function Asignacion() {
         if (show && pedido) {
             setSelectedVenta({
                 id: pedido.id,
-                cliente_nombre: pedido.cliente_nombre || 'Cliente desconocido',
+                clienteNombre: pedido.cliente_nombre || 'Cliente desconocido',
                 comentario: pedido.comentario || null,
             });
         } else {
@@ -182,10 +189,10 @@ export default function Asignacion() {
  
         // Buscar el pedido para obtener el nombre del cliente
         const pedido = pedidos?.find(p => p.id === pedidoId);
-        const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+        const clienteNombre = pedido?.clienteNombre || 'Cliente desconocido';
  
         console.log('📝 Cliente seleccionado:', { id: pedidoId, cliente: clienteNombre });
-        setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+        setSelectedVenta({ id: pedidoId, clienteNombre: clienteNombre, comentario: pedido?.comentario || null });
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -231,13 +238,13 @@ export default function Asignacion() {
  
             // Buscar el pedido para obtener el nombre del cliente
             const pedido = pedidos?.find(p => p.id === pedidoId);
-            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+            const clienteNombre = pedido?.clienteNombre || 'Cliente desconocido';
  
             console.log('👤 Chofer seleccionado:', { _id: conductorId, nombre: conductorNombre });
             console.log('📝 Cliente para asignar:', { _id: pedidoId, cliente: clienteNombre });
  
             setSelectedChofer({ id: conductorId, nombre: conductorNombre });
-            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+            setSelectedVenta({ id: pedidoId, clienteNombre: clienteNombre, comentario: pedido?.comentario || null });
             setShowConfirmModal(true);
         } else if (dropZoneId === 'en-transito') {
             // Drop en tránsito - solo mostrar toast de éxito
@@ -249,10 +256,10 @@ export default function Asignacion() {
  
             // Buscar el pedido para obtener el nombre del cliente
             const pedido = pedidos?.find(p => p.id === pedidoId);
-            const clienteNombre = pedido?.cliente_nombre || 'Cliente desconocido';
+            const clienteNombre = pedido?.clienteNombre || 'Cliente desconocido';
  
-            console.log('🔄 Pedido para reasignar:', { id: pedidoId, cliente_nombre: clienteNombre });
-            setSelectedVenta({ id: pedidoId, cliente_nombre: clienteNombre, comentario: pedido?.comentario || null });
+            console.log('🔄 Pedido para reasignar:', { id: pedidoId, clienteNombre: clienteNombre });
+            setSelectedVenta({ id: pedidoId, clienteNombre: clienteNombre, comentario: pedido?.comentario || null });
             setShowReasignacionModal(true);
         }
     };
@@ -334,7 +341,7 @@ export default function Asignacion() {
                 title="Confirmar Asignación de pedido"
                 confirmationQuestion={<div>
                     <p>Se asignará el pedido de </p>
-                    <p><strong>{selectedVenta?.cliente_nombre}</strong></p>
+                    <p><strong>{selectedVenta?.clienteNombre}</strong></p>
                     <p>al chofer <strong>{selectedChofer?.nombre}</strong>?</p>
                 </div>}
                 onClose={() => {
@@ -480,7 +487,7 @@ export default function Asignacion() {
                                     if (pedidoEnConductor) {
                                         pedido = {
                                             id: pedidoEnConductor.id,
-                                            cliente_nombre: pedidoEnConductor.nombre_cliente,
+                                            clienteNombre: pedidoEnConductor.nombreCliente,
                                             items: pedidoEnConductor.items
                                         } as IPedidoPorAsignar;
                                         break;
@@ -492,7 +499,7 @@ export default function Asignacion() {
 
                             return (
                                 <div className="py-2">
-                                    <p className="text-md font-bold uppercase">{pedido.cliente_nombre}</p>
+                                    <p className="text-md font-bold uppercase">{pedido.clienteNombre}</p>
                                     <p className={`text-xs ${dragOrigin === 'conductores' ? 'text-green-200' : 'text-gray-200'
                                         }`}>
                                         {pedido.items?.[0] ? `${pedido.items[0].cantidad}x ${pedido.items[0].nombre}` : 'Sin items'}

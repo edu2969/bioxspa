@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
 import { getNUCode } from "@/lib/nuConverter";
-import type { ICargaDespachoView } from "@/types/types";
+import type { ICargaDespachoClienteView, ICargaDespachoVentaView, ICargaDespachoView } from "@/types/types";
 import { LiaPencilAltSolid } from "react-icons/lia";
 import { useForm } from "react-hook-form";
 import Image from "next/image";
@@ -30,6 +30,15 @@ interface FormData {
   nombreRetira: string;
   rutRetiraNum: string;
   rutRetiraDv: string;
+}
+
+function getVentas(cargamento: ICargaDespachoView | undefined) {
+  if (!cargamento) return [] as ICargaDespachoVentaView[];
+  return cargamento.clientes.flatMap((cliente) => cliente.ventas);
+}
+
+function getFirstVenta(cargamento: ICargaDespachoView | undefined) {
+  return getVentas(cargamento)[0] || null;
 }
 
 export default function GestorDeCargaView({
@@ -62,6 +71,7 @@ export default function GestorDeCargaView({
     mutationFn: async () => {
       const cargamento = cargamentos?.[0];
       if (!cargamento) throw new Error('No hay cargamento disponible');
+      const primeraVenta = getFirstVenta(cargamento);
 
       // Endpoint dinámico basado en si tiene rutaId
       const endpoint = cargamento.rutaDespachoId ?
@@ -72,9 +82,9 @@ export default function GestorDeCargaView({
       const payload = cargamento.rutaDespachoId ? {
         rutaId: cargamento.rutaDespachoId
       } : {
-        ventaId: cargamento.ventas[0]?.ventaId,
-        nombreRecibe: cargamento.ventas[0]?.entregasEnLocal?.[0]?.nombreRecibe || '',
-        rutRecibe: cargamento.ventas[0]?.entregasEnLocal?.[0]?.rutRecibe || ''
+        ventaId: primeraVenta?.ventaId,
+        nombreRecibe: primeraVenta?.entregasEnLocal?.[0]?.nombreRecibe || '',
+        rutRecibe: primeraVenta?.entregasEnLocal?.[0]?.rutRecibe || ''
       };
 
       console.log("Confirmando cargamento con payload:", payload);
@@ -146,10 +156,12 @@ export default function GestorDeCargaView({
   const loadState = () => {
     if (!cargamentos || cargamentos.length === 0) return { complete: false, partial: false };
     // Usar el cargamento específico de este componente visual (index), no necesariamente el primero
-    const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento    
+    const cargamento = cargamentos[0]; // Este componente siempre recibe un array con un solo elemento
+    const ventas = getVentas(cargamento);
+    const primeraVenta = ventas[0];
     const esProcesoCarga = cargamento.rutaDespachoId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.preparacion;
     const esProcesoDescarga = cargamento.rutaDespachoId !== null && cargamento.estado === TIPO_ESTADO_RUTA_DESPACHO.descarga;
-    const tieneTraslado = cargamento.ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
+    const tieneTraslado = ventas.some(v => v.tipo === TIPO_ORDEN.traslado);
     const ventaEnLocal = cargamento.rutaDespachoId === null;
 
 
@@ -170,7 +182,7 @@ export default function GestorDeCargaView({
         cargamento.cargaItemIds.map(item => item.subcategoriaCatalogoId)
       );
 
-      const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
+      const porcentaje = ventas.reduce((accVenta, venta) => {
         const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
           const totalItems = detalle.multiplicador;
           const itemsEscaneados = totalItems - (detalle.restantes || 0);
@@ -178,10 +190,10 @@ export default function GestorDeCargaView({
         }
           , 0) / venta.detalles.length;
         return accVenta + porcentajeVenta;
-      }, 0) / cargamento.ventas.length;
+      }, 0) / (ventas.length || 1);
 
       // Verificar si cada venta tiene al menos un detalle con subcategoriaCatalogoId en cargaItemIds
-      const todasLasVentasTienenAlMenosUno = porcentaje < 100 && cargamento.ventas.every(venta =>
+      const todasLasVentasTienenAlMenosUno = porcentaje < 100 && ventas.every(venta =>
         venta.detalles.some(detalle =>
           cargaItemSubcategoriaIds.has(String(detalle.subcategoriaCatalogoId.id))
         )
@@ -204,26 +216,26 @@ export default function GestorDeCargaView({
     if (ventaEnLocal) {
       console.log("VENTA EN LOCAL");
       // Calcular porcentaje basado en los restantes
-      const porcentaje = cargamento.ventas.reduce((accVenta, venta) => {
+      const porcentaje = ventas.reduce((accVenta, venta) => {
         const porcentajeVenta = venta.detalles.reduce((accDetalle, detalle) => {
           const totalItems = detalle.multiplicador;
           const itemsEntregados = totalItems - (detalle.restantes || 0);
           return accDetalle + (itemsEntregados / totalItems) * 100;
         }, 0) / venta.detalles.length;
         return accVenta + porcentajeVenta;
-      }, 0) / cargamento.ventas.length;
+      }, 0) / (ventas.length || 1);
 
       // Verificar si todas las entregas están completas (todos los restantes son 0)
-      const todasLasEntregasCompletas = cargamento.ventas.every(venta =>
+      const todasLasEntregasCompletas = ventas.every(venta =>
         venta.detalles.every(detalle => detalle.restantes === 0)
       );
 
       // Verificar si hay al menos una entrega parcial (al menos un restante < multiplicador)
-      const hayEntregasParciales = cargamento.ventas.some(venta =>
+      const hayEntregasParciales = ventas.some(venta =>
         venta.detalles.some(detalle => detalle.restantes < detalle.multiplicador)
       );
 
-      const validacionQuienRecibe = cargamento.ventas[0]?.entregasEnLocal?.[0];
+      const validacionQuienRecibe = primeraVenta?.entregasEnLocal?.[0];
       if (!validacionQuienRecibe || !validacionQuienRecibe.nombreRecibe || !validacionQuienRecibe.rutRecibe) {
         console.log("Falta información de quién recibe en local");        
       }
@@ -270,90 +282,98 @@ export default function GestorDeCargaView({
             </div>
           </div>}
 
-          {cargamento.ventas && cargamento.ventas.map((venta, vidx) => <div key={`venta_${vidx}`} className="w-full mb-2 bg-gray-200 p-1 rounded-md shadow-md">
-            {cargamento.retiroEnLocal && <div className="w-full flex text-xl font-bold px-3 py-1">
-              <div className="w-full flex text-lg font-bold px-3 relative">
-                <div className="w-full relative">
-                  <p className="text-xs">Nombre de quién retira en local</p>
-                  <div className="mt-1 text-nowrap border border-gray-300 rounded px-2">
-                    <p className="-mt-1">{venta.entregasEnLocal[0]?.nombreRecibe || 'Desconocido'}</p>
-                    <p className="text-xs -mt-1">RUT: {venta.entregasEnLocal[0]?.rutRecibe || '-'}</p>
-                  </div>
-                </div>
-                <div className="absolute top-8 right-5 text-blue-500 flex items-center justify-end">
-                  <LiaPencilAltSolid className="cursor-pointer hover:text-blue-600" size="1.3rem" onClick={() => {
-                    setValue("nombreRetira", venta.entregasEnLocal[0]?.nombreRecibe || "");
-                    setValue("rutRetiraNum", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[0] : "");
-                    setValue("rutRetiraDv", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[1] : "");
-                    setSelectedVentaId(venta.ventaId);
-                    setShowModalNombreRetira(true);
-                  }} />
+          {cargamento.clientes && cargamento.clientes.map((clienteGrupo: ICargaDespachoClienteView, clienteIdx) => <div key={`cliente_${clienteGrupo.cliente.id || clienteGrupo.cliente.rut || clienteIdx}`} className="w-full mb-2 rounded-md bg-gray-300/70 p-1 shadow-md">
+              <div className="w-full flex px-2 border border-gray-300 rounded-t-lg border-b-0 bg-white pb-1">
+                <div className="w-full text-left ml-2 text-gray-400">
+                  <p className="text-md font-bold truncate -mb-1">{clienteGrupo.cliente.nombre || "Sin cliente"}</p>
+                  <p className="text-xs truncate m-0">{clienteGrupo.cliente.rut}</p>
+                  {cargamento.retiroEnLocal && <div className="text-sm font-bold text-gray-700">
+                    <p>ENTREGA DE CILINDROS</p>
+                    {index === 0 && <span className="text-xs">Escanee cilindros a entregar</span>}
+                  </div>}
                 </div>
               </div>
-            </div>}
-            <div className="w-full flex px-2 border border-gray-300 rounded-t-lg border-b-0 bg-white pb-1">
-              <div className="w-full text-left ml-2 text-gray-400">
-                <p className="text-md font-bold truncate -mb-1">{venta.cliente.nombre || "Sin cliente"}</p>
-                <p className="text-xs truncate m-0">{venta.cliente.rut}</p>
-                {cargamento.retiroEnLocal && <div className="text-sm font-bold text-gray-700">
-                  <p>ENTREGA DE CILINDROS</p>
-                  {index === 0 && <span className="text-xs">Escanee cilindros a entregar</span>}
-                </div>}
-              </div>
-              <div className={`relative flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
-                <div className="mt-1 mr-2 cursor-pointer" onClick={(e) => {
-                  e.stopPropagation();
-                  if (index === 0) {
-                    toast(`${venta.comentario || "Sin comentarios"}`, { icon: '💬' });
-                  }
-                }}>
-                  {!venta.comentario
-                    ? <VscCommentDraft size="1.75rem" />
-                    : <VscCommentUnresolved size="1.75rem" />}
-                </div>
-                {venta.comentario && <div className="absolute top-[20px] right-[10px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
-              </div>
-            </div>
-            <ul className="flex-1 flex flex-wrap items-center justify-center -mt-0.5">
-              {venta.detalles.map((detalle, idx) => (
-                <li
-                  key={`descarga_${idx}`}
-                  className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1)
-                    ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
-                >
-                  <div className="w-full flex items-left">
-                    <div className="flex">
-                      <div>
-                      <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
-                      {detalle.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
-                      {detalle.subcategoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
-                      </div>
-                      <div className="font-bold text-xl ml-2">
-                        {detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <span>
-                          {(() => {
-                            const elem = detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
-                            let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
-                            if (!match) {
-                              match = ["", (elem ?? 'N/A'), ''];
-                            }
-                            const [, p1, p2] = match;
-                            return (
-                              <>
-                                {p1 ? p1.toUpperCase() : ''}
-                                {p2 ? <small>{p2}</small> : ''}
-                              </>
-                            );
-                          })()}
-                        </span>}
+              {clienteGrupo.ventas.map((venta, vidx) => <div key={`venta_${clienteIdx}_${vidx}`} className="w-full mb-2 bg-gray-200 p-1 rounded-md shadow-md last:mb-0">
+                {cargamento.retiroEnLocal && <div className="w-full flex text-xl font-bold px-3 py-1">
+                  <div className="w-full flex text-lg font-bold px-3 relative">
+                    <div className="w-full relative">
+                      <p className="text-xs">Nombre de quién retira en local</p>
+                      <div className="mt-1 text-nowrap border border-gray-300 rounded px-2">
+                        <p className="-mt-1">{venta.entregasEnLocal[0]?.nombreRecibe || 'Desconocido'}</p>
+                        <p className="text-xs -mt-1">RUT: {venta.entregasEnLocal[0]?.rutRecibe || '-'}</p>
                       </div>
                     </div>
-                        <p className="text-2xl orbitron ml-2"><b>{detalle.subcategoriaCatalogoId.cantidad}</b> <small>{detalle.subcategoriaCatalogoId.unidad}</small></p>
+                    <div className="absolute top-8 right-5 text-blue-500 flex items-center justify-end">
+                      <LiaPencilAltSolid className="cursor-pointer hover:text-blue-600" size="1.3rem" onClick={() => {
+                        setValue("nombreRetira", venta.entregasEnLocal[0]?.nombreRecibe || "");
+                        setValue("rutRetiraNum", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[0] : "");
+                        setValue("rutRetiraDv", venta.entregasEnLocal[0]?.rutRecibe ? venta.entregasEnLocal[0].rutRecibe.split("-")[1] : "");
+                        setSelectedVentaId(venta.ventaId);
+                        setShowModalNombreRetira(true);
+                      }} />
+                    </div>
                   </div>
-                  <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
-                </li>
-              ))}
-            </ul>
-          </div>)}
+                </div>}
+                <div className="w-full flex px-2 border border-gray-300 rounded-t-lg border-b-0 bg-white pb-1">
+                  <div className="w-full text-left ml-2 text-gray-400">
+                    <p className="text-sm font-bold truncate -mb-1">Venta #{vidx + 1}</p>
+                    <p className="text-xs truncate m-0">{new Date(venta.fecha).toLocaleDateString('es-CL')}</p>
+                  </div>
+                  <div className={`relative flex justify-end ${venta.comentario ? 'text-gray-500' : 'text-gray-400 '}`}>
+                    <div className="mt-1 mr-2 cursor-pointer" onClick={(e) => {
+                      e.stopPropagation();
+                      if (index === 0) {
+                        toast(`${venta.comentario || "Sin comentarios"}`, { icon: '💬' });
+                      }
+                    }}>
+                      {!venta.comentario
+                        ? <VscCommentDraft size="1.75rem" />
+                        : <VscCommentUnresolved size="1.75rem" />}
+                    </div>
+                    {venta.comentario && <div className="absolute top-[20px] right-[10px] w-[10px] h-[10px] rounded-full bg-red-600"></div>}
+                  </div>
+                </div>
+                <ul className="flex-1 flex flex-wrap items-center justify-center -mt-0.5">
+                  {venta.detalles.map((detalle, idx) => (
+                    <li
+                      key={`descarga_${clienteIdx}_${vidx}_${idx}`}
+                      className={`w-full flex text-sm border border-gray-300 px-0 py-2 ${(idx === 0 && venta.detalles.length != 1) ? 'rounded-t-lg' : (idx === venta.detalles.length - 1 && venta.detalles.length != 1)
+                        ? 'rounded-b-lg' : venta.detalles.length === 1 ? 'rounded-lg' : ''} ${detalle.restantes === 0 ? 'bg-green-300 opacity-50 cursor-not-allowed' : detalle.restantes < 0 ? 'bg-yellow-100' : 'bg-white hover:bg-gray-100 cursor-pointer'} transition duration-300 ease-in-out`}
+                    >
+                      <div className="w-full flex items-left">
+                        <div className="flex">
+                          <div>
+                          <div className="text-white bg-orange-400 px-2 py-0 rounded text-xs ml-0.5 -my-1 h-4 mb-1.5 font-bold">{getNUCode(detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento)}</div>
+                          {detalle.subcategoriaCatalogoId.categoriaCatalogoId.esIndustrial && <div className="text-white bg-blue-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4 mb-1.5">Industrial</div>}
+                          {detalle.subcategoriaCatalogoId.sinSifon && <div className="text-white bg-gray-400 px-2 py-0 rounded text-xs -ml-2 -my-1 h-4">Sin Sifón</div>}
+                          </div>
+                          <div className="font-bold text-xl ml-2">
+                            {detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento && <span>
+                              {(() => {
+                                const elem = detalle.subcategoriaCatalogoId.categoriaCatalogoId.elemento;
+                                let match = elem.match(/^([a-zA-Z]*)(\d*)$/);
+                                if (!match) {
+                                  match = ["", (elem ?? 'N/A'), ''];
+                                }
+                                const [, p1, p2] = match;
+                                return (
+                                  <>
+                                    {p1 ? p1.toUpperCase() : ''}
+                                    {p2 ? <small>{p2}</small> : ''}
+                                  </>
+                                );
+                              })()}
+                            </span>}
+                          </div>
+                        </div>
+                            <p className="text-2xl orbitron ml-2"><b>{detalle.subcategoriaCatalogoId.cantidad}</b> <small>{detalle.subcategoriaCatalogoId.unidad}</small></p>
+                      </div>
+                      <div className="w-24 text-xl font-bold orbitron border-l-gray-300 text-right mr-3 border-l-2">{detalle.multiplicador - detalle.restantes} <small>/</small> {detalle.multiplicador}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>)}
+            </div>)}
 
           {index === 0 && !inputTemporalVisible && <div className="absolute -bottom-2 flex flex-col w-full pr-4">
             <div className="flex">

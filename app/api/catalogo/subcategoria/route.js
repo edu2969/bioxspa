@@ -46,7 +46,7 @@ export async function GET(request) {
                 const { count, error: countError } = await supabase
                     .from("items_catalogo")
                     .select("id", { count: "exact", head: true })
-                    .eq("subcategoria_id", subcategoria.id);
+                    .eq("subcategoria_catalogo_id", subcategoria.id);
 
                 if (countError) {
                     console.error(`Error counting items for subcategoria ${subcategoria.id}:`, countError);

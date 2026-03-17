@@ -5,7 +5,7 @@ import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_CARGO } from "@/app/utils/constants";
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        const requestedUserId = searchParams.get("userId");
+        const requestedUserId = searchParams.get("usuarioId");
 
         if (!requestedUserId) {
             return NextResponse.json({ ok: false, error: "userId is required" }, { status: 400 });

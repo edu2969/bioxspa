@@ -89,9 +89,6 @@ export default function RutaEnTransito({
         enabled: !!rutaId
     });
 
-    const ventasIds = (ventasEnTransito || []).map((venta) => venta.venta_id).filter(Boolean);
-    const ventasFilter = ventasIds.length ? `id=in.(${ventasIds.join(',')})` : undefined;
-
     useRealtimeQuery({
         channelName: `ruta-en-transito-${rutaId || 'sin-ruta'}`,
         schema: 'public',
@@ -108,17 +105,17 @@ export default function RutaEnTransito({
     });
 
     useRealtimeQuery({
-        channelName: `ventas-en-transito-${rutaId || 'sin-ruta'}`,
+        channelName: `ruta-ventas-en-transito-${rutaId || 'sin-ruta'}`,
         schema: 'public',
-        table: 'ventas',
-        event: 'UPDATE',
-        filter: ventasFilter,
+        table: 'ruta_despacho_ventas',
+        event: '*',
+        filter: rutaId ? `ruta_despacho_id=eq.${rutaId}` : undefined,
         queryKeys: [
             ['ventas-en-transito', rutaId],
             ['ruta-en-transito', rutaId],
             ['rutas-en-transito'],
         ],
-        enabled: !!rutaId && !!ventasFilter,
+        enabled: !!rutaId,
     });
 
     return rutaId && (<div className="w-full border rounded-lg bg-gray-100 shadow-md mb-4 pt-4" key={`ruta_${index}`}>
@@ -137,22 +134,22 @@ export default function RutaEnTransito({
                 />
                 <div className="flex mb-2 mt-2">
                     <BsGeoAltFill size="1.25rem" className="text-gray-700 ml-2" />
-                    <p className="text-xs text-gray-500 ml-2 truncate">{rutaEnTransito?.direccion_destino || 'Seleccionando destino...'}</p>
+                    <p className="text-xs text-gray-500 ml-2 truncate">{rutaEnTransito?.direccionDestino || 'Seleccionando destino...'}</p>
                 </div>
             </div>
 
             <div className="flex-1 min-w-0 pr-2 mb-2">
                 <div className="w-full">
                     <p className="text-xs text-gray-600">Conductor</p>
-                    <p className="text-lg uppercase font-bold -mt-1 mb-2 truncate">{rutaEnTransito?.nombre_chofer}</p>
+                    <p className="text-lg uppercase font-bold -mt-1 mb-2 truncate">{rutaEnTransito?.nombreChofer}</p>
                     <div className="space-y-2 max-h-[300px] overflow-y-auto"> {/* Scroll si hay muchas ventas */}
                     {ventasEnTransito && ventasEnTransito.map((venta, idxVenta) => (
-                        <div key={venta.venta_id || idxVenta} className={`border rounded-lg pl-2 pr-6 py-1 shadow transition-all duration-200 ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'border-green-500 bg-green-50' : 'border-blue-400 bg-white/80'} min-h-12`}>
+                        <div key={venta.ventaId || idxVenta} className={`border rounded-lg pl-2 pr-6 py-1 shadow transition-all duration-200 ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'border-green-500 bg-green-50' : 'border-blue-400 bg-white/80'} min-h-12`}>
                             <div className={`flex font-bold text-xs mb-1 ${venta.estado === TIPO_ESTADO_VENTA.entregado ? 'text-green-600' : 'text-blue-700'}`}>
                                 {venta.estado === TIPO_ESTADO_VENTA.entregado && <FaRegCheckCircle size="1rem" className="flex-shrink-0" />}
                                 {venta.estado === TIPO_ESTADO_VENTA.reparto && <FaTruckFast size="1rem" className="flex-shrink-0" />}
                                 <div className="flex flex-1 min-w-0 px-1 h-10"> {/* Mejor manejo del espacio */}
-                                    <p className="uppercase truncate">{venta.nombre_cliente || "Desconocido"}</p>
+                                    <p className="uppercase truncate">{venta.nombreCliente || "Desconocido"}</p>
                                     {venta.tipo === TIPO_ORDEN.traslado && <span className="text-xs text-blue-800 rounded-sm bg-blue-200 px-2 font-bold inline-block mt-0.5">RETIRO DE CILINDROS</span>}
                                 </div>
                                 <div className={`${venta.comentario ? 'text-blue-500 ' : 'text-gray-500 '} flex-shrink-0`}>
@@ -164,7 +161,7 @@ export default function RutaEnTransito({
                                                     queryClient.invalidateQueries({ queryKey: ['ventas-en-transito', rutaId] });
                                                     queryClient.invalidateQueries({ queryKey: ['ruta-en-transito', rutaId] });
                                                 };
-                                                onShowCommentModal(venta.venta_id, venta.comentario, invalidateQueries); 
+                                                onShowCommentModal(venta.ventaId, venta.comentario, invalidateQueries); 
                                             }}>
                                             {!venta.comentario ? <VscCommentDraft size="1.5rem" /> : <VscCommentUnresolved size="1.5rem" />}
                                         </div>
@@ -178,9 +175,9 @@ export default function RutaEnTransito({
                                     return (
                                         <div key={idxDetalle} className="mb-1 border rounded border-gray-400 mr-2 orbitron px-1 flex items-center bg-blue-50">
                                             <b>{detalle.multiplicador}</b>x {detalle.elemento?.toUpperCase() || "?"} {detalle.cantidad}{detalle.unidad}
-                                            {detalle.sin_sifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
-                                            {detalle.es_industrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
-                                            {detalle.es_medicinal && <span className="bg-green-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">MED</span>}
+                                            {detalle.sinSifon && <span className="bg-gray-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">S/S</span>}
+                                            {detalle.esIndustrial && <span className="bg-blue-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">IND</span>}
+                                            {detalle.esMedicinal && <span className="bg-green-500 rounded px-1 mx-1 text-xs text-white relative -top-0.5">MED</span>}
                                         </div>
                                     );
                                 })}

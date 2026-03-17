@@ -8,6 +8,10 @@ import type { IItemCatalogoPowerScanView } from "../types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSoundPlayer } from "@/components/context/SoundPlayerContext";
 
+function getCargamentoKey(cargamento: any) {
+    return cargamento?.rutaDespachoId || cargamento?.clientes?.flatMap((cliente: any) => cliente.ventas || [])?.[0]?.ventaId || null;
+}
+
 /**
  * Reordena los nuevos cargamentos según el orden de los cargamentos actuales
  * Preserva el orden personalizado después de actualizar los datos
@@ -16,7 +20,7 @@ function reorderCargamentos(nuevosCargamentos: any[], cargamentosActuales: any[]
     if (!nuevosCargamentos || !cargamentosActuales) return nuevosCargamentos;
     
     // Crear mapa de IDs para orden rápido
-    const ordenActual = cargamentosActuales.map(c => c.rutaId || c.ventas[0]?.ventaId);
+    const ordenActual = cargamentosActuales.map((c) => getCargamentoKey(c));
     
     // Reordenar nuevos cargamentos según el orden actual
     const reordenados = [];
@@ -24,7 +28,7 @@ function reorderCargamentos(nuevosCargamentos: any[], cargamentosActuales: any[]
     // Primero agregar los que están en el orden actual
     for (const id of ordenActual) {
         const cargamento = nuevosCargamentos.find(c => 
-            (c.rutaId || c.ventas[0]?.ventaId) === id
+            getCargamentoKey(c) === id
         );
         if (cargamento) {
             reordenados.push(cargamento);
@@ -33,7 +37,7 @@ function reorderCargamentos(nuevosCargamentos: any[], cargamentosActuales: any[]
     
     // Luego agregar cualquier cargamento nuevo que no estuviera antes
     for (const cargamento of nuevosCargamentos) {
-        const id = cargamento.rutaId || cargamento.ventas[0]?.ventaId;
+        const id = getCargamentoKey(cargamento);
         if (!ordenActual.includes(id)) {
             reordenados.push(cargamento);
         }
