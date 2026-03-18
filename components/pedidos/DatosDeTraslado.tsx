@@ -1,11 +1,15 @@
-import { UseFormRegister } from "react-hook-form";
+import { UseFormRegister, UseFormWatch } from "react-hook-form";
 import ClienteSearchView from "../prefabs/ClienteSearchView";
 import { useState } from "react";
 import { IClienteSeachResult } from "../prefabs/types";
 import ClientAddressManagerView from "../prefabs/ClientAddressManagerView";
 import { INuevaVentaSubmit } from "./types";
 
-export default function DatosDeTraslado({ register }: { register: UseFormRegister<INuevaVentaSubmit> }) {
+export default function DatosDeTraslado({ 
+    register
+}: { 
+    register: UseFormRegister<INuevaVentaSubmit>;    
+}) {
     const [clienteSelected, setClienteSelected] = useState<IClienteSeachResult | null>(null);
     
     return (<fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">

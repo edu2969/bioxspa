@@ -15,6 +15,7 @@ import Loader from "../Loader";
 import QuienRecibeModal from "../modals/QuienRecibeModal";
 import ModalConfirmarCargaParcial from "../modals/ModalConfirmarCargaParcial";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthorization } from "@/hooks/useAuth";
 
 /**
  * Reordena los cargamentos después de remover el primer elemento
@@ -58,6 +59,9 @@ export default function GestorDeCargaView({
   const temporalRef = useRef<HTMLInputElement>(null);
   const { setValue } = useForm<FormData>();
   const queryClient = useQueryClient();
+  const auth = useAuthorization();
+  const userId = auth.user?.id || null;
+  
 
   const handleRemoveFirst = () => {
     setAnimating(true);
@@ -112,34 +116,34 @@ export default function GestorDeCargaView({
         handleRemoveFirst();
 
         // Preservar el orden actual antes de cualquier actualización
-        const cargamentosActuales = queryClient.getQueryData(['cargamentos-despacho']);
+        const cargamentosActuales = queryClient.getQueryData(['cargamentos-despacho', userId]);
 
         // Después de 1 segundo (tiempo de animación), actualizar la query data preservando orden
         setTimeout(() => {
           if (cargamentosActuales && Array.isArray(cargamentosActuales)) {
             // Usar la función que preserva el orden al remover el primer elemento
             const cargamentosActualizados = preserveOrderAfterRemoval(cargamentosActuales);
-            queryClient.setQueryData(['cargamentos-despacho'], cargamentosActualizados);
+            queryClient.setQueryData(['cargamentos-despacho', userId], cargamentosActualizados);
             
             // También invalidar para obtener datos frescos, pero después de establecer el orden
             setTimeout(() => {
               const datosActuales = queryClient.getQueryData(['cargamentos-despacho']);
-              queryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] });
+              queryClient.invalidateQueries({ queryKey: ['cargamentos-despacho', userId] });
               
               // Si después de invalidar hay cambios, reordenar preservando la estructura
               setTimeout(() => {
-                const datosNuevos = queryClient.getQueryData(['cargamentos-despacho']);
+                const datosNuevos = queryClient.getQueryData(['cargamentos-despacho', userId]);
                 if (datosNuevos && Array.isArray(datosNuevos) && datosActuales && Array.isArray(datosActuales)) {
                   // Solo reordenar si hay diferencias en la estructura, no en el orden
                   if (datosNuevos.length !== datosActuales.length) {
-                    queryClient.setQueryData(['cargamentos-despacho'], datosNuevos);
+                    queryClient.setQueryData(['cargamentos-despacho', userId], datosNuevos);
                   }
                 }
               }, 100);
             }, 50);
           } else {
             // Fallback al comportamiento original si no hay datos actuales
-            queryClient.setQueryData(['cargamentos-despacho'], (oldData: ICargaDespachoView[] | undefined) => {
+            queryClient.setQueryData(['cargamentos-despacho', userId], (oldData: ICargaDespachoView[] | undefined) => {
               return preserveOrderAfterRemoval(oldData);
             });
           }

@@ -17,6 +17,111 @@ import { useQuery } from '@tanstack/react-query';
 import Nav from '../Nav';
 import { useUser } from "@/components/providers/UserProvider";
 import { TIPO_CARGO } from '@/app/utils/constants';
+import Image from 'next/image';
+import { getColorEstanque } from '@/lib/uix';
+
+const cilindros = [
+    // O2 10 m3
+    ...Array(10).fill(null).map((_, i) => ({
+        id: `cilindro_o2_10_${i}`,
+        codigo: `O2-10-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'O₂', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 10, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // O2 6 m3
+    ...Array(6).fill(null).map((_, i) => ({
+        id: `cilindro_o2_6_${i}`,
+        codigo: `O2-06-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'O₂', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 6, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // O2 Medicinal 9 m3
+    ...Array(4).fill(null).map((_, i) => ({
+        id: `cilindro_o2med_9_${i}`,
+        codigo: `O2M-09-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'O₂', esMedicinal: true, esIndustrial: false },
+        subcategoria: { cantidad: 9, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // Argón 10 m3
+    ...Array(20).fill(null).map((_, i) => ({
+        id: `cilindro_ar_10_${i}`,
+        codigo: `AR-10-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'Ar', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 10, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // Argón 9 m3
+    ...Array(7).fill(null).map((_, i) => ({
+        id: `cilindro_ar_9_${i}`,
+        codigo: `AR-09-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'Ar', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 9, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // Acetileno 10 m3
+    ...Array(4).fill(null).map((_, i) => ({
+        id: `cilindro_ac_10_${i}`,
+        codigo: `AC-10-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'C₂H₂', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 10, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // O2 Medicinal 9 m3 (segunda tanda)
+    ...Array(6).fill(null).map((_, i) => ({
+        id: `cilindro_o2med_9b_${i}`,
+        codigo: `O2M-09B-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'O₂', esMedicinal: true, esIndustrial: false },
+        subcategoria: { cantidad: 9, unidad: 'm³', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // CO2 sin sifón 10 kg
+    ...Array(6).fill(null).map((_, i) => ({
+        id: `cilindro_co2_10_${i}`,
+        codigo: `CO2-10-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'CO₂', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 10, unidad: 'kg', sinSifon: true },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    })),
+    // CO2 con sifón 25 kg
+    ...Array(10).fill(null).map((_, i) => ({
+        id: `cilindro_co2_25_${i}`,
+        codigo: `CO2-25-${String(i + 1).padStart(3, '0')}`,
+        categoria: { elemento: 'CO₂', esMedicinal: false, esIndustrial: true },
+        subcategoria: { cantidad: 25, unidad: 'kg', sinSifon: false },
+        ownerId: null,
+        estado: i % 2 === 0 ? 'LLENO' : 'VACÍO',
+        fechaUltimo: '10/abr/2024',
+        diasTranscurridos: 10
+    }))
+];
+
 
 export default function Pedidos() {
     const router = useRouter();
@@ -45,9 +150,9 @@ export default function Pedidos() {
         name: 'direccionRetiroId'
     });
 
-    const motivoTrasladoSeleccionado = useWatch({
+    const motivo = useWatch({
         control,
-        name: 'motivoTraslado'
+        name: 'motivo'
     });
     
     const { data: cliente } = useQuery<ICliente | null>({
@@ -147,6 +252,79 @@ export default function Pedidos() {
         }
     }, [selectedPlace, tipoOrden, setValue]);
 
+    const resumenCilindros = Object.values(
+        cilindros.reduce((acc, cilindro) => {
+            const ownerType = cilindro.ownerId ? 'TP' : 'BIOX';
+            const estado = String(cilindro.estado || '').toUpperCase().includes('LLENO') ? 'LLENO' : 'VACIO';
+            const key = [
+                cilindro.categoria.elemento,
+                cilindro.subcategoria.cantidad,
+                cilindro.subcategoria.unidad,
+                estado,
+                cilindro.categoria.esIndustrial ? 1 : 0,
+                cilindro.categoria.esMedicinal ? 1 : 0,
+                cilindro.subcategoria.sinSifon ? 1 : 0,
+                ownerType,
+            ].join('|');
+
+            if (!acc[key]) {
+                acc[key] = {
+                    key,
+                    cantidad: 0,
+                    elemento: cilindro.categoria.elemento,
+                    medida: cilindro.subcategoria.cantidad,
+                    unidad: cilindro.subcategoria.unidad,
+                    esIndustrial: cilindro.categoria.esIndustrial,
+                    esMedicinal: cilindro.categoria.esMedicinal,
+                    sinSifon: cilindro.subcategoria.sinSifon,
+                    ownerType,
+                    estado,
+                };
+            }
+
+            acc[key].cantidad += 1;
+            return acc;
+        }, {} as Record<string, {
+            key: string;
+            cantidad: number;
+            elemento: string;
+            medida: number;
+            unidad: string;
+            esIndustrial: boolean;
+            esMedicinal: boolean;
+            sinSifon: boolean;
+            ownerType: 'BIOX' | 'TP';
+            estado: 'VACIO' | 'LLENO';
+        }>)
+    );
+
+    const normalizarElementoParaColor = (elemento: string) => {
+        if (!elemento) return '';
+
+        return elemento
+            .replace(/₀/g, '0')
+            .replace(/₁/g, '1')
+            .replace(/₂/g, '2')
+            .replace(/₃/g, '3')
+            .replace(/₄/g, '4')
+            .replace(/₅/g, '5')
+            .replace(/₆/g, '6')
+            .replace(/₇/g, '7')
+            .replace(/₈/g, '8')
+            .replace(/₉/g, '9');
+    };
+
+    const getCylinderScale = (elemento: string, medida: number, unidad: string) => {
+        const elementoNormalizado = normalizarElementoParaColor(elemento).toLowerCase();
+        const unidadNormalizada = String(unidad || '').toLowerCase();
+
+        const base = elementoNormalizado === 'co2' && unidadNormalizada === 'kg' ? 45 : 10;
+        const rawScale = Number(medida || 0) / base;
+
+        // Mantener legibilidad visual en tarjetas compactas.
+        return Math.max(0.45, Math.min(rawScale || 1, 1.4));
+    };
+
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
             <div className="w-full pb-2 mt-14 h-[calc(100vh-116px)] overflow-y-auto" ref={formScrollRef}>
@@ -165,7 +343,7 @@ export default function Pedidos() {
                             {/* TRASLADO */}
                             {tipoOrden == 2 && <DatosDeTraslado register={register} />}
                             {/* ÓRDEN DE TRABAJO */}
-                            {tipoOrden == 3 && <DatosOrdenDeTrabajo register={register} />}
+                            {tipoOrden == 3 && <DatosOrdenDeTrabajo register={register} watch={watch}/>}
 
                             {/* IFORMACION EXTRA */}
                             {hasRole([TIPO_CARGO.encargado])
@@ -208,60 +386,59 @@ export default function Pedidos() {
                         {/* SELECTOR DE ITEMS */}
                         {(tipoOrden == 2 || tipoOrden == 3) && <div className="mt-6">
                             <div className={`w-full`}>
-                                <p className="font-bold text-lg">{tipoOrden == 2 ? 'CILINDROS PARA TRASLADO' : 'CILINDROS DISPONIBLES'}</p>
-                                <div className="w-full flex items-center bg-gray-300 px-4 py-2 mt-2 rounded-t-md uppercase text-sm sm:text-xs">
-                                    <div className="w-3/12 pr-4">
-                                        <p className="font-bold">CODIGO</p>
-                                    </div>
-                                    <div className="w-3/12 pr-4">
-                                        <p className="font-bold">Nombre</p>
-                                    </div>
-                                    <div className="w-2/12 pr-4">
-                                        <p className="font-bold">Propietario</p>
-                                    </div>
-                                    <div className="w-2/12 pr-4">
-                                        <p className="font-bold text-center">Fecha PH</p>
-                                    </div>
-                                    <div className="w-2/12 pr-4">
-                                        <p className="font-bold text-center">Estado</p>
-                                    </div>
+                                <p className="font-bold text-lg">{tipoOrden == 2 ? 'CILINDROS PARA TRASLADO' : 'CILINDROS DISPONIBLES'}</p>                                
+                                <div className="mt-3 flex flex-wrap gap-3">
+                                    {resumenCilindros.map((grupo, index) => (
+                                        (() => {
+                                            const scale = getCylinderScale(grupo.elemento, grupo.medida, grupo.unidad);
+                                            const width = 24 * scale;
+                                            const height = 96 * scale;
+
+                                            return (
+                                        <div
+                                            key={`cilindro_resumen_${grupo.key}_${index}`}
+                                            className="relative flex w-full gap-3 sm:w-[calc(50%-0.375rem)] lg:w-[calc(33.333%-0.5rem)] xl:w-[calc(12.5%-0.65625rem)] min-h-[170px] rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm"
+                                        >
+                                            <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-blue-600 px-2 text-xs font-bold text-white">
+                                                {grupo.cantidad}
+                                            </span>
+
+                                            <div className="flex w-10 items-center justify-center">
+                                                <Image
+                                                    width={Math.round(width)}
+                                                    height={Math.round(height)}
+                                                    src={`/ui/tanque_biox${getColorEstanque(normalizarElementoParaColor(grupo.elemento))}.png`}
+                                                    style={{ width: `${width}px`, height: 'auto' }}
+                                                    alt={`cilindro_${grupo.elemento}_${grupo.medida}${grupo.unidad}`}
+                                                />
+                                            </div>
+
+                                            <div className="flex-1">
+                                                <div className="mb-3 flex flex-wrap gap-1 pr-8">
+                                                    {grupo.esIndustrial && <span className="rounded bg-yellow-600 px-2 py-0.5 text-xs font-bold text-white">IND</span>}
+                                                    {grupo.esMedicinal && <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">MED</span>}
+                                                    {grupo.sinSifon && <span className={`rounded px-2 py-0.5 text-xs font-bold text-white bg-gray-700`}>S/S</span>}
+                                                </div>
+
+                                                <p className="mb-2 text-2xl font-bold leading-none">
+                                                    {grupo.elemento} <span className="orbitron">{grupo.medida}</span>
+                                                    <span className="ml-1 text-base font-semibold">{grupo.unidad}</span>
+                                                </p>
+
+                                                <p className="w-12 rounded px-2 py-0.5 text-xs font-bold text-white bg-green-700">
+                                                    {grupo.ownerType}
+                                                </p>
+
+                                                <div className="mt-3 flex items-center gap-2 text-sm font-bold">
+                                                    <span className={`h-3.5 w-3.5 rounded-full ${grupo.estado === 'LLENO' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                                    <span>{grupo.estado === 'LLENO' ? 'LLENO' : 'VACIO'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                            );
+                                        })()
+                                    ))}
                                 </div>
-                                {/*cilindros.length > 0 && cilindros.map((cilindro, index) => (
-                                    <div key={`cilindro_${index}`} className={`w-full flex items-center mb-0.5 pb-1 px-2 bg-gray-100`}>
-                                        <div className="w-2/12">
-                                            <span className="font-bold mt-3 mr-2">{cilindro.codigo}</span>
-                                        </div>
-                                        <div className="w-4/12 pr-4">
-                                            <p className="flex space-x-1 mt-1">
-                                                <span className="font-bold text-xl">{cilindro.categoria.elemento}</span>
-                                                <span className="text-xl orbitron mt-0">{cilindro.subcategoria.cantidad}</span>
-                                                <span className="mt-1">{cilindro.subcategoria.unidad}</span>
-                                                {cilindro.categoria.esMedicinal && <span className="text-xs text-white bg-blue-600 rounded px-2 pt-0.5 h-5 mt-1">MED</span>}
-                                                {cilindro.categoria.esIndustrial && <span className="text-xs text-white bg-yellow-600 rounded px-2 pt-0.5 h-5 mt-1">IND</span>}
-                                                {cilindro.subcategoria.sinSifon && <span className="text-xs text-white bg-gray-600 rounded px-2 pt-0.5 h-5 mt-1">S/S</span>}
-                                            </p>
-                                        </div>
-                                        <div className="w-3/12 pr-4">
-                                            {cilindro.ownerId && <span className="text-xs border-gray-500 bg-gray-400 rounded px-2 pt-0 h-5 mr-2 text-white font-bold">TP</span>}
-                                            {cilindro.ownerId && <span className="mt-1">{cilindro.ownerId.nombre}</span>}
-                                            {!cilindro.ownerId && <span className="mt-1">BIOX</span>}
-                                        </div>
-                                        <div className="w-2/12 pr-4">
-                                            <div className="flex">
-                                                <span className="font-bold mt-2 px-4">10/abr/2024</span>
-                                                <span className="w-full font-bold text-sm text-right mt-2">
-                                                    hace 10 días
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="w-2/12 pr-4">
-                                            <div className="flex text-sm space-x-2 justify-end">
-                                                <span className="w-4 h-4 border-gray-600 border-2 rounded-full bg-gray-400 mt-2"></span>
-                                                <span className="font-bold mt-1">VACÍO</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))*/}
                             </div>
                         </div>}
 

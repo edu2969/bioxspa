@@ -1,11 +1,14 @@
-import { UseFormRegister } from "react-hook-form";
+import { UseFormRegister, UseFormWatch } from "react-hook-form";
 import { INuevaVentaSubmit } from "./types";
 
 export default function DatosOrdenDeTrabajo({
-    register,
+    register, watch
 }: {
     register: UseFormRegister<INuevaVentaSubmit>;
+    watch: UseFormWatch<INuevaVentaSubmit>;
 }) {
+    const motivo = watch('motivo');
+    const motivoNumber = Number(motivo);
     return (<fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
         <legend className="font-bold text-gray-700 px-2">Detalle de orden</legend>
         <div className="w-full flex-col mt-3 space-y-4">
@@ -13,25 +16,16 @@ export default function DatosOrdenDeTrabajo({
                 <label htmlFor="motivo" className="block text-sm font-medium text-gray-700">Prestador</label>
                 <select
                     id="motivo"
-                    {...register('motivo')}
+                    {...register('motivo', { valueAsNumber: true })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                 >
-                    <option value="">Seleccione opción</option>
-                    <option value="2">AirLiquide - Coronel</option>
-                    <option value="6">Messer - Coronel</option>
-                    <option value="8">Messer - Santiago</option>
-                    <option value="9">Planta Envasado Biox</option>
-                    <option value="10">Linde Gas Chile S.A.</option>
+                    <option value={0}>Seleccione opción</option>
+                    <option value={1}>Planta Envasado Biox</option>
+                    <option value={10}>AirLiquide - Coronel</option>
+                    <option value={11}>Messer - Coronel</option>
+                    <option value={12}>Messer - Santiago</option>
+                    <option value={13}>Linde Gas Chile S.A.</option>
                 </select>
-            </div>
-            <div className="w-full">
-                <label htmlFor="controlEnvase" className="block text-sm font-medium text-gray-700">Control de envase</label>
-                <input
-                    id="controlEnvase"
-                    {...register(`controlEnvase`)}
-                    type="text"
-                    className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
-                />
             </div>
             <div className="w-full">
                 <label htmlFor="servicio" className="block text-sm font-medium text-gray-700">Servicio</label>
@@ -47,6 +41,15 @@ export default function DatosOrdenDeTrabajo({
                     <option value="4">Recarga cilindros</option>
                 </select>
             </div>
+            {motivoNumber !== 1 && <div className="w-full">
+                <label htmlFor="controlEnvase" className="block text-sm font-medium text-gray-700">Control de envase</label>
+                <input
+                    id="controlEnvase"
+                    {...register(`controlEnvase`)}
+                    type="text"
+                    className="mt-1 mr-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm text-right"
+                />
+            </div>}            
         </div>
     </fieldset>);
 }

@@ -113,7 +113,7 @@ export async function GET(request) {
                     .from("rutas_despacho")
                     .select("id")
                     .eq("conductor_id", userId)
-                    .eq("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+                    .in("estado", [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.orden_cargada])
                     .single();
 
                 let pedidos = [];

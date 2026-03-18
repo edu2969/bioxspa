@@ -70,7 +70,9 @@ export default function Asignacion() {
         schema: 'public',
         table: 'rutas_despacho',
         event: '*',
-        queryKeys: [['rutas-en-transito', sucursalId]],
+        queryKeys: [['rutas-en-transito', sucursalId], 
+            ['pedidos-por-asignar', sucursalId],
+            ['conductores', sucursalId]],
         enabled: !!sucursalId,
     });
 
@@ -79,7 +81,9 @@ export default function Asignacion() {
         schema: 'public',
         table: 'ruta_despacho_ventas',
         event: '*',
-        queryKeys: [['pedidos-por-asignar', sucursalId], ['rutas-en-transito', sucursalId]],
+        queryKeys: [['rutas-en-transito', sucursalId], 
+            ['pedidos-por-asignar', sucursalId],
+            ['conductores', sucursalId]],
         enabled: !!sucursalId,
     });
 
