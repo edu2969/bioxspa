@@ -6,7 +6,7 @@ import {
     InfoWindow
 } from "@react-google-maps/api";
 import { GrOverview } from "react-icons/gr";
-import { useGoogleMaps } from "./GoogleMapProvider";
+import { GoogleMapsProvider, useGoogleMaps } from "./GoogleMapProvider";
 
 const REGION_BIOBIO_BOUNDS = {
     north: -36.0,
@@ -91,7 +91,7 @@ export default function MapaCilindros({ data }) {
         map.fitBounds(bounds, zoomedCluster ? 80 : 2);
     }, [getBounds, zoomedCluster, isLoaded, mapRef]);
 
-    return (
+    return (<GoogleMapsProvider>
         <div className="w-full h-full relative" style={{ minHeight: 400 }}>
             {!isLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
@@ -207,5 +207,5 @@ export default function MapaCilindros({ data }) {
                 </>
             )}
         </div>
-    );
+        </GoogleMapsProvider>);
 }

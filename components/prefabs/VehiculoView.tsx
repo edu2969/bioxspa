@@ -28,10 +28,10 @@ const VehiculoView = forwardRef<HTMLDivElement, {
     // Usar el hook de escalado con el vehículo actual
     const currentScaling = useVehicleScaling(ref as RefObject<HTMLDivElement>, vehiculo);
 
-    return (
+    return (        
         <div
             ref={ref}
-            className="w-full px-4 pt-6 pb-4 relative scroll-none overflow-visible"
+            className="w-full mx-auto px-4 pt-6 pb-4 relative scroll-none overflow-visible"
             style={{ 
                 height: currentScaling.isReady ? currentScaling.vehicleDimensions.height + 80 : 200,
                 minHeight: 200
@@ -40,7 +40,7 @@ const VehiculoView = forwardRef<HTMLDivElement, {
             {currentScaling.isReady && (
                 <>
                     <Image 
-                        className={`absolute${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
+                        className={`absolute opacity-40${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
                         src={`/ui/${currentScaling.getVehicleImageName(vehiculo)}.png`}
                         alt={`camion_atras_${vehiculo ? vehiculo.marca + vehiculo.modelo : 'desconocido'}`}
                         style={{
@@ -63,7 +63,7 @@ const VehiculoView = forwardRef<HTMLDivElement, {
                             </div>
 
                             <Image 
-                                className={`absolute${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
+                                className={`absolute opacity-80${currentScaling.getVehicleImageName(vehiculo).includes('desconocida') ? ' grayscale' : ''}`} 
                                 src={`/ui/${currentScaling.getVehicleImageName(vehiculo)}_front.png`}
                                 style={{
                                     top: currentScaling.vehiclePosition.top,

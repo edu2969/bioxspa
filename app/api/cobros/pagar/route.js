@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { syncBIDeudasFromVentas } from "@/lib/arriendos/syncBIDeudasFromVentas";
 
 // filepath: d:/git/bioxspa/app/api/cobros/pagar/route.js
 
 export async function POST(request) {
     try {
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
+        const authResult = await getAuthenticatedUser({ requireAuth: true });
+        if (!authResult.success || !authResult.data) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
+
+        const { user } = authResult.data;
+        const supabase = await getSupabaseServerClient();
 
         console.log("Usuario autenticado:", user.id);
 
@@ -26,6 +30,7 @@ export async function POST(request) {
         let pagosCreados = [];
         let ventasActualizadas = [];
         let historialEstados = [];
+        const ventaIdsActualizadas = [];
 
         for (const ventaObj of ventas) {
             const ventaId = ventaObj._id;
@@ -86,6 +91,7 @@ export async function POST(request) {
                 estado: nuevoEstado,
                 por_cobrar: nuevoPorCobrar
             });
+            ventaIdsActualizadas.push(ventaId);
 
             // Agregar historial de estado si cambió
             if (nuevoEstado !== venta.estado) {
@@ -137,12 +143,32 @@ export async function POST(request) {
             }
         }
 
+        let biDeudas = { ok: true, source: "cobros_pagar", ventaIds: [] };
+        if (ventaIdsActualizadas.length > 0) {
+            try {
+                biDeudas = await syncBIDeudasFromVentas({
+                    supabase,
+                    ventaIds: ventaIdsActualizadas,
+                    source: "cobros_pagar",
+                });
+            } catch (biError) {
+                console.error("Error sincronizando bi_deudas desde cobros/pagar:", biError);
+                biDeudas = {
+                    ok: false,
+                    source: "cobros_pagar",
+                    error: biError.message,
+                    ventaIds: ventaIdsActualizadas,
+                };
+            }
+        }
+
         console.log("Pagos registrados correctamente");
         return NextResponse.json({ 
             ok: true,
             message: "Pagos registrados", 
             pagos: pagosCreados,
-            ventasActualizadas 
+            ventasActualizadas,
+            biDeudas,
         });
 
     } catch (error) {

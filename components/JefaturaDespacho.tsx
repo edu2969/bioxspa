@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
 import { Toaster } from 'react-hot-toast';
@@ -22,11 +22,52 @@ function getFirstVentaId(cargamento: ICargaDespachoView | null | undefined) {
   return cargamento?.clientes?.flatMap((cliente) => cliente.ventas)?.[0]?.ventaId || null;
 }
 
+function getAllVentaIdsKey(cargamento: ICargaDespachoView | null | undefined) {
+  if (!cargamento) return null;
+
+  const ventaIds = cargamento.clientes
+    ?.flatMap((cliente) => cliente.ventas)
+    ?.map((venta) => venta.ventaId)
+    ?.filter(Boolean) || [];
+
+  if (!ventaIds.length) return null;
+
+  return ventaIds.join("|");
+}
+
+function getCargaId(cargamento: ICargaDespachoView | null | undefined) {
+  if (!cargamento) return null;
+  return cargamento.rutaDespachoId || `local_${getAllVentaIdsKey(cargamento) || getFirstVentaId(cargamento) || "sin-venta"}`;
+}
+
+function orderCargamentosByPrevious(
+  incoming: ICargaDespachoView[] = [],
+  previousOrder: string[] = []
+) {
+  if (!incoming.length) return [];
+  if (!previousOrder.length) return incoming;
+
+  const orderIndex = new Map(previousOrder.map((id, idx) => [id, idx]));
+
+  return [...incoming].sort((a, b) => {
+    const aId = getCargaId(a);
+    const bId = getCargaId(b);
+    const aIdx = aId ? orderIndex.get(aId) : undefined;
+    const bIdx = bId ? orderIndex.get(bId) : undefined;
+
+    if (aIdx !== undefined && bIdx !== undefined) return aIdx - bIdx;
+    if (aIdx !== undefined) return -1;
+    if (bIdx !== undefined) return 1;
+    return 0;
+  });
+}
+
 export default function JefaturaDespacho() {
   const [scanMode, setScanMode] = useState(false);
   const [rutaId, setRutaId] = useState<string | null>(null);
   const [ventaId, setVentaId] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
+  const previousOrderRef = useRef<string[]>([]);
 
   const auth = useAuthorization();
   const userId = auth.user?.id || null;
@@ -74,8 +115,20 @@ export default function JefaturaDespacho() {
       console.log("Cargamentos de despacho:", data);
       return data.cargamentos || [];
     },
+    select: (incoming) => orderCargamentosByPrevious(incoming || [], previousOrderRef.current),
     enabled: !!userId
   });
+
+  useEffect(() => {
+    if (!cargamentos || !cargamentos.length) {
+      previousOrderRef.current = [];
+      return;
+    }
+
+    previousOrderRef.current = cargamentos
+      .map((cargamento) => getCargaId(cargamento))
+      .filter((id): id is string => !!id);
+  }, [cargamentos]);
 
   const handleShowNext = () => {
     if (!cargamentos || cargamentos.length <= 1 || animating) return;
@@ -93,6 +146,10 @@ export default function JefaturaDespacho() {
 
       // Actualizar la query data con el nuevo orden
       queryClient.setQueryData(['cargamentos-despacho', userId], nuevosCargamentos);
+
+      previousOrderRef.current = nuevosCargamentos
+        .map((cargamento) => getCargaId(cargamento))
+        .filter((id): id is string => !!id);
 
       // Actualizar rutaId/ventaId basado en el nuevo primer cargamento
       if (nuevosCargamentos.length > 0) {

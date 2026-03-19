@@ -100,11 +100,11 @@ export default function PanelConductor() {
         <ChecklistProvider tipo="vehiculo">
 
             <SoundPlayerProvider>
-                {ruta && (
+                {ruta && (<div className="w-full flex flex-row items-center justify-between">
                     <div
                         ref={vehicleContainerRef}
-                        className="fixed top-4 right-4 w-80 z-10"
-                        style={{ maxHeight: '300px' }}
+                        className="w-full mx-auto top-4 right-4 z-10"
+                        style={{ maxHeight: '45vh' }}
                     >
                         <VehiculoView
                             rutaId={ruta.id}
@@ -113,6 +113,7 @@ export default function PanelConductor() {
                             ref={vehicleContainerRef}
                         />
                     </div>
+                </div>
                 )}
 
                 <div className="w-full flex flex-col items-end fixed bottom-0 rounded-t-lg pt-3" style={{ zIndex: 101 }}>

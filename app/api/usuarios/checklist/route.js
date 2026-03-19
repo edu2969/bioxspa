@@ -28,7 +28,7 @@ export async function GET(req) {
     }
 
     if (tiposChecklist.length === 0) {
-        return NextResponse.json({ ok: true, passed: true, checklists: [] });
+        return NextResponse.json({ ok: true, passed: true, checklists: [] }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     const startOfDay = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
@@ -49,7 +49,7 @@ export async function GET(req) {
         ok: true,
         passed: checklists.filter(c => c.passed).length === tiposChecklist.length,
         checklists
-    });
+    }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req) {

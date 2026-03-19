@@ -27,11 +27,16 @@ export function ChecklistProvider({ tipo, children }: {
 }) {
     const [showModal, setShowModal] = useState(false);
     const { user, loading: loadingUser } = useUser();
+    // La fecha del día se incluye en la key para que React Query invalide
+    // automáticamente al cambiar de día sin necesidad de reload manual.
+    const today = new Date().toDateString();
 
     const { data: checklist, isLoading: isLoadingChecklist } = useQuery<IChecklistData>({
-        queryKey: ["checklist", user?.id],
+        queryKey: ["checklist", user?.id, today],
         queryFn: async () => {
-            const r = await fetch("/api/usuarios/checklist");
+            // cache: 'no-store' evita que el navegador devuelva la respuesta
+            // HTTP cacheada del día anterior sin consultar al servidor.
+            const r = await fetch("/api/usuarios/checklist", { cache: 'no-store' });
             if (!r.ok) {
                 if (r.status === 401) {
                     return { ok: false, passed: true, checklists: [] };
@@ -42,7 +47,10 @@ export function ChecklistProvider({ tipo, children }: {
             console.log("Checklist data:", data);
             return data;
         },
-        enabled: !loadingUser && !!user
+        enabled: !loadingUser && !!user,
+        staleTime: 0,              // Siempre considerado stale → refetch al montar
+        refetchOnMount: 'always',  // Refetch cada vez que el componente monta (cambio de pantalla)
+        refetchOnWindowFocus: true,
     });
 
     const hasApprovedChecklist = (tipoChecklist: number) => {

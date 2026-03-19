@@ -28,7 +28,7 @@ const stateColors = [
     "bg-green-600",
 ];
 
-export default function HomeGenerencia({ googleMapsApiKey }) {
+export default function HomeGenerencia() {
     const [loadingAdmingPanel, setLoadingAdminPanel] = useState(true);
     const [branches, setBranches] = useState(null);
     const [notificationVisible, setNotificationVisible] = useState(false);
@@ -311,7 +311,7 @@ export default function HomeGenerencia({ googleMapsApiKey }) {
                 )}
 
                 <div className={`absolute top-10 right-6 w-1/2 h-[calc(100vh-14rem)] bg-white rounded-md border border-gray-300 ${branchSelected != null ? '' : 'hidden'}`} ref={mapRef}>
-                    <MapaCilindros googleMapsApiKey={googleMapsApiKey} data={mapData} />
+                    <MapaCilindros data={mapData} />
 
                     <div className="relativebg-white rounded-md px-2 pt-2 pb-0 border border-gray-300 mt-4">
                         <span className="position absolute text-xs font-bold mb-2 -mt-4 bg-white px-2 text-gray-400">TIPOS DE GASES</span>

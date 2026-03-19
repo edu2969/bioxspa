@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
+import { syncBIDeudasFromVentas } from "@/lib/arriendos/syncBIDeudasFromVentas";
 
 export async function POST(req) {
     try {
@@ -135,8 +136,27 @@ export async function POST(req) {
                     .in('id', itemIds);
                 if (updItemsErr) console.error('[confirmarDescarga] Error updating item_catalogos direccion:', updItemsErr);
             }
+
+            let biDeudas;
+            try {
+                biDeudas = await syncBIDeudasFromVentas({
+                    supabase,
+                    ventaIds,
+                    source: 'confirmar_descarga',
+                });
+            } catch (biError) {
+                console.error('[confirmarDescarga] Error syncing bi_deudas:', biError);
+                biDeudas = {
+                    ok: false,
+                    source: 'confirmar_descarga',
+                    error: biError.message,
+                    ventaIds,
+                };
+            }
+
+            return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado, biDeudas });
         }
-        return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado });
+        return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado, biDeudas: { ok: true, source: 'confirmar_descarga', ventaIds: [] } });
     } catch (error) {
         console.error('ERROR in confirmarDescarga:', error);
         return NextResponse.json({ ok: false, error: 'Internal Server Error' }, { status: 500 });

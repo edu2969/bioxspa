@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { registerArriendosFromVenta } from "@/lib/arriendos/registerArriendosFromVenta";
 
 const buildItemView = (row, expectedDireccion) => {
     const sub = row.subcategoria || null;
@@ -207,6 +208,15 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Error registrando el item en la venta" }, { status: 500 });
         }
 
+        const arriendos = await registerArriendosFromVenta({
+            supabase,
+            ventaId,
+            userId,
+            source: "entregar_en_local",
+            itemCatalogoIds: [item.id],
+            fechaDesde: venta.fecha,
+        });
+
         // TODO: Add to historial de carga (this would require the carga model structure)
         // This part would need the carga/movimiento model definitions to implement properly
 
@@ -214,7 +224,8 @@ export async function POST(request) {
             ok: true,
             message: "Item entregado exitosamente",
             itemId: item.id,
-            codigo: item.codigo
+            codigo: item.codigo,
+            arriendos,
         });
 
     } catch (error) {

@@ -415,6 +415,17 @@ CREATE TABLE ruta_despacho_historial_carga_items_movidos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE arriendo_cilindros (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cliente_id UUID REFERENCES clientes(id) NOT NULL,
+    venta_id UUID REFERENCES ventas(id) ON DELETE CASCADE,
+    item_catalogo_id UUID REFERENCES items_catalogo(id) NOT NULL,
+    fecha_desde TIMESTAMPTZ NOT NULL,
+    fecha_hasta TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(venta_id, item_catalogo_id)
+);
+
 -- Habilitar payload completo para Realtime en rutas de despacho
 ALTER TABLE rutas_despacho REPLICA IDENTITY FULL;
 ALTER TABLE ruta_despacho_ventas REPLICA IDENTITY FULL;
@@ -462,7 +473,9 @@ CREATE POLICY rutas_despacho_select_policy ON rutas_despacho
 CREATE TABLE bi_deudas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     sucursal_id UUID REFERENCES sucursales(id) NOT NULL,
+    dependencia_id UUID REFERENCES dependencias(id),
     cliente_id UUID REFERENCES clientes(id) NOT NULL,
+    categoria_catalogo_id UUID REFERENCES categorias_catalogo(id),
     fecha DATE NOT NULL,
     periodo CHAR(1) NOT NULL CHECK (periodo IN ('D', 'S', 'M', 'A')),
     monto DECIMAL(15,2) NOT NULL,
@@ -512,9 +525,10 @@ CREATE TABLE bi_principal (
 -- BI de cilindros
 CREATE TABLE bi_cilindros (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    sucursal_id UUID REFERENCES sucursales(id),
+    sucursal_id UUID REFERENCES sucursales(id) NOT NULL,
+    dependencia_id UUID REFERENCES dependencias(id),
     cliente_id UUID REFERENCES clientes(id),
-    categoria_id UUID REFERENCES categorias_catalogo(id),
+    categoria_catalogo_id UUID REFERENCES categorias_catalogo(id),
     fecha DATE NOT NULL,
     periodo CHAR(1) NOT NULL CHECK (periodo IN ('D', 'S', 'M', 'A')),
     

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { TIPO_CARGO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
+import { registerArriendosFromVenta } from "@/lib/arriendos/registerArriendosFromVenta";
+import { syncBIDeudasFromVentas } from "@/lib/arriendos/syncBIDeudasFromVentas";
 
 export async function POST(request) {
     try {
@@ -113,6 +115,14 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
+        const arriendos = await registerArriendosFromVenta({
+            supabase,
+            ventaId,
+            userId,
+            source: "confirmar_entrega_local",
+            fechaDesde: venta.fecha,
+        });
+
         const nuevoEstado = TIPO_ESTADO_VENTA.entregado;
 
         const { error: updateVentaError } = await supabase
@@ -139,7 +149,24 @@ export async function POST(request) {
             }
         }
 
-        return NextResponse.json({ ok: true, estado: nuevoEstado, por_cobrar: true });
+        let biDeudas = { ok: true, source: "confirmar_entrega_local", ventaIds: [ventaId] };
+        try {
+            biDeudas = await syncBIDeudasFromVentas({
+                supabase,
+                ventaIds: [ventaId],
+                source: "confirmar_entrega_local",
+            });
+        } catch (biError) {
+            console.error("Error sincronizando bi_deudas en confirmarEntregaEnLocal:", biError);
+            biDeudas = {
+                ok: false,
+                source: "confirmar_entrega_local",
+                error: biError.message,
+                ventaIds: [ventaId],
+            };
+        }
+
+        return NextResponse.json({ ok: true, estado: nuevoEstado, por_cobrar: true, arriendos, biDeudas });
 
     } catch (error) {
         console.error("Error in confirmarEntregaEnLocal endpoint:", error);

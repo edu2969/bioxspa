@@ -23,7 +23,13 @@ const VEHICLE_CONFIGS = {
   "volkswagen_constellation": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 12, pesoMax: 6000, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
   "volkswagen_delivery": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 10, pesoMax: 4500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
   "kia_frontier": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.5, pesoMax: 1150, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
-  "ford_transit": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 9, pesoMax: 3500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "ford_transit": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 9, pesoMax: 3500, cylinderLayout: {
+    baseTop: 0.3,
+    baseLeft: 0.22,
+    maxCylindersPerLine: 10,
+    blockOffsetHorizontal: 0.15,
+    blockOffsetVertical: 0.01
+  } },
   "default": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 5, pesoMax: 1500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT }
 };
 
