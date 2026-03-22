@@ -33,7 +33,7 @@ export default function MapCilinderMasterView({
 	return (
 		<div className={`absolute top-10 right-6 w-1/2 h-[calc(100vh-18rem)] bg-white rounded-md border border-gray-300 ${visible ? "" : "hidden"}`}>
 			<GoogleMapsProvider>
-				<MapaCilindros key={`mapa_${new Date()}`} data={mapData} />
+				<MapaCilindros key={`mapa_${new Date()}`} data={mapData} />c
 			</GoogleMapsProvider>
 
 			<div className="relativebg-white rounded-md px-2 pt-2 pb-0 border border-gray-300 mt-4">
