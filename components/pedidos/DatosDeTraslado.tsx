@@ -1,8 +1,8 @@
 import { UseFormRegister, UseFormWatch } from "react-hook-form";
-import ClienteSearchView from "../prefabs/ClienteSearchView";
+import ClienteSearchView from "../_prefabs/ClienteSearchView";
 import { useState } from "react";
-import { IClienteSeachResult } from "../prefabs/types";
-import ClientAddressManagerView from "../prefabs/ClientAddressManagerView";
+import { IClienteSeachResult } from "../_prefabs/types";
+import ClientAddressManagerView from "../_prefabs/ClientAddressManagerView";
 import { INuevaVentaSubmit } from "./types";
 
 export default function DatosDeTraslado({ 

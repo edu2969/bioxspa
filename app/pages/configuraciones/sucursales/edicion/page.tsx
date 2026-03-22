@@ -8,7 +8,7 @@ export default function Page() {
     <Suspense fallback={<div className="flex items-center justify-center h-full">
       <Loader texto="Cargando..." />
       </div>}>
-      <EditSucursal googleMapsApiKey={apiKey} />
+      <EditSucursal/>
     </Suspense>
   );
 }

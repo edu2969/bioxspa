@@ -1,13 +1,14 @@
 "use client";
+
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import React from 'react';
 import { useRouter } from 'next/navigation';
 import { SiFord, SiHyundai, SiKia, SiMitsubishi, SiVolkswagen } from 'react-icons/si';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { FaTrashAlt } from 'react-icons/fa';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import Nav from '../Nav';
 dayjs.locale('es');
 var relative = require('dayjs/plugin/relativeTime');
 dayjs.extend(relative);
@@ -39,7 +40,7 @@ export default function FlotaPanel() {
                 method: 'DELETE',
             });
             if (response.ok) {
-                setVehiculos(vehiculos.filter(v => v._id !== vehiculoId));
+                setVehiculos(vehiculos.filter(v => v.id !== vehiculoId));
             } else {
                 console.error('Failed to delete vehiculo');
             }
@@ -57,7 +58,7 @@ export default function FlotaPanel() {
             <div className="grid grid-cols-5 h-full gap-4 p-4">
                 {!loadingPanel && vehiculos.length > 0 && vehiculos.map((vehiculo, index) => (
                 <div key={index} className="relative w-full border rounded-lg p-4 bg-white shadow-md hover:shadow-xl transition-shadow duration-300 hover:bg-gray-100 cursor-pointer"
-                onClick={() => router.push(`/modulos/configuraciones/flota/${vehiculo._id}`)}>
+                onClick={() => router.push(`/pages/configuraciones/flota/${vehiculo.id}`)}>
                     <Image className="absolute top-0 left-0 ml-12 mt-6" src={`/ui/${vehiculo.marca.split(" ")[0].toLowerCase() + "_" + vehiculo.modelo.split(" ")[0].toLowerCase()}.png`} alt="camion" width={188} height={146} />
                     <Image className="absolute top-0 left-0 ml-12 mt-6" src={`/ui/${vehiculo.marca.split(" ")[0].toLowerCase() + "_" + vehiculo.modelo.split(" ")[0].toLowerCase()}_front.png`} alt="camion_frontal" width={188} height={146} />
                     <div className="absolute -left-3 top-2 bg-white">
@@ -87,7 +88,7 @@ export default function FlotaPanel() {
                     </div>
                     <div className="absolute top-3 right-3 text-red-200" onClick={(e) => {
                         e.stopPropagation();                        
-                        setVehiculoToDelete(vehiculo._id);
+                        setVehiculoToDelete(vehiculo.id);
                         setShowConfirm(true);
                     }}>
                         <FaTrashAlt size={"1.5rem"}/>
@@ -118,6 +119,7 @@ export default function FlotaPanel() {
                 confirmationLabel="Eliminar"
                 loading={deleting}
             />
+            <Nav />
         </main>
     );
 }

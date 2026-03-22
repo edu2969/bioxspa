@@ -37,6 +37,7 @@ CREATE TABLE direcciones (
 -- Dependencias y Sucursales
 CREATE TABLE dependencias (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sucursal_id UUID REFERENCES sucursales(id) ON DELETE CASCADE,
     nombre VARCHAR(100) NOT NULL,
     tipo INTEGER NOT NULL, -- 1: sucursal, 10: bodega, 11: sucursal_bodega, 20: bodega_proveedor
     direccion_id UUID REFERENCES direcciones(id),
@@ -47,9 +48,8 @@ CREATE TABLE dependencias (
 
 CREATE TABLE sucursales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    codigo_interno INTEGER UNIQUE NOT NULL, -- Para mantener compatibilidad
+    codigo INTEGER UNIQUE NOT NULL, -- Para mantener compatibilidad
     nombre VARCHAR(100) NOT NULL,
-    dependencia_id UUID REFERENCES dependencias(id),
     direccion_id UUID REFERENCES direcciones(id),
     visible BOOLEAN DEFAULT true,
     prioridad INTEGER DEFAULT 0,

@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function GET(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
 
@@ -16,7 +10,7 @@ export async function GET(request) {
             return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
         }
 
-        // Obtener items del catálogo con información completa de subcategoría y categoría
+        const supabase = await getSupabaseServerClient();
         const { data: itemsCatalogo, error: itemsError } = await supabase
             .from("items_catalogo")
             .select(`

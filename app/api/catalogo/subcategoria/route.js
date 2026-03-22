@@ -1,18 +1,32 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
         const { searchParams } = new URL(request.url);
         const categoriaCatalogoId = searchParams.get('id');
         
-        // Construir la consulta con filtro opcional por categoría
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }
+
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.gerente])) {
+            console.warn(`User ${userId} is not a gerente. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User is not a gerente" }, { status: 403 });
+        }
+        
+        const supabase = await getSupabaseServerClient();
         let query = supabase
             .from("subcategorias_catalogo")
             .select(`

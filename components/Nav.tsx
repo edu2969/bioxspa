@@ -12,7 +12,7 @@ import { RESOURCES, ACTIONS } from '@/lib/auth/permissions';
 import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
-import PowerScanView from './prefabs/powerScan/PowerScanView';
+import PowerScanView from './_prefabs/powerScan/PowerScanView';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);

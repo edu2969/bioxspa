@@ -6,28 +6,25 @@ import { AiFillHome } from "react-icons/ai";
 import { FaPlus, FaUserCircle } from "react-icons/fa";
 import { GiMoebiusStar } from "react-icons/gi";
 import { IoIosArrowForward } from "react-icons/io";
-
-const USER_ROLE = {
-    client: 'client',
-    admin: 'admin'
-};
+import { USER_ROLE } from "@/app/utils/constants";
+import Nav from "./Nav";
 
 export default function Accesos() {
-    const [users, setUsers] = useState([]);
+    const [usuarios, setUsuarios] = useState([]);
     
-    async function getUsers() {
+    async function getUsuarios() {
         try {
-            const res = await fetch(`/api/users`)
+            const res = await fetch(`/api/usuarios`)
             const data = await res.json();
-            setUsers(data.users || []);
-            console.log(data.users);
+            setUsuarios(data.usuarios || []);
+            console.log(data.usuarios);
         } catch (error) {
-            console.error('Error fetching users:', error);
+            console.error('Error fetching usuarios:', error);
         }
     }
 
     useEffect(() => {
-        getUsers();
+        getUsuarios();
     }, []);
 
     return (
@@ -49,7 +46,7 @@ export default function Accesos() {
                                     <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" />
                                 </svg>
                             </div>
-                            <input type="text" id="table-search-users" className="block p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg w-80 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Codigo/Nombre" />
+                            <input type="text" id="table-search-usuarios" className="block p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg w-80 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Codigo/Nombre" />
                         </div>
                         <Link href="/modulos/homeneo/usuarios/edicion">
                             <button className="flex w-full justify-center rounded-md bg-ship-cove-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-ship-cove-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
@@ -76,16 +73,17 @@ export default function Accesos() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map(user => (
-                                    <tr key={user.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                {usuarios.map(usuario => (
+                                    <tr key={usuario.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                         <th scope="row" className="flex items-center px-6 py-4 text-gray-900 whitespace-nowrap dark:text-white">
-                                            {user.avatarImg && <Image className="w-10 h-10 rounded-full" src={user.avatarImg} alt={`${user.name} avatar`} width={40} height={40}/>}
-                                            {user.avatarImg === "" && <FaUserCircle className="w-10 h-10 text-slate-400" size="1em" />}
+                                            <Image className="w-10 h-10 rounded-full" src={`/profiles/${usuario.email.split('@')[0].toLowerCase()}.jpg`} alt={`${usuario.nombre} avatar`} width={40} height={40}/>                                            
                                             <div className="ps-3">
                                                 <div className="text-base font-semibold">
-                                                    {user.role === USER_ROLE.client ? <span className="bg-blue-800 rounded-md text-white p-1">CLIENTE</span>
+                                                    {usuario.role !== USER_ROLE.neo ? <span className="bg-blue-800 rounded-md text-white p-1">
+                                                        {Object.keys(USER_ROLE).find(key => USER_ROLE[key] === usuario.role)?.toUpperCase() || "USER"}
+                                                    </span>
                                                         : <GiMoebiusStar size="2em" />}
-                                                    <div className="font-normal text-gray-500">{user.email}</div>{user.name}
+                                                    <div className="font-normal text-gray-500">{usuario.email}</div>{usuario.nombre}
                                                 </div>
                                             </div>
                                         </th>
@@ -96,8 +94,8 @@ export default function Accesos() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <Link href={{
-                                                pathname: "/modulos/homeneo/usuarios/edicion/",
-                                                query: { _id: user.id }
+                                                pathname: "/pages/usuarios/edicion/",
+                                                query: { id: usuario.id }
                                             }}>
                                                 <span className="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit user</span>
                                             </Link>
@@ -109,6 +107,7 @@ export default function Accesos() {
                     </div>
                 </div>
             </div>
+            <Nav />
         </main>
     )
 }

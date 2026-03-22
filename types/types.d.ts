@@ -1,6 +1,6 @@
 import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 import { IDireccion } from "./direccion";
-import { IVentaView } from "@/components/prefabs/types";
+import { IVentaView } from "@/components/_prefabs/types";
 
 export interface IPedidoPorAsignar {
     id: string;

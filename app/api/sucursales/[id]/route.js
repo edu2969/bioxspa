@@ -4,21 +4,20 @@ import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
 
 export async function GET(req, props) {
     try {
-        const supabase = await getSupabaseServerClient();
         console.log(req.url);
         const params = await props.params;
         const { data: authResult } = await getAuthenticatedUser();
-
+        
         if (!authResult || !authResult.userData) {
             return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
-
+        
+        const supabase = await getSupabaseServerClient();
         // Obtener la sucursal con su dirección
         const { data: sucursalData, error: sucursalError } = await supabase
             .from("sucursales")
             .select(`
                 id,
-                codigo_interno,
                 nombre,
                 visible,
                 prioridad,
@@ -37,6 +36,7 @@ export async function GET(req, props) {
             .single();
 
         if (sucursalError || !sucursalData) {
+            console.error("Error fetching sucursal:", sucursalError);
             return NextResponse.json({ error: "Sucursal not found" }, { status: 400 });
         }
 
@@ -55,13 +55,6 @@ export async function GET(req, props) {
                     place_id,
                     latitud,
                     longitud
-                ),
-                cliente:clientes(
-                    id,
-                    nombre,
-                    rut,
-                    telefono,
-                    email
                 ),
                 cargos:cargos(
                     id,

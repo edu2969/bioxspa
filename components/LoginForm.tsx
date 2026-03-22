@@ -6,18 +6,17 @@ import { useForm } from "react-hook-form";
 import Image from "next/image";
 import Loader from "./Loader";
 import { IoAlertCircle } from "react-icons/io5";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginForm() {
   const router = useRouter();
+  const { signIn } = useAuth();
   
   const onError = (errors: any, e: any) => console.log(errors, e);
   const [resolution, setResolution] = useState({ width: 0, height: 0 });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [status, setStatus] = useState("");
-
-  const supabase = getSupabaseBrowserClient();
 
   const {
     register,
@@ -28,17 +27,23 @@ export default function LoginForm() {
   const onSubmit = async (data: any) => {
     setStatus("");
     setIsLoggingIn(true);
+    setRedirecting(false);
     
     try {
       console.log('Intentando login con:', data.email);
-      const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: data.password });
-      if(error) {
-        console.log("ERROR", error);
-        setStatus(error.message);
+      const result = await signIn(data.email, data.password);
+
+      if (!result.success) {
+        const errorMessage = result.error?.message || result.message || "Error en el login";
+        console.log("ERROR", errorMessage);
+        setStatus(errorMessage);
+        setIsLoggingIn(false);
       } else {
         console.log('Login exitoso, redirigiendo...');
+        setIsLoggingIn(false);
         setRedirecting(true);
         router.replace("/pages");
+        router.refresh();
       }
     } catch (error) {
       console.error('Error en onSubmit:', error);
@@ -91,9 +96,9 @@ export default function LoginForm() {
             </div>}
           </div>
           <div>
-            <button type="submit" onSubmit={handleSubmit(onSubmit)} disabled={isLoggingIn}
+            <button type="submit" disabled={isLoggingIn || redirecting}
               className="w-full rounded-md bg-black px-3 py-2 text-lg font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 h-12">
-                {isLoggingIn ? <Loader texto="Validando"/> : redirecting ? <Loader texto="Redirigiendo..."/> : "Entrar"}
+                {redirecting ? <Loader texto="Redirigiendo..."/> : isLoggingIn ? <Loader texto="Validando"/> : "Entrar"}
             </button>
           </div>
         </div>

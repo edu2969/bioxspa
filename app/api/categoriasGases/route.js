@@ -17,7 +17,9 @@ export async function GET() {
         const { data: categorias, error } = await supabase
             .from('categorias_catalogo')
             .select('id, elemento, es_industrial, es_medicinal')
-            .eq('tipo', TIPO_CATEGORIA_CATALOGO.gas);
+            .eq('tipo', TIPO_CATEGORIA_CATALOGO.cilindro);
+
+        console.log("----------->", categorias, error);
 
         if (error) {
             return NextResponse.json({
@@ -26,9 +28,8 @@ export async function GET() {
             }, { status: 500 });
         }
 
-        // Transformar respuesta para mantener compatibilidad con frontend
         const categoriasCompatibles = categorias.map(categoria => ({
-            _id: categoria.id,  // Mantener _id para compatibilidad
+            id: categoria.id,
             elemento: categoria.elemento,
             esIndustrial: categoria.es_industrial,
             esMedicinal: categoria.es_medicinal

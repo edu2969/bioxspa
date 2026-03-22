@@ -1,15 +1,29 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
+import { TIPO_CARGO } from "@/app/utils/constants";
 
 export async function GET() {
     try {
-        const supabase = await getSupabaseServerClient();
-        const { data: authResult } = await getAuthenticatedUser();
-        if (!authResult || !authResult.userData) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
         }
 
-        // Obtener categorías con conteo de subcategorías
+        const { user, userData } = authResult.data;
+        const userId = user.id;
+        const userCargoTypes = (userData.cargos || []).map((cargo) => cargo.tipo);
+        const hasCargo = (allowedCargoTypes) =>
+            userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
+
+        if (!hasCargo([TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])) {
+            console.warn(`User ${userId} does not have the required role. Role: ${userData.role}`);
+            return NextResponse.json({ ok: false, error: "Access denied. User does not have the required role" }, { status: 403 });
+        }
+
+        const supabase = await getSupabaseServerClient();
         const { data: categorias, error } = await supabase
             .from("categorias_catalogo")
             .select(`
@@ -34,7 +48,7 @@ export async function GET() {
 
         // Transformar datos para mantener compatibilidad con frontend
         const categoriasConSubcategorias = categorias.map(categoria => ({
-            _id: categoria.id,
+            id: categoria.id,
             nombre: categoria.nombre,
             descripcion: categoria.descripcion,
             urlImagen: categoria.url_imagen,
@@ -56,13 +70,8 @@ export async function GET() {
 
 export async function POST(request) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
         const body = await request.json();
-        const { _id } = body || {};
+        const { id } = body || {};
 
         // Validación según el esquema
         const requiredFields = ["nombre", "urlImagen"];
@@ -71,6 +80,14 @@ export async function POST(request) {
                 return NextResponse.json({ error: `El campo '${field}' es requerido.` }, { status: 400 });
             }
         }
+
+        const authResult = await getAuthenticatedUser({ requireAuth: true });        
+        if (!authResult.success || !authResult.data) {
+            return NextResponse.json(
+                { ok: false, error: authResult.message || "Usuario no autenticado" },
+                { status: 401 }
+            );
+        }        
 
         // Convertir campos a snake_case para la base de datos
         const categoriaData = {
@@ -86,15 +103,17 @@ export async function POST(request) {
         };
 
         let categoria;
-        if (_id) {
+        const supabase = await getSupabaseServerClient();
+        if (id) {
             // Actualizar existente
             const { data: updatedCategoria, error } = await supabase
                 .from("categorias_catalogo")
                 .update(categoriaData)
-                .eq("id", _id)
+                .eq("id", id)
                 .select()
                 .single();
 
+            console.log("Update result:", { id, updatedCategoria, error });
             if (error) {
                 if (error.code === 'PGRST116') {
                     return NextResponse.json({ error: "Categoría no encontrada." }, { status: 404 });
@@ -120,7 +139,7 @@ export async function POST(request) {
 
         // Transformar respuesta para mantener compatibilidad con frontend
         const response = {
-            _id: categoria.id,
+            id: categoria.id,
             nombre: categoria.nombre,
             descripcion: categoria.descripcion,
             urlImagen: categoria.url_imagen,

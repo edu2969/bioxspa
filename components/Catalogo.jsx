@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import Loader from './Loader';
 import { useForm } from 'react-hook-form';
 import { TIPO_ITEM_CATALOGO } from '@/app/utils/constants';
+import Nav from './Nav';
 
 export default function Catalogo() {
     const [selectedCategoria, setSelectedCategoria] = useState(null);
@@ -31,7 +32,7 @@ export default function Catalogo() {
         setSelectedCategoria(categoria);
         setSelectedSubcategoria(null);
         setItems([]);
-        const response = await fetch(`/api/catalogo/subcategoria?id=${categoria._id}`);
+        const response = await fetch(`/api/catalogo/subcategoria?id=${categoria.id}`);
         const data = await response.json();
         setSubcategorias(data);
         setLoadingSubcategoria(false);
@@ -40,7 +41,7 @@ export default function Catalogo() {
     const handleSubcategoriaClick = async (subcategoria) => {
         setLoadingItems(true);
         setSelectedSubcategoria(subcategoria);
-        const response = await fetch(`/api/catalogo/subcategoria/items?id=${subcategoria._id}`);
+        const response = await fetch(`/api/catalogo/subcategoria/items?id=${subcategoria.id}`);
         const data = await response.json();
         setItems(data);
         setLoadingItems(false);
@@ -89,7 +90,7 @@ export default function Catalogo() {
         setSavingSubcategoria(false);
         if (response.ok) {
             setSubcategorias((prev) =>
-                prev.map((subcat) => (subcat._id === result._id ? result : subcat))
+                prev.map((subcat) => (subcat.id === result.id ? result : subcat))
             );
             setEditingSubcategoria(null);
         }
@@ -109,7 +110,7 @@ export default function Catalogo() {
         setSavingCategoria(false);
         if (response.ok) {
             setCategorias((prev) =>
-                prev.map((cat) => (cat._id === result._id ? result : cat))
+                prev.map((cat) => (cat.id === result.id ? result : cat))
             );
             setEditingCategoria(null);
         }
@@ -431,6 +432,7 @@ export default function Catalogo() {
                     </div>
                 </div>
             )}
+            <Nav />
         </main>
     );
 }

@@ -1,11 +1,19 @@
 import EditVehiculo from "@/components/flota/EditVehiculo";
+import { notFound } from "next/navigation";
 
 interface EditVehiculoPageProps {
-    params: {
+    params: Promise<{
         vehiculoId: string[];
-    };
+    }>;
 }
 
-export default function EditVehiculoPage({ params }: EditVehiculoPageProps) {
-    return <EditVehiculo vehiculoId={params.vehiculoId[0]} />;
+export default async function EditVehiculoPage({ params }: EditVehiculoPageProps) {
+    const { vehiculoId } = await params;
+    const id = vehiculoId?.[0];
+
+    if (!id) {
+        notFound();
+    }
+
+    return <EditVehiculo vehiculoId={id} />;
 }

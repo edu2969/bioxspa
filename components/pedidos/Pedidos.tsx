@@ -9,7 +9,7 @@ import { useAuthorization } from '@/lib/auth/useAuthorization';
 import type { ICliente } from '@/types/cliente';
 import type { INuevaVentaSubmit } from './types';
 import DatosGenerales from './DatosGenerales';
-import ListadoDePrecios from '../prefabs/ListadoDePrecios';
+import ListadoDePrecios from '../_prefabs/ListadoDePrecios';
 import DatosDeTraslado from './DatosDeTraslado';
 import DatosOrdenDeTrabajo from './DatosOrdenDeTrabajo';
 import DatosDelCliente from './DatosDelCliente';

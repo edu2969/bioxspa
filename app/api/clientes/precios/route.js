@@ -85,7 +85,7 @@ export async function GET(req) {
             console.log(`[GET /api/clientes/precios] Searching for clientes and subcategorias with text: ${searchText}`);
             const { data: matchingClientes, error: clientesError } = await supabase
                 .from("clientes")
-                .select("id, nombre, rut, tipo_precio")
+                .select("id, nombre, rut")
                 .or(`nombre.ilike.%${searchText}%,rut.ilike.%${searchText}%`);
 
             if (clientesError) {

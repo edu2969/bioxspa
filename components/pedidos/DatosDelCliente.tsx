@@ -4,11 +4,11 @@ import { INuevaVentaSubmit } from "./types";
 import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Selector } from "../prefabs/Selector";
+import { Selector } from "../_prefabs/Selector";
 import { IDocumentoTributario } from "@/types/documentoTributario";
-import ClientAddressManagerView from "../prefabs/ClientAddressManagerView";
-import ClienteSearchView from "../prefabs/ClienteSearchView";
-import type { IClienteSeachResult } from "../prefabs/types";
+import ClientAddressManagerView from "../_prefabs/ClientAddressManagerView";
+import ClienteSearchView from "../_prefabs/ClienteSearchView";
+import type { IClienteSeachResult } from "../_prefabs/types";
 import Loader from "../Loader";
 import { TIPO_CARGO } from "@/app/utils/constants";
 

@@ -108,8 +108,7 @@ const HomeGerencia = () => {
 
   return (
     <div className="flex h-screen w-full px-6 mt-16 text-blue-900 overflow-y-auto">
-      <div className="w-1/3">
-        {/* ... */}
+      <div className="w-1/3">        
         <div className="w-full mt-4 text-blue-900 shadow-md rounded-md p-6">
           <div className="relative">
             <p className="rounded-full bg-red-500 text-white text-xs p-1 w-6 h-6 text-center absolute ml-4 -top-1 left-2">3</p>

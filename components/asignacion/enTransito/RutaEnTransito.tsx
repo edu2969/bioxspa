@@ -1,5 +1,5 @@
 import { TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
-import VehiculoView from "@/components/prefabs/VehiculoView";
+import VehiculoView from "@/components/_prefabs/VehiculoView";
 import useVehicleScaling from "@/components/uix/useVehicleScaling";
 import { ICilindroView, IRutaEnTransito, IRutasEnTransitoResponse, IVentaEnTransito } from "@/types/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

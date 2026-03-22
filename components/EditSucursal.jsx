@@ -16,8 +16,9 @@ import { TbBadges, TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 import Image from 'next/image';
 import { IoChevronBack } from 'react-icons/io5';
+import { GoogleMapsProvider } from './maps/GoogleMapProvider';
 
-export default function EditSucursal({ googleMapsApiKey }) {
+export default function EditSucursal() {
     const params = useSearchParams();
     const router = useRouter();
     const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm();
@@ -38,10 +39,10 @@ export default function EditSucursal({ googleMapsApiKey }) {
 
     const fetchUsuarios = async () => {
         try {
-            const response = await fetch('/api/users');
+            const response = await fetch('/api/usuarios');
             const data = await response.json();
-            if (data.users != undefined) {
-                setUsers(data.users);
+            if (data.usuarios != undefined) {
+                setUsers(data.usuarios);
             } else {
                 console.error("Error fetching usuarios:", data.error);
             }
@@ -50,10 +51,10 @@ export default function EditSucursal({ googleMapsApiKey }) {
         }
     };
 
-    const getUserAvatarFromUserId = (userId) => {
-        const user = users.find(user => user._id === userId);
-        if (user) {
-            return `/profiles/${user.email.split('@')[0].toLowerCase()}.jpg`;
+    const getUsuarioAvatarFromUsuarioId = (usuarioId) => {
+        const usuario = users.find(usuario => usuario.id === usuarioId);
+        if (usuario) {
+            return `/profiles/${usuario.email.split('@')[0].toLowerCase()}.jpg`;
         }
         return '/profiles/undefined.jpg';
     }
@@ -174,11 +175,11 @@ export default function EditSucursal({ googleMapsApiKey }) {
         const values = getValues();
         const cargo = {
             tipo: values[`newCargoDependenciaTipo`],
-            user: users.find(user => user.name === values[`newCargoDependenciaUsuario`]),
-            userId: users.find(user => user.name === values[`newCargoDependenciaUsuario`])?._id,
+            usuario: users.find(user => user.nombre === values[`newCargoDependenciaUsuario`]),
+            usuarioId: users.find(user => user.nombre === values[`newCargoDependenciaUsuario`])?.id,
             desde: values[`newCargoDependenciaDesde`],
             hasta: values[`newCargoDependenciaHasta`],
-            dependenciaId: dependencias[editingCargoDependenciaParentIndex]._id,
+            dependenciaId: dependencias[editingCargoDependenciaParentIndex].id,
         };
         const updatedDependencias = [...dependencias];
         if (editingCargoDependenciaIndex < updatedDependencias[editingCargoDependenciaParentIndex].cargos.length) {
@@ -195,8 +196,8 @@ export default function EditSucursal({ googleMapsApiKey }) {
         const values = getValues();
         const cargo = {
             tipo: values[`newCargoSucursalTipo`],
-            user: users.find(user => user.name === values[`newCargoSucursalUsuario`]),
-            userId: users.find(user => user.name === values[`newCargoSucursalUsuario`])?._id,
+            usuario: users.find(user => user.nombre === values[`newCargoSucursalUsuario`]),
+            usuarioId: users.find(user => user.nombre === values[`newCargoSucursalUsuario`])?.id,
             desde: values[`newCargoSucursalDesde`],
             hasta: values[`newCargoSucursalHasta`],
             sucursalId: params.get("id"),
@@ -210,7 +211,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
         setEditingCargoSucursalIndex(null);
     }
 
-    return (
+    return (<GoogleMapsProvider>
         <main className="w-full h-screen pt-3">
             <div className="ml-24">
                     <button
@@ -247,7 +248,6 @@ export default function EditSucursal({ googleMapsApiKey }) {
                         <div className="w-6/12">
                             <label htmlFor="direccion" className="block text-sm font-medium text-gray-700">Dirección</label>
                             <Autocomplete
-                                apiKey={googleMapsApiKey}
                                 onPlaceSelected={(place) => {
                                     console.log("DIRECCION", place);
                                     setValue("direccion", place.formatted_address);
@@ -288,13 +288,13 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                     <div className="w-full flex flex-col justify-center items-center m-auto h-24 rounded-full">
                                                         <div className="relative w-full text-center flex flex-col items-center">
                                                             <Image
-                                                                src={getUserAvatarFromUserId(cargo.userId)}
+                                                                src={getUsuarioAvatarFromUsuarioId(cargo.usuario.id)}
                                                                 alt="avatar"
                                                                 className="w-20 h-20 rounded-full"
                                                                 onClick={() => {
                                                                     if (editingCargoSucursalIndex != null && editingCargoSucursalIndex !== idx) return;
                                                                     setEditingCargoSucursalIndex(idx);
-                                                                    setValue(`newCargoSucursalUsuario`, cargo.user?.name || '');
+                                                                    setValue(`newCargoSucursalUsuario`, cargo.usuario?.name || '');
                                                                     setValue(`newCargoSucursalTipo`, cargo.tipo);
                                                                     setValue(`newCargoSucursalDesde`, cargo.desde);
                                                                     setValue(`newCargoSucursalHasta`, cargo.hasta);
@@ -316,7 +316,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                 <MdDeleteForever className="text-lg border border-gray-400 rounded-full" size="1.5rem" />
                                                             </span>
                                                         </div>
-                                                        <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.user.name.split(" ").slice(0, 2).join(" ")}</span>
+                                                        <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.usuario.nombre.split(" ").slice(0, 2).join(" ")}</span>
                                                     </div>
                                                 </div>
                                             ))}
@@ -635,14 +635,14 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                         if (editingCargoDependenciaIndex === null || editingCargoDependenciaParentIndex !== index) {
                                                                             setEditingCargoDependenciaIndex(idx);
                                                                             setEditingCargoDependenciaParentIndex(index);
-                                                                            setValue(`newCargoDependenciaUsuario`, cargo.user.name);
+                                                                            setValue(`newCargoDependenciaUsuario`, cargo.usuario.nombre);
                                                                             setValue(`newCargoDependenciaTipo`, cargo.tipo);                                                                            
                                                                         }
                                                                     }}>
                                                                     <div className="w-full flex flex-col justify-center items-center m-auto h-24 rounded-full">
                                                                         <div className="relative w-full text-center flex flex-col items-center">
                                                                             <Image
-                                                                                src={getUserAvatarFromUserId(cargo.userId)}
+                                                                                src={getUsuarioAvatarFromUsuarioId(cargo.usuario.id)}
                                                                                 alt="avatar"
                                                                                 className="w-20 h-20 rounded-full"
                                                                                 width={56} height={56}
@@ -663,7 +663,7 @@ export default function EditSucursal({ googleMapsApiKey }) {
                                                                             }}>
                                                                                 <MdDeleteForever className="border border-gray-400 rounded-full" size="1.5rem" />
                                                                             </span>
-                                                                            <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.user.name.split(" ").slice(0, 2).join(" ")}</span>
+                                                                            <span className="mt-2 font-bold text-xs text-center overflow-ellipsis">{cargo.usuario.nombre.split(" ").slice(0, 2).join(" ")}</span>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -867,5 +867,5 @@ export default function EditSucursal({ googleMapsApiKey }) {
             <ConfirmModal show={showModal} confirmationLabel={"Eliminar"} title={"Eliminar Dependencia"}
                 confirmationQuestion={`¿Estás seguro de eliminar la dependencia ${showModal && dependencias[selectedIndex]?.nombre}?`} onClose={() => setShowModal(false)} onConfirm={handleDelete} />
         </main>
-    );
+    </GoogleMapsProvider>);
 }

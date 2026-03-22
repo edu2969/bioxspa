@@ -5,7 +5,7 @@ import { TIPO_CHECKLIST_ITEM, TIPO_CARGO } from "@/app/utils/constants";
 import { AiOutlineClose } from "react-icons/ai";
 import Loader from "../Loader";
 import { IoIosArrowBack } from "react-icons/io";
-import type { IChecklistAnswer } from "../prefabs/types";
+import type { IChecklistAnswer } from "../_prefabs/types";
 import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

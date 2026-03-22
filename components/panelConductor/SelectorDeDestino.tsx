@@ -4,7 +4,7 @@ import { TIPO_ORDEN } from "@/app/utils/constants";
 import { FaMapLocationDot, FaTruckFast } from "react-icons/fa6";
 import { BsFillGeoAltFill } from "react-icons/bs";
 import { useForm } from "react-hook-form";
-import { Selector } from "../prefabs/Selector";
+import { Selector } from "../_prefabs/Selector";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Loader from "../Loader";
 import { FaFlagCheckered } from "react-icons/fa";

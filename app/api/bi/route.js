@@ -35,7 +35,7 @@ export async function GET(req) {
 
         const MainPanel = (branches || []).map(branch => ({
             nombre: branch.nombre,
-            _id: branch.id,
+            id: branch.id,
             tipo: undefined,
             totalVentas: 0,
             deudaTotal: 0,
@@ -64,7 +64,7 @@ export async function GET(req) {
                     monto_arrendado,
                     cliente:clientes(nombre, rut)
                 `)
-                .eq("sucursal_id", panel._id)
+                .eq("sucursal_id", panel.id)
                 .eq("periodo", "M")
                 .gt("monto_adeudado", 0)
                 .gte("fecha", sixMonthsAgo)

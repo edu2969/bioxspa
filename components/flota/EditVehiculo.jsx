@@ -20,16 +20,16 @@ export default function EditVehiculo({ vehiculoId }) {
         console.log("vehiculoId:", vehiculoId);
         if (vehiculoId) {
             setLoading(true);
-            fetch(`/api/flota/${vehiculoId}`)
+            fetch(`/api/flota/byId/${vehiculoId}`)
                 .then(res => res.json())
                 .then(data => {
                     console.log("DATA", data);
                     setVehiculo(data.vehiculo);
                     Object.entries(data.vehiculo).forEach(([key, value]) => {
-                        if (typeof value === "object" && value !== null && value._id) {
-                            setValue(key, value._id);
+                        if (typeof value === "object" && value !== null && value.id) {
+                            setValue(key, value.id);
                         } else if (key === "choferIds" && Array.isArray(value)) {
-                            setValue(key, value.map(v => v?._id || v));
+                            setValue(key, value.map(v => v?.id || v));
                         } else if (key === "posicionActual" && value) {
                             setValue("latitud", value.latitud ?? "");
                             setValue("longitud", value.longitud ?? "");

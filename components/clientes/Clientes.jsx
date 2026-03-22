@@ -12,9 +12,10 @@ import { MdAddLocationAlt } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { IoChevronBack } from "react-icons/io5";
 import toast, { Toaster } from 'react-hot-toast';
+import { GoogleMapsProvider } from "../maps/GoogleMapProvider";
 
 // Direcciones de despacho editor
-export default async function Clientes() {
+export default function Clientes() {
     const [loadingClients, setLoadingClients] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState([]);
     const [clienteSelected, setClienteSelected] = useState(null);
@@ -25,8 +26,8 @@ export default async function Clientes() {
     const router = useRouter();
     const scrollRef = useRef(null);
     const [saving, setSaving] = useState(false);
-    const searchParams = await useSearchParams();
     const [loadingCliente, setLoadingCliente] = useState(false);
+    const searchParams = useSearchParams();
     const clienteId = searchParams.get("id");
 
     // Abre el modal y carga los datos de la dirección seleccionada
@@ -34,7 +35,7 @@ export default async function Clientes() {
         const dir = direccionesDespacho[idx] || {};
         setDireccionEdit({
             direccionId: {
-                nombre: dir.direccionId.nombre || "",
+                nombre: dir.direccionId.direccionCliente || "",
                 latitud: dir.direccionId.latitud ?? -33.45,
                 longitud: dir.direccionId.longitud ?? -70.65,
             },
@@ -212,7 +213,7 @@ export default async function Clientes() {
                                                     className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                     onClick={async () => {
                                                         setLoadingCliente(true);
-                                                        const clienteResp = await fetch(`/api/clientes?id=${cliente._id}`);
+                                                        const clienteResp = await fetch(`/api/clientes?id=${cliente.id}`);
                                                         const clienteData = await clienteResp.json();
                                                         if (clienteResp.ok && clienteData.ok) {
                                                             console.log("DATA CLIENTE", clienteData.cliente);
@@ -382,11 +383,13 @@ export default async function Clientes() {
 
                             <div className={`w-full flex transition-all ease-linear ${direccionEditIdx !== null ? 'h-96' : 'h-0'} overflow-hidden`}>
                                 <div className="w-2/3 h-80">
-                                    <MapWithDraggableMarker
-                                        lat={direccionEdit?.direccionId?.latitud ?? 0}
-                                        lng={direccionEdit?.direccionId?.longitud ?? 0}
-                                        onMarkerChange={handleMapMarkerChange}
-                                    />
+                                    <GoogleMapsProvider>
+                                        <MapWithDraggableMarker
+                                            lat={direccionEdit?.direccionId?.latitud ?? 0}
+                                            lng={direccionEdit?.direccionId?.longitud ?? 0}
+                                            onMarkerChange={handleMapMarkerChange}
+                                        />
+                                    </GoogleMapsProvider>
                                 </div>
                                 <div className="w-1/3 pl-4">
                                     <div className="gap-4">                                        

@@ -5,7 +5,7 @@ import { IUser } from "@/types/user";
 import { useQuery } from "@tanstack/react-query";
 import { ISucursal } from "@/types/sucursal";
 import { INuevaVentaSubmit } from "./types";
-import { Selector } from "../prefabs/Selector";
+import { Selector } from "../_prefabs/Selector";
 import { UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { useEffect } from "react";

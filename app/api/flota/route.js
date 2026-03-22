@@ -3,11 +3,11 @@ import { getSupabaseServerClient } from "@/lib/supabase";
 
 // Obtener todos los vehículos
 export async function GET() {
-    const supabase = getSupabaseServerClient();
+    const supabase = await getSupabaseServerClient();
     // Fetch all vehicles from Supabase
     const { data: vehiculos, error } = await supabase
         .from('vehiculos')
-        .select('id, marca, modelo, patente, chofer_ids');
+        .select('id, marca, modelo, patente');
 
     if (error) {
         console.error('Error fetching vehiculos:', error);
@@ -20,14 +20,14 @@ export async function GET() {
 // Actualiza o crea un vehículo
 export async function POST(request) {
     const data = await request.json();
-    const { _id, ...vehiculoData } = data;
+    const { id, ...vehiculoData } = data;
 
     try {
-        if (_id) {
+        if (id) {
             const { data: vehiculo, error } = await supabase
                 .from('vehiculos')
                 .update(vehiculoData)
-                .eq('id', _id)
+                .eq('id', id)
                 .select('*')
                 .single();
 

@@ -4,21 +4,14 @@ import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 // Se obtiene el vehículo por ID y sus choferes asociados
 export async function GET(request, { params }) {
     try {
-        const { user } = await getAuthenticatedUser();
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-        }
-
-        console.log("params:", params);
-        
-        const { id } = params; // id es un array por [...id]
+        const { id } = await params; // id es un array por [...id]
         const vehiculoId = Array.isArray(id) ? id[0] : id;
 
         if (!vehiculoId) {
             return NextResponse.json({ error: "ID de vehículo no proporcionado" }, { status: 400 });
         }
 
-        // Buscar el vehículo por ID con relaciones
+        const supabase = await getSupabaseServerClient();
         const { data: vehiculo, error: vehiculoError } = await supabase
             .from("vehiculos")
             .select(`
@@ -46,6 +39,7 @@ export async function GET(request, { params }) {
             .single();
 
         if (vehiculoError || !vehiculo) {
+            console.log("Vehículo no encontrado:", vehiculoError);
             return NextResponse.json({ error: "Vehículo no encontrado" }, { status: 404 });
         }
 
@@ -56,12 +50,7 @@ export async function GET(request, { params }) {
                 conductor:usuarios(
                     id,
                     nombre,
-                    email,
-                    role_legacy,
-                    active,
-                    persona_id,
-                    created_at,
-                    updated_at
+                    email
                 )
             `)
             .eq("vehiculo_id", vehiculoId);

@@ -1,5 +1,5 @@
 import Clientes from "@/components/clientes/Clientes";
 
-export default async function ClientesPage() {
+export default function ClientesPage() {
     return <Clientes/>;
 }

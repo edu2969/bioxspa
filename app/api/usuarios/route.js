@@ -5,9 +5,9 @@ import bcrypt from "bcryptjs";
 export async function GET() {
   try {
     console.log("Getting all users from Supabase...");
-    
+    const supabase = await getSupabaseServerClient();
     const { data: usuarios, error } = await supabase
-      .from('usuarios')
+      .from("usuarios")
       .select('*')
       .order('created_at', { ascending: false });
     
@@ -25,6 +25,7 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const supabase = await getSupabaseServerClient();
     const params = await req.json();
     console.log("Users POST to Supabase...", params);
 
