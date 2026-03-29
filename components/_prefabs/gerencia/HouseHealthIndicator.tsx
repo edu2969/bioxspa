@@ -1,11 +1,10 @@
 import { TIPO_DEPENDENCIA } from "@/app/utils/constants";
 import BarChart from "@/components/charts/BarChart";
-import GaugesView from "@/components/_prefabs/gerencia/GaugesView";
-import RentabilityIndicator from "@/components/_prefabs/gerencia/RentabilityIndicator";
 import { CiBellOn } from "react-icons/ci";
 import { FaWhatsappSquare } from "react-icons/fa";
 import { IoSettingsSharp } from "react-icons/io5";
 import { RiHomeOfficeFill } from "react-icons/ri";
+import MainActionsPanel from "./MainActionsPanel";
 
 interface HouseHealthIndicatorProps {
 	branch: any;
@@ -31,24 +30,50 @@ export default function HouseHealthIndicator({
 	onToggleMessages,
 }: HouseHealthIndicatorProps) {
 	return (
-		<div
-			key={index}
-			className="absolute w-full h-screen transition-all duration-500"
-			style={getBoxStyles(index)}
-		>
-			<div className="relative w-full h-full bg-white rounded-lg p-4">
-				<RiHomeOfficeFill className="relative ml-4 -top-0.5" size="14.1rem" />
+		<div key={index}
+			className={`absolute w-full h-screen transition-all duration-500 ${getBoxStyles(index)}`}>
 
-				<div className="absolute top-12 left-20 w-8 h-40 flex flex-col justify-end">
-					{Array.from({ length: 7 }).map((_, i) => (
-						<div
-							key={`segmento_${index}_${i}`}
-							className={`w-full h-3 mb-1 ${i < (7 - branch.estado) ? "bg-white" : stateColors[branch.estado + 1]} ${i === 6 ? "rounded-bl-md" : ""}`}
-						/>
-					))}
+				<div>				
+					<div className="flex items-center">
+						<div className="flex hover:bg-slate-600 hover:text-white rounded-lg px-2 cursor-pointer ml-12" onClick={() => onBranchClick(index)}>
+							<IoSettingsSharp size="1.5rem" className="text-white mt-1 mr-2" />
+							<span className="text-2xl font-bold uppercase">{branch.nombre}</span>
+						</div>
+						<div className="flex ml-4">
+							<div className="relative hover:scale-125 cursor-pointer" onClick={onToggleNotifications}>
+								<CiBellOn size="2rem" />
+								<div className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+									4
+								</div>
+							</div>
+							<div className="relative ml-2 hover:scale-125 cursor-pointer" onClick={onToggleMessages}>
+								<FaWhatsappSquare className="text-green-600" size="2rem" />
+								<div className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+									9
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<RiHomeOfficeFill className="relative ml-5 md:ml-4 top-0 md:-top-0.5 text-9xl md:text-[14.1rem]" />	
+
+					<div className="absolute top-20 md:top-16 left-12 md:left-16 w-5 md:w-8 h-16 md:h-40 flex flex-col justify-end">
+						{Array.from({ length: 7 }).map((_, i) => (
+							<div
+								key={`segmento_${index}_${i}`}
+								className={`w-full h-3 mb-1 ${i < (7 - branch.estado) ? "bg-gray-300" : stateColors[branch.estado + 1]} ${i === 6 ? "rounded-bl-md" : ""}`}
+							/>
+						))}
+					</div>						
+                                    
+				
 				</div>
 
-				<RentabilityIndicator rentabilidad={branch.rentabilidad} />
+				{branchSelected !== null && <div className="w-80 h-36 ml-4">
+					<MainActionsPanel visible={branchSelected !== null} />
+				</div>}
+
+							
 
 				{branch.tipo == TIPO_DEPENDENCIA.sucursal && (
 					<div className="absolute flex top-16 left-72 font-bold">
@@ -90,27 +115,6 @@ export default function HouseHealthIndicator({
 					</div>
 				)}
 
-				<div className="absolute top-4 left-56 flex items-center">
-					<div className="flex hover:bg-slate-600 hover:text-white rounded-lg px-2 cursor-pointer" onClick={() => onBranchClick(index)}>
-						<IoSettingsSharp size="1.5rem" className="text-white mt-1 mr-2" />
-						<span className="text-2xl font-bold uppercase">{branch.nombre}</span>
-					</div>
-					<div className="flex ml-4">
-						<div className="relative hover:scale-125 cursor-pointer" onClick={onToggleNotifications}>
-							<CiBellOn size="2rem" />
-							<div className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-								4
-							</div>
-						</div>
-						<div className="relative ml-2 hover:scale-125 cursor-pointer" onClick={onToggleMessages}>
-							<FaWhatsappSquare className="text-green-600" size="2rem" />
-							<div className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-								9
-							</div>
-						</div>
-					</div>
-				</div>
-
 				{branch.tipo == TIPO_DEPENDENCIA.sucursal && (
 					<div className={`absolute bottom-0 right-16 ${branchSelected !== null ? "w-[640px] h-[520px]" : ""}`}>
 						<BarChart
@@ -120,9 +124,6 @@ export default function HouseHealthIndicator({
 						/>
 					</div>
 				)}
-
-				<GaugesView branch={branch} />
-			</div>
 		</div>
 	);
 }

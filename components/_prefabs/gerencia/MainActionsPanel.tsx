@@ -11,7 +11,7 @@ export default function MainActionsPanel({ visible }: MainActionsPanelProps) {
 	}
 
 	return (
-		<div className="absolute top-24 left-72 bg-white rounded-md p-4 border border-gray-300">
+		<div className="w-full h-full bg-white rounded-md p-4 border border-gray-300">
 			<span className="position relative -top-7 text-xs font-bold mb-2 bg-white px-2 text-gray-400">ACCIONES RAPIDAS</span>
 			<Link href="/modulos/pedidos/nuevo" className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
 				<TbShoppingBagPlus size="1.5rem" className="mr-2" />

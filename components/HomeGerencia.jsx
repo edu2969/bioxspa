@@ -9,6 +9,7 @@ import Loader from "./Loader";
 import HouseHealthIndicator from "@/components/_prefabs/gerencia/HouseHealthIndicator";
 import MainActionsPanel from "@/components/_prefabs/gerencia/MainActionsPanel";
 import MapCilinderMasterView from "@/components/_prefabs/gerencia/MapCilinderMasterView";
+import RentabilityIndicator from "./_prefabs/gerencia/RentabilityIndicator";
 
 const stateColors = [
     "bg-white",
@@ -162,69 +163,62 @@ export default function HomeGenerencia() {
 
     const getBoxStyles = (index) => {
         if (branchSelected === index) {
-            return {
-                width: '100%',
-                height: '100%',
-                transform: 'translate(0, 0)',
-            };
+            return 'transform-none w-1/2 h-1/2 md:w-full md:h-full';
         } else if (branchSelected !== null) {
             const translateMap = [
-                'translate(-100%, -100%)',
-                'translate(100%, -100%)',
-                'translate(-100%, 100%)',
-                'translate(100%, 200%)',
+                'translate-x-0 translate-y-0',
+                'translate-y-1/2 translate-x-0',
+                'translate-x-0 translate-y-full',
+                'translate-x-full translate-y-full',
             ];
-            return {
-                width: '50%',
-                height: '50vh',
-                transform: translateMap[index],
-            };
+            return 'w-1/2 h-1/2 ' + translateMap[index];
         } else {
             const translateMap = [
-                'translate(0, 0)',
-                'translate(100%, 0)',
-                'translate(0, 100%)',
-                'translate(100%, 100%)',
+                'translate-x-0 translate-y-0',
+                'translate-y-1/2 translate-x-0',
+                'translate-x-0 translate-y-full',
+                'translate-x-full translate-y-full',
             ];
-            return {
-                width: '50%',
-                height: '50vh',
-                transform: translateMap[index],
-            };
+            return 'w-1/2 h-1/2 ' + translateMap[index];
         }
     };
 
     return (
-        <main className="mt-4 h-screen overflow-y-auto">
+        <main className="w-full h-screen overflow-y-auto">
             <div className={`absolute w-full h-full`}>
-                {branches && branches.map((branch, index) => (
-                    <HouseHealthIndicator
-                        key={index}
-                        branch={branch}
-                        index={index}
-                        branchSelected={branchSelected}
-                        stateColors={stateColors}
-                        getBoxStyles={getBoxStyles}
-                        onDebtClick={handleDebtClick}
-                        onBranchClick={handleBranchClick}
-                        onToggleNotifications={handleToggleNotifications}
-                        onToggleMessages={handleToggleMessages}
-                    />
-                ))}
+
+                <div className="w-full md:w-1/2 flex flex-col md:flex-row h-full mt-6">
+                    
+                        {branches && branches.map((branch, index) => (
+                            (branchSelected == null || branchSelected === index) && (                                
+                                <HouseHealthIndicator
+                                    key={index}
+                                    branch={branch}
+                                    index={index}
+                                    branchSelected={branchSelected}
+                                    stateColors={stateColors}
+                                    getBoxStyles={getBoxStyles}
+                                    onDebtClick={handleDebtClick}
+                                    onBranchClick={handleBranchClick}
+                                    onToggleNotifications={handleToggleNotifications}
+                                    onToggleMessages={handleToggleMessages}
+                                />
+                            )))}
+                </div>
 
                 {branchSelected !== null && (
-                    <div className="absolute bottom-24 left-4">
-                        <div className="w-full">
-                            {["VENDIDO", "PRODUCIDO", "ARRIENDO", "O2", "At", "Ar", "Al", "Ac"].map((category, i) => (
+                    <div className="absolute bottom-20 md:bottom-16 left-0 md:left-4 scale-75 md:scale-100 -translate-x-10">
+                        <div className="w-full ml-10">
+                            {["VENTA", "PRODUCIDO", "ARRIENDO", "O2", "At", "Ar", "Al", "Ac"].map((category, i) => (
                                 <button
                                     key={`chip_${category}_${i}`}
-                                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-0 mr-1 px-4 rounded-md"
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-0 mr-1 px-4 rounded-md mb-1.5 text-sm"
                                 >
                                     {category}
                                 </button>
                             ))}
                         </div>
-                        <div className="flex">
+                        <div className="flex flex-wrap w-full">
                             {Array.from({ length: 3 }).map((_, i) => (
                                 <Gaugue
                                     key={`gaugue_${i}`}
@@ -238,19 +232,21 @@ export default function HomeGenerencia() {
                     </div>
                 )}
 
-                <MainActionsPanel visible={branchSelected !== null} />
+                {branchSelected != null && (<RentabilityIndicator rentabilidad={branchSelected.rentabilidad} />)}
 
-                <MapCilinderMasterView
-                    visible={branchSelected !== null}
-                    mapData={mapData}
-                    categorias={categorias}
-                    selectedCategoryIds={selectedCategoryIds}
-                    onToggleCategory={handleToggleCategory}
-                    propios={propios}
-                    onTogglePropios={handleTogglePropios}
-                    llenos={llenos}
-                    onToggleLlenos={handleToggleLlenos}
-                />
+                <div className="absolute top-56 md:top-0 right-0 mt-16 w-3/5 md:w-1/2 md:mr-8">
+                    <MapCilinderMasterView
+                        visible={branchSelected !== null}
+                        mapData={mapData}
+                        categorias={categorias}
+                        selectedCategoryIds={selectedCategoryIds}
+                        onToggleCategory={handleToggleCategory}
+                        propios={propios}
+                        onTogglePropios={handleTogglePropios}
+                        llenos={llenos}
+                        onToggleLlenos={handleToggleLlenos}
+                    />
+                </div>
 
                 {branchSelected !== null && graficoGases != null && (loadingMultilinea ? <Loader /> :
                     <div className="absolute top-24 left-72 w-[600px] h-[320px]">

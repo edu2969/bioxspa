@@ -15,15 +15,6 @@ const REGION_BIOBIO_BOUNDS = {
     east: -71.5,
 };
 
-const MAP_CONTAINER_STYLE = {
-    width: "100%",
-    height: "100%",
-    minHeight: "400px",
-    position: "absolute",
-    top: 0,
-    left: 0,
-};
-
 const MAP_OPTIONS = {
     mapTypeId: "roadmap",
     streetViewControl: false,
@@ -92,18 +83,19 @@ export default function MapaCilindros({ data }) {
     }, [getBounds, zoomedCluster, isLoaded, mapRef]);
 
     return (
-        <div className="w-full h-full relative" style={{ minHeight: 400 }}>
+        <div className="w-full h-full">
             {!isLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
                     <span className="text-lg font-bold">Cargando mapa...</span>
                 </div>
             )}
             {isLoaded && (
-                <>
+                <div className="w-full h-full">
                     <GoogleMap
-                        mapContainerStyle={MAP_CONTAINER_STYLE}
                         options={MAP_OPTIONS}
+                        mapContainerStyle={{ width: "100%", height: "100%" }}
                         zoom={8}
+                        
                         center={
                             !zoomedCluster
                                 ? { lat: -37.0, lng: -72.7 }
@@ -118,7 +110,7 @@ export default function MapaCilindros({ data }) {
                         {!zoomedCluster && data 
                             && data.map((cliente) => (
                                 <Marker
-                                    key={cliente._id}
+                                    key={cliente.id}
                                     position={{ lat: cliente.direccionId.latitud, lng: cliente.direccionId.longitud }}
                                     label={{
                                         text: cliente.llenos.toString(),
@@ -204,7 +196,7 @@ export default function MapaCilindros({ data }) {
                             </button>
                         </div>
                     )}
-                </>
+                </div>
             )}
         </div>
     );

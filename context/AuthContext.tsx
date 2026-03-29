@@ -320,6 +320,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const loadUserData = async (userId: string): Promise<AuthResult<User>> => {
     try {
+      console.log("-----------------> voy por acá")
       // Obtener usuario básico
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
@@ -471,6 +472,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const initAuth = async () => {
+      console.log("----------> initAuth ejecutado");
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -575,7 +577,7 @@ export function useRequireAuth() {
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/');
-    }
+    } else router.replace('/pages');
   }, [user, loading, router]);
 
   return { user, loading };

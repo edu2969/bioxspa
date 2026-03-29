@@ -11,7 +11,7 @@ export default function GaugesView({ branch }: GaugesViewProps) {
 	}
 
 	return (
-		<div className="absolute flex bottom-4 right-4 bg-green-50 shadow-md rounded-md p-4">
+		<div className="absolute flex bottom-4 left-0 md:right-4 bg-green-50 shadow-md rounded-md p-4">
 			<div className="flex text-green-700">
 				<TbMoneybag size="2.1em" className="mr-2 mt-2" />
 				<div>
