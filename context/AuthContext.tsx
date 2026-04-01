@@ -320,13 +320,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const loadUserData = async (userId: string): Promise<AuthResult<User>> => {
     try {
-      console.log("-----------------> voy por acá")
+      console.log("-----------------> voy por acá", userId);
       // Obtener usuario básico
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
         .select('id, email, nombre')
         .eq('id', userId)
         .single();
+
+        if(userError) {
+          console.warn('⚠️ Error consultando datos de usuario en BD:', userError);
+          throw userError;
+        }
 
       // Obtener cargos activos por separado
       const { data: cargosData, error: cargosError } = await supabase
@@ -341,6 +346,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .eq('usuario_id', userId)
         .eq('activo', true)
         .is('hasta', null);
+
+      if(cargosError) {
+        console.warn('⚠️ Error consultando cargos de usuario en BD:', cargosError);
+        throw cargosError;
+      }
 
       // Obtener información de sesión en paralelo
       const { data: sessionData } = await supabase.auth.getSession();

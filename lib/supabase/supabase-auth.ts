@@ -117,6 +117,7 @@ export async function getAuthenticatedUser(
     
     if (error) {
       console.warn('❌ Error de autenticación:', error.message);
+      console.warn('⚠️ data:', data);
       return {
         success: false,
         data: null,

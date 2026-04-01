@@ -82,14 +82,27 @@ export async function GET(request) {
 
         const dependenciaIds = dependencias.map((d) => d.id);
 
-        // Obtener cargos de conductores
+        const { data: rutasActivas, error: rutasError } = await supabase
+            .from("rutas_despacho")
+            .select("id, conductor_id")
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada)
+            .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso)
+            .in("dependencia_id", dependenciaIds);
+
+        if(rutasError) {
+            console.error("Error fetching active routes:", rutasError);
+            return NextResponse.json({ ok: false, error: "Error fetching active routes" }, { status: 500 });
+        }
+
+        const conductoresActivos = rutasActivas ? rutasActivas.map((ruta) => String(ruta.conductor_id)) : [];
         const { data: cargosChoferes, error: cargosError } = await supabase
             .from("cargos")
             .select("usuario_id")
             .eq("tipo", TIPO_CARGO.conductor)
-            .or(`sucursal_id.eq.${sucursal.id},dependencia_id.in.(${dependenciaIds.join(",")})`);
+            .not("usuario_id", "in", `(${conductoresActivos.length > 0 ? conductoresActivos.join(",") : ""})`);
 
         if (cargosError) {
+            console.log("Error fetching cargos de conductores:", cargosError);
             return NextResponse.json({ ok: false, error: cargosError.message }, { status: 500 });
         }
 
@@ -122,7 +135,7 @@ export async function GET(request) {
                     const { data: rutaVentas, error: rutaVentasError } = await supabase
                         .from("ruta_despacho_ventas")
                         .select("venta_id")
-                        .eq("ruta_despacho_id", rutaDespacho.id);                    
+                        .eq("ruta_despacho_id", rutaDespacho.id);
 
                     if (rutaVentasError) {
                         console.error(`[GET /api/pedidos/asignacion/conductores] Error fetching ventas for ruta ID ${rutaDespacho.id}:`, rutaVentasError);

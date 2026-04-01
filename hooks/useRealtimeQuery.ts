@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { useOnVisibilityChange } from "./useOnVisibilityChange";
 
 type UseRealtimeQueryOptions = {
   channelName: string;
@@ -23,7 +24,7 @@ export function useRealtimeQuery({
   enabled = true,
 }: UseRealtimeQueryOptions) {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const queryKeysRef = useRef(queryKeys);
   const lastStatusRef = useRef<string | null>(null);
 
@@ -40,8 +41,9 @@ export function useRealtimeQuery({
     const normalizedFilter = filter?.trim();
 
     const channel = supabase
-      .channel(channelName)
-      .on(
+      .channel(channelName);
+
+    channel.on(
         "postgres_changes",
         {
           event,
@@ -72,7 +74,10 @@ export function useRealtimeQuery({
         }
 
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn(`[Realtime] Channel ${channelName} status: ${status}`);
+          console.warn(`[Realtime] Channel ${channelName} status: ${status}`);     
+          supabase.removeChannel(channel);     
+          channel.subscribe();
+          console.log(`[Realtime] Channel ${channelName} re-subscribed after error/timeout.`);
         }
       });
 

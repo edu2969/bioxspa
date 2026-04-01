@@ -36,11 +36,14 @@ export async function GET() {
                 .from('ventas')
                 .select('estado, direccion_despacho_id')
                 .gte('estado', TIPO_ESTADO_VENTA.borrador)
-                .lte('estado', TIPO_ESTADO_VENTA.reparto);
+                .lt('estado', TIPO_ESTADO_VENTA.entregado);
 
             if (ventasError) {
-                throw ventasError;
+                console.log("Error fetching ventas:", ventasError);
+                return NextResponse.json({ ok: false, error: "Error fetching ventas" }, { status: 500 });
             }
+
+            console.log("Ventas para cobranza:", ventas);
 
             const pedidosCount = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.borrador).length || 0;
             const porAsignar = ventas?.filter((v) => v.estado === TIPO_ESTADO_VENTA.por_asignar).length || 0;
@@ -110,39 +113,18 @@ export async function GET() {
             // Find ventas in estado 'preparacion' for choferes in the dependencia
             const { data: ventas, error: ventasError } = await supabase
                 .from('ventas')
-                .select('id, estado, direccion_despacho_id, tipo')
-                .or(`estado.eq.${TIPO_ESTADO_VENTA.preparacion},and(estado.eq.${TIPO_ESTADO_VENTA.por_asignar},direccion_despacho_id.is.null),estado.eq.${TIPO_ESTADO_VENTA.entregado}`);
+                .select('id')
+                .in('estado', [TIPO_ESTADO_VENTA.preparacion, 
+                    TIPO_ESTADO_VENTA.por_asignar]);
+
+            console.log("Ventas para despacho/responsable:", ventas);
 
             if (ventasError) {
-                throw ventasError;
+                console.log("Error fetching ventas:", ventasError);
+                return NextResponse.json({ ok: false, error: "Error fetching ventas" }, { status: 500 });
             }
 
-            const ventaIds = ventas?.filter(venta => {
-                if (venta.estado === TIPO_ESTADO_VENTA.entregado) {
-                    return venta.tipo === TIPO_ORDEN.traslado;
-                }
-                return true;
-            }).map(venta => venta.id) || [];
-
-            const ventasDespachoEnLocal = ventas?.filter((venta) => !venta.direccion_despacho_id).length || 0;
-
-            // Count rutasDespacho where the ventas are present
-            const { data: rutas, error: rutasError } = await supabase
-                .from('rutas_despacho')
-                .select('id')
-                .in('conductor_id', conductorIds)
-                .in('estado', [
-                    TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                    TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
-                ]);
-
-            if (rutasError) {
-                throw rutasError;
-            }
-
-            const contadores = rutas ? rutas.length : 0;
-
-            return NextResponse.json({ ok: true, data: [contadores + ventasDespachoEnLocal] });
+            return NextResponse.json({ ok: true, data: [ventas?.length || 0] });
         }
 
         // CHOFER

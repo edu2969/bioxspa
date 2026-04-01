@@ -138,8 +138,6 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "No workplace address details found for user" }, { status: 400 });
         }
 
-        console.log("Direcion item", item.direccion, "Cargo-direccion", expectedDireccion);
-
         if (!item.direccion.id || !expectedDireccion 
             || item.direccion.id !== expectedDireccion.id) {
             const itemBuild = buildItemView(item, expectedDireccion);

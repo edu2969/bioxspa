@@ -60,7 +60,7 @@ export async function POST(req) {
             .from('rutas_despacho')
             .update({ estado: nuevoEstado })
             .eq('id', rutaId);
-        if (updRutaErr) console.error('[confirmarDescarga] Error updating ruta estado:', updRutaErr);
+        if (updRutaErr) console.error('[confirmarDescarga] Error updating ruta estado:', updRutaErr);        
 
         // Insert ruta_despacho_historial_estados
         const { error: histErr } = await supabase
@@ -72,90 +72,69 @@ export async function POST(req) {
             });
         if (histErr) console.error('[confirmarDescarga] Error inserting ruta_despacho_historial_estados:', histErr);
 
-        // Get ventas for this ruta via ruta_despacho_ventas
-        const { data: rutaVentas, error: rvErr } = await supabase
-            .from('ruta_despacho_ventas')
-            .select('venta_id')
-            .eq('ruta_despacho_id', rutaId);
-        if (rvErr) console.error('[confirmarDescarga] Error fetching ruta_despacho_ventas:', rvErr);
-
-        const ventaIds = (rutaVentas || []).map((r) => r.venta_id).filter(Boolean);
-
-        if (ventaIds.length > 0) {
-            // Update ventas estado and por_cobrar
-            const { error: updVentasErr } = await supabase
-                .from('ventas')
-                .update({ 
-                    estado: TIPO_ESTADO_VENTA.entregado, 
-                    por_cobrar: true 
-                })
-                .in('id', ventaIds);
-            if (updVentasErr) console.error('[confirmarDescarga] Error updating ventas:', updVentasErr);
-
-            // Insert venta_historial_estados for all ventas
-            const histRows = ventaIds.map((id) => ({ venta_id: id, estado: TIPO_ESTADO_VENTA.entregado, created_at: nowIso }));
-            const { error: vhErr } = await supabase
-                .from('venta_historial_estados')
-                .insert(histRows);
-            if (vhErr) console.error('[confirmarDescarga] Error inserting venta_historial_estados:', vhErr);
-
-            // Fetch ventas to process direccion updates and BI generation
-            const { data: ventasRows, error: ventasFetchErr } = await supabase
-                .from('ventas')
-                .select('id, direccion_despacho_id, cliente_id, sucursal_id, valor_total, fecha')
-                .in('id', ventaIds);
-            if (ventasFetchErr) console.error('[confirmarDescarga] Error fetching ventas data:', ventasFetchErr);
-
-            // For each venta, update item_catalogos direccion if venta has direccion_despacho_id
-            for (const venta of ventasRows || []) {
-                if (!venta.direccion_despacho_id) continue;
-
-                // Fetch detalle_ventas for this venta
-                const { data: detalles, error: detallesErr } = await supabase
-                    .from('detalle_ventas')
-                    .select('id')
-                    .eq('venta_id', venta.id);
-                if (detallesErr) console.error('[confirmarDescarga] Error fetching detalles:', detallesErr);
-
-                const detalleIds = (detalles || []).map((d) => d.id);
-                if (detalleIds.length === 0) continue;
-
-                // Fetch detalle_venta_items for these detalles to find item ids
-                const { data: detalleItems, error: dviErr } = await supabase
-                    .from('detalle_venta_items')
-                    .select('item_catalogo_id')
-                    .in('detalle_venta_id', detalleIds);
-                if (dviErr) console.error('[confirmarDescarga] Error fetching detalle_venta_items:', dviErr);
-
-                const itemIds = (detalleItems || []).map((di) => di.item_catalogo_id).filter(Boolean);
-                if (itemIds.length === 0) continue;
-
-                const { error: updItemsErr } = await supabase
-                    .from('items_catalogo')
-                    .update({ direccion_id: venta.direccion_despacho_id })
-                    .in('id', itemIds);
-                if (updItemsErr) console.error('[confirmarDescarga] Error updating item_catalogos direccion:', updItemsErr);
-            }
-
-            let biDeudas;
-            try {
-                biDeudas = await syncBIDeudasFromVentas({
-                    supabase,
-                    ventaIds,
-                    source: 'confirmar_descarga',
-                });
-            } catch (biError) {
-                console.error('[confirmarDescarga] Error syncing bi_deudas:', biError);
-                biDeudas = {
-                    ok: false,
-                    source: 'confirmar_descarga',
-                    error: biError.message,
-                    ventaIds,
-                };
-            }
-
-            return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado, biDeudas });
+        // Get ruta_despacho_destinos por arribar
+        const { data: destino, error: destinosErr } = await supabase
+            .from('ruta_despacho_destinos')
+            .select('id, direccion_id')
+            .eq('ruta_despacho_id', rutaId)
+            .eq('fecha_arribo', null)
+            .single();
+        
+        if (destinosErr) { 
+            console.error('[confirmarDescarga] Error fetching ruta_despacho_destinos:', destinosErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta destinos' }, { status: 500 });
         }
+
+        // Get ventas for this ruta via ruta_despacho_ventas
+        const { data: ventaRuta, error: rvErr } = await supabase
+            .from('ruta_despacho_ventas')
+            .select('id, venta_id')
+            .eq('direccion_despacho_id', destino.direccion_id)
+            .single();
+
+        if (rvErr) {
+            console.error('[confirmarDescarga] Error fetching ruta_despacho_ventas:', rvErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
+        }
+        // Update ventas estado and por_cobrar
+        const { error: updVentasErr } = await supabase
+            .from('ventas')
+            .update({ estado: TIPO_ESTADO_VENTA.entregado, por_cobrar: true })
+            .eq('id', ventaRuta.venta_id);
+
+        if(updVentasErr) {
+            console.error('[confirmarDescarga] Error updating ventas:', updVentasErr);
+            return NextResponse.json({ ok: false, error: 'Error updating ventas' }, { status: 500 });
+        }
+        
+        // Update arribo destino
+        const { error: updDestinoErr } = await supabase
+            .from('ruta_despacho_destinos')
+            .update({ arribo: nowIso })
+            .eq('direccion_despacho_id', destino.direccion_id);
+        if (updDestinoErr) {
+            console.error('[confirmarDescarga] Error updating ruta_despacho_destinos arribo:', updDestinoErr);
+            return NextResponse.json({ ok: false, error: 'Error updating destino arribo' }, { status: 500 });
+        }
+
+        // Actualizar vista BI deudas
+        let biDeudas;
+        try {
+            biDeudas = await syncBIDeudasFromVentas({
+                supabase,
+                ventaIds,
+                source: 'confirmar_descarga',
+            });
+        } catch (biError) {
+            console.error('[confirmarDescarga] Error syncing bi_deudas:', biError);
+            biDeudas = {
+                ok: false,
+                source: 'confirmar_descarga',
+                error: biError.message,
+                ventaIds,
+            };
+        }
+            
         return NextResponse.json({ ok: true, message: 'Descarga confirmada exitosamente', estado: nuevoEstado, biDeudas: { ok: true, source: 'confirmar_descarga', ventaIds: [] } });
     } catch (error) {
         console.error('ERROR in confirmarDescarga:', error);

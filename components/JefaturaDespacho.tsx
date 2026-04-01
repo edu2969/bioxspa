@@ -75,7 +75,7 @@ export default function JefaturaDespacho() {
   const queryClient = useQueryClient();
 
   useRealtimeQuery({
-    channelName: `cargamentos-despacho-ruta-${userId || 'sin-usuario'}`,
+    channelName: `cargamentos-despacho-ruta-${userId}`,
     schema: 'public',
     table: 'rutas_despacho',
     event: '*',
@@ -84,7 +84,7 @@ export default function JefaturaDespacho() {
   });
 
   useRealtimeQuery({
-    channelName: `cargamentos-despacho-ruta-${userId || 'sin-usuario'}`,
+    channelName: `ventas-despacho-${userId}`,
     schema: 'public',
     table: 'ventas',
     event: '*',
@@ -93,7 +93,7 @@ export default function JefaturaDespacho() {
   });
 
   useRealtimeQuery({
-    channelName: `cargamentos-despacho-venta-${userId || 'sin-usuario'}`,
+    channelName: `ventas-rutas-despacho-${userId}`,
     schema: 'public',
     table: 'ruta_despacho_ventas',
     event: '*',

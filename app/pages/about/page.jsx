@@ -11,7 +11,7 @@ export default function About() {
                         <p className="text-6xl text-gray-700 mb-6" style={{ transform: "scaleY(1.5)" }}>BIOX</p>
                         <span className="flex text-xs ml-7 text-gray-400 mt-10">
                             versión 0.92a
-                            <div className="cursor-pointer text-xs ml-2" onClick={() => fetch("/api/bi/cilindros/init")}>
+                            <div className="cursor-pointer text-xs ml-2" onClick={() => fetch("/api/regenerator?q=resetVentas")}>
                                 🪰
                             </div>
                         </span>

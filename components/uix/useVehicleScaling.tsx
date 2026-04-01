@@ -20,7 +20,13 @@ const VEHICLE_CONFIGS = {
     blockOffsetVertical: 0.02
   } },
   "mitsubishi_l200": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.7, pesoMax: 1100, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
-  "volkswagen_constellation": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 12, pesoMax: 6000, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
+  "volkswagen_constellation": { baseWidth: 306, baseHeight: 275, aspectRatio: 1.113, m2: 12, pesoMax: 6000, cylinderLayout: {
+    baseTop: 0.18,
+    baseLeft: 0.22,
+    maxCylindersPerLine: 10,
+    blockOffsetHorizontal: 0.15,
+    blockOffsetVertical: 0.01
+  } },
   "volkswagen_delivery": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 10, pesoMax: 4500, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
   "kia_frontier": { baseWidth: 247, baseHeight: 191, aspectRatio: 1.293, m2: 4.5, pesoMax: 1150, cylinderLayout: DEFAULT_CYLINDER_LAYOUT },
   "ford_transit": { baseWidth: 300, baseHeight: 200, aspectRatio: 1.5, m2: 9, pesoMax: 3500, cylinderLayout: {
@@ -123,7 +129,7 @@ export const useVehicleScaling = (
     
     // Centrar el vehículo en el contenedor
     const vehicleLeft = (containerSize.width - scaledWidth) / 2;
-    const vehicleTop = (containerSize.height - scaledHeight) / 2;
+    const vehicleTop = (containerSize.height - scaledHeight) * 0.25;
 
     setScalingConfig({
       containerSize,

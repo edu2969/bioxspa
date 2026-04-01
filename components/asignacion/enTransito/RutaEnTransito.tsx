@@ -118,7 +118,7 @@ export default function RutaEnTransito({
         enabled: !!rutaId,
     });
 
-    return rutaId && (<div className="w-full border rounded-lg bg-gray-100 shadow-md mb-4 pt-4" key={`ruta_${index}`}>
+    return rutaId && (<div className="w-full border rounded-lg bg-gray-100 shadow-md mb-4" key={`ruta_${index}`}>
         <div className="flex">
             <div className="flex-1" 
                 ref={vehicleContainerRef}
@@ -140,7 +140,7 @@ export default function RutaEnTransito({
 
             <div className="flex-1 min-w-0 pr-2 mb-2">
                 <div className="w-full">
-                    <p className="text-xs text-gray-600">Conductor</p>
+                    <p className="text-xs text-gray-600 pt-4">Conductor</p>
                     <p className="text-lg uppercase font-bold -mt-1 mb-2 truncate">{rutaEnTransito?.nombreChofer}</p>
                     <div className="space-y-2 max-h-[300px] overflow-y-auto"> {/* Scroll si hay muchas ventas */}
                     {ventasEnTransito && ventasEnTransito.map((venta, idxVenta) => (

@@ -147,7 +147,7 @@ export default function HomeAccessPanel() {
     </div>) : undefined;
 
   useRealtimeQuery({
-    channelName: `home-counters-ventas-${userId || 'sin-usuario'}`,
+    channelName: `home-counters-ventas-${userId}`,
     schema: 'public',
     table: 'ventas',
     event: '*',
@@ -156,7 +156,7 @@ export default function HomeAccessPanel() {
   });
 
   useRealtimeQuery({
-    channelName: `home-counters-rutas-${userId || 'sin-usuario'}`,
+    channelName: `home-counters-rutas-${userId}`,
     schema: 'public',
     table: 'rutas_despacho',
     event: '*',
@@ -167,12 +167,9 @@ export default function HomeAccessPanel() {
   const { data: homeCounters, isLoading } = useQuery<Array<number>>({
     queryKey: ['home-counters', userId],
     queryFn: async () => {
-      const response = await fetch('/api/home', {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-      });
+      const response = await fetch('/api/home');
       const resp = await response.json();
+      console.log(">>>>>> Home counters response:", resp);
       return resp.data || [];
     },
     enabled: !!userId // Solo ejecutar si hay usuario autenticado

@@ -43,7 +43,9 @@ export async function POST(req) {
 
         if (!rutaData) return NextResponse.json({ ok: false, error: 'RutaDespacho not found' }, { status: 404 });
 
-        const allowedStates = [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada, TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada, TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino];
+        const allowedStates = [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada, 
+            TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada, 
+            TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino];
         if (!allowedStates.includes(rutaData.estado)) return NextResponse.json({ ok: false, error: 'Ruta not in allowed state' }, { status: 400 });
 
         if (String(rutaData.conductor_id) !== String(user.id)) return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });

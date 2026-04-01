@@ -47,7 +47,7 @@ export default function PedidoEnConductor({ pedido, choferId, onShowDetalle, onS
         <div 
             ref={setDragRef}
             style={dragStyle}
-            className="cursor-pointer bg-green-600 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2 relative"
+            className="cursor-pointer bg-green-200 rounded shadow-md py-1 pl-2 pr-10 mb-2 mt-2 relative"
             onClick={handleClick}
         >
             <div className="flex w-full" key={`pedido_chofer_${choferId}_${indexPedido}`}>

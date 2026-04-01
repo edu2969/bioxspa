@@ -9,6 +9,7 @@ import { Control, useWatch } from 'react-hook-form';
 import { INuevaVentaSubmit } from '../pedidos/types';
 import { useDroppable } from '@dnd-kit/core';
 import PedidoConductor from './conductores/PedidoConductor';
+import { VscCopilotWarning } from 'react-icons/vsc';
 
 export default function Conductores({
     control,
@@ -53,13 +54,13 @@ export default function Conductores({
             <div
                 ref={setNodeRef}
                 key={`en_espera_${index}`}
-                className={`text-white relative p-2 rounded-lg mb-2 transition-all duration-200 ${!chofer.checklist ? 'bg-neutral-400' : 'bg-green-500'
-                    } ${isOver && chofer.checklist ? 'border-2 border-dashed border-yellow-400 bg-green-400 scale-105' : 'border'
+                className={`relative p-2 rounded-lg mb-2 transition-all duration-200 ${!chofer.checklist ? 'bg-red-300 text-red-600' : 'bg-green-300 text-gray-700'
+                    } ${isOver && chofer.checklist ? 'border-2 border-dashed border-yellow-400 bg-green-200 scale-105' : 'border'
                     }`}
                 data-id={`choferId_${chofer.id}`}
             >
                 <div className="font-bold uppercase flex">
-                    <GoCopilot size="1.5rem" /><span className="ml-2">{chofer.nombre}</span>
+                    {chofer.checklist ? <GoCopilot size="1.5rem" /> : <VscCopilotWarning size="1.5rem" />}<span className="ml-2">{chofer.nombre}</span>
                 </div>
                 {!chofer.checklist && (
                     <div className="flex items-center text-red-600 text-xs font-semibold mt-1">
@@ -83,8 +84,8 @@ export default function Conductores({
                             <RiZzzFill size="1rem" className="mr-1" />
                             <p>SIN ÓRDENES</p>
                         </div>
-                        {chofer.checklist && <div className="flex items-center text-green-200 text-xs font-semibold mt-1">
-                            <span className="inline-block w-2 h-2 rounded-full bg-green-300 mr-2"></span>
+                        {chofer.checklist && <div className="flex items-center text-green-700 text-xs font-semibold mt-1">
+                            <span className="inline-block w-2 h-2 rounded-full bg-green-600 mr-2"></span>
                             Listo para asignar
                         </div>}
                     </div>

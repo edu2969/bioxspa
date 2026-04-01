@@ -39,7 +39,7 @@ export async function POST(request) {
         // Verifica que la venta exista.
         const { data: venta, error: ventaError } = await supabase
             .from("ventas")
-            .select("id, estado")
+            .select("id, estado, cliente:clientes(direccion_id)")
             .eq("id", ventaId)
             .single();
 
@@ -52,9 +52,7 @@ export async function POST(request) {
             .from("venta_entregas_local")
             .select("id, nombre_recibe, rut_recibe")
             .eq("venta_id", ventaId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .single();
 
         if (entregaError) {
             console.error("Error fetching venta_entregas_local:", entregaError);
@@ -78,7 +76,7 @@ export async function POST(request) {
                 id,
                 cantidad,
                 subcategoria_catalogo_id,
-                items:detalle_venta_items(id)
+                items:detalle_venta_items(id, item_catalogo_id)
             `)
             .eq("venta_id", ventaId);
 
@@ -115,6 +113,40 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
+        // Pasado el test, actualiza la direccion del item a la del cliente
+        const direccionCliente = venta.cliente?.direccion_id;
+        if(!direccionCliente) {
+            return NextResponse.json({
+                ok: false,
+                error: "No se pudo determinar la dirección del cliente para esta entrega"
+            }, { status: 400 });
+        }
+
+        let itemIdsToUpdate = [];
+        for (const detalle of detalles) {
+            for (const item of detalle.items || []) {
+                itemIdsToUpdate.push(item.item_catalogo_id);
+            }
+        }
+        console.log("------------------------------------------------> Item IDs to update:", itemIdsToUpdate, "con direccion_id", direccionCliente);
+        if (itemIdsToUpdate.length > 0) {
+            const { error: updateItemError } = await supabase
+                .from("items_catalogo")
+                .update({ direccion_id: direccionCliente })
+                .in("id", itemIdsToUpdate);
+
+            if (updateItemError) {
+                console.error("Error updating items_catalogo direccion_id:", updateItemError);
+                return NextResponse.json({ ok: false, error: "Error updating item address" }, { status: 500 });
+            }
+        } else {
+            return NextResponse.json({
+                ok: false,
+                error: "No se encontraron items para actualizar con la dirección del cliente"
+            }, { status: 400 });
+        }
+
+        // Bi de arriendos
         const arriendos = await registerArriendosFromVenta({
             supabase,
             ventaId,

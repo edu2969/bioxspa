@@ -87,7 +87,7 @@ export { ResponseHelper, createResponse, createErrorResponse, createSuccessRespo
 // ===============================================
 
 export const SUPABASE_LIB_VERSION = '2.0.0';
-export const SUPABASE_LIB_NAME = 'kskin-manager-supabase';
+export const SUPABASE_LIB_NAME = 'bioxspa-supabase';
 
 /**
  * Información de la librería de Supabase
@@ -95,5 +95,5 @@ export const SUPABASE_LIB_NAME = 'kskin-manager-supabase';
 export const SupabaseLib = {
   version: SUPABASE_LIB_VERSION,
   name: SUPABASE_LIB_NAME,
-  description: 'Sistema unificado de Supabase para kskin-manager'
+  description: 'Sistema unificado de Supabase para bioxspa'
 } as const;

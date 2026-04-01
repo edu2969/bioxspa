@@ -22,10 +22,13 @@ export default function AccessButton({
             </div>
             <div className={`absolute top-8 left-1/2 ml-12 w-32`}>
                 <div className="flex flex-col items-left mr-2 space-y-2">
-                    {props.badges && props.badges.map((badged, index) => (<div key={`badged_${index}`} className={`flex ${colors[index % colors.length]} text-white text-xs rounded-full px-3 pr-1.5 h-8`}>
-                        <span className="text-lg mr-1"><b>{badged.value}</b></span>
-                        {badged.text && <p className="text-md mt-2">{badged.text}</p>}
-                    </div>))}
+                    {props.badges && props.badges.map((badged, index) => {
+                        if(!badged.value || badged.value === 0) return null;
+                        return (<div key={`badged_${index}`} className={`flex ${colors[index % colors.length]} text-white text-xs rounded-full px-3 pr-1.5 h-8`}>
+                            <span className="text-lg mr-1"><b>{badged.value}</b></span>
+                            {badged.text && <p className="text-md mt-2">{badged.text}</p>}
+                        </div>);
+                    })}
                 </div>
             </div>
             {props.warningMessage}
