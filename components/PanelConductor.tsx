@@ -134,7 +134,8 @@ export default function PanelConductor() {
                                 estado={estado} />}
 
                         {(estado === TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada
-                            || estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino) &&
+                            || estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino
+                        || estado == TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada) &&
                             <SelectorDeDestino rutaDespacho={ruta} />}
 
                         {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta &&
@@ -147,7 +148,7 @@ export default function PanelConductor() {
                                 rutaDespacho={ruta}
                                 setScanMode={setScanMode} />)}
 
-                        {estado === TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada &&
+                        {estado === TIPO_ESTADO_RUTA_DESPACHO.regreso &&
                             <VolverABase rutaDespacho={ruta} />
                         }
 

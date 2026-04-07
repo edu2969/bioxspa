@@ -9,6 +9,7 @@ import Loader from "../Loader";
 import { LuFlagOff } from "react-icons/lu";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
+import CheckPoint from "./CheckPoint";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
     const tramoActual = rutaDespacho.destinos.find(tramo => tramo.fechaArribo == null);
@@ -116,6 +117,7 @@ export default function ConfirmacionLlegadaADestino({
         <form onSubmit={handleSubmit(onSubmit)}>
             {estado === TIPO_ESTADO_RUTA_DESPACHO.en_ruta && !ingresoQuienRecibe && <div className="flex flex-col items-center justify-center space-y-3 text-center">
                 <h1 className="font-bold text-2xl">Conduce con precaución.</h1>
+                <CheckPoint esTitulo={true} index={0} isLast={true} destino={rutaDespacho.destinos[rutaDespacho.destinos.length - 1]} />
                 <MdBusAlert size="8rem" className="text-yellow-400" />
                 <span className="text-xl">Al llegar, avisas presionando el botón</span>
                 <button

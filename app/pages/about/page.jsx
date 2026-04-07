@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Nav from "@/components/Nav";
 
 export default function About() {
     return (
@@ -25,6 +26,7 @@ export default function About() {
                     </div>
                 </div>
             </div>
+            <Nav />
         </div>
     )
 }

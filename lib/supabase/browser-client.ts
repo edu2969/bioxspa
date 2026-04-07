@@ -10,7 +10,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { getSupabaseConfig } from "./config";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import ws from "ws";
 
 // Cache global para cliente singleton
 let clientCache: SupabaseClient | null = null;

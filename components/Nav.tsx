@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react';
 import { AiFillHome, AiOutlineMenu, AiOutlineClose, AiFillAliwangwang, AiOutlineLogout } from 'react-icons/ai'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
@@ -13,14 +13,15 @@ import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './_prefabs/powerScan/PowerScanView';
+import { signOut } from "@/services/auth-service";
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const path = usePathname();
     const auth = useAuthorization();
-    const { signOut } = useAuth();
     const [scanMode, setScanMode] = useState(false);
+    const router = useRouter();    
 
     const menuItemClass = "w-full min-h-20 rounded-md bg-slate-500 shadow-sm text-white hover:bg-white hover:text-[#313A46] transition-colors flex flex-col justify-center items-center";
     const menuItemContentClass = "h-full w-full px-4 py-3 flex items-center gap-4 text-left";
@@ -49,7 +50,7 @@ export default function Nav() {
             await signOut();
 
             // Navegación dura para asegurar estado limpio en toda la app.
-            window.location.href = '/';
+            router.push('/pages/logout');
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
             setIsLoggingOut(false);

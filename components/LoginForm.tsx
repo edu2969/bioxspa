@@ -6,14 +6,13 @@ import { useForm } from "react-hook-form";
 import Image from "next/image";
 import Loader from "./Loader";
 import { IoAlertCircle } from "react-icons/io5";
-import { useAuth } from "@/context/AuthContext";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export default function LoginForm() {
-  const router = useRouter();
-  const { signIn } = useAuth();
+  const router = useRouter();  
+  const supabase = createSupabaseBrowserClient();
   
   const onError = (errors: any, e: any) => console.log(errors, e);
-  const [resolution, setResolution] = useState({ width: 0, height: 0 });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [status, setStatus] = useState("");
@@ -25,29 +24,18 @@ export default function LoginForm() {
   } = useForm();
 
   const onSubmit = async (data: any) => {
-    setStatus("");
     setIsLoggingIn(true);
-    setRedirecting(false);
-    
+
     try {
       console.log('Intentando login con:', data.email);
-      const result = await signIn(data.email, data.password);
-
-      if (!result.success) {
-        const errorMessage = result.error?.message || result.message || "Error en el login";
-        console.log("ERROR", errorMessage);
-        setStatus(errorMessage);
-        setIsLoggingIn(false);
-      } else {
+      const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: data.password });
+      if (!error) {
         console.log('Login exitoso, redirigiendo...');
-        setIsLoggingIn(false);
         setRedirecting(true);
         router.replace("/pages");
-        router.refresh();
       }
     } catch (error) {
       console.error('Error en onSubmit:', error);
-      setStatus((error as Error).message || "Error en el login");
       setIsLoggingIn(false);
     }
   };
@@ -102,20 +90,7 @@ export default function LoginForm() {
             </button>
           </div>
         </div>
-      </form>
-      <div style={{
-        position: "absolute",
-        top: 72,
-        right: 16,
-        background: "rgba(0,0,0,0.5)",
-        color: "#fff",
-        padding: "2px 8px",
-        borderRadius: "6px",
-        fontSize: "12px",
-        zIndex: 50
-      }}>
-        {resolution.width} x {resolution.height}
-      </div>
+      </form>      
     </main>
   );
 }

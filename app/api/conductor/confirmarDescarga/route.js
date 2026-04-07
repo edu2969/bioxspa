@@ -3,6 +3,15 @@ import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_CARGO } from "@/app/utils/constants";
 import { syncBIDeudasFromVentas } from "@/lib/arriendos/syncBIDeudasFromVentas";
 
+/**
+ * Dado el usuario autenticado conductor, verifica que la ruta
+ * exista y esté asignada a él. Busca entonces el destino
+ * sin arribo de la ruta en estado de descarga, colocandole fecha de arribo.
+ * Entre las ventas de la ruta, se busca aquella en que coincida la dirección de
+ * destino de despacho de una de ellas.
+ * @param {*} req 
+ * @returns 
+ */
 export async function POST(req) {
     try {
         console.log("POST request received for confirmarDescarga (Supabase)");
@@ -29,8 +38,10 @@ export async function POST(req) {
             console.warn(`User ${userId} is not a conductor. Role: ${userData.role}`);
             return NextResponse.json({ ok: false, error: "Access denied. User is not a conductor" }, { status: 403 });
         }
-
-        const supabase = await getSupabaseServerClient();
+        
+        const supabase = await getSupabaseServerClient();                
+        
+        // Varificación de ruta existente
         const { data: rutaData, error: rutaErr } = await supabase
             .from("rutas_despacho")
             .select("id, estado, conductor_id")
@@ -40,7 +51,7 @@ export async function POST(req) {
         if (rutaErr) {
             console.error('[confirmarDescarga] Error fetching ruta:', rutaErr);
             return NextResponse.json({ ok: false, error: 'Error fetching ruta' }, { status: 500 });
-        }
+        }       
 
         if (!rutaData) return NextResponse.json({ ok: false, error: 'Ruta no encontrada' }, { status: 404 });
 
@@ -52,9 +63,86 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
-        const nuevoEstado = TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
-        const nowIso = new Date().toISOString();
+        // Get ruta_despacho_destinos por arribar
+        const { data: destino, error: destinosErr } = await supabase
+            .from('ruta_despacho_destinos')
+            .select('id, direccion_id')
+            .eq('ruta_despacho_id', rutaId)
+            .is('fecha_arribo', null)
+            .single();
+        
+        if (destinosErr) { 
+            console.error('[confirmarDescarga] Error fetching ruta_despacho_destinos:', destinosErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta destinos' }, { status: 500 });
+        }
 
+        if(!destino) {
+            return NextResponse.json({ ok: false, error: 'No hay destinos pendientes de arribo para esta ruta' }, { status: 400 });
+        }
+
+        // Get ventas for this ruta via ruta_despacho_ventas
+        const { data: ventasRuta, error: rvErr } = await supabase
+            .from('ruta_despacho_ventas')
+            .select('id, venta_id')
+            .eq('ruta_despacho_id', rutaId);            
+
+        if (rvErr) {
+            console.error('[confirmarDescarga] Error fetching ruta_despacho_ventas:', rvErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
+        }
+
+        const { data: ventaRuta, error: vrErr } = await supabase            
+            .from('ventas')
+            .select('id')
+            .in('id', ventasRuta.map(v => v.venta_id))
+            .eq('direccion_despacho_id', destino.direccion_id)
+            .single();   
+            
+        if(vrErr) {
+            console.error('[confirmarDescarga] Error fetching venta for ruta:', vrErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching venta for ruta' }, { status: 500 });
+        }        
+
+        // Update ventas estado and por_cobrar
+        const { error: updVentasErr } = await supabase
+            .from('ventas')
+            .update({ estado: TIPO_ESTADO_VENTA.entregado, por_cobrar: true })
+            .eq('id', ventaRuta.id);
+
+        if(updVentasErr) {
+            console.error('[confirmarDescarga] Error updating ventas:', updVentasErr);
+            return NextResponse.json({ ok: false, error: 'Error updating ventas' }, { status: 500 });
+        }
+
+        // Crea un historial de cambio de estado de la venta
+        const { error: updHistorialEstadoVentaErr } = await supabase
+            .from('venta_historial_estados')
+            .insert({
+                venta_id: ventaRuta.id,
+                estado: TIPO_ESTADO_VENTA.entregado,
+                usuario_id: userId,
+            });
+
+        if (updHistorialEstadoVentaErr) {
+            console.error('[confirmarDescarga] Error inserting venta_historial_estados:', updHistorialEstadoVentaErr);
+            return NextResponse.json({ ok: false, error: 'Error updating venta historial estados' }, { status: 500 });
+        }
+        
+        // Update arribo destino
+        const nowIso = new Date().toISOString();
+        const { error: updDestinoErr } = await supabase
+            .from('ruta_despacho_destinos')
+            .update({ fecha_arribo: nowIso })
+            .eq('ruta_despacho_id', destino.id);
+
+        if (updDestinoErr) {
+            console.error('[confirmarDescarga] Error updating ruta_despacho_destinos arribo:', updDestinoErr);
+            return NextResponse.json({ ok: false, error: 'Error updating destino arribo' }, { status: 500 });
+        }        
+
+        // Actualizacion estado de ruta        
+        const nuevoEstado = TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
+        
         // Update ruta estado
         const { error: updRutaErr } = await supabase
             .from('rutas_despacho')
@@ -72,57 +160,12 @@ export async function POST(req) {
             });
         if (histErr) console.error('[confirmarDescarga] Error inserting ruta_despacho_historial_estados:', histErr);
 
-        // Get ruta_despacho_destinos por arribar
-        const { data: destino, error: destinosErr } = await supabase
-            .from('ruta_despacho_destinos')
-            .select('id, direccion_id')
-            .eq('ruta_despacho_id', rutaId)
-            .eq('fecha_arribo', null)
-            .single();
-        
-        if (destinosErr) { 
-            console.error('[confirmarDescarga] Error fetching ruta_despacho_destinos:', destinosErr);
-            return NextResponse.json({ ok: false, error: 'Error fetching ruta destinos' }, { status: 500 });
-        }
-
-        // Get ventas for this ruta via ruta_despacho_ventas
-        const { data: ventaRuta, error: rvErr } = await supabase
-            .from('ruta_despacho_ventas')
-            .select('id, venta_id')
-            .eq('direccion_despacho_id', destino.direccion_id)
-            .single();
-
-        if (rvErr) {
-            console.error('[confirmarDescarga] Error fetching ruta_despacho_ventas:', rvErr);
-            return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
-        }
-        // Update ventas estado and por_cobrar
-        const { error: updVentasErr } = await supabase
-            .from('ventas')
-            .update({ estado: TIPO_ESTADO_VENTA.entregado, por_cobrar: true })
-            .eq('id', ventaRuta.venta_id);
-
-        if(updVentasErr) {
-            console.error('[confirmarDescarga] Error updating ventas:', updVentasErr);
-            return NextResponse.json({ ok: false, error: 'Error updating ventas' }, { status: 500 });
-        }
-        
-        // Update arribo destino
-        const { error: updDestinoErr } = await supabase
-            .from('ruta_despacho_destinos')
-            .update({ arribo: nowIso })
-            .eq('direccion_despacho_id', destino.direccion_id);
-        if (updDestinoErr) {
-            console.error('[confirmarDescarga] Error updating ruta_despacho_destinos arribo:', updDestinoErr);
-            return NextResponse.json({ ok: false, error: 'Error updating destino arribo' }, { status: 500 });
-        }
-
         // Actualizar vista BI deudas
         let biDeudas;
         try {
             biDeudas = await syncBIDeudasFromVentas({
                 supabase,
-                ventaIds,
+                ventaIds: [ventaRuta.id],
                 source: 'confirmar_descarga',
             });
         } catch (biError) {
@@ -131,7 +174,7 @@ export async function POST(req) {
                 ok: false,
                 source: 'confirmar_descarga',
                 error: biError.message,
-                ventaIds,
+                ventaIds: [ventaRuta.id],
             };
         }
             

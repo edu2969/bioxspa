@@ -14,18 +14,23 @@ export default function ClienteSearchView({
     titulo,
     register,
     setClienteSelected,
+    clienteInicial,
     isLoading
 }: {
     titulo?: string;
     register: UseFormRegisterReturn;
     setClienteSelected: (value: IClienteSeachResult | null) => void;
+    clienteInicial?: {
+        id: string;
+        nombre: string;
+    } | null;
     isLoading?: boolean;
 }) {
     const { user, hasRole } = useAuthorization();
-    const [textoBusqueda, setTextoBusqueda] = useState("");
+    const [textoBusqueda, setTextoBusqueda] = useState(clienteInicial?.nombre || "");
     const router = useRouter();
     const [debouncedSearch, setDebouncedSearch] = useState("");    
-    const [clienteId, setClienteId] = useState<string | null>(null);
+    const [clienteId, setClienteId] = useState<string | null>(clienteInicial?.id || null);
     const [isRedirecting, setIsRedirecting] = useState(false);
     
     useEffect(() => {
@@ -45,6 +50,14 @@ export default function ClienteSearchView({
         },
         enabled: !clienteId && debouncedSearch.length >= 3
     });
+
+    useEffect(() => {        
+        if (clienteInicial && clienteInicial.id && clienteInicial.nombre !== "") {
+            console.log("Procesando cliente inicial:", clienteInicial);
+            setClienteId(clienteInicial.id);
+            setTextoBusqueda(clienteInicial.nombre);
+        }
+    }, [clienteInicial, setClienteId, setTextoBusqueda]);
 
     const handleSelect = (cliente: IClienteSeachResult) => {
         setTextoBusqueda(cliente.nombre);

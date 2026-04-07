@@ -11,6 +11,7 @@ type SelectorProps<T> = {
   isLoading?: boolean;
   onChange?: (value: string) => void;
   disableAutoSelect?: boolean; // Nueva prop para deshabilitar auto-selección
+  defaultValue?: string;
 };
 
 export function Selector<T>({
@@ -23,12 +24,13 @@ export function Selector<T>({
   isLoading,
   onChange,
   disableAutoSelect = false, // Por defecto false para mantener comportamiento actual
+  defaultValue
 }: SelectorProps<T>) {
   
   // Seleccionar automáticamente si solo hay una opción (solo si no está deshabilitado)
   useEffect(() => {
     if (options && options.length === 1 && !isLoading && !disableAutoSelect) {
-      const singleValue = getValue(options[0]);
+      const singleValue = getValue(defaultValue ? options.find(o => getValue(o) === defaultValue) || options[0] : options[0]);
       // Simular un cambio en el select para que react-hook-form lo detecte
       const event = new Event('change', { bubbles: true });
       Object.defineProperty(event, 'target', {

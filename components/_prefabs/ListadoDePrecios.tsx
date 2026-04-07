@@ -31,12 +31,10 @@ export default function ListadoDePrecios({
 
     const { data: precios, isLoading: loadingPrecios } = useQuery<IPrecioView[]>({
         queryKey: ['precios-cliente', clienteId],
-        queryFn: async () => {
-            console.log("Fetching precios for clienteId:", clienteId);
+        queryFn: async () => {            
             if (!clienteId) return [];
             const response = await fetch(`/api/clientes/precios?clienteId=${clienteId}`);
-            const data = await response.json();
-            console.log("Precios obtenidos:", data);
+            const data = await response.json();            
             return data.precios;
         },
         enabled: !!clienteId,

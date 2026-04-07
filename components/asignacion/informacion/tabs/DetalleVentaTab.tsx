@@ -1,15 +1,16 @@
 "use client";
 
-import React from 'react';
 import Image from 'next/image';
 import { FaEdit, FaBan } from 'react-icons/fa';
 import { getColorEstanque } from '@/lib/uix';
 import type { IDetalleVentaView } from '@/types/venta';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 
 export default function OperacionesTab({ ventaId } : {
     ventaId: string | null;
 }) {
+    const router = useRouter();
     const { data: ventaDetalle } = useQuery<IDetalleVentaView | null>({
         queryKey: ['venta-detalle', ventaId],
         queryFn: async () => {
@@ -21,6 +22,12 @@ export default function OperacionesTab({ ventaId } : {
         },
         enabled: ventaId !== null
     });
+
+    const handleEditVenta = (ventaId?: string) => {
+        if (ventaId) {
+            router.push(`/pages/pedidos/editar/${ventaId}`);
+        }
+    }
 
     return (
         <div className="h-72 overflow-y-auto space-y-4 min-w-lg">
@@ -114,7 +121,9 @@ export default function OperacionesTab({ ventaId } : {
             <div className="space-y-2">
                 <button 
                     className="w-full flex items-center justify-center py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-semibold text-sm"
-                    onClick={() => alert('Función Modificar - En desarrollo')}
+                    onClick={() => {
+                        handleEditVenta(ventaDetalle?.id);
+                    }}
                 >
                     <FaEdit className="mr-2" />
                     MODIFICAR ORDEN

@@ -85,8 +85,7 @@ export async function GET(request) {
         const { data: rutasActivas, error: rutasError } = await supabase
             .from("rutas_despacho")
             .select("id, conductor_id")
-            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada)
-            .lte("estado", TIPO_ESTADO_RUTA_DESPACHO.regreso)
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.en_ruta)
             .in("dependencia_id", dependenciaIds);
 
         if(rutasError) {
@@ -99,7 +98,8 @@ export async function GET(request) {
             .from("cargos")
             .select("usuario_id")
             .eq("tipo", TIPO_CARGO.conductor)
-            .not("usuario_id", "in", `(${conductoresActivos.length > 0 ? conductoresActivos.join(",") : ""})`);
+            .not("usuario_id", "in", `(${conductoresActivos.length > 0 ? conductoresActivos.join(",") : ""})`)
+            .in("dependencia_id", dependenciaIds);
 
         if (cargosError) {
             console.log("Error fetching cargos de conductores:", cargosError);
@@ -126,7 +126,10 @@ export async function GET(request) {
                     .from("rutas_despacho")
                     .select("id")
                     .eq("conductor_id", userId)
-                    .in("estado", [TIPO_ESTADO_RUTA_DESPACHO.preparacion, TIPO_ESTADO_RUTA_DESPACHO.orden_cargada])
+                    .in("estado", [TIPO_ESTADO_RUTA_DESPACHO.preparacion, 
+                        TIPO_ESTADO_RUTA_DESPACHO.orden_cargada,
+                        TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada,
+                        TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino])
                     .single();
 
                 let pedidos = [];

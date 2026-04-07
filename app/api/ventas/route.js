@@ -10,6 +10,7 @@ export const POST = withAuthorization(
       const supabase = await getSupabaseServerClient();
 
       const payload = {
+        id: body.id,
         tipo: body.tipo,
         usuarioId: body.usuarioId,
         clienteId: body.clienteId,
@@ -112,64 +113,135 @@ export const POST = withAuthorization(
           ? TIPO_ESTADO_VENTA.por_asignar
           : TIPO_ESTADO_VENTA.borrador;          
 
-      const { data: nuevaVenta, error: ventaError } = await supabase
-        .from("ventas")
-        .insert({
-          tipo: payload.tipo,
-          cliente_id: payload.clienteId,
-          vendedor_id: payload.usuarioId,
-          sucursal_id: payload.sucursalId || cargoActivo?.sucursal_id || null,
-          dependencia_id: cargoActivo?.dependencia_id || null,
-          fecha: new Date().toISOString(),
-          estado: estadoInicial,
-          valor_neto: valorNeto,
-          valor_iva: valorIVA,
-          valor_total: valorTotal,
-          saldo: valorTotal,
-          documento_tributario_id: payload.documentoTributarioId,
-          direccion_despacho_id: payload.direccionDespachoId || null,
-          comentario: payload.comentario || "",
-        })
-        .select();
+      if(!payload.id) {
+        const { data: nuevaVenta, error: ventaError } = await supabase
+          .from("ventas")
+          .insert({
+            tipo: payload.tipo,
+            cliente_id: payload.clienteId,
+            vendedor_id: payload.usuarioId,
+            sucursal_id: payload.sucursalId || cargoActivo?.sucursal_id || null,
+            dependencia_id: cargoActivo?.dependencia_id || null,
+            fecha: new Date().toISOString(),
+            estado: estadoInicial,
+            valor_neto: valorNeto,
+            valor_iva: valorIVA,
+            valor_total: valorTotal,
+            saldo: valorTotal,
+            documento_tributario_id: payload.documentoTributarioId,
+            direccion_despacho_id: payload.direccionDespachoId || null,
+            comentario: payload.comentario || "",
+          })
+          .select();
 
-      if (ventaError || !nuevaVenta) {
-        console.error("Error al crear la venta:", ventaError?.message);
-        return NextResponse.json({ error: "Error al crear la venta" }, { status: 500 });
-      }      
+        if (ventaError || !nuevaVenta) {
+          console.error("Error al crear la venta:", ventaError?.message);
+          return NextResponse.json({ error: "Error al crear la venta" }, { status: 500 });
+        }      
 
-      // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
-      const detalles = payload.items.map((item) => ({
-        venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
-        subcategoria_catalogo_id: item.subcategoriaId,
-        cantidad: item.cantidad,
-        neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
-        iva: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 0.19,
-        total: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 1.19,
-      }));
+        // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
+        const detalles = payload.items.map((item) => ({
+          venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
+          subcategoria_catalogo_id: item.subcategoriaId,
+          cantidad: item.cantidad,
+          neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
+          iva: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 0.19,
+          total: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 1.19,
+        }));
 
-      const { error: detalleError } = await supabase
-        .from("detalle_ventas")
-        .insert(detalles);
+        const { error: detalleError } = await supabase
+          .from("detalle_ventas")
+          .insert(detalles);
 
-      if (detalleError) {
-        console.error("Error al crear los detalles de la venta:", detalleError.message);
-        return NextResponse.json({ error: "Error al crear los detalles de la venta" }, { status: 500 });
+        if (detalleError) {
+          console.error("Error al crear los detalles de la venta:", detalleError.message);
+          return NextResponse.json({ error: "Error al crear los detalles de la venta" }, { status: 500 });
+        }
+
+        // Insertar el estado inicial en la tabla venta_historial_estados
+        const { error: historialError } = await supabase
+          .from("venta_historial_estados")
+          .insert({
+            venta_id: nuevaVenta[0].id,
+            estado: estadoInicial
+          });
+
+        if (historialError) {
+          console.error("Error al insertar el historial de estados:", historialError.message);
+          return NextResponse.json({ error: "Error al insertar el historial de estados" }, { status: 500 });
+        }
+
+        return NextResponse.json({ ok: true, venta: nuevaVenta[0] });
+      } else {
+        const { data: updVenta, error: ventaError } = await supabase
+          .from("ventas")
+          .update({
+            tipo: payload.tipo,
+            cliente_id: payload.clienteId,
+            vendedor_id: payload.usuarioId,
+            sucursal_id: payload.sucursalId || cargoActivo?.sucursal_id || null,
+            dependencia_id: cargoActivo?.dependencia_id || null,
+            estado: estadoInicial,
+            valor_neto: valorNeto,
+            valor_iva: valorIVA,
+            valor_total: valorTotal,
+            saldo: valorTotal,
+            documento_tributario_id: payload.documentoTributarioId,
+            direccion_despacho_id: payload.direccionDespachoId || null,
+            comentario: payload.comentario || "",
+          })
+          .eq("id", payload.id);
+
+        if (ventaError || !nuevaVenta) {
+          console.error("Error al crear la venta:", ventaError?.message);
+          return NextResponse.json({ error: "Error al crear la venta" }, { status: 500 });
+        }
+        
+        const { error: deleteError } = await supabase
+          .from("detalle_ventas")
+          .delete()
+          .eq("venta_id", payload.id);
+
+        if (deleteError) {
+          console.error("Error al eliminar los detalles anteriores de la venta:", deleteError.message);
+          return NextResponse.json({ error: "Error al actualizar los detalles de la venta" }, { status: 500 });
+        }
+
+        // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
+        const detalles = payload.items.map((item) => ({
+          venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
+          subcategoria_catalogo_id: item.subcategoriaId,
+          cantidad: item.cantidad,
+          neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
+          iva: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 0.19,
+          total: (preciosMap[item.subcategoriaId] || 0) * item.cantidad * 1.19,
+        }));
+
+        const { error: detalleError } = await supabase
+          .from("detalle_ventas")
+          .insert(detalles);
+
+        if (detalleError) {
+          console.error("Error al crear los detalles de la venta:", detalleError.message);
+          return NextResponse.json({ error: "Error al crear los detalles de la venta" }, { status: 500 });
+        }
+
+        // Insertar el estado inicial en la tabla venta_historial_estados
+        const { error: historialError } = await supabase
+          .from("venta_historial_estados")
+          .insert({
+            venta_id: nuevaVenta[0].id,
+            estado: estadoInicial
+          });
+
+        if (historialError) {
+          console.error("Error al insertar el historial de estados:", historialError.message);
+          return NextResponse.json({ error: "Error al insertar el historial de estados" }, { status: 500 });
+        }
+
+        return NextResponse.json({ ok: true, venta: nuevaVenta[0] });
       }
-
-      // Insertar el estado inicial en la tabla venta_historial_estados
-      const { error: historialError } = await supabase
-        .from("venta_historial_estados")
-        .insert({
-          venta_id: nuevaVenta[0].id,
-          estado: estadoInicial
-        });
-
-      if (historialError) {
-        console.error("Error al insertar el historial de estados:", historialError.message);
-        return NextResponse.json({ error: "Error al insertar el historial de estados" }, { status: 500 });
-      }
-
-      return NextResponse.json({ ok: true, venta: nuevaVenta[0] });
+      
     } catch (error) {
       console.error("Error processing venta:", error);
       return NextResponse.json({ error: String(error) }, { status: 500 });

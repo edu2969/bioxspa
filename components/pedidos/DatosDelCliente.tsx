@@ -14,15 +14,20 @@ import { TIPO_CARGO } from "@/app/utils/constants";
 
 export default function DatosDelCliente({
     tipoOrden,
+    clienteInicial,
+    direccionDespachoInicialId,
     register,
     setValue
 }: {
     tipoOrden: number;
+    clienteInicial?: IClienteSeachResult | null;
+    direccionDespachoInicialId?: string | null | undefined;
     register: UseFormRegister<INuevaVentaSubmit>;
     setValue: UseFormSetValue<INuevaVentaSubmit>;
 }) {
     const auth = useAuthorization();
-    const [clienteSelected, setClienteSelected] = useState<IClienteSeachResult | null>(null);    
+    const [clienteSelected, setClienteSelected] = useState<IClienteSeachResult | null>(clienteInicial || null);
+    const [textoInicial, setTextoInicial] = useState(clienteInicial?.nombre || "");
 
     const { data: documentosTributarios, isLoading: loadingDocumentosTributarios } = useQuery<IDocumentoTributario[]>({
         queryKey: ['documentos-tributarios-venta'],
@@ -39,17 +44,29 @@ export default function DatosDelCliente({
             if (!clienteSelected?.id) return null;
             const response = await fetch(`/api/clientes?id=${clienteSelected.id}`);
             const data = await response.json();
-            console.log("Cliente cargado:", data.cliente);
             return data.cliente;
-        }
+        },
+        enabled: !!clienteSelected?.id        
     });
 
     useEffect(() => {
-        if (cliente && !loadingDocumentosTributarios && documentosTributarios && documentosTributarios.length > 0) {            
-            setValue("documentoTributarioId", String(cliente.documentoTributarioId));
-            setValue("clienteId", cliente.id);
+        if (cliente && !loadingDocumentosTributarios 
+            && documentosTributarios 
+            && documentosTributarios.length > 0) {
+            console.log("Cliente seleccionado:", cliente);
+            setValue("clienteId", cliente.id);            
+            if(clienteInicial?.nombre === '') {            
+                setClienteSelected({
+                    id: cliente.id || '',
+                    nombre: cliente.nombre,
+                    rut: cliente.rut,
+                    direccionesDespacho: cliente.direccionesDespacho || []
+                });
+                setValue("documentoTributarioId", String(cliente.documentoTributarioId));
+                setValue("direccionDespachoId", direccionDespachoInicialId || '');
+            }
         }
-    }, [cliente, documentosTributarios, loadingDocumentosTributarios, setValue]);
+    }, [cliente, documentosTributarios, loadingDocumentosTributarios, setValue, direccionDespachoInicialId]);
 
     return <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
         <legend className="font-bold text-gray-700 px-2">Datos del Cliente</legend>
@@ -59,6 +76,10 @@ export default function DatosDelCliente({
             <ClienteSearchView titulo="Seleccione al cliente" 
                 register={register("clienteId", { required: true })}
                 setClienteSelected={setClienteSelected}
+                clienteInicial={{
+                    id: clienteSelected?.id || '',
+                    nombre: clienteSelected?.nombre || ''
+                }}
                 isLoading={loadingCliente} />
         </div>}
 
@@ -66,6 +87,7 @@ export default function DatosDelCliente({
         {(cliente && (tipoOrden == 1 || tipoOrden == 4) &&
         <ClientAddressManagerView register={register("direccionDespachoId")}
             label="Dirección de despacho"
+            direccionIdInicialId={direccionDespachoInicialId}
             direcciones={cliente.direccionesDespacho || []}/>)}
 
         {/* DOCUMENTO TRIBUTARIO */}

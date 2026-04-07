@@ -97,45 +97,80 @@ export async function POST() {
 
             if (ventaErr) {
                 console.error('[CONFIRMAR ORDEN] Error fetching venta:', ventaErr);
-            } else if (venta && venta.cliente_id) {
-                const { data: direcciones, error: dirErr } = await supabase
-                    .from('cliente_direcciones_despacho')
-                    .select('direccion_id')
-                    .eq('cliente_id', venta.cliente_id);
+            } 
+            
+            const { data: direcciones, error: dirErr } = await supabase
+                .from('cliente_direcciones_despacho')
+                .select('direccion_id')
+                .eq('cliente_id', venta.cliente_id);
 
-                if (dirErr) {
-                    console.error('[CONFIRMAR ORDEN] Error fetching cliente direcciones:', dirErr);
-                } else if (direcciones && direcciones.length === 1) {
-                    const direccionId = direcciones[0].direccion_id;
+            if (dirErr) {
+                console.error('[CONFIRMAR ORDEN] Error fetching cliente direcciones:', dirErr);
+            }
+            
+            if (direcciones && direcciones.length === 1) {
+                const direccionId = direcciones[0].direccion_id;
 
-                    // Verificar si ya existe ese destino en la ruta
-                    const { data: existingDestino, error: exErr } = await supabase
+                // Verificar si ya existe ese destino en la ruta
+                const { data: existingDestino, error: exErr } = await supabase
+                    .from('ruta_despacho_destinos')
+                    .select('id')
+                    .eq('ruta_despacho_id', rutaDespacho.id)
+                    .eq('direccion_id', direccionId)
+                    .limit(1);
+
+                if (exErr) console.error('[CONFIRMAR ORDEN] Error checking ruta_despacho_destinos:', exErr);
+
+                if (!existingDestino || existingDestino.length === 0) {
+                    const { error: insErr } = await supabase
                         .from('ruta_despacho_destinos')
-                        .select('id')
-                        .eq('ruta_despacho_id', rutaDespacho.id)
-                        .eq('direccion_id', direccionId)
-                        .limit(1);
+                        .insert({ 
+                            ruta_despacho_id: rutaDespacho.id, 
+                            direccion_id: direccionId, 
+                            fecha_arribo: null 
+                        });
 
-                    if (exErr) console.error('[CONFIRMAR ORDEN] Error checking ruta_despacho_destinos:', exErr);
+                    if (insErr) console.error('[CONFIRMAR ORDEN] Error inserting ruta_despacho_destinos:', insErr);
 
-                    if (!existingDestino || existingDestino.length === 0) {
-                        const { error: insErr } = await supabase
-                            .from('ruta_despacho_destinos')
-                            .insert({ 
-                                ruta_despacho_id: rutaDespacho.id, 
-                                direccion_id: direccionId, 
-                                fecha_arribo: null 
-                            });
-                        if (insErr) console.error('[CONFIRMAR ORDEN] Error inserting ruta_despacho_destinos:', insErr);
-
-                        // Actualizar estado a seleccion_destino
-                        const { error: upd2Err } = await supabase
-                            .from('rutas_despacho')
-                            .update({ estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino })
-                            .eq('id', rutaDespacho.id);
-                        if (upd2Err) console.error('[CONFIRMAR ORDEN] Error updating ruta to seleccion_destino:', upd2Err);
+                    // Actualizar estado a seleccion_destino
+                    const { error: upd2Err } = await supabase
+                        .from('rutas_despacho')
+                        .update({ estado: TIPO_ESTADO_RUTA_DESPACHO.en_ruta })
+                        .eq('id', rutaDespacho.id);
+                    
+                    if (upd2Err) {
+                        console.error('[CONFIRMAR ORDEN] Error updating ruta to seleccion_destino:', upd2Err);
                     }
                 }
+            } else {
+                const { error: updErr } = await supabase
+                    .from('rutas_despacho')
+                    .update({ estado: TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino })
+                    .eq('id', rutaDespacho.id);
+
+                if (updErr) {
+                    console.error('[CONFIRMAR ORDEN] Error updating ruta to seleccion_destino:', updErr);
+                }
+            }            
+        } else {
+            const { data: ventasRuta, error: ventasRutaErr } = await supabase
+                .from('ruta_despacho_ventas')
+                .select('venta_id')
+                .eq('ruta_despacho_id', rutaDespacho.id);
+
+            if(ventasRutaErr) {
+                console.error('[CONFIRMAR ORDEN] Error fetching ruta_despacho_ventas:', ventasRutaErr);
+                return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
+            }
+
+            const { error: updVentaErr } = await supabase
+                .from('ventas')
+                .update({ estado: TIPO_ESTADO_RUTA_DESPACHO.reparto })
+                .in('id', ventasRuta.map(v => v.venta_id));
+
+            if (updVentaErr) {
+                console.error('[CONFIRMAR ORDEN] Error updating venta:', updVentaErr);
+                return NextResponse.json({ ok: false, error: 'Error updating venta' }, { status: 500 });
             }
         }
 

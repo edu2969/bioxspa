@@ -226,7 +226,6 @@ export async function GET(request) {
             .in("dependencia_id", dependenciaIds)
             .in("estado", [
                 TIPO_ESTADO_RUTA_DESPACHO.preparacion,
-                TIPO_ESTADO_RUTA_DESPACHO.descarga,
                 TIPO_ESTADO_RUTA_DESPACHO.regreso_confirmado
             ]);
 

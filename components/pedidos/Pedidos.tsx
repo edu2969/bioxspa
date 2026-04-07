@@ -19,6 +19,7 @@ import { useUser } from "@/components/providers/UserProvider";
 import { TIPO_CARGO } from '@/app/utils/constants';
 import Image from 'next/image';
 import { getColorEstanque } from '@/lib/uix';
+import { IClienteSeachResult } from '../_prefabs/types';
 
 const cilindros = [
     // O2 10 m3
@@ -123,12 +124,18 @@ const cilindros = [
 ];
 
 
-export default function Pedidos() {
+export default function Pedidos({
+    pedidoId
+}: {
+    pedidoId: string;
+}) {
     const router = useRouter();
     const { register, handleSubmit, setValue, getValues, control , formState, watch } = useForm<INuevaVentaSubmit>({
         mode: "onChange"
     });
     const [creandoOrden, setCreandoOrden] = useState(false);
+    const [clienteInicial, setClienteInicial] = useState<IClienteSeachResult | null>(null);
+    const [direccionInicialDespachoId, setDireccionInicialDespachoId] = useState<string | null>(null);
     const [redirecting, setRedirecting] = useState(false);
     const formScrollRef = useRef<HTMLDivElement>(null);
     const { user, hasRole } = useAuthorization();
@@ -154,15 +161,27 @@ export default function Pedidos() {
         control,
         name: 'motivo'
     });
+
+    const { data: pedido, isLoading: pedidoLoading } = useQuery({
+        queryKey: ['pedido', pedidoId],
+        queryFn: async () => {
+            const response = await fetch(`/api/ventas/byId/${pedidoId}`);
+            const data = await response.json();            
+            return data;
+        },
+        enabled: !!pedidoId
+    })
     
     const { data: cliente } = useQuery<ICliente | null>({
         queryKey: ['cliente-by-id', clienteId],
         queryFn: async () => {
+            console.log("Fetching cliente for clienteId:", clienteId);
             if (!clienteId) return null;
             const response = await fetch(`/api/clientes?id=${clienteId}`);
-            const data = await response.json();
+            const data = await response.json();            
             return data.cliente;
-        }
+        },
+        enabled: !!clienteId
     });
 
     const fetchWithAuth = async (payload: any) => {
@@ -172,6 +191,10 @@ export default function Pedidos() {
         }
 
         const token = userContext.session.access_token;
+
+        if(pedidoId) {
+            payload.id = pedidoId;
+        }
 
         const response = await fetch('/api/ventas', {
             method: 'POST',
@@ -245,6 +268,29 @@ export default function Pedidos() {
         }
         return false;
     }
+
+    useEffect(() => {
+        if(!pedidoLoading && pedido) {
+            setValue('tipo', pedido.tipo);
+            setClienteInicial({
+                id: pedido.clienteId,
+                nombre: '',
+                rut: '',
+                direccionesDespacho: []
+            });
+            setValue('sucursalId', pedido.sucursalId);
+            setValue('comentario', pedido.comentario);
+            if(pedido.items && Array.isArray(pedido.items)) {
+                const preciosForm = pedido.items.map((item: any) => ({
+                    subcategoriaId: item.subcategoriaId,
+                    cantidad: item.cantidad,
+                    seleccionado: true
+                }));
+                setValue('precios', preciosForm);
+            }
+            setDireccionInicialDespachoId(pedido.direccionDespachoId || '');
+        }
+    }, [pedido, pedidoLoading, setValue]);
 
     useEffect(() => {
         if(selectedPlace && tipoOrden == 2) {
@@ -336,6 +382,8 @@ export default function Pedidos() {
                             <DatosGenerales register={register} setValue={setValue} />
 
                             {tipoOrden == 1 && <DatosDelCliente
+                                clienteInicial={clienteInicial}
+                                direccionDespachoInicialId={direccionInicialDespachoId}
                                 tipoOrden={tipoOrden}
                                 register={register}
                                 setValue={setValue} />}
@@ -362,9 +410,9 @@ export default function Pedidos() {
                                             />
                                         </div>
                                         <div className="w-full">
-                                            <label htmlFor="codigoHES" className="block text-sm font-medium text-gray-700">Código HES</label>
+                                            <label htmlFor="codigoHes" className="block text-sm font-medium text-gray-700">Código HES</label>
                                             <input
-                                                id="codigoHES"
+                                                id="codigoHes"
                                                 {...register('codigoHes')}
                                                 type="text"
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
@@ -456,7 +504,7 @@ export default function Pedidos() {
                             >
                                 {creandoOrden 
                                     ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> 
-                                    : `CREAR ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
+                                    : `${pedidoId ? 'EDITAR' : 'CREAR'} ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
                             </button>
                         </div>
 

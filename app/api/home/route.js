@@ -96,20 +96,6 @@ export async function GET() {
                 dependenciaId = userCargo.dependencia_id;
             }
 
-            // Find all chofer cargos in the same dependencia
-            const { data: choferCargos, error: choferError } = await supabase
-                .from('cargos')
-                .select('usuario_id')
-                .eq('dependencia_id', dependenciaId)
-                .eq('tipo', TIPO_CARGO.conductor)
-                .is('hasta', null);
-
-            if (choferError) {
-                throw choferError;
-            }
-
-            const conductorIds = choferCargos?.map((cargo) => cargo.usuario_id) || [];
-
             // Find ventas in estado 'preparacion' for choferes in the dependencia
             const { data: ventas, error: ventasError } = await supabase
                 .from('ventas')

@@ -112,6 +112,8 @@ const resetVentas = async () => {
             await deleteAllRows("rutas_despacho");
         }
 
+        await deleteAllRows("ventas");
+
         return {
             message: "Reset completo de ventas y rutas finalizado.",
             ventasEliminadas,

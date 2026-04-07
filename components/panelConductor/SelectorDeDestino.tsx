@@ -117,7 +117,8 @@ export default function SelectorDeDestino({
 
             <div className="w-full text-left -mt-3">
                 <div className="w-full flex mt-1 h-12 items-center">
-                    <BsFillGeoAltFill size="1.1rem" className="w-4" /><span className="text-sm ml-2">Barros Arana</span>
+                    <BsFillGeoAltFill size="1.1rem" className="w-4" />
+                    <span className="text-sm ml-2">Barros Arana</span>
                 </div>
                 {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (
                     <CheckPoint key={`check_point_${indexRuta}`} index={indexRuta} isLast={false} destino={destino} />

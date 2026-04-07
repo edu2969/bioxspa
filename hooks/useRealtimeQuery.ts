@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useOnVisibilityChange } from "./useOnVisibilityChange";
 
 type UseRealtimeQueryOptions = {
@@ -85,4 +85,62 @@ export function useRealtimeQuery({
       supabase.removeChannel(channel);
     };
   }, [channelName, table, schema, filter, event, enabled, queryClient, supabase]);
+
+  useEffect(() => {
+    let subscription: RealtimeChannel
+
+    const setupRealtimeSubscription = async () => {
+      await unsubscribeRealtimeConnection()
+      subscription = supabase
+        .channel('list-all-channel')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'lists',
+          },
+          (payload) => {
+            
+          }
+        )
+        .subscribe((status) => {
+          console.log('List Insert and Update Listener.... ', status)
+        })
+    }
+
+    const unsubscribeRealtimeConnection = async () => {
+      if (subscription) {
+        const message = await subscription.unsubscribe()
+        console.log(`${message} - List realtime listener removed.`)
+      }
+    }
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Tab is visible again.')
+        if (subscription.state === 'closed') {
+          console.log('SUBSCRIPTION IS CLOSED.')
+          // Token refesh is important to prevent prevent reconnection failure
+          const { data } = await supabase.auth.getSession()
+          if (data.session) {
+            supabase.realtime.setAuth(data.session?.access_token)
+            setupRealtimeSubscription()
+          }
+        }
+      }
+    }
+
+    // Set up initial subscription
+    setupRealtimeSubscription()
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Cleanup
+    return () => {
+      unsubscribeRealtimeConnection()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, []);
 }
