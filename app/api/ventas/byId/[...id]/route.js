@@ -37,7 +37,7 @@ export async function GET(req, props) {
     // Obtiene los detalles
     const { data: items, error: detalleVentasError } = await supabase
         .from('detalle_ventas')
-        .select(`cantidad, 
+        .select(`cantidad, subcategoriaId:subcategoria_catalogo_id,
             subcategoria:subcategoria_catalogo_id(
                 id, cantidad, unidad, sinSifon:sin_sifon, categoria:categoria_id(
                     id, elemento, esIndustrial:es_industrial, esMedicinal:es_medicinal

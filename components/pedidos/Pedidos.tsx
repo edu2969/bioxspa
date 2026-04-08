@@ -231,6 +231,8 @@ export default function Pedidos({
             }))
         };
 
+        console.log("Payload a enviar:", payload);
+
         try {
             await fetchWithAuth(payload);
             setCreandoOrden(false);
@@ -271,6 +273,7 @@ export default function Pedidos({
 
     useEffect(() => {
         if(!pedidoLoading && pedido) {
+            console.log("Pedido cargado, populando formulario:", pedido);
             setValue('tipo', pedido.tipo);
             setClienteInicial({
                 id: pedido.clienteId,

@@ -173,7 +173,7 @@ export const POST = withAuthorization(
 
         return NextResponse.json({ ok: true, venta: nuevaVenta[0] });
       } else {
-        const { data: updVenta, error: ventaError } = await supabase
+        const { error: ventaError } = await supabase
           .from("ventas")
           .update({
             tipo: payload.tipo,
@@ -192,9 +192,9 @@ export const POST = withAuthorization(
           })
           .eq("id", payload.id);
 
-        if (ventaError || !nuevaVenta) {
-          console.error("Error al crear la venta:", ventaError?.message);
-          return NextResponse.json({ error: "Error al crear la venta" }, { status: 500 });
+        if (ventaError) {
+          console.error("Error al actualizar la venta:", ventaError?.message);
+          return NextResponse.json({ error: "Error al actualizar la venta" }, { status: 500 });
         }
         
         const { error: deleteError } = await supabase
@@ -209,7 +209,7 @@ export const POST = withAuthorization(
 
         // Cambiar el map de detalles para asegurar que nuevaVenta.id sea leído correctamente
         const detalles = payload.items.map((item) => ({
-          venta_id: nuevaVenta[0].id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
+          venta_id: payload.id, // Asegurarse de acceder al primer elemento si nuevaVenta es un array
           subcategoria_catalogo_id: item.subcategoriaId,
           cantidad: item.cantidad,
           neto: (preciosMap[item.subcategoriaId] || 0) * item.cantidad,
@@ -230,7 +230,7 @@ export const POST = withAuthorization(
         const { error: historialError } = await supabase
           .from("venta_historial_estados")
           .insert({
-            venta_id: nuevaVenta[0].id,
+            venta_id: payload.id,
             estado: estadoInicial
           });
 
@@ -239,7 +239,7 @@ export const POST = withAuthorization(
           return NextResponse.json({ error: "Error al insertar el historial de estados" }, { status: 500 });
         }
 
-        return NextResponse.json({ ok: true, venta: nuevaVenta[0] });
+        return NextResponse.json({ ok: true });
       }
       
     } catch (error) {
