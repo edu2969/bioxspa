@@ -15,7 +15,7 @@ export default function ClientAddressManagerView({
 }: {
     label: string,
     register: UseFormRegisterReturn,
-    direccionIdInicialId: string | null | undefined,
+    direccionIdInicialId?: string | null | undefined,
     direcciones: IDireccion[]
 }) {
     const [showAddressManagerModal, setShowAddressManagerModal] = useState(false);

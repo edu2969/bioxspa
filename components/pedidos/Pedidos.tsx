@@ -127,7 +127,7 @@ const cilindros = [
 export default function Pedidos({
     pedidoId
 }: {
-    pedidoId: string;
+    pedidoId?: string;
 }) {
     const router = useRouter();
     const { register, handleSubmit, setValue, getValues, control , formState, watch } = useForm<INuevaVentaSubmit>({

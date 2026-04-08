@@ -5,6 +5,6 @@ import { GoogleMapsProvider } from "@/components/maps/GoogleMapProvider";
 
 export default function PedidosPage() {
     return (<GoogleMapsProvider>
-        <Pedidos/>        
+        <Pedidos />        
     </GoogleMapsProvider>);
 }
