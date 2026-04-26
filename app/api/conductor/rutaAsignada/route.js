@@ -65,7 +65,7 @@ export async function GET(request) {
                         cliente:clientes(
                             nombre,
                             telefono,
-                            direcciones_despacho:cliente_direcciones_despacho(direccion_id)
+                            direccionesDespacho:cliente_direcciones_despacho(id:direccion_id)
                         )
                     )
                 )

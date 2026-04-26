@@ -3,7 +3,7 @@
 import Loader from "../Loader";
 import { useQuery } from "@tanstack/react-query";
 import { IClienteSeachResult } from "./types";
-import { UseFormRegisterReturn } from "react-hook-form";
+import { UseFormRegisterReturn, UseFormSetValue } from "react-hook-form";
 import { useEffect, useState } from "react";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { useRouter } from "next/navigation";
@@ -13,24 +13,20 @@ import { TIPO_CARGO } from "@/app/utils/constants";
 export default function ClienteSearchView({
     titulo,
     register,
-    setClienteSelected,
-    clienteInicial,
-    isLoading
+    clienteId,    
+    isLoading,    
+    onChange
 }: {
     titulo?: string;
     register: UseFormRegisterReturn;
-    setClienteSelected: (value: IClienteSeachResult | null) => void;
-    clienteInicial?: {
-        id: string;
-        nombre: string;
-    } | null;
+    clienteId?: string;    
     isLoading?: boolean;
+    onChange?: (value: string) => void;
 }) {
-    const { user, hasRole } = useAuthorization();
-    const [textoBusqueda, setTextoBusqueda] = useState(clienteInicial?.nombre || "");
+    const { hasRole } = useAuthorization();
+    const [textoBusqueda, setTextoBusqueda] = useState("");
     const router = useRouter();
     const [debouncedSearch, setDebouncedSearch] = useState("");    
-    const [clienteId, setClienteId] = useState<string | null>(clienteInicial?.id || null);
     const [isRedirecting, setIsRedirecting] = useState(false);
     
     useEffect(() => {
@@ -51,18 +47,16 @@ export default function ClienteSearchView({
         enabled: !clienteId && debouncedSearch.length >= 3
     });
 
-    useEffect(() => {        
-        if (clienteInicial && clienteInicial.id && clienteInicial.nombre !== "") {
-            console.log("Procesando cliente inicial:", clienteInicial);
-            setClienteId(clienteInicial.id);
-            setTextoBusqueda(clienteInicial.nombre);
-        }
-    }, [clienteInicial, setClienteId, setTextoBusqueda]);
-
     const handleSelect = (cliente: IClienteSeachResult) => {
         setTextoBusqueda(cliente.nombre);
-        setClienteId(cliente.id || null);
-        setClienteSelected(cliente);
+        const event = new Event('change', { bubbles: true });
+        Object.defineProperty(event, 'target', {
+            writable: false,
+            value: { name: register.name, value: cliente.id }
+        });
+        register.onChange(event);
+        onChange?.(cliente.id);
+        console.log("cliente", cliente);
     };
     
     return (<div className="w-full">
@@ -79,8 +73,6 @@ export default function ClienteSearchView({
                     onChange={(e) => {
                         const value = e.target.value;                        
                         if(value.trim() === '') {
-                            setClienteSelected(null);
-                            setClienteId(null);
                             register.onChange({ target: { value: '' } });                            
                         }
                         setTextoBusqueda(value);

@@ -28,8 +28,8 @@ export function ChecklistProvider({ tipo, children }: {
     const [showModal, setShowModal] = useState(false);
     const { user, loading: loadingUser } = useUser();
     // La fecha del día se incluye en la key para que React Query invalide
-    // automáticamente al cambiar de día sin necesidad de reload manual.
-    const today = new Date().toDateString();
+    // automáticamente al cambiar de día sin necesidad de reload manual en formato YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
 
     const { data: checklist, isLoading: isLoadingChecklist } = useQuery<IChecklistData>({
         queryKey: ["checklist", user?.id, today],

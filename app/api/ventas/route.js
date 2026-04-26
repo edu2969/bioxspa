@@ -26,6 +26,8 @@ export const POST = withAuthorization(
         }))
       };
 
+      console.log("Venta payload", payload);
+
       // Obtener contexto de cargo activo para dependencia/sucursal.
       const { data: cargoActivo } = await supabase
         .from("cargos")

@@ -20,7 +20,6 @@ export default function InformacionDeCarga({
             if(!rutaDespacho) return { encargado: '', cilindros: [] };
             const response = await fetch(`/api/conductor/listadoDeCarga?rutaId=${rutaDespacho.id}`);
             const data = await response.json();
-            console.log("CARGA-vehiculo", {...data});
             return {...data};
         },
         enabled: !!rutaDespacho
@@ -72,7 +71,7 @@ export default function InformacionDeCarga({
         </div>}
 
 
-        {!loadingListaDeCarga &&rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
+        {!loadingListaDeCarga && rutaDespacho && estado == TIPO_ESTADO_RUTA_DESPACHO.orden_cargada && <div className="w-full">
             <p className="text-center text-xl font-bold">Confirma{`${mutation.isPending ? 'ndo' : ''}`} la carga</p>
             <div className="flex flex-col md:flex-row px-4 py-2">
                 <div className="w-full md:w-1/3">

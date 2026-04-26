@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
-import { TIPO_CARGO, TIPO_ORDEN } from "@/app/utils/constants";
+import { TIPO_CARGO, TIPO_ORDEN, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function GET(request) {
     try {
@@ -52,50 +52,30 @@ export async function GET(request) {
             if (!cargos || cargos.length === 0) return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
-        // Direcciones ya asignadas sin fecha de arribo
-        const asignadas = (rutaData.ruta_despacho_destinos || []).filter(d => d.fecha_arribo === null).map(d => String(d.direccion_id));
-
         // Ventas asociadas a la ruta
-        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id).filter(Boolean);
-        if (ventaIds.length === 0) return NextResponse.json({ ok: false, error: 'No hay ventas asociadas a la ruta' }, { status: 404 });
+        const ventaIds = (rutaData.ruta_despacho_ventas || []).map(r => r.venta_id);
+        if (ventaIds.length === 0) {
+            console.error(`[destinos] No ventas found for rutaId ${rutaId}`);
+            return NextResponse.json({ ok: false, error: 'No hay ventas asociadas a la ruta' }, { status: 404 });
+        }
 
         const { data: ventas, error: ventasErr } = await supabase
             .from('ventas')
             .select('id, cliente_id, direccion_despacho_id, cliente:clientes(id, nombre)')
-            .in('id', ventaIds);
+            .in('id', ventaIds)
+            .lt("estado", TIPO_ESTADO_VENTA.entregado);
 
         if (ventasErr) {
             console.error('[destinos] Error fetching ventas:', ventasErr);
             return NextResponse.json({ ok: false, error: 'Error fetching ventas' }, { status: 500 });
         }
 
-        // Recopilar direcciones candidatas: direccion_despacho_id de ventas no asignadas
-        const candidatos = new Set();
-        const clienteIdsToLookup = new Set();
-
-        for (const v of (ventas || [])) {
-            const dirId = v.direccion_despacho_id;
-            if (dirId && !asignadas.includes(String(dirId))) {
-                candidatos.add(String(dirId));
-                continue;
-            }
-            if (v.cliente_id) clienteIdsToLookup.add(v.cliente_id);
+        if(ventas.length === 0) {
+            console.warn(`[destinos] No ventas found for rutaId ${rutaId} after filtering by estado`);
+            return NextResponse.json({ ok: true, destinos: [] });            
         }
 
-        // Buscar direcciones de clientes cuando la venta no tiene direccion_despacho
-        if (clienteIdsToLookup.size > 0) {
-            const clienteIds = Array.from(clienteIdsToLookup);
-            const { data: cliDirs, error: cliDirsErr } = await supabase
-                .from('cliente_direcciones_despacho')
-                .select('cliente_id, direccion_id')
-                .in('cliente_id', clienteIds);
-            if (cliDirsErr) console.error('[destinos] Error fetching cliente direcciones:', cliDirsErr);
-            for (const cd of (cliDirs || [])) {
-                if (!asignadas.includes(String(cd.direccion_id))) candidatos.add(String(cd.direccion_id));
-            }
-        }
-
-        const direccionIds = Array.from(candidatos);
+        const direccionIds = ventas.map(v => v.direccion_despacho_id);
         if (direccionIds.length === 0) return NextResponse.json({ ok: true, destinos: [] });
 
         const { data: direcciones, error: dirErr } = await supabase
@@ -114,15 +94,6 @@ export async function GET(request) {
             if (v.cliente && v.cliente.nombre) clienteNombreMap[v.cliente_id] = v.cliente.nombre;
         }
 
-        // Also map direccion_id -> cliente_id from cliente_direcciones_despacho
-        const { data: cliDirsAll } = await supabase
-            .from('cliente_direcciones_despacho')
-            .select('cliente_id, direccion_id')
-            .in('direccion_id', direccionIds);
-
-        const direccionToCliente = {};
-        for (const cd of (cliDirsAll || [])) direccionToCliente[cd.direccion_id] = cd.cliente_id;
-
         const destinos = (direcciones || []).map(d => ({
             tipo: TIPO_ORDEN.venta,
             fechaArribo: null,
@@ -133,8 +104,10 @@ export async function GET(request) {
                 longitud: d.longitud || 0,
             },
             comentario: d.comentario || '',            
-            nombreCliente: clienteNombreMap[direccionToCliente[d.id]] || ''
+            nombreCliente: clienteNombreMap[ventas.find(v => v.direccion_despacho_id === d.id)?.cliente_id] || ''
         }));
+
+        console.log("Destinos finales:", destinos);
 
         return NextResponse.json({ ok: true, destinos });
     } catch (error) {

@@ -152,16 +152,6 @@ export default function Pedidos({
         name: 'clienteId'
     });
 
-    const direccionRetiroSeleccionado = useWatch({
-        control,
-        name: 'direccionRetiroId'
-    });
-
-    const motivo = useWatch({
-        control,
-        name: 'motivo'
-    });
-
     const { data: pedido, isLoading: pedidoLoading } = useQuery({
         queryKey: ['pedido', pedidoId],
         queryFn: async () => {
@@ -170,19 +160,80 @@ export default function Pedidos({
             return data;
         },
         enabled: !!pedidoId
-    })
-    
-    const { data: cliente } = useQuery<ICliente | null>({
-        queryKey: ['cliente-by-id', clienteId],
-        queryFn: async () => {
-            console.log("Fetching cliente for clienteId:", clienteId);
-            if (!clienteId) return null;
-            const response = await fetch(`/api/clientes?id=${clienteId}`);
-            const data = await response.json();            
-            return data.cliente;
-        },
-        enabled: !!clienteId
-    });
+    })  
+
+    const resumenCilindros = Object.values(
+        cilindros.reduce((acc, cilindro) => {
+            const ownerType = cilindro.ownerId ? 'TP' : 'BIOX';
+            const estado = String(cilindro.estado || '').toUpperCase().includes('LLENO') ? 'LLENO' : 'VACIO';
+            const key = [
+                cilindro.categoria.elemento,
+                cilindro.subcategoria.cantidad,
+                cilindro.subcategoria.unidad,
+                estado,
+                cilindro.categoria.esIndustrial ? 1 : 0,
+                cilindro.categoria.esMedicinal ? 1 : 0,
+                cilindro.subcategoria.sinSifon ? 1 : 0,
+                ownerType,
+            ].join('|');
+
+            if (!acc[key]) {
+                acc[key] = {
+                    key,
+                    cantidad: 0,
+                    elemento: cilindro.categoria.elemento,
+                    medida: cilindro.subcategoria.cantidad,
+                    unidad: cilindro.subcategoria.unidad,
+                    esIndustrial: cilindro.categoria.esIndustrial,
+                    esMedicinal: cilindro.categoria.esMedicinal,
+                    sinSifon: cilindro.subcategoria.sinSifon,
+                    ownerType,
+                    estado,
+                };
+            }
+
+            acc[key].cantidad += 1;
+            return acc;
+        }, {} as Record<string, {
+            key: string;
+            cantidad: number;
+            elemento: string;
+            medida: number;
+            unidad: string;
+            esIndustrial: boolean;
+            esMedicinal: boolean;
+            sinSifon: boolean;
+            ownerType: 'BIOX' | 'TP';
+            estado: 'VACIO' | 'LLENO';
+        }>)
+    );
+
+    const normalizarElementoParaColor = (elemento: string) => {
+        if (!elemento) return '';
+
+        return elemento
+            .replace(/₀/g, '0')
+            .replace(/₁/g, '1')
+            .replace(/₂/g, '2')
+            .replace(/₃/g, '3')
+            .replace(/₄/g, '4')
+            .replace(/₅/g, '5')
+            .replace(/₆/g, '6')
+            .replace(/₇/g, '7')
+            .replace(/₈/g, '8')
+            .replace(/₉/g, '9');
+    };
+
+    const getCylinderScale = (elemento: string, medida: number, unidad: string) => {
+        const elementoNormalizado = normalizarElementoParaColor(elemento).toLowerCase();
+        const unidadNormalizada = String(unidad || '').toLowerCase();
+
+        const base = elementoNormalizado === 'co2' && unidadNormalizada === 'kg' ? 45 : 10;
+        const rawScale = Number(medida || 0) / base;
+
+        // Mantener legibilidad visual en tarjetas compactas.
+        return Math.max(0.45, Math.min(rawScale || 1, 1.4));
+    };
 
     const fetchWithAuth = async (payload: any) => {
         if (!userContext || !userContext.session) {
@@ -221,7 +272,7 @@ export default function Pedidos({
             tipo: data.tipo,
             usuarioId: hasRole([TIPO_CARGO.gerente]) ? data.usuarioId : user.id,
             comentario: data.comentario || "",
-            clienteId: cliente?.id,
+            clienteId: data.clienteId,
             documentoTributarioId: data.documentoTributarioId,
             direccionDespachoId: data.direccionDespachoId,
             sucursalId: data.sucursalId,
@@ -301,79 +352,6 @@ export default function Pedidos({
         }
     }, [selectedPlace, tipoOrden, setValue]);
 
-    const resumenCilindros = Object.values(
-        cilindros.reduce((acc, cilindro) => {
-            const ownerType = cilindro.ownerId ? 'TP' : 'BIOX';
-            const estado = String(cilindro.estado || '').toUpperCase().includes('LLENO') ? 'LLENO' : 'VACIO';
-            const key = [
-                cilindro.categoria.elemento,
-                cilindro.subcategoria.cantidad,
-                cilindro.subcategoria.unidad,
-                estado,
-                cilindro.categoria.esIndustrial ? 1 : 0,
-                cilindro.categoria.esMedicinal ? 1 : 0,
-                cilindro.subcategoria.sinSifon ? 1 : 0,
-                ownerType,
-            ].join('|');
-
-            if (!acc[key]) {
-                acc[key] = {
-                    key,
-                    cantidad: 0,
-                    elemento: cilindro.categoria.elemento,
-                    medida: cilindro.subcategoria.cantidad,
-                    unidad: cilindro.subcategoria.unidad,
-                    esIndustrial: cilindro.categoria.esIndustrial,
-                    esMedicinal: cilindro.categoria.esMedicinal,
-                    sinSifon: cilindro.subcategoria.sinSifon,
-                    ownerType,
-                    estado,
-                };
-            }
-
-            acc[key].cantidad += 1;
-            return acc;
-        }, {} as Record<string, {
-            key: string;
-            cantidad: number;
-            elemento: string;
-            medida: number;
-            unidad: string;
-            esIndustrial: boolean;
-            esMedicinal: boolean;
-            sinSifon: boolean;
-            ownerType: 'BIOX' | 'TP';
-            estado: 'VACIO' | 'LLENO';
-        }>)
-    );
-
-    const normalizarElementoParaColor = (elemento: string) => {
-        if (!elemento) return '';
-
-        return elemento
-            .replace(/₀/g, '0')
-            .replace(/₁/g, '1')
-            .replace(/₂/g, '2')
-            .replace(/₃/g, '3')
-            .replace(/₄/g, '4')
-            .replace(/₅/g, '5')
-            .replace(/₆/g, '6')
-            .replace(/₇/g, '7')
-            .replace(/₈/g, '8')
-            .replace(/₉/g, '9');
-    };
-
-    const getCylinderScale = (elemento: string, medida: number, unidad: string) => {
-        const elementoNormalizado = normalizarElementoParaColor(elemento).toLowerCase();
-        const unidadNormalizada = String(unidad || '').toLowerCase();
-
-        const base = elementoNormalizado === 'co2' && unidadNormalizada === 'kg' ? 45 : 10;
-        const rawScale = Number(medida || 0) / base;
-
-        // Mantener legibilidad visual en tarjetas compactas.
-        return Math.max(0.45, Math.min(rawScale || 1, 1.4));
-    };
-
     return (
         <main className="w-full min-h-screen pt-0 overflow-y-auto bg-white sm:px-1 md:px-4">
             <div className="w-full pb-2 mt-14 h-[calc(100vh-116px)] overflow-y-auto" ref={formScrollRef}>
@@ -385,7 +363,7 @@ export default function Pedidos({
                             <DatosGenerales register={register} setValue={setValue} />
 
                             {tipoOrden == 1 && <DatosDelCliente
-                                clienteInicial={clienteInicial}
+                                clienteId={clienteId}
                                 direccionDespachoInicialId={direccionInicialDespachoId}
                                 tipoOrden={tipoOrden}
                                 register={register}
@@ -395,36 +373,36 @@ export default function Pedidos({
                             {tipoOrden == 2 && <DatosDeTraslado register={register} />}
                             {/* ÓRDEN DE TRABAJO */}
                             {tipoOrden == 3 && <DatosOrdenDeTrabajo register={register} watch={watch}/>}
-
-                            {/* IFORMACION EXTRA */}
-                            {hasRole([TIPO_CARGO.encargado])
-                                && cliente != null && cliente.ordenCompra &&
-                                <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
-                                    <legend className="font-bold text-gray-700 px-2">Orden de compra</legend>
-                                    <div className="w-full flex-col mt-3 space-y-4">
-                                        <div className="w-full">
-                                            <label htmlFor="numeroOrden" className="block text-sm font-medium text-gray-700">N° de órden</label>
-                                            <input
-                                                id="numeroOrden"
-                                                {...register('numeroOrden')}
-                                                type="text"
-                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                                placeholder="Ingrese el número de órden"
-                                            />
-                                        </div>
-                                        <div className="w-full">
-                                            <label htmlFor="codigoHes" className="block text-sm font-medium text-gray-700">Código HES</label>
-                                            <input
-                                                id="codigoHes"
-                                                {...register('codigoHes')}
-                                                type="text"
-                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                                                placeholder="Ingrese el código HES"
-                                            />
-                                        </div>
-                                    </div>
-                                </fieldset>}
                         </div>
+
+                        {/* IFORMACION EXTRA */}
+                        {hasRole([TIPO_CARGO.encargado])
+                            && clienteId &&
+                            <fieldset className="border rounded-md px-4 pt-0 pb-2 space-y-4">
+                                <legend className="font-bold text-gray-700 px-2">Orden de compra</legend>
+                                <div className="w-full flex-col mt-3 space-y-4">
+                                    <div className="w-full">
+                                        <label htmlFor="numeroOrden" className="block text-sm font-medium text-gray-700">N° de órden</label>
+                                        <input
+                                            id="numeroOrden"
+                                            {...register('numeroOrden')}
+                                            type="text"
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            placeholder="Ingrese el número de órden"
+                                        />
+                                    </div>
+                                    <div className="w-full">
+                                        <label htmlFor="codigoHes" className="block text-sm font-medium text-gray-700">Código HES</label>
+                                        <input
+                                            id="codigoHes"
+                                            {...register('codigoHes')}
+                                            type="text"
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            placeholder="Ingrese el código HES"
+                                        />
+                                    </div>
+                                </div>
+                            </fieldset>}
 
                         {(tipoOrden == 1 || tipoOrden == 4) && clienteId
                             && <ListadoDePrecios register={register} 
@@ -507,7 +485,7 @@ export default function Pedidos({
                             >
                                 {creandoOrden 
                                     ? <div className="relative mt-0"><Loader texto={redirecting ? "VOLVIENDO" : "CREANDO"} /></div> 
-                                    : `${pedidoId ? 'EDITAR' : 'CREAR'} ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
+                                    : `${pedidoId ? 'ACTUALIZAR' : 'CREAR'} ${["VENTA", "ÓRDEN DE TRASLADO", "ÓRDEN", "COTIZACIÓN"][tipoOrden - 1] ?? "ÓRDEN"}`}
                             </button>
                         </div>
 

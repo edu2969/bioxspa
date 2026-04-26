@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { getAuthenticatedUser } from "@/lib/supabase/supabase-auth";
-import { TIPO_ESTADO_VENTA } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from "@/app/utils/constants";
 
 export async function POST(request) {
     try {
@@ -69,16 +69,8 @@ export async function POST(request) {
         const { data: itemsFound, error: itemError } = await supabase
             .from("items_catalogo")
             .select(`
-                id,
-                codigo,
-                estado,
-                garantia_anual,
-                stock_minimo,
-                stock_actual,
-                fecha_mantencion,
-                direccion:direcciones(id, direccion_cliente),
-                propietario:clientes(id, nombre, rut),
-                subcategoria:subcategorias_catalogo(id, nombre, cantidad, unidad, sin_sifon, categoria:categorias_catalogo(id, nombre, elemento, es_industrial))
+                id, codigo, propietarioId:propietario_id, direccionId:direccion_id, 
+                subcategoria:subcategoria_catalogo_id(id, categoria:categoria_catalogo_id(id))
             `)
             .eq("codigo", codigo)
             .limit(1);
@@ -93,6 +85,54 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
         }
 
+        // Revisa en las rutas de despacho activas si el item está cargado
+        // Todas las rutas activas.
+        const { data: activeRutas, error: activeRutasErr } = await supabase
+            .from("rutas_despacho")
+            .select("id")
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+            .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado);
+
+        if(activeRutasErr) {
+            console.error("Error fetching active rutas:", activeRutasErr);
+            return NextResponse.json({ ok: false, error: "Error fetching active routes" }, { status: 500 });
+        }
+
+        if(activeRutas) {
+            const activeRutaIds = activeRutas.map(r => r.id);
+            const { data: historiales, error: historialesErr } = await supabase
+                .from("ruta_despacho_historial_carga")
+                .select("id")
+                .in("ruta_despacho_id", activeRutaIds);
+
+            if(historialesErr) {
+                console.error("Error checking if item is already loaded in active routes:", itemsCargadosErr);
+                return NextResponse.json({ ok: false, error: "Error checking item in active routes" }, { status: 500 });
+            }
+
+            // Debe tener un solo historial, que significa que tiene solo (es_carga = true).
+            // Si está el item, no puede cargarlo
+            if(historiales && historiales.length === 1) {
+                const historialesIds = historiales.map(h => h.id);
+                const { data: itemsMovidos, error: itemsMovidosErr } = await supabase
+                    .from("ruta_despacho_historial_carga_items_movidos")
+                    .select("id")
+                    .eq("ruta_despacho_historial_carga_id", historialesIds[0])
+                    .eq("item_catalogo_id", itemRow.id)
+                    .maybeSingle();
+
+                if(itemsMovidosErr) {
+                    console.error("Error checking if item is already loaded in active routes:", itemsMovidosErr);
+                    return NextResponse.json({ ok: false, error: "Error checking item in active routes" }, { status: 500 });
+                }
+
+                if(itemsMovidos) {
+                    console.log("Item is already loaded in an active route:", itemRow.id);
+                    return NextResponse.json({ ok: false, error: "El item ya está cargado en una ruta activa" }, { status: 400 });
+                }                
+            }
+        }
+
         // Fetch expected direccion details for helpful response in modal
         const { data: expectedDireccion, error: expectedDireccionError } = await supabase
             .from("direcciones")
@@ -102,46 +142,6 @@ export async function POST(request) {
 
         if (expectedDireccionError || !expectedDireccion) {
             return NextResponse.json({ ok: false, error: "No workplace address details found for user" }, { status: 400 });
-        }
-
-        const buildItemView = (row) => {
-            const sub = row.subcategoria || null;
-            const cat = sub?.categoria || null;
-            return {
-                id: row.id,
-                ownerId: row.propietario ? { id: row.propietario.id, nombre: row.propietario.nombre, rut: row.propietario.rut } : null,
-                direccionId: row.direccion ? { id: row.direccion.id, direccionCliente: row.direccion.direccion_cliente } : null,
-                elemento: (cat && cat.elemento) || (sub && sub.nombre) || "",
-                codigo: row.codigo,
-                subcategoriaCatalogoId: sub ? {
-                    id: sub.id,
-                    temporalId: undefined,
-                    nombre: sub.nombre,
-                    categoriaCatalogoId: cat ? {
-                        id: cat.id,
-                        nombre: cat.nombre,
-                        elemento: cat.elemento,
-                        esIndustrial: cat.es_industrial
-                    } : null,
-                    cantidad: sub.cantidad,
-                    unidad: sub.unidad,
-                    sinSifon: sub.sin_sifon                    
-                } : null,
-                stockActual: row.stock_actual,
-                stockMinimo: row.stock_minimo,
-                garantiaAnual: row.garantia_anual,
-                estado: row.estado,
-                fechaMantencion: row.fecha_mantencion,
-                direccionInvalida: String(row.direccion?.id) !== String(expectedDireccion?.id),
-                direccionEsperada: expectedDireccion
-                    ? { id: expectedDireccion.id, direccionCliente: expectedDireccion.direccion_cliente }
-                    : null
-            };
-        };
-
-        // If item is not located at user's workplace, return a helpful error with item view
-        if (String(itemRow.direccion?.id) !== String(expectedDireccion?.id)) {
-            return NextResponse.json({ ok: false, item: buildItemView(itemRow), error: "El item no está donde se esperaba" }, { status: 400 });
         }
 
         // Helper: ensure a carga historial exists (latest) and return its id
@@ -258,7 +258,7 @@ export async function POST(request) {
 
             const carga_item_ids = (cargaHistorials || []).flatMap(h => (h.items || []).map(i => i.item_catalogo_id));
 
-            return NextResponse.json({ ok: true, item: buildItemView(itemRow), carga_item_ids });
+            return NextResponse.json({ ok: true, item: itemRow, carga_item_ids });
         } else if (ventaId) {
             const { data: venta, error: ventaErr } = await supabase
                 .from("ventas")
@@ -318,7 +318,7 @@ export async function POST(request) {
                 return NextResponse.json({ ok: false, error: "Failed to record moved item" }, { status: 500 });
             }
 
-            return NextResponse.json({ ok: true, item: buildItemView(itemRow) });
+            return NextResponse.json({ ok: true, item: itemRow });
         }
 
         return NextResponse.json({ ok: false, error: "No operation performed" }, { status: 400 });

@@ -19,8 +19,6 @@ export async function GET() {
             .select('id, elemento, es_industrial, es_medicinal')
             .eq('tipo', TIPO_CATEGORIA_CATALOGO.cilindro);
 
-        console.log("----------->", categorias, error);
-
         if (error) {
             return NextResponse.json({
                 ok: false,

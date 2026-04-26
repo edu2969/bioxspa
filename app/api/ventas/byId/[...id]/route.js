@@ -39,7 +39,7 @@ export async function GET(req, props) {
         .from('detalle_ventas')
         .select(`cantidad, subcategoriaId:subcategoria_catalogo_id,
             subcategoria:subcategoria_catalogo_id(
-                id, cantidad, unidad, sinSifon:sin_sifon, categoria:categoria_id(
+                id, cantidad, unidad, sinSifon:sin_sifon, categoria:categoria_catalogo_id(
                     id, elemento, esIndustrial:es_industrial, esMedicinal:es_medicinal
                 ), precio:precios(
                     valor, moneda

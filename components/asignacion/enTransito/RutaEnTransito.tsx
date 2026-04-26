@@ -1,7 +1,7 @@
-import { TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
+import { TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA, TIPO_ORDEN } from "@/app/utils/constants";
 import VehiculoView from "@/components/_prefabs/VehiculoView";
 import useVehicleScaling from "@/components/uix/useVehicleScaling";
-import { ICilindroView, IRutaEnTransito, IRutasEnTransitoResponse, IVentaEnTransito } from "@/types/types";
+import { ICilindroView, IRutaEnTransito, IVentaEnTransito } from "@/types/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
@@ -9,6 +9,25 @@ import { BsGeoAltFill } from "react-icons/bs";
 import { FaRegCheckCircle } from "react-icons/fa";
 import { FaTruckFast } from "react-icons/fa6";
 import { VscCommentDraft, VscCommentUnresolved } from "react-icons/vsc";
+
+const indicadorEstadoRuta = (estado: number) => {
+    console.log("Estado de ruta:", estado);
+    switch (estado) {
+        case TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino:
+            return { color: 'bg-yellow', text: 'Preparando el viaje' };
+        case TIPO_ESTADO_RUTA_DESPACHO.en_ruta:
+            return { color: 'bg-blue', text: 'En tránsito' };
+        case TIPO_ESTADO_RUTA_DESPACHO.descarga:
+            return { color: 'bg-orange', text: 'Descargando' };
+        case TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada:
+            return { color: 'bg-green', text: 'Descarga confirmada' };
+        case TIPO_ESTADO_RUTA_DESPACHO.regreso:
+            return { color: 'bg-purple', text: 'Regresando a base' };
+        default:
+            return { color: 'bg-gray', text: 'Desconocida' };
+    }
+};
+    
 
 export default function RutaEnTransito({
     rutaId,
@@ -26,21 +45,6 @@ export default function RutaEnTransito({
     
     // Hook de escalado para el vehículo
     const vehicleScaling = useVehicleScaling(vehicleContainerRef);
-
-    
-
-    // Obtener datos del vehículo para el scaling
-    const { data: vehiculo } = useQuery({
-        queryKey: ['vehiculo-conductor', rutaId],
-        queryFn: async () => {
-            if (!rutaId) return null;
-            const response = await fetch(`/api/conductor/vehiculoAsignado?rutaId=${rutaId}`);
-            const data = await response.json();
-            console.log("Vehículo asignado:", data);
-            return data.vehiculo;
-        },
-        enabled: !!rutaId
-    });
 
     const { data: cargados, isLoading: loadingCargados } = useQuery<ICilindroView[]>({
         queryKey: ['carga-vehiculo', rutaId],
@@ -132,7 +136,11 @@ export default function RutaEnTransito({
                     descargados={descargados || []}
                     ref={vehicleContainerRef}
                 />
-                <div className="flex mb-2 mt-2">
+                <div className={`flex items-center ${indicadorEstadoRuta(estado).color} text-xs font-semibold -mt-6 ml-3`}>
+                    <span className={`inline-block w-2 h-2 rounded-full ${indicadorEstadoRuta(estado).color}-500 mr-2`}></span>
+                    {`${indicadorEstadoRuta(estado).text}`}
+                </div>
+                <div className="flex mb-2 mt-2">                    
                     <BsGeoAltFill size="1.25rem" className="text-gray-700 ml-2" />
                     <p className="text-xs text-gray-500 ml-2 truncate">{rutaEnTransito?.direccionDestino || 'Seleccionando destino...'}</p>
                 </div>

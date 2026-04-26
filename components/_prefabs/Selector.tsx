@@ -1,5 +1,6 @@
 import { UseFormRegisterReturn } from "react-hook-form";
 import { useEffect } from "react";
+import Loader from "../Loader";
 
 type SelectorProps<T> = {
   options: T[];
@@ -26,7 +27,7 @@ export function Selector<T>({
   disableAutoSelect = false, // Por defecto false para mantener comportamiento actual
   defaultValue
 }: SelectorProps<T>) {
-  
+
   // Seleccionar automáticamente si solo hay una opción (solo si no está deshabilitado)
   useEffect(() => {
     if (options && options.length === 1 && !isLoading && !disableAutoSelect) {
@@ -47,23 +48,30 @@ export function Selector<T>({
       <label htmlFor="cliente" className="block text-sm font-medium text-gray-700">
         {label ?? "Seleccione..."}
       </label>
-      <select
-        {...register}
-        onChange={e => {
-          register.onChange(e);
-          onChange?.(e.target.value);
-        }}
-        disabled={isLoading}
-        value={options && options.length === 1 && !isLoading && !disableAutoSelect ? getValue(options[0]) : undefined}
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-      >
-        <option value="">{isLoading ? `Cargando${label ? " " + label : ""}...` : (placeholder || `Seleccione${label ? " " + label : ""}...`)}</option>
-        {options?.map((item, idx) => (
-          <option key={idx} value={getValue(item)}>
-            {getLabel(item)}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          {...register}
+          onChange={e => {
+            register.onChange(e);
+            onChange?.(e.target.value);
+          }}
+          defaultValue={defaultValue}
+          disabled={isLoading}
+          value={options && options.length === 1 && !isLoading && !disableAutoSelect ? getValue(options[0]) : undefined}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+        >
+          <option value="">{isLoading ? `Cargando${label ? " " + label : ""}...` : (placeholder || `Seleccione${label ? " " + label : ""}...`)}</option>
+          {options?.map((item, idx) => (
+            <option key={idx} value={getValue(item)}>
+              {getLabel(item)}
+            </option>
+          ))}
+        </select>
+        {isLoading && <div className="absolute w-full top-1 bg-white/80">
+          <div className="w-full flex justify-end items-end"><Loader texto="" /></div>
+        </div>}
+      </div>
+
     </div>
   );
 }

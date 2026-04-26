@@ -372,13 +372,13 @@ export default function Asignacion() {
                                 const errorData = await response.json();
                                 throw new Error(errorData.error || "Error al asignar el pedido");
                             }
-                            toast.success("Pedido asignado con éxito");
                             await Promise.all([
                                 qryClient.invalidateQueries({ queryKey: ['pedidos-por-asignar', sucursalId] }),
                                 qryClient.invalidateQueries({ queryKey: ['conductores', sucursalId] }),
                                 qryClient.invalidateQueries({ queryKey: ['cargamentos-despacho'] })
-                            ]);
+                            ]);                            
                             setIsSaving(true);
+                            toast.success("Pedido asignado con éxito");
                         } catch (error) {
                             console.error("Error al asignar el pedido:", error);
                             if (error instanceof Error) {

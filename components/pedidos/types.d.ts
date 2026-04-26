@@ -54,3 +54,17 @@ export interface INuevaVentaSubmit {
         subcategoriaId: string;
     }[];
 }
+
+export interface IPowerScanForm {
+    id: string;
+    estado: number;
+    carga: number;
+    subcategoriaId: string;
+    categoriaId: string;
+    stockActual: number;
+    stockMinimo: number;
+    codigo: string;
+    fechaMantencion?: string;
+    propietarioId?: string | null;
+    direccionId?: string | null;    
+}

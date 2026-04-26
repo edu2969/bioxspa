@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
-import { USER_ROLE } from '@/app/utils/constants';
+import { USER_ROLE, TIPO_ESTADO_RUTA_DESPACHO, TIPO_ESTADO_VENTA } from '@/app/utils/constants';
 
 export async function GET(request) {
     try {
@@ -18,7 +18,7 @@ export async function GET(request) {
         // Fetch ruta with nested destinos and conductor info
         const { data: rutaData, error: rutaErr } = await supabase
             .from('rutas_despacho')
-            .select('id, conductor_id, conductor:usuarios(id, nombre), ruta_despacho_destinos(id, direccion:direcciones(id, direccion_cliente), created_at)')
+            .select('id, estado, conductor_id, conductor:usuarios(id, nombre), ruta_despacho_destinos(id, direccion:direcciones(id, direccion_cliente), fecha_arribo)')
             .eq('id', rutaId)
             .maybeSingle();
 
@@ -45,14 +45,41 @@ export async function GET(request) {
             }
         }
 
-        // Determine latest destino by created_at
+        // Determina el último destino
         let direccionDestino = '';
-        const destinos = rutaData.ruta_despacho_destinos || [];
-        if (destinos.length > 0) {
-            destinos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            direccionDestino = destinos[0]?.direccion?.direccion_cliente || '';
-        }
+        if(rutaData.estado === TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino) {
+            // Si hay solo una venta sin entregar, la dirección de despacho es de esa venta
+            const { data: ventas, error: ventasErr } = await supabase
+            .from('ruta_despacho_ventas')
+            .select('id, venta_id(id, estado, direccion_despacho_id(direccion_cliente))')
+            .eq('ruta_despacho_id', rutaId);
+            
+            if(ventasErr) {
+                console.log("[rutaEnTransito] Error al obtener las ventas de la ruta");
+                return NextResponse.json({ ok: false, error: 'Error al obtener las ventas de la ruta'}, { status: 500 });
+            }
 
+            if(!ventas) {
+                console.log("[rutaEnTransito] No hay ventas para la ruta");
+                return NextResponse.json({ ok: false, error: 'No hay ventas para la ruta' }, { status: 400 });
+            }
+
+            if(ventas.filter(v => v.venta_id.estado < TIPO_ESTADO_VENTA.entregado).length === 1) {
+                direccionDestino = ventas[0].venta_id.direccion_despacho_id.direccion_cliente;
+            } else {
+                direccionDestino = 'Selección de destino';
+            }
+        } else {
+            const destinoSinArribo = rutaData.ruta_despacho_destinos.find(d => d.fecha_arribo == null);
+            if(destinoSinArribo) {
+                direccionDestino = destinoSinArribo.direccion.direccion_cliente;
+            } else {
+                const destinos = rutaData.ruta_despacho_destinos.sort((a, b) => (new Date(b.fecha_arribo).getTime() - new Date(a.fecha_arribo).getTime()));
+                console.log("Destinos ordenados", destinos);
+                direccionDestino = destinos[0].direccion.direccion_cliente;
+            }
+        }
+        
         const rutaEnTransito = {
             rutaId: rutaData.id,
             direccionDestino: direccionDestino,

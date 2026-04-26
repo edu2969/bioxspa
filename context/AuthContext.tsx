@@ -11,10 +11,9 @@ import { createSupabaseBrowserClient, destroyBrowserClient } from '@/lib/supabas
 import type { 
   AuthResult, 
   SessionInfo, 
-  AuthContext as SupabaseAuthContext 
+  AuthContext
 } from '@/lib/supabase/supabase-auth';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { TIPO_CARGO } from '@/app/utils/constants';
 
 // ===============================================
 // TIPOS DE DATOS

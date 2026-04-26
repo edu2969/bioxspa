@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient, getAuthenticatedUser } from "@/lib/supabase";
 import { registerArriendosFromVenta } from "@/lib/arriendos/registerArriendosFromVenta";
+import { TIPO_ESTADO_RUTA_DESPACHO } from "@/app/utils/constants";
 
 const buildItemView = (row, expectedDireccion) => {
     const sub = row.subcategoria || null;
@@ -125,6 +126,50 @@ export async function POST(request) {
         const item = (itemsFound && itemsFound[0]) || null;
         if (!item) {
             return NextResponse.json({ ok: false, error: "Item not found" }, { status: 404 });
+        }
+
+        // Valida que el cilindro no esté en alguna ruta activa
+        const { data: rutasActivas, error: rutasError } = await supabase
+            .from("rutas_despacho")
+            .select("id")
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
+            .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado);
+
+        if(rutasError) {
+            console.error("Error fetching active routes:", rutasError);
+            return NextResponse.json({ ok: false, error: "Error checking active routes" }, { status: 500 });            
+        }
+
+        if(rutasActivas && rutasActivas.length > 0) {
+            const rutaIds = rutasActivas.map(r => r.id);
+            const { data: historiales, error: historialError } = await supabase
+                .from("ruta_despacho_historial_carga")
+                .select("id")
+                .in("ruta_despacho_id", rutaIds);
+
+            if(historialError) {
+                console.error("Error fetching route histories:", historialError);
+                return NextResponse.json({ ok: false, error: "Error checking route histories" }, { status: 500 });
+            }
+            
+            const historialIds = historiales ? historiales.map(h => h.id) : [];
+            if(historialIds.length > 0) {
+                const { data: itemsMovidos, error: itemsMovidosError } = await supabase
+                    .from("ruta_despacho_historial_carga_items_movidos")
+                    .select("id")
+                    .in("ruta_despacho_historial_carga_id", historialIds)
+                    .eq("item_catalogo_id", item.id);
+
+                if(itemsMovidosError) {
+                    console.error("Error fetching moved items in routes:", itemsMovidosError);
+                    return NextResponse.json({ ok: false, error: "Error checking items in active routes" }, { status: 500 });
+                }
+
+                if(itemsMovidos && itemsMovidos.length === 1) {
+                    console.log("Item is in an active route, cannot deliver in local");
+                    return NextResponse.json({ ok: false, error: "El item está en una ruta de despacho activa" }, { status: 400 });                    
+                }
+            }
         }
 
         // Fetch expected direccion details for helpful response in modal

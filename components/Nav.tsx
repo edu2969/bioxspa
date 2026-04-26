@@ -7,13 +7,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import { MdOutlinePropaneTank, MdSell } from 'react-icons/md';
 import { IoSettingsSharp } from 'react-icons/io5';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
-import { useAuth } from '@/context/AuthContext';
 import { RESOURCES, ACTIONS } from '@/lib/auth/permissions';
 import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './_prefabs/powerScan/PowerScanView';
-import { signOut } from "@/services/auth-service";
+import SoundPlayerProvider from './context/SoundPlayerContext';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);
@@ -45,9 +44,6 @@ export default function Nav() {
                 method: 'DELETE',
                 credentials: 'include',
             });
-
-            // Limpia sesión en cliente y estado local de auth.
-            await signOut();
 
             // Navegación dura para asegurar estado limpio en toda la app.
             router.push('/pages/logout');
@@ -151,10 +147,11 @@ export default function Nav() {
                     </div>
                 )}
             </div>
-            {scanMode && 
-            <PowerScanView 
-                scanMode={scanMode} setScanMode={setScanMode} rutaId={null} ventaId={null}
-                operacion="gestionar" />}
+            {scanMode && <SoundPlayerProvider>
+                <PowerScanView 
+                    scanMode={scanMode} setScanMode={setScanMode} rutaId={null} ventaId={null}
+                    operacion="gestionar" />
+                </SoundPlayerProvider>}
         </div>
     )
 }

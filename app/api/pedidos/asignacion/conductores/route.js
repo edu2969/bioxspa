@@ -85,7 +85,8 @@ export async function GET(request) {
         const { data: rutasActivas, error: rutasError } = await supabase
             .from("rutas_despacho")
             .select("id, conductor_id")
-            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.en_ruta)
+            .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino)
+            .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado)
             .in("dependencia_id", dependenciaIds);
 
         if(rutasError) {

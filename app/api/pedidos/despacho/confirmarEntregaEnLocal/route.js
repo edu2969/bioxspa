@@ -128,7 +128,6 @@ export async function POST(request) {
                 itemIdsToUpdate.push(item.item_catalogo_id);
             }
         }
-        console.log("------------------------------------------------> Item IDs to update:", itemIdsToUpdate, "con direccion_id", direccionCliente);
         if (itemIdsToUpdate.length > 0) {
             const { error: updateItemError } = await supabase
                 .from("items_catalogo")

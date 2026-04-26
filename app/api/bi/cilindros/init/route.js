@@ -117,8 +117,8 @@ async function loadSubcategoriaCategoriaMap(supabase) {
     // Fallback para entornos legacy donde la FK pueda llamarse distinto.
     const legacy = await supabase
         .from("subcategorias_catalogo")
-        .select("id, categoria_id")
-        .not("categoria_id", "is", null);
+        .select("id, categoria_catalogo_id")
+        .not("categoria_catalogo_id", "is", null);
 
     if (legacy.error) {
         throw new Error(`[bi_cilindros:init] Error leyendo subcategorias_catalogo: ${legacy.error.message}`);
@@ -126,7 +126,7 @@ async function loadSubcategoriaCategoriaMap(supabase) {
 
     for (const row of legacy.data || []) {
         const subcategoriaId = normalizeId(row.id);
-        const categoriaId = normalizeId(row.categoria_id);
+        const categoriaId = normalizeId(row.categoria_catalogo_id);
         if (subcategoriaId && categoriaId) {
             map.set(subcategoriaId, categoriaId);
         }

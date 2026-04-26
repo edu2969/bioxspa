@@ -64,7 +64,7 @@ export default function InputManualCodeView(props: {
     return (<div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-20 z-50 px-4">
         {!inputTemporalVisible ? <>
             <div className="absolute top-2 bg-white rounded-lg shadow-lg px-4 py-2 max-w-xs">
-                <div className="flex">
+                <div className="flex" onClick={() => setInputTemporalVisible(true)}>
                     <Loader texto="Escanee un código..." />
                 </div>
             </div>
@@ -94,9 +94,7 @@ export default function InputManualCodeView(props: {
                 className="border border-gray-300 rounded-lg px-3 py-2 w-64"
                 autoFocus
                 onKeyDown={(e) => {
-                    console.log("event key:", e.key);
                     if (e.key === 'Enter') {
-                        console.log("Código temporal ingresado:", e.currentTarget.value);
                         const codigo = e.currentTarget.value;
                         setInputTemporalVisible(false);
                         onCodeSubmit(codigo);

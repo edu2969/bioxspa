@@ -1,20 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import Image from "next/image";
 import Loader from "./Loader";
 import { IoAlertCircle } from "react-icons/io5";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function LoginForm() {
-  const router = useRouter();  
-  const supabase = createSupabaseBrowserClient();
-  
   const onError = (errors: any, e: any) => console.log(errors, e);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [status, setStatus] = useState("");
 
   const {
@@ -22,23 +18,21 @@ export default function LoginForm() {
     formState: { errors },
     handleSubmit,
   } = useForm();
+  const router = useRouter();
+
+  const { signIn } = useAuth();
 
   const onSubmit = async (data: any) => {
-    setIsLoggingIn(true);
-
-    try {
-      console.log('Intentando login con:', data.email);
-      const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: data.password });
-      if (!error) {
-        console.log('Login exitoso, redirigiendo...');
-        setRedirecting(true);
-        router.replace("/pages");
-      }
-    } catch (error) {
-      console.error('Error en onSubmit:', error);
-      setIsLoggingIn(false);
+    setIsLoggingIn(true);    
+    const result = await signIn(data.email, data.password);
+    console.log("Result?", result);
+    if(result.success) {
+      router.push('/pages');
+    } else {      
+      setStatus(result.message || "Error desconocido");      
     }
-  };
+    setIsLoggingIn(false);
+  };  
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between py-8 px-6">
@@ -84,9 +78,9 @@ export default function LoginForm() {
             </div>}
           </div>
           <div>
-            <button type="submit" disabled={isLoggingIn || redirecting}
+            <button type="submit" disabled={isLoggingIn}
               className="w-full rounded-md bg-black px-3 py-2 text-lg font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 h-12">
-                {redirecting ? <Loader texto="Redirigiendo..."/> : isLoggingIn ? <Loader texto="Validando"/> : "Entrar"}
+                {isLoggingIn === true ? <Loader texto={`Validando`}/> : "Entrar"}
             </button>
           </div>
         </div>

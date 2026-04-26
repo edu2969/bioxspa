@@ -1,14 +1,7 @@
-import { ICategoriaCatalogo } from "./categoriaCatalogo";
-
 export interface ISubcategoriaCatalogo {
     id?: string;
-    temporalId?: string;
-    nombre: string;
-    categoriaCatalogoId: ICategoriaCatalogo;
+    categoriaCatalogoId?: string;
     cantidad?: number;
     unidad?: string;
-    sinSifon?: boolean;
-    urlImagen?: string | null;
-    createdAt?: string;
-    updatedAt?: string;
+    sinSifon?: boolean;    
 }

@@ -37,7 +37,7 @@ export async function GET(req) {
                         cantidad,
                         unidad,
                         sin_sifon,
-                        categorias_catalogo:categoria_id(
+                        categorias_catalogo:categoria_catalogo_id(
                             id,
                             nombre,
                             tipo,
@@ -122,7 +122,7 @@ export async function GET(req) {
                         cantidad,
                         unidad,
                         sin_sifon,
-                        categorias_catalogo:categoria_id(
+                        categorias_catalogo:categoria_catalogo_id(
                             id,
                             nombre,
                             tipo,

@@ -76,15 +76,15 @@ export interface IChecklistlistResult {
 
 export interface IItemCatalogoPowerScanView {
     id: string;
-    ownerId?: ICliente | null;
+    propietarioId?: ICliente | null;
     direccionId?: IDireccion | null;
-    elemento: string;
     codigo: string;
-    subcategoriaCatalogoId: ISubcategoriaCatalogo;
+    subcategoriaCatalogoId: string;
     stockActual: number;
     stockMinimo: number;
     garantiaAnual: number;
     estado: number;
+    carga: number;
     fechaMantencion?: Date | null;
     direccionInvalida?: boolean;
     direccionEsperada?: {

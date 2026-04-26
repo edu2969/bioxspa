@@ -29,8 +29,8 @@ export interface ICliente {
     comentario?: string;
     contacto?: string;
     documentoTributarioId?: string | null;
-    activo?: boolean;
-    cilindrosMin?: string;
+    activo: boolean;
+    cilindrosMin?: number;
     cilindrosMax?: number;
     enQuiebra?: boolean;
     mesesAumento?: number[];

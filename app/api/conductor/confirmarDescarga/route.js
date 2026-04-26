@@ -63,27 +63,10 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
         }
 
-        // Get ruta_despacho_destinos por arribar
-        const { data: destino, error: destinosErr } = await supabase
-            .from('ruta_despacho_destinos')
-            .select('id, direccion_id')
-            .eq('ruta_despacho_id', rutaId)
-            .is('fecha_arribo', null)
-            .single();
-        
-        if (destinosErr) { 
-            console.error('[confirmarDescarga] Error fetching ruta_despacho_destinos:', destinosErr);
-            return NextResponse.json({ ok: false, error: 'Error fetching ruta destinos' }, { status: 500 });
-        }
-
-        if(!destino) {
-            return NextResponse.json({ ok: false, error: 'No hay destinos pendientes de arribo para esta ruta' }, { status: 400 });
-        }
-
         // Get ventas for this ruta via ruta_despacho_ventas
         const { data: ventasRuta, error: rvErr } = await supabase
             .from('ruta_despacho_ventas')
-            .select('id, venta_id')
+            .select('id, venta_id(id, estado)')
             .eq('ruta_despacho_id', rutaId);            
 
         if (rvErr) {
@@ -91,17 +74,73 @@ export async function POST(req) {
             return NextResponse.json({ ok: false, error: 'Error fetching ruta ventas' }, { status: 500 });
         }
 
+        const { data: destinoReciente, error: destRecErr } = await supabase
+            .from('ruta_despacho_destinos')
+            .select('direccion_id')
+            .eq('ruta_despacho_id', rutaId)
+            .order('fecha_arribo', { ascending: false })
+            .limit(1)
+            .single();
+
+        if(!destinoReciente || destRecErr) {
+            console.error('[confirmarDescarga] Error fetching recent destino:', destRecErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching recent destino' }, { status: 500 });
+        }
+
         const { data: ventaRuta, error: vrErr } = await supabase            
             .from('ventas')
             .select('id')
-            .in('id', ventasRuta.map(v => v.venta_id))
-            .eq('direccion_despacho_id', destino.direccion_id)
+            .in('id', ventasRuta.map(v => v.venta_id.id))
+            .eq('direccion_despacho_id', destinoReciente.direccion_id)
             .single();   
             
         if(vrErr) {
             console.error('[confirmarDescarga] Error fetching venta for ruta:', vrErr);
             return NextResponse.json({ ok: false, error: 'Error fetching venta for ruta' }, { status: 500 });
-        }        
+        }  
+        
+        // Actualiza la dirección de los items en cada detalle de la venta
+        const { data: detalles, error: detallesErr } = await supabase
+            .from('detalle_ventas')
+            .select('id')
+            .eq('venta_id', ventaRuta.id);
+
+        if(detallesErr) {
+            console.error('[confirmarDescarga] Error fetching detalle_ventas:', detallesErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching detalle ventas' }, { status: 500 });
+        }
+
+        if(!detalles || detalles.length === 0) {
+            console.warn(`[confirmarDescarga] No detalles found for venta ${ventaRuta.id}`);
+            return NextResponse.json({ ok: false, error: 'No detalles found for venta' }, { status: 404 });
+        }
+
+        const detalleIds = detalles.map(d => d.id);
+        
+        const { data: detalleItems, error: diErr } = await supabase
+            .from('detalle_venta_items')
+            .select('id, item_catalogo_id')
+            .in('detalle_venta_id', detalleIds);
+
+        if(diErr) {
+            console.error('[confirmarDescarga] Error fetching detalle_venta_items:', diErr);
+            return NextResponse.json({ ok: false, error: 'Error fetching detalle venta items' }, { status: 500 });
+        }
+
+        if(!detalleItems || detalleItems.length === 0) {
+            console.warn(`[confirmarDescarga] No detalle_venta_items found for venta ${ventaRuta.id}`);
+            return NextResponse.json({ ok: false, error: 'No detalle venta items found for venta' }, { status: 404 });
+        }
+
+        const { error: updItemsErr } = await supabase
+            .from('items_catalogo')
+            .update({ direccion_id: destinoReciente.direccion_id })
+            .in('id', detalleItems.map(di => di.item_catalogo_id));
+
+        if(updItemsErr) {
+            console.error('[confirmarDescarga] Error updating items_catalogo:', updItemsErr);
+            return NextResponse.json({ ok: false, error: 'Error updating items catalogo' }, { status: 500 });
+        }
 
         // Update ventas estado and por_cobrar
         const { error: updVentasErr } = await supabase
@@ -126,22 +165,13 @@ export async function POST(req) {
         if (updHistorialEstadoVentaErr) {
             console.error('[confirmarDescarga] Error inserting venta_historial_estados:', updHistorialEstadoVentaErr);
             return NextResponse.json({ ok: false, error: 'Error updating venta historial estados' }, { status: 500 });
-        }
-        
-        // Update arribo destino
-        const nowIso = new Date().toISOString();
-        const { error: updDestinoErr } = await supabase
-            .from('ruta_despacho_destinos')
-            .update({ fecha_arribo: nowIso })
-            .eq('ruta_despacho_id', destino.id);
-
-        if (updDestinoErr) {
-            console.error('[confirmarDescarga] Error updating ruta_despacho_destinos arribo:', updDestinoErr);
-            return NextResponse.json({ ok: false, error: 'Error updating destino arribo' }, { status: 500 });
         }        
 
+        // Busca si queda algún destino pendiente
+        const ventasRestantes = ventasRuta.filter(v => v.venta_id.id !== ventaRuta.id && v.venta_id.estado !== TIPO_ESTADO_VENTA.entregado);
+
         // Actualizacion estado de ruta        
-        const nuevoEstado = TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
+        const nuevoEstado = ventasRestantes.length > 0 ? TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino : TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada;
         
         // Update ruta estado
         const { error: updRutaErr } = await supabase

@@ -1,7 +1,7 @@
-import './globals.css';
 import { roboto, orbitron, red_hat_display } from '@/app/fonts';
 import ClientProviders from '@/components/providers/ClientProviders';
 import { Suspense } from 'react';
+import '@/app/globals.css';
 
 export const metadata = {
   title: 'BIOX',

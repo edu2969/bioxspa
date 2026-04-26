@@ -18,7 +18,7 @@ export async function GET() {
         const hasCargo = (allowedCargoTypes) =>
             userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
 
-        if (!hasCargo([TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])) {
+        if (!hasCargo([TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.conductor, TIPO_CARGO.despacho])) {
             console.warn(`User ${userId} does not have the required role. Role: ${userData.role}`);
             return NextResponse.json({ ok: false, error: "Access denied. User does not have the required role" }, { status: 403 });
         }
@@ -50,18 +50,14 @@ export async function GET() {
         const categoriasConSubcategorias = categorias.map(categoria => ({
             id: categoria.id,
             nombre: categoria.nombre,
-            descripcion: categoria.descripcion,
-            urlImagen: categoria.url_imagen,
             tipo: categoria.tipo,
-            gas: categoria.gas,
             elemento: categoria.elemento,
             esIndustrial: categoria.es_industrial,
-            esMedicinal: categoria.es_medicinal,
-            seguir: categoria.seguir,
+            esMedicinal: categoria.es_medicinal,            
             cantidadSubcategorias: categoria.subcategorias?.[0]?.count || 0
         }));
 
-        return NextResponse.json(categoriasConSubcategorias);
+        return NextResponse.json({ ok: true, categorias: categoriasConSubcategorias });
     } catch (error) {
         console.error("Error fetching categorias:", error);
         return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { IRutasEnTransitoResponse } from '@/types/types';
 import { useDroppable } from '@dnd-kit/core';
 import Loader from '../Loader';
@@ -10,7 +10,6 @@ export default function EnTransito({ sucursalId, onShowCommentModal } : {
     sucursalId: string;
     onShowCommentModal: (ventaId: string, comentario?: string | null, onSaveComment?: () => void) => void;
 }) {
-    const queryClient = useQueryClient();
     const { setNodeRef, isOver } = useDroppable({
         id: 'en-transito',
     });
@@ -26,10 +25,6 @@ export default function EnTransito({ sucursalId, onShowCommentModal } : {
         },
         enabled: !!sucursalId
     });
-
-    const onSaveComment = () => {
-        queryClient.invalidateQueries({ queryKey: ['rutas-en-transito', sucursalId] });
-    }
 
     return (
         <div 

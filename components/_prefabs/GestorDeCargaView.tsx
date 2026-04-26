@@ -431,7 +431,6 @@ export default function GestorDeCargaView({
               className="border border-gray-300 rounded-lg px-3 py-2 w-64"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  console.log("Código temporal ingresado:", e.currentTarget.value);
                   setInputTemporalVisible(false);
                   e.currentTarget.value = '';
                 }

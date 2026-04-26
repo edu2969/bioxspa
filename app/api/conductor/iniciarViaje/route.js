@@ -46,16 +46,26 @@ export async function POST(req) {
         const allowedStates = [TIPO_ESTADO_RUTA_DESPACHO.orden_confirmada, 
             TIPO_ESTADO_RUTA_DESPACHO.descarga_confirmada, 
             TIPO_ESTADO_RUTA_DESPACHO.seleccion_destino];
-        if (!allowedStates.includes(rutaData.estado)) return NextResponse.json({ ok: false, error: 'Ruta not in allowed state' }, { status: 400 });
+        if (!allowedStates.includes(rutaData.estado)) {
+            console.log("[iniciarViaje] La ruta no está en un estado válido")
+            return NextResponse.json({ ok: false, error: 'Ruta not in allowed state' }, { status: 400 });
+        }
 
-        if (String(rutaData.conductor_id) !== String(user.id)) return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
+        if (String(rutaData.conductor_id) !== String(user.id)) {
+            console.log("[iniciarViaje] Acceso denegado: Solo el conductor puede iniciar sus rutas")
+            return NextResponse.json({ ok: false, error: 'Access denied' }, { status: 403 });
+        }
 
         // Find ventas for this ruta that match direccionId
         const { data: rutaVentas, error: rvErr } = await supabase
             .from('ruta_despacho_ventas')
             .select('venta_id')
             .eq('ruta_despacho_id', rutaId);
-        if (rvErr) console.error('[iniciarViaje] Error fetching ruta_despacho_ventas:', rvErr);
+        
+            if (rvErr) {
+            console.error('[iniciarViaje] Error fetching ruta_despacho_ventas:', rvErr);
+            return NextResponse.json({ ok: false, error: 'No se encuentran las ventas'});
+        }
 
         const ventaIds = (rutaVentas || []).map(r => r.venta_id).filter(Boolean);
         if (ventaIds.length > 0) {
@@ -67,7 +77,10 @@ export async function POST(req) {
 
             if (ventasErr) {
                 console.error('[iniciarViaje] Error fetching ventas:', ventasErr);
-            } else if (ventasMatch && ventasMatch.length > 0) {
+                return NextResponse.json({ ok: false, error: "Error al obtener las ventas: " + ventasErr }, { status: 500 });
+            } 
+            
+            if (ventasMatch && ventasMatch.length > 0) {
                 const idsToUpdate = ventasMatch.map(v => v.id);
                 const { error: updErr } = await supabase
                     .from('ventas')

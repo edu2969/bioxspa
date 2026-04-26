@@ -11,7 +11,8 @@ import Loader from "../Loader";
 import QuienRecibeModal from "../modals/QuienRecibeModal";
 
 const getVentaActual = (ruta: IRutaConductorView) => {
-    return ruta.ventas.find(rv => rv.actual) || null;
+    const destino = ruta.destinos?.sort((a, b) => new Date(b.fechaArribo || 0).getTime() - new Date(a.fechaArribo || 0).getTime())?.[0];
+    return ruta.ventas.find(venta => venta.cliente.direccionesDespacho?.some(direccion => direccion.id === destino?.direccion.id));
 }
 
 export default function GestorDeDescarga({
@@ -27,37 +28,6 @@ export default function GestorDeDescarga({
     const [listaDescargaLocal, setListaDescargaLocal] = useState<IListadoDescargaView | null>(null);
     const queryClient = useQueryClient();
 
-    // Mutación para descargar cilindros individuales
-    const mutation = useMutation({
-        mutationFn: async (codigo: string) => {
-            console.log("Iniciando descarga para código:", codigo, rutaDespacho.id);            
-            const response = await fetch('/api/cilindros/descargar', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    rutaId: rutaDespacho.id,
-                    codigo
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Error al descargar cilindro');
-            }
-
-            return await response.json();
-        },
-        onSuccess: (data) => {
-            if (data.ok) {
-                toast.success(`Cilindro ${data.codigo} descargado correctamente`);
-            }
-        },
-        onError: (error: any) => {
-            toast.error(error.message || 'Error al descargar cilindro');
-        }
-    });
 
     // Metación para confirmar la descarga completa
     const confirmarDescargaMutation = useMutation({
@@ -200,7 +170,6 @@ export default function GestorDeDescarga({
                 className="border border-gray-300 rounded-lg px-3 py-2 w-64"
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                        console.log("Código temporal ingresado:", e.currentTarget.value);
                         setInputTemporalVisible(false);
                         e.currentTarget.value = '';
                     }

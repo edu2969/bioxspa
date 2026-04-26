@@ -30,7 +30,16 @@ export async function GET(req) {
                 direcciones_despacho:cliente_direcciones_despacho(direccion_id(id, direccion_cliente, latitud, longitud)),
                 documento_tributario_id,
                 credito,
-                meses_aumento
+                meses_aumento,
+                envio_factura,
+                envio_reporte,
+                seguimiento,
+                reporte_deuda,
+                notificacion,
+                comentario,
+                contacto,
+                dias_de_pago,
+                url_web
             `)
             .eq("id", id)
             .single();
@@ -52,6 +61,8 @@ export async function GET(req) {
                 telefono: cliente.telefono,
                 email: cliente.email,
                 emailIntercambio: cliente.email_intercambio,
+                envioReporte: cliente.envio_reporte,
+                envioFactura: cliente.envio_factura,
                 ordenCompra: cliente.orden_compra,
                 arriendo: cliente.arriendo,
                 cilindrosMin: cliente.cilindros_min,
@@ -66,7 +77,14 @@ export async function GET(req) {
                 })),
                 documentoTributarioId: cliente.documento_tributario_id,
                 credito: cliente.credito,
-                mesesAumento: cliente.meses_aumento
+                mesesAumento: cliente.meses_aumento,
+                reporteDeuda: cliente.reporte_deuda,
+                notificacion: cliente.notificacion,
+                seguimiento: cliente.seguimiento,
+                contacto: cliente.contacto,
+                urlWeb: cliente.url_web,
+                diasDePago: cliente.dias_de_pago,
+                comentario: cliente.comentario
             }
         });
     } catch (error) {
@@ -86,21 +104,48 @@ export async function POST(req) {
         const entity = await req.json();
         console.log("[POST] Datos recibidos:", entity);
 
-        const { data: existingCliente, error: fetchError } = await supabase
-            .from("clientes")
-            .select("id")
-            .eq("id", entity.id)
-            .single();
-
-        if (fetchError && fetchError.code !== "PGRST116") {
-            console.error("[POST] Error checking existing cliente:", fetchError);
-            return NextResponse.json({ error: "Error checking existing cliente" }, { status: 500 });
+        const payload = {
+            nombre: entity.nombre,
+            rut: entity.rut,
+            giro: entity.giro,
+            telefono: entity.telefono,
+            email: entity.email,
+            email_intercambio: entity.emailIntercambio,
+            comentario: entity.comentario,
+            contacto: entity.contacto,
+            url_web: entity.urlWeb,
+            dias_de_pago: entity.diasDePago,
+            credito: entity.credito,
+            cilindros_max: entity.cilindrosMax,
+            cilindros_min: entity.cilindrosMin,
+            meses_aumento: entity.mesesAumento?.split(",") || [],
+            envio_factura: entity.envioFactura,
+            envio_reporte: entity.envioReporte,
+            reporte: entity.reporte,
+            seguimiento: entity.seguimiento,
+            orden_compra: entity.ordenCompra,
+            reporte_deuda: entity.reporteDeuda,
+            arriendo: entity.arriendo, 
+            notificacion: entity.notificacion,
+            activo: entity.activo,
+            en_quiebra: entity.enQuiebra
         }
 
-        if (existingCliente) {
+        if(entity.id) {
+            const { data: existingCliente, error: fetchError } = await supabase
+                .from("clientes")
+                .select("id")
+                .eq("id", entity.id)
+                .single();
+
+            if (fetchError && fetchError.code !== "PGRST116") {
+                console.error("[POST] Error checking existing cliente:", fetchError);
+                return NextResponse.json({ error: "Error checking existing cliente" }, { status: 500 });
+            }
+
             const { error: updateError } = await supabase
                 .from("clientes")
-                .update(entity)
+                .update(payload)
                 .eq("id", entity.id);
 
             if (updateError) {
@@ -110,20 +155,20 @@ export async function POST(req) {
 
             console.log("[POST] Cliente actualizado correctamente");
             return NextResponse.json({ ok: true, cliente: entity });
-        } else {
-            const { data: newCliente, error: createError } = await supabase
-                .from("clientes")
-                .insert(entity)
-                .single();
+        } 
 
-            if (createError) {
-                console.error("[POST] Error creating cliente:", createError);
-                return NextResponse.json({ error: "Error creating cliente" }, { status: 500 });
-            }
+        const { data: newCliente, error: createError } = await supabase
+            .from("clientes")
+            .insert(payload)
+            .single();
 
-            console.log("[POST] Nuevo cliente creado:", newCliente);
-            return NextResponse.json({ ok: true, cliente: newCliente });
+        if (createError) {
+            console.error("[POST] Error creating cliente:", createError);
+            return NextResponse.json({ error: "Error creating cliente" }, { status: 500 });
         }
+
+        console.log("[POST] Nuevo cliente creado:", newCliente);
+        return NextResponse.json({ ok: true, cliente: newCliente });        
     } catch (error) {
         console.error("[POST] ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });

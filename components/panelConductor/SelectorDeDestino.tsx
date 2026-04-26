@@ -42,16 +42,21 @@ export default function SelectorDeDestino({
     })
 
     const { mutate: iniciarViaje, isPending: isLoading } = useMutation({
-        mutationFn: async () => {            
+        mutationFn: async () => {
+            console.log("RutaDespacho iniciarViaje: ", rutaDespacho);
             if (!rutaDespacho?.id) {
                 throw new Error('Missing rutaId');
             }
-
+            
             let direccionDestinoId = getValues("direccionDestinoId");
-            if (!direccionDestinoId) {
-                direccionDestinoId = rutaDespacho.destinos?.length && rutaDespacho.destinos[rutaDespacho.destinos.length - 1].direccion.id;
+            if(destinos.length === 1) {
+                direccionDestinoId = destinos[0].direccion.id;
             }
-
+            
+            if (!direccionDestinoId) {
+                direccionDestinoId = rutaDespacho.destinos?.sort((a, b) => new Date(b.fechaArribo || 0).getTime() - new Date(a.fechaArribo || 0).getTime()).length && rutaDespacho.destinos[rutaDespacho.destinos.length - 1].direccion.id;
+            }
+            
             if (!direccionDestinoId) {
                 throw new Error('Debe seleccionar un destino');
             }
@@ -98,10 +103,15 @@ export default function SelectorDeDestino({
                 && rutaDespacho.destinos.map((destino, indexRuta) => (
                 <div className="h-12" key={`ruta_iconos_${indexRuta}`}>
                     <div className="h-4" />
-                    {destino.fechaArribo
+                    {destino.fechaArribo !== null
                         ? <TbFlagCheck className="text-xl mt-1" />
                         : <FaTruckFast className="text-xl mt-1 w-6" />}
                 </div>))}
+
+                {!isLoadingDestinos && destinos && destinos.length === 1 && <div className="h-12" key={`ruta_iconos_final`}>
+                    <div className="h-4" />
+                    <FaTruckFast className="text-xl mt-1 w-6" />
+                </div>}
             </div>
 
             <div className="flex flex-col items-center justify-start h-full">
@@ -112,6 +122,11 @@ export default function SelectorDeDestino({
                             <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
                             <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
                         </div>))}
+
+                    {!isLoadingDestinos && destinos && destinos.length === 1 && <div className="w-6" key={`ruta_segmento_final`}>
+                            <div className="w-2 h-10 bg-blue-400 -mt-1 -mb-2 mx-auto" />
+                            <div className="w-6 h-6 rounded-full bg-white border-4 border-blue-400" />
+                        </div>}
                 </div>
             </div>
 
@@ -123,14 +138,18 @@ export default function SelectorDeDestino({
                 {rutaDespacho.destinos?.length > 0 && rutaDespacho.destinos.map((destino, indexRuta) => (
                     <CheckPoint key={`check_point_${indexRuta}`} index={indexRuta} isLast={false} destino={destino} />
                 ))}
+
+                {!isLoadingDestinos && destinos && destinos.length === 1 &&
+                    <CheckPoint key={`check_point_final`} index={9999} isLast={true} destino={destinos[0]} />}
             </div>
         </div>
         
         {!isLoadingDestinos && destinos && destinos.length > 1 && <Selector 
             options={destinos.map((destino: IDestinoView): { label: string; value: string } => {
+                const venta = rutaDespacho.ventas?.find(v => v.cliente.direccionesDespacho?.some(d => d.id === destino.direccion.id));
                 return {
                     value: destino.direccion.id,
-                    label: destino.direccion.direccionCliente || "?? - ??"
+                    label: venta?.cliente.nombre + " - " + destino.direccion.direccionCliente?.split(",")[0] || "?? - ??"
                 }
             })}
             register={register("direccionDestinoId")}
@@ -138,7 +157,7 @@ export default function SelectorDeDestino({
             placeholder={rutaDespacho && rutaDespacho.destinos?.some(r => r.fechaArribo === null) ? "Cambiar tu selección" : "Selecciona un destino"}
             getLabel={(option: { label: string; value: string }) => option.label}
             getValue={(option: { label: string; value: string }) => option.value}
-        />}
+        />}         
 
         {isLoadingDestinos && <div className="w-full">
             <Loader texto="Cargando destinos..." />

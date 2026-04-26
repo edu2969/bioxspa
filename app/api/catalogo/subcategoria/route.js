@@ -21,7 +21,7 @@ export async function GET(request) {
         const hasCargo = (allowedCargoTypes) =>
             userCargoTypes.some((cargoType) => allowedCargoTypes.includes(cargoType));
 
-        if (!hasCargo([TIPO_CARGO.gerente])) {
+        if (!hasCargo([TIPO_CARGO.gerente, TIPO_CARGO.encargado, TIPO_CARGO.cobranza, TIPO_CARGO.conductor, TIPO_CARGO.despacho])) {
             console.warn(`User ${userId} is not a gerente. Role: ${userData.role}`);
             return NextResponse.json({ ok: false, error: "Access denied. User is not a gerente" }, { status: 403 });
         }
@@ -31,7 +31,7 @@ export async function GET(request) {
             .from("subcategorias_catalogo")
             .select(`
                 id,
-                categoria_id,
+                categoria_catalogo_id,
                 temporal_id,
                 nombre,
                 descripcion,
@@ -44,7 +44,7 @@ export async function GET(request) {
             `);
 
         if (categoriaCatalogoId) {
-            query = query.eq("categoria_id", categoriaCatalogoId);
+            query = query.eq("categoria_catalogo_id", categoriaCatalogoId);
         }
 
         const { data: subcategorias, error: subcategoriasError } = await query;
@@ -67,8 +67,8 @@ export async function GET(request) {
                     // En caso de error, continuar con count = 0
                     return {
                         ...subcategoria,
-                        _id: subcategoria.id, // Mantener compatibilidad con frontend
-                        categoriaCatalogoId: subcategoria.categoria_id,
+                        id: subcategoria.id, // Mantener compatibilidad con frontend
+                        categoriaCatalogoId: subcategoria.categoria_catalogo_id,
                         temporalId: subcategoria.temporal_id,
                         sinSifon: subcategoria.sin_sifon,
                         precioSugerido: subcategoria.precio_sugerido,
@@ -80,8 +80,8 @@ export async function GET(request) {
 
                 return {
                     ...subcategoria,
-                    _id: subcategoria.id, // Mantener compatibilidad con frontend
-                    categoriaCatalogoId: subcategoria.categoria_id,
+                    id: subcategoria.id, // Mantener compatibilidad con frontend
+                    categoriaCatalogoId: subcategoria.categoria_catalogo_id,
                     temporalId: subcategoria.temporal_id,
                     sinSifon: subcategoria.sin_sifon,
                     precioSugerido: subcategoria.precio_sugerido,
