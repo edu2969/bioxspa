@@ -16,7 +16,8 @@ export async function GET(request) {
                 categoria_catalogo_id,
                 cantidad,
                 unidad,
-                sin_sifon                
+                sin_sifon,
+                precio_sugerido                
             `);
 
         if (categoriaCatalogoId) {
@@ -42,19 +43,23 @@ export async function GET(request) {
                     console.error(`Error counting items for subcategoria ${subcategoria.id}:`, countError);
                     // En caso de error, continuar con count = 0
                     return {
-                        ...subcategoria,
                         id: subcategoria.id, // Mantener compatibilidad con frontend
                         categoriaCatalogoId: subcategoria.categoria_catalogo_id,
                         sinSifon: subcategoria.sin_sifon,
+                        precioSugerido: subcategoria.precio_sugerido,
+                        cantidad: subcategoria.cantidad,
+                        unidad: subcategoria.unidad,
                         cantidadItemsCatalogo: 0
                     };
                 }
 
                 return {
-                    ...subcategoria,
                     id: subcategoria.id, // Mantener compatibilidad con frontend
                     categoriaCatalogoId: subcategoria.categoria_catalogo_id,
                     sinSifon: subcategoria.sin_sifon,
+                    precioSugerido: subcategoria.precio_sugerido,
+                    cantidad: subcategoria.cantidad,
+                    unidad: subcategoria.unidad,
                     cantidadItemsCatalogo: count || 0
                 };
             })

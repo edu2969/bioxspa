@@ -4,11 +4,12 @@ import Loader from "../Loader";
 import { useQuery } from "@tanstack/react-query";
 import { IClienteSeachResult } from "./types";
 import { UseFormRegisterReturn, UseFormSetValue } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { useRouter } from "next/navigation";
 import { LiaPencilAltSolid } from "react-icons/lia";
 import { TIPO_CARGO } from "@/app/utils/constants";
+import { IDireccion } from "@/types/direccion";
 
 export default function ClienteSearchView({
     titulo,

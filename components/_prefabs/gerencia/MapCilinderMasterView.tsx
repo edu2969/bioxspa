@@ -1,5 +1,5 @@
 import MapaCilindros from "@/components/maps/MapaCilindros";
-import { GoogleMapsProvider } from "@/components/maps/GoogleMapProvider";
+import { GoogleMapsProvider } from "@/components/providers/GoogleMapProvider";
 
 interface Categoria {
 	id?: string;

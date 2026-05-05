@@ -1,5 +1,5 @@
 import Pedidos from "@/components/pedidos/Pedidos";
-import { GoogleMapsProvider } from "@/components/maps/GoogleMapProvider";
+import { GoogleMapsProvider } from "@/components/providers/GoogleMapProvider";
 
 export default async function EditarPedidoPage({ params }: { params: { pedidoId: string } }) {
     const { pedidoId } = await params;

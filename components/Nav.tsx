@@ -12,7 +12,7 @@ import { Can } from '@/lib/auth/AuthorizationComponents';
 import Image from 'next/image';
 import { BsQrCodeScan } from 'react-icons/bs';
 import PowerScanView from './_prefabs/powerScan/PowerScanView';
-import SoundPlayerProvider from './context/SoundPlayerContext';
+import SoundPlayerProvider from '../context/SoundPlayerContext';
 
 export default function Nav() {
     const [menuActivo, setMenuActivo] = useState(false);

@@ -366,8 +366,7 @@ export default function Pedidos({
                                 clienteId={clienteId}
                                 direccionDespachoInicialId={direccionInicialDespachoId}
                                 tipoOrden={tipoOrden}
-                                register={register}
-                                setValue={setValue} />}
+                                register={register} />}
 
                             {/* TRASLADO */}
                             {tipoOrden == 2 && <DatosDeTraslado register={register} />}

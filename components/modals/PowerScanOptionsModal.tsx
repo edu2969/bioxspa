@@ -12,7 +12,7 @@ import toast from "react-hot-toast";
 import { getNUCode } from "@/lib/nuConverter";
 import { BsFillGeoAltFill } from "react-icons/bs";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSoundPlayer } from "../context/SoundPlayerContext";
+import { useSoundPlayer } from "../../context/SoundPlayerContext";
 import { Selector } from "../_prefabs/Selector";
 import { ICategoriaCatalogo } from "@/types/categoriaCatalogo";
 import { ISubcategoriaCatalogo } from "@/types/subcategoriaCatalogo";
@@ -433,16 +433,15 @@ export function PowerScanOptionsModal({
                                                     />
                                                 </div>
                                                 <div className="col-span-3">
-                                                    <ClienteSearchView register={register("propietarioId")} clienteInicial={{
-                                                        id: cliente?.id || '',
-                                                        nombre: cliente?.nombre || ''
-                                                    }}/>
+                                                    <ClienteSearchView register={register("propietarioId")} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     {cliente && !loadingCliente &&
                                                         <ClientAddressManagerView label="Dirección de despacho"
+                                                            clienteId={cliente.id || null}
+                                                            tipo="despacho"
                                                             register={register("direccionId")}
-                                                            direccionIdInicialId={item?.direccionId}
+                                                            direccionInicialId={item?.direccionId}
                                                             direcciones={cliente.direccionesDespacho || []} />}
                                                 </div>
                                             </div>

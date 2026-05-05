@@ -12,7 +12,7 @@ import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { RESOURCES, ACTIONS } from "@/lib/auth/permissions";
 import { TIPO_CARGO, TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
-import { useChecklist } from "@/components/context/ChecklistContext";
+import { useChecklist } from "@/context/ChecklistContext";
 import { PiWarningOctagonBold } from "react-icons/pi";
 
 const getModulesForUser = (
@@ -176,7 +176,7 @@ export default function HomeAccessPanel() {
   });
 
   // Mostrar loader mientras carga la autenticación o los datos
-  if (!auth.user || isLoading || isLoadingChecklist || !homeCounters) {
+  if (!auth.user || isLoading || isLoadingChecklist || !homeCounters || !userId) {
     return (
       <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
         <Loader />

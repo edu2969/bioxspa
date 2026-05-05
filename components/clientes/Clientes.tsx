@@ -13,6 +13,7 @@ import ClientAddressManagerView from "../_prefabs/ClientAddressManagerView";
 import { IClienteSeachResult } from "../_prefabs/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ICliente } from "@/types/cliente";
+import { IDireccion } from "@/types/direccion";
 
 interface IClienteForm {
     id: string;
@@ -71,7 +72,7 @@ export default function Clientes() {
             cilindrosMin: 0,
             cilindrosMax: 9999,
             enQuiebra: false,
-            mesesAumento: [],
+            mesesAumento: "",
             documentoTributarioId: '',
         }
     });
@@ -79,6 +80,7 @@ export default function Clientes() {
     const scrollRef = useRef(null);
     const searchParams = useSearchParams();
     const [clienteId, setClienteId] = useState<string | null>(null);
+    const [direccionCliente, setDireccionCliente] = useState<IDireccion | null>(null);
 
     const { data: cliente, isLoading: isLoadingCliente } = useQuery<ICliente>({
         queryKey: ["cliente-by-id", clienteId],
@@ -95,6 +97,10 @@ export default function Clientes() {
         const paramId = searchParams.get("id");
         setClienteId(paramId);        
     }, [searchParams]);
+
+    useEffect(() => {
+        console.log("Direccion seleccionada           -----------------> ", direccionCliente);        
+    }, [direccionCliente]);
 
     useEffect(() => {
         if(!isLoadingCliente && cliente) {            
@@ -137,7 +143,7 @@ export default function Clientes() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ ...data })
+                body: JSON.stringify({ ...data, direccion: direccionCliente })
             });
             return await response.json();
         },
@@ -263,7 +269,7 @@ export default function Clientes() {
                 </div>
 
                 <div className="w-full h-[calc(100vh-9.6rem)] overflow-y-auto px-4 pb-4"
-                ref={scrollRef}>
+                    ref={scrollRef}>
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
@@ -286,11 +292,13 @@ export default function Clientes() {
                                 <label className="block text-sm font-medium text-gray-700">Email</label>
                                 <input {...register("email")} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm" />
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-2">                                
                                 <ClientAddressManagerView 
+                                    clienteId={clienteId}
                                     tipo={'comercial'} 
                                     register={register("direccionId")} 
-                                    direccionIdInicialId={cliente?.direccionId} 
+                                    direccionInicialId={cliente?.direccionId} 
+                                    onSelect={setDireccionCliente}
                                     label="Dirección comercial"/>
                             </div>
                             <div>
@@ -354,11 +362,14 @@ export default function Clientes() {
                         </div>
                         <hr className="my-4" />
                         <div>
-                            <ClientAddressManagerView                             
+                            <ClientAddressManagerView
+                                clienteId={clienteId}
                                 label={`Direcciones de despacho`}
                                 register={register('direccionId')}
                                 direcciones={cliente?.direccionesDespacho}
-                                tipo={'despacho'} />                            
+                                tipo={'despacho'}                                
+                                onSelect={setDireccionCliente}
+                                />                            
                         </div>
                                                   
 

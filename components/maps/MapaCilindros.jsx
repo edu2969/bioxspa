@@ -6,7 +6,7 @@ import {
     InfoWindow
 } from "@react-google-maps/api";
 import { GrOverview } from "react-icons/gr";
-import { useGoogleMaps } from "./GoogleMapProvider";
+import { useGoogleMaps } from "../providers/GoogleMapProvider";
 
 const REGION_BIOBIO_BOUNDS = {
     north: -36.0,

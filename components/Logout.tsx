@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Loader from "./Loader";
 import { IoAlertOutline } from "react-icons/io5";
+import { signOut } from "@/services/auth-service";
 
 async function waitForSessionToBeUnauthenticated(timeoutMs = 9000) {
     const start = Date.now();
@@ -23,8 +24,9 @@ async function waitForSessionToBeUnauthenticated(timeoutMs = 9000) {
 
 export default function LoginOut() {
     const router = useRouter();
-    useEffect(() => {
+    useEffect(() => {        
         async function cerrarSesion() {
+            await signOut();
             try {
                 const resp = await waitForSessionToBeUnauthenticated();
                 if(resp) {

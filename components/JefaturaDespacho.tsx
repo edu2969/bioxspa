@@ -14,7 +14,7 @@ import GestorDeCargaView from "./_prefabs/GestorDeCargaView";
 import PowerScanView from "./_prefabs/powerScan/PowerScanView";
 import Nav from "./Nav";
 import { ICargaDespachoView } from "@/types/types";
-import SoundPlayerProvider from "./context/SoundPlayerContext";
+import SoundPlayerProvider from "../context/SoundPlayerContext";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useAuthorization } from "@/hooks/useAuth";
 

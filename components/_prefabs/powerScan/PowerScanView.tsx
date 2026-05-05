@@ -5,7 +5,7 @@ import InputManualCodeView from "./InputManualCodeView";
 import { PowerScanOptionsModal } from "@/components/modals/PowerScanOptionsModal";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSoundPlayer } from "@/components/context/SoundPlayerContext";
+import { useSoundPlayer } from "@/context/SoundPlayerContext";
 import { IItemCatalogo } from "@/types/itemCatalogo";
 
 function getCargamentoKey(cargamento: any) {

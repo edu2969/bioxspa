@@ -16,7 +16,7 @@ import { TbBadges, TbMedal2, TbMoneybag, TbTruckLoading } from 'react-icons/tb';
 import { GoCopilot } from 'react-icons/go';
 import Image from 'next/image';
 import { IoChevronBack } from 'react-icons/io5';
-import { GoogleMapsProvider } from './maps/GoogleMapProvider';
+import { GoogleMapsProvider } from './providers/GoogleMapProvider';
 
 export default function EditSucursal() {
     const params = useSearchParams();

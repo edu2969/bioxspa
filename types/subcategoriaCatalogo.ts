@@ -3,5 +3,6 @@ export interface ISubcategoriaCatalogo {
     categoriaCatalogoId?: string;
     cantidad?: number;
     unidad?: string;
-    sinSifon?: boolean;    
+    sinSifon?: boolean;
+    precioSugerido?: number;    
 }

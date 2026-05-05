@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useContext, createContext, ReactNode } from 'react';
+import { useState, useEffect, useContext, createContext, ReactNode, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient, destroyBrowserClient } from '@/lib/supabase/browser-client';
 import type { 
@@ -13,7 +13,7 @@ import type {
   SessionInfo, 
   AuthContext
 } from '@/lib/supabase/supabase-auth';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
 
 // ===============================================
 // TIPOS DE DATOS
@@ -71,10 +71,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const supabaseRef = useRef<SupabaseClient | null>(null);
 
-  // Cliente Supabase optimizado
-  const supabase = createSupabaseBrowserClient();
-  
+  const getSupabaseClient = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createSupabaseBrowserClient();
+    }
+    return supabaseRef.current;
+  };
+
   // ===============================================
   // FUNCIONES DE SUPABASE
   // ===============================================
@@ -84,7 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       
       // Primero intentar con Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await getSupabaseClient().auth.signInWithPassword({
         email,
         password
       });
@@ -111,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         // Verificar si se estableció la sesión
-        const { data: newSession } = await supabase.auth.getSession();
+        const { data: newSession } = await getSupabaseClient().auth.getSession();
         if (newSession?.session?.user) {
           const userResult = await loadUserData(newSession.session.user.id);
           return userResult;
@@ -159,7 +164,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const supabaseSignOut = async () => {
     try {
       setLoading(true);
-      await supabase.auth.signOut();
+      await getSupabaseClient().auth.signOut();
       
       // Limpiar estado
       setUser(null);
@@ -168,6 +173,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Limpiar cliente cached
       destroyBrowserClient();
+      supabaseRef.current = null;
     } catch (error) {
       console.error('Error en logout de Supabase:', error);
     } finally {
@@ -179,7 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await getSupabaseClient().auth.signUp({
         email,
         password,
         options: {
@@ -237,7 +243,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       console.log('🔄 Refrescando sesión...');
       
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await getSupabaseClient().auth.getSession();
       
       if (error) {
         console.error('❌ Error obteniendo sesión:', error);
@@ -277,9 +283,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const validateSession = async (): Promise<boolean> => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await getSupabaseClient().auth.getSession();
       
       if (error || !session) {
+        setUser(null);
+        setCargos([]);
+        setSessionInfo(null);
         return false;
       }
       
@@ -320,6 +329,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loadUserData = async (userId: string): Promise<AuthResult<User>> => {
     try {
       // Obtener usuario básico
+      const supabase = getSupabaseClient();
       const { data: userData, error: userError } = await supabase
         .from('usuarios')
         .select('id, email, nombre')
@@ -351,13 +361,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       // Obtener información de sesión en paralelo
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await getSupabaseClient().auth.getSession();
       
       if (userError) {
         console.warn('⚠️ Error consultando datos de usuario en BD:', userError);
         
         // Fallback usando solo datos de auth
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
         if (authUser) {
           const fallbackUser: User = {
             id: authUser.id,
@@ -445,7 +455,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('❌ Error en loadUserData:', error);
       
       // Fallback básico en caso de error
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSupabaseClient().auth.getUser();
       if (user) {
         const fallbackUser: User = {
           id: user.id,
@@ -481,7 +491,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const initAuth = async () => {      
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session }, error } = await getSupabaseClient().auth.getSession();
 
         if (error) {
           console.error('❌ Error al recuperar la sesión:', error);
@@ -510,7 +520,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initAuth();
 
     // Escuchar cambios de autenticación con logging mejorado
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: subscription } = getSupabaseClient().auth.onAuthStateChange(async (event, session) => {
       setLoading(true);
       
       try {
@@ -524,6 +534,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Limpiar cliente si es logout
           if (event === 'SIGNED_OUT') {
             destroyBrowserClient();
+            supabaseRef.current = null;
           }
         }
       } catch (error) {
@@ -582,9 +593,13 @@ export function useRequireAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/');
-    } else router.replace('/pages');
+    if (!loading) {
+      if (!user) {
+        router.replace('/');
+      } else {
+        router.replace('/pages');
+      }
+    }
   }, [user, loading, router]);
 
   return { user, loading };

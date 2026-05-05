@@ -1,5 +1,8 @@
 import Clientes from "@/components/clientes/Clientes";
+import { GoogleMapsProvider } from "@/components/providers/GoogleMapProvider";
 
 export default function ClientesPage() {
-    return <Clientes/>;
+    return (<GoogleMapsProvider>
+    <Clientes/>
+</GoogleMapsProvider>);
 }

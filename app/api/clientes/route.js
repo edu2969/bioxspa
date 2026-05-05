@@ -27,7 +27,7 @@ export async function GET(req) {
                 cilindros_max,
                 activo,
                 en_quiebra,
-                direcciones_despacho:cliente_direcciones_despacho(direccion_id(id, direccion_cliente, latitud, longitud)),
+                direcciones_despacho:cliente_direcciones_despacho(id, direccion_id:direcciones(id, direccion_cliente, latitud, longitud, place_id, comentario), comentario),
                 documento_tributario_id,
                 credito,
                 meses_aumento,
@@ -48,6 +48,8 @@ export async function GET(req) {
             console.error("[GET] Error fetching cliente:", error);
             return NextResponse.json({ error: "Cliente not found" }, { status: 404 });
         }
+
+        console.log("Cliente", cliente);
 
         return NextResponse.json({
             ok: true, cliente: {
@@ -73,7 +75,8 @@ export async function GET(req) {
                     id: d.direccion_id.id,
                     direccionCliente: d.direccion_id.direccion_cliente,
                     latitud: d.direccion_id.latitud,
-                    longitud: d.direccion_id.longitud
+                    longitud: d.direccion_id.longitud,
+                    comentario: d.direccion_id.comentario
                 })),
                 documentoTributarioId: cliente.documento_tributario_id,
                 credito: cliente.credito,
@@ -103,8 +106,81 @@ export async function POST(req) {
 
         const entity = await req.json();
         console.log("[POST] Datos recibidos:", entity);
+        
+        // Primero, revisa si la dirección existe, sea por id y por placeId
+        let direccion = entity.direccion ? {
+            id: entity.direccion.id,
+            direccion_cliente: entity.direccion.direccionCliente,
+            latitud: entity.direccion.latitud,
+            longitud: entity.direccion.longitud,
+            placeId: entity.direccion.placeId
+        } : null;
 
-        const payload = {
+        if(direccion != null && direccion.id !== "") {
+            const { error: uptDireccionExistenteError } = await supabase
+                .from('direcciones')
+                .update({
+                    direccion_cliente: direccion.direccionCliente,
+                    latitud: direccion.latitud,
+                    longitud: direccion.longitud,
+                    place_id: direccion.placeId
+                })
+                .eq('id', direccion.id);
+
+            if(uptDireccionExistenteError) {
+                console.log("[POST] Error al actualizar la dirección existente");
+                return NextResponse.json({ ok: false, error: "Error al actualizar la dirección existente"});
+            }            
+        } else {
+            const { data: direccionPorPlaceId, error: errDireccionPorPlaceId } = await supabase
+                .from('direcciones')
+                .select('id')
+                .eq('place_id', entity.direccion.placeId);
+
+            if(!direccionPorPlaceId) {
+                const { data: newDireccion, error: insertNewDireccionError } = await supabase
+                    .from('direcciones')
+                    .insert({
+                        direccion_cliente: entity.direccion.direccion_cliente.split(",")[0],
+                        latitud: entity.direccion.latitud,
+                        longitud: entity.direccion.longitud
+                    });
+                
+                if(insertNewDireccionError) {
+                    console.error("[POST] Error al insertar la dirección nueva", insertNewDireccionError);
+                    return NextResponse.json({ ok: false, error: "No se pudo insertar la dirección nueva" });
+                }
+
+                if(!newDireccion) {
+                    console.log("[POST] No se pudo insertar la dirección nueva");
+                    return NextResponse.json({ ok: false, error: "No se pudo insertar la nueva dirección" });
+                }
+                direccionId = newDireccion.id;
+            } else {
+                const { data: updDireccion, error: uptError } = await supabase
+                    .from('direcciones')
+                    .update({
+                        direccion_cliente: entity.direccion.direccion_cliente.split(",")[0],
+                        latitud: entity.direccion.latitud,
+                        longitud: entity.direccion.longitud
+                    })
+                    .eq('id', direccionPorPlaceId.id);
+                
+                if(uptError) {
+                    console.log("[POST] Error al actualizar la dirección", direccionPorPlaceId.id);
+                    return NextResponse.json({ ok: false, error: "Error al actualizar la dirección" });
+                }
+
+                if(!updDireccion) {
+                    console.log("[POST] Error al actualizar la dirección");
+                    return NextResponse.json({ ok: false, error: "Error al actualizar la "})
+                }
+                direccion.id = direccionPorPlaceId.id;
+            }
+        }
+
+        // Ahora actualiza el cliente. Podría venir direccion.id
+        let payload = {
             nombre: entity.nombre,
             rut: entity.rut,
             giro: entity.giro,
@@ -131,6 +207,11 @@ export async function POST(req) {
             en_quiebra: entity.enQuiebra
         }
 
+        if(direccion && direccion.id) {
+            payload.direccion_id = direccion.id
+        }
+
+        let clienteId = "";
         if(entity.id) {
             const { data: existingCliente, error: fetchError } = await supabase
                 .from("clientes")
@@ -153,18 +234,24 @@ export async function POST(req) {
                 return NextResponse.json({ error: "Error updating cliente" }, { status: 500 });
             }
 
-            console.log("[POST] Cliente actualizado correctamente");
-            return NextResponse.json({ ok: true, cliente: entity });
-        } 
+            clienteId = entity.id;
+        } else {
+            const { data: newCliente, error: createError } = await supabase
+                .from("clientes")
+                .insert(payload)
+                .single();
 
-        const { data: newCliente, error: createError } = await supabase
-            .from("clientes")
-            .insert(payload)
-            .single();
+            if (createError) {
+                console.error("[POST] Error creating cliente:", createError);
+                return NextResponse.json({ error: "Error creating cliente" }, { status: 500 });
+            }
 
-        if (createError) {
-            console.error("[POST] Error creating cliente:", createError);
-            return NextResponse.json({ error: "Error creating cliente" }, { status: 500 });
+            if (!newCliente) {
+                console.error("[POST] No se pudo insertar el cliente");
+                return NextResponse.json({ error: "No se pudo insertar el cliente" }, { status: 500 });
+            }
+
+            clienteId = newCliente.id;
         }
 
         console.log("[POST] Nuevo cliente creado:", newCliente);

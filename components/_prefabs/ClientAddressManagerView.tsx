@@ -4,94 +4,62 @@ import { UseFormRegisterReturn } from "react-hook-form";
 import { IDireccion } from "@/types/direccion";
 import { MdAddLocationAlt, MdOutlineEditLocationAlt } from "react-icons/md";
 import { Selector } from "./Selector";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ClientAddressManagerModal } from "../modals/ClientAddressManagerModal";
-import GooglePlacesAutocomplete from 'react-google-places-autocomplete';
+import Loader from "../Loader";
+import { useGoogleMaps } from "../providers/GoogleMapProvider";
+import InputAddressAutocomplete from "./InputAddressAutocomplete";
 
 export default function ClientAddressManagerView({
+    clienteId,
     tipo,
     label,
     register,
-    direccionIdInicialId,
+    direccionInicialId,
     direcciones,
-    onChange
+    onSelect
 }: {
+    clienteId: string | null;
     tipo: 'comercial' | 'despacho' | 'venta',
     label: string,
     register: UseFormRegisterReturn,
-    direccionIdInicialId?: string | null | undefined,
+    direccionInicialId?: string | null | undefined,
     direcciones?: IDireccion[]
-    onChange?: (value: string) => void;
+    onSelect?: (data: IDireccion | null) => void;    
 }) {
     const [showAddressManagerModal, setShowAddressManagerModal] = useState(false);
-    const [selectedDireccionId, setSelectedDireccionId] = useState<string | null>(direccionIdInicialId ?? null);
     const [selectedDireccion, setSelectedDireccion] = useState<IDireccion | null>(null);
+    const [newDireccion, setNewDireccion] = useState(true);
 
-    const handleDireccionSelected = (direccionId: string) => {
-        console.log("E: ", direccionId);
-        const event = new Event('change', { bubbles: true });
-        Object.defineProperty(event, 'target', {
-            writable: false,
-            value: { name: register.name, value: direccionId }
-        });
-        register.onChange(event);
-        onChange?.(direccionId);
-    }
+    const isGoogleApiLoaded = useGoogleMaps();
 
-    const MarkerIcon = () => (
-        <svg
-            width="32"
-            height="32"
-            viewBox="0 0 32 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-        >
-            {/* Circle background */}
-            <circle cx="16" cy="16" r="15" fill="#94B4F7" />
-            {/* Map marker */}
-            <path
-                d="M16 8C13.24 8 11 10.24 11 13C11 17 16 22 16 22C16 22 21 17 21 13C21 10.24 18.76 8 16 8ZM16 14.5C15.17 14.5 14.5 13.83 14.5 13C14.5 12.17 15.17 11.5 16 11.5C16.83 11.5 17.5 12.17 17.5 13C17.5 13.83 16.83 14.5 16 14.5Z"
-                fill="#ffffff"
-            />
-        </svg>
-    );
-
-    const formatOptionLabel = ({ label }: { label: string }) => (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <MarkerIcon />
-            <span>{label}</span>
-        </div>
-    );
-
-    const [autocompletePlace, setAutocompletePlace] = useState(null);
-
-    const handleSelect = async (place: any) => {
-        setAutocompletePlace(place);
-    };
+    console.log("Direcciones", direcciones);
 
     return (<div>
         <div className="flex w-full">
             {tipo != 'comercial' ? <Selector getLabel={d => d.direccionCliente || "Sin nombre"}
                 label={label}
-                placeholder={tipo === 'venta' ? 'Retiro en local' : 'Seleccione'}
+                placeholder={tipo === 'despacho' ? 'Retiro en local' : 'Seleccione'}
                 getValue={d => d.id}
                 options={direcciones || []}
-                defaultValue={direccionIdInicialId || ''}
+                defaultValue={direccionInicialId || ''}
                 register={register}
-                onChange={(e) => {
-                    handleDireccionSelected(e);
+                onChange={(e) => {   
+                    console.log("------> SELECTED", direcciones?.find(d => d.id === e) || null);
+                    setSelectedDireccion(direcciones?.find(d => d.id === e) || null);
                 }}
                 disableAutoSelect={true}
             /> : <div className="flex flex-col w-full">
-                <label htmlFor="cliente" className="block font-medium text-gray-700">{label || 'Dirección'}</label>
-                <GooglePlacesAutocomplete
-                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_API_KEY}
-                    selectProps={{
-                        value: autocompletePlace,
-                        onChange: handleSelect,
-                        formatOptionLabel: formatOptionLabel,
-                    }}
-                    />
+                <label htmlFor="cliente" className="block font-medium text-gray-700 text-sm">{label || 'Dirección'}</label>
+                {isGoogleApiLoaded ? <InputAddressAutocomplete 
+                    onSelect={onSelect} 
+                    initialAddress={null} /> : <div className="relative w-full">
+                    <input className="absolute block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                        disabled={true} />
+                    <div className="w-full pt-0.5 left-0 top-0 bg-white/70 flex flex-col justify-end items-end">
+                        <Loader texto="" />
+                    </div>
+                </div>}
             </div>
             }
             {tipo === 'despacho' && <>
@@ -99,29 +67,33 @@ export default function ClientAddressManagerView({
                     type="button"
                     className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
                     onClick={() => {
-                        setSelectedDireccionId(null);
+                        setNewDireccion(true);
                         setShowAddressManagerModal(true);
                     }}
                 >
                     <MdAddLocationAlt size="1.8rem" />
                 </button>
-                <button
+                {selectedDireccion != null && <button
                     type="button"
                     className="ml-2 flex items-center px-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-semibold h-11 mt-4"
                     onClick={() => {
+                        setNewDireccion(false);
                         setShowAddressManagerModal(true);
                     }}
                 >
                     <MdOutlineEditLocationAlt size="1.8rem" />
-                </button>
+                </button>}
             </>}
         </div>
 
-        {showAddressManagerModal && 
+        {showAddressManagerModal &&
             <ClientAddressManagerModal
+                clienteId={clienteId}
                 show={showAddressManagerModal}
-                initialDireccion={selectedDireccion}
-                onClose={() => setShowAddressManagerModal(false)}
+                initialDireccion={newDireccion ? null : selectedDireccion}
+                onClose={() => {                    
+                    setShowAddressManagerModal(false)
+                }}
             />}
     </div>);
 }

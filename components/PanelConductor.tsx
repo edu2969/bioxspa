@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import SoundPlayerProvider from "./context/SoundPlayerContext";
-import { ChecklistProvider } from "./context/ChecklistContext";
+import SoundPlayerProvider from "../context/SoundPlayerContext";
+import { ChecklistProvider } from "../context/ChecklistContext";
 import { ICilindroView, IRutaConductorView } from "@/types/types";
 import Nav from "./Nav";
 import { useState, useRef, useEffect, Suspense } from "react";

@@ -58,9 +58,11 @@ export default function DatosDelCliente({
         {/*EDICIÓN DE DIRECCIÓN DE DESPACHO */}
         {(cliente && (tipoOrden == 1 || tipoOrden == 4) &&
         <ClientAddressManagerView register={register("direccionDespachoId")}
+            tipo="despacho"
             label="Dirección de despacho"
-            direccionIdInicialId={direccionId}
-            direcciones={cliente.direccionesDespacho || []}/>)}
+            direccionInicialId={direccionId}
+            direcciones={cliente.direccionesDespacho || []}
+            clienteId={clienteId || ""} />)}
 
         {/* DOCUMENTO TRIBUTARIO */}
         {auth.hasRole([TIPO_CARGO.encargado, TIPO_CARGO.responsable, TIPO_CARGO.cobranza])

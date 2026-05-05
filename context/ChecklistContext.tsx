@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import ChecklistModal from "../modals/ChecklistModal";
+import ChecklistModal from "../components/modals/ChecklistModal";
 import { TIPO_CHECKLIST } from "@/app/utils/constants";
-import { useUser } from "../providers/UserProvider";
+import { useUser } from "../components/providers/UserProvider";
 
 interface IChecklistData {
     ok: boolean;

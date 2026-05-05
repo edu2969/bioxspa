@@ -15,10 +15,10 @@ export async function GET() {
             .from("cargos")
             .select("tipo, sucursal_id, dependencia_id")
             .eq("usuario_id", authResult.userData.id)
-            .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])
-            .single();
+            .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.responsable]);
 
         if (cargoError || !cargo) {
+            console.log("Error fetching cargo:", cargoError);
             return NextResponse.json({ ok: false, error: "Unauthorized access" }, { status: 403 });
         }
 
@@ -110,10 +110,11 @@ export async function POST(request) {
             .from("cargos")
             .select("tipo, sucursal_id, dependencia_id")
             .eq("usuario_id", authResult.userData.id)
-            .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado])
-            .single();
+            .in("tipo", [TIPO_CARGO.gerente, TIPO_CARGO.cobranza, TIPO_CARGO.encargado,
+                TIPO_CARGO.responsable]);
 
         if (cargoError || !cargo) {
+            console.log("Error fetching cargo:", cargoError);
             return NextResponse.json({ ok: false, error: "Unauthorized access" }, { status: 403 });
         }
 
@@ -123,7 +124,6 @@ export async function POST(request) {
             subcategoriaCatalogoId,
             valor,
             clienteId,
-            tipo = 1, // Default tipo mayorista
             sucursalId = cargo.sucursal_id
         } = body;
 
@@ -175,11 +175,8 @@ export async function POST(request) {
                 .eq('id', precioId)
                 .select(`
                     id,
-                    precio,
+                    valor,
                     fecha_desde,
-                    fecha_hasta,
-                    activo,
-                    tipo,
                     subcategoria_catalogo_id,
                     cliente_id,
                     sucursal_id
@@ -203,8 +200,6 @@ export async function POST(request) {
                 .select('id')
                 .eq('cliente_id', clienteId)
                 .eq('subcategoria_catalogo_id', subcategoriaCatalogoId)
-                .eq('tipo', tipo)
-                .eq('activo', true)
                 .single();
 
             if (existingPrecio) {
@@ -221,18 +216,16 @@ export async function POST(request) {
                     cliente_id: clienteId,
                     subcategoria_catalogo_id: subcategoriaCatalogoId,
                     sucursal_id: sucursalId,
-                    tipo: tipo,
-                    precio: valor,
-                    fecha_desde: new Date(),
-                    activo: true
+                    valor: valor,
+                    moneda: "CLP",
+                    impuesto: 0.19,
+                    valor_bruto: valor * 1.19,
+                    fecha_desde: new Date()
                 })
                 .select(`
                     id,
-                    precio,
+                    valor,
                     fecha_desde,
-                    fecha_hasta,
-                    activo,
-                    tipo,
                     subcategoria_catalogo_id,
                     cliente_id,
                     sucursal_id

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChecklistProvider } from "./context/ChecklistContext";
+import { ChecklistProvider } from "../context/ChecklistContext";
 import HomeAccessPanel from "./_prefabs/HomeAccessPanel";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
@@ -13,8 +13,9 @@ export default function Home() {
     const auth = useAuthorization();
     const isGerente = auth.hasRole([TIPO_CARGO.gerente]);
 
-    const queryClient = new QueryClient();
-    return (<QueryClientProvider client={queryClient}>
+    const queryClient = new QueryClient();    
+    return (
+    <QueryClientProvider client={queryClient}>
         {isGerente ? (
             <HomeGerencia/>
         ) : (

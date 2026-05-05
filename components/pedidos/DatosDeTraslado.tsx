@@ -32,12 +32,18 @@ export default function DatosDeTraslado({
 
         {/* EMPRESA PARA RETIRO */}
         <div className="w-full">
-            <ClienteSearchView titulo="Empresa donde se retira" register={register('empresaDondeRetirar')}
-            setClienteSelected={setClienteSelected}/>
+            <ClienteSearchView 
+                titulo="Empresa donde se retira" 
+                register={register('empresaDondeRetirar')}
+            />
         </div>
 
         {/*DIRECCIÓN DONDE RETIRAR */}
-        <ClientAddressManagerView label="Dirección de retiro" register={register('direccionRetiroId')} 
+        <ClientAddressManagerView 
+            clienteId={clienteSelected?.id || null}
+            tipo='despacho'
+            label="Dirección de retiro" 
+            register={register('direccionRetiroId')} 
             direcciones={clienteSelected?.direccionesDespacho || []}/>
     </fieldset>);
 }
