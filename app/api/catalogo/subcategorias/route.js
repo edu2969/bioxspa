@@ -14,6 +14,7 @@ export async function GET(request) {
             .select(`
                 id,
                 categoria_catalogo_id,
+                nombre,
                 cantidad,
                 unidad,
                 sin_sifon,
@@ -55,7 +56,8 @@ export async function GET(request) {
 
                 return {
                     id: subcategoria.id, // Mantener compatibilidad con frontend
-                    categoriaCatalogoId: subcategoria.categoria_catalogo_id,
+                    categoriaCatalogoId: subcategoria.categoria_catalogo_id,                    
+                    nombre: subcategoria.nombre,
                     sinSifon: subcategoria.sin_sifon,
                     precioSugerido: subcategoria.precio_sugerido,
                     cantidad: subcategoria.cantidad,

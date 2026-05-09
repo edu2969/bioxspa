@@ -16,16 +16,20 @@ export default function ClientAddressManagerView({
     label,
     register,
     direccionInicialId,
+    direccionInicialCliente,
     direcciones,
-    onSelect
+    onSelect,
+    className,
 }: {
     clienteId: string | null;
-    tipo: 'comercial' | 'despacho' | 'venta',
-    label: string,
-    register: UseFormRegisterReturn,
-    direccionInicialId?: string | null | undefined,
-    direcciones?: IDireccion[]
-    onSelect?: (data: IDireccion | null) => void;    
+    tipo: 'comercial' | 'despacho' | 'venta';
+    label: string;
+    register: UseFormRegisterReturn;
+    direccionInicialId?: string | null | undefined;
+    direccionInicialCliente?: string | null | undefined;
+    direcciones?: IDireccion[];
+    onSelect?: (data: IDireccion | null) => void;
+    className?: string;
 }) {
     const [showAddressManagerModal, setShowAddressManagerModal] = useState(false);
     const [selectedDireccion, setSelectedDireccion] = useState<IDireccion | null>(null);
@@ -49,12 +53,14 @@ export default function ClientAddressManagerView({
                     setSelectedDireccion(direcciones?.find(d => d.id === e) || null);
                 }}
                 disableAutoSelect={true}
+                className={className}
             /> : <div className="flex flex-col w-full">
                 <label htmlFor="cliente" className="block font-medium text-gray-700 text-sm">{label || 'Dirección'}</label>
                 {isGoogleApiLoaded ? <InputAddressAutocomplete 
                     onSelect={onSelect} 
-                    initialAddress={null} /> : <div className="relative w-full">
-                    <input className="absolute block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                    className={className}
+                    initialAddress={direccionInicialCliente || null} /> : <div className="relative w-full">
+                    <input className={`absolute block ${className || ''}`}
                         disabled={true} />
                     <div className="w-full pt-0.5 left-0 top-0 bg-white/70 flex flex-col justify-end items-end">
                         <Loader texto="" />

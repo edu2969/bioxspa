@@ -13,6 +13,7 @@ type SelectorProps<T> = {
   onChange?: (value: string) => void;
   disableAutoSelect?: boolean; // Nueva prop para deshabilitar auto-selección
   defaultValue?: string;
+  className?: string;
 };
 
 export function Selector<T>({
@@ -25,7 +26,8 @@ export function Selector<T>({
   isLoading,
   onChange,
   disableAutoSelect = false, // Por defecto false para mantener comportamiento actual
-  defaultValue
+  defaultValue,
+  className
 }: SelectorProps<T>) {
 
   // Seleccionar automáticamente si solo hay una opción (solo si no está deshabilitado)
@@ -58,7 +60,7 @@ export function Selector<T>({
           defaultValue={defaultValue}
           disabled={isLoading}
           value={options && options.length === 1 && !isLoading && !disableAutoSelect ? getValue(options[0]) : undefined}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+          className={className}
         >
           <option value="">{isLoading ? `Cargando${label ? " " + label : ""}...` : (placeholder || `Seleccione${label ? " " + label : ""}...`)}</option>
           {options?.map((item, idx) => (

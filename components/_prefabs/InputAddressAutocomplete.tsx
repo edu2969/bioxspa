@@ -9,9 +9,10 @@ import { IDireccion } from '@/types/direccion';
 type Props = {
   onSelect?: (data: IDireccion | null) => void;
   initialAddress: string | null;
+  className?: string;
 };
 
-export default function InputAddressAutocomplete({ onSelect, initialAddress }: Props) {
+export default function InputAddressAutocomplete({ onSelect, initialAddress, className }: Props) {
   const { isLoaded } = useGoogleMaps();
   const { input, setInput, predictions, getPlaceDetails } = usePlacesAutocomplete();
 
@@ -46,7 +47,7 @@ export default function InputAddressAutocomplete({ onSelect, initialAddress }: P
         onFocus={() => setShow(true)}       // 👈 aquí activas
         onBlur={() => setShow(false)}       // 👈 opcional (cerrar)
         onChange={(e) => setInput(e.target.value)}
-        className="w-full border p-2"
+        className={className}
         placeholder="Dirección"
       />
 

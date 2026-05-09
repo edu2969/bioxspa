@@ -1,5 +1,6 @@
 export interface IDireccionDespacho {
     id: string;
+    direccionCliente: string;
     latitud: number;
     longitud: number;
     comentario?: string;
@@ -11,7 +12,7 @@ export interface ICliente {
     creadorId?: string | null;
     nombre: string;
     rut: string;
-    direccionId?: string | null;
+    direccion?: IDireccionDespacho | null;
     giro?: string;
     telefono?: string;
     email?: string;

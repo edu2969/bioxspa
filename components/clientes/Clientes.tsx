@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { TiUserAddOutline } from "react-icons/ti";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import Loader from "@/components/Loader";
 import { FaRegSave } from "react-icons/fa";
 import { useRouter } from "next/navigation";
@@ -14,12 +14,14 @@ import { IClienteSeachResult } from "../_prefabs/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ICliente } from "@/types/cliente";
 import { IDireccion } from "@/types/direccion";
+import InputRut from "../_prefabs/InputRut";
 
 interface IClienteForm {
     id: string;
     nombre: string;
     rut: string;
     direccionId: string;
+    direccionCliente: string;
     giro: string;
     telefono: string;
     email: string;
@@ -49,7 +51,7 @@ export default function Clientes() {
     const [loadingClients, setLoadingClients] = useState(false);
     const [autocompleteClienteResults, setAutocompleteClienteResults] = useState<IClienteSeachResult[]>([]);
     const [direccionesDespacho, setDireccionesDespacho] = useState([]);
-    const { register, handleSubmit, setValue, reset } = useForm<IClienteForm>({
+    const { register, handleSubmit, setValue, reset, control } = useForm<IClienteForm>({
         defaultValues: {
             nombre: '',
             rut: '',
@@ -109,7 +111,8 @@ export default function Clientes() {
                 id: cliente.id,
                 nombre: cliente.nombre,
                 rut: cliente.rut,
-                direccionId: cliente.direccionId || '',
+                direccionId: cliente.direccion?.id || '',
+                direccionCliente: cliente.direccion?.direccionCliente || '',
                 giro: cliente.giro,
                 telefono: cliente.telefono,
                 email: cliente.email,
@@ -278,7 +281,18 @@ export default function Clientes() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">RUT</label>
-                                <input {...register("rut", { required: true })} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm" />
+                                <Controller
+                                    name="rut"
+                                    control={control}
+                                    rules={{ required: "RUT es requerido" }}
+                                    render={({ field }) => (
+                                        <InputRut
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                                            value={field.value || ''}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Giro</label>
@@ -294,10 +308,12 @@ export default function Clientes() {
                             </div>
                             <div className="col-span-2">                                
                                 <ClientAddressManagerView 
+                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                     clienteId={clienteId}
                                     tipo={'comercial'} 
                                     register={register("direccionId")} 
-                                    direccionInicialId={cliente?.direccionId} 
+                                    direccionInicialId={cliente?.direccion?.id || ''}
+                                    direccionInicialCliente={cliente?.direccion?.direccionCliente || ''} 
                                     onSelect={setDireccionCliente}
                                     label="Dirección comercial"/>
                             </div>
@@ -369,6 +385,7 @@ export default function Clientes() {
                                 direcciones={cliente?.direccionesDespacho}
                                 tipo={'despacho'}                                
                                 onSelect={setDireccionCliente}
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                                 />                            
                         </div>
                                                   

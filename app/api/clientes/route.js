@@ -17,7 +17,7 @@ export async function GET(req) {
                 nombre,
                 giro,
                 rut,
-                direccion_id,
+                direccion:direcciones(id, direccion_cliente),
                 telefono,
                 email,
                 email_intercambio,
@@ -58,7 +58,8 @@ export async function GET(req) {
                 giro: cliente.giro,
                 rut: cliente.rut,
                 direccion: {
-                    id: cliente.direccion_id
+                    id: cliente.direccion?.id,
+                    direccionCliente: cliente.direccion?.direccion_cliente
                 },
                 telefono: cliente.telefono,
                 email: cliente.email,
@@ -135,7 +136,8 @@ export async function POST(req) {
             const { data: direccionPorPlaceId, error: errDireccionPorPlaceId } = await supabase
                 .from('direcciones')
                 .select('id')
-                .eq('place_id', entity.direccion.placeId);
+                .eq('place_id', entity.direccion.placeId)
+                .single();
 
             if(!direccionPorPlaceId) {
                 const { data: newDireccion, error: insertNewDireccionError } = await supabase
@@ -157,23 +159,19 @@ export async function POST(req) {
                 }
                 direccionId = newDireccion.id;
             } else {
-                const { data: updDireccion, error: uptError } = await supabase
+                console.log("[POST] Dirección ya existe con el placeId, actualizando datos...", direccionPorPlaceId);
+                const { error: uptError } = await supabase
                     .from('direcciones')
                     .update({
-                        direccion_cliente: entity.direccion.direccion_cliente.split(",")[0],
+                        direccion_cliente: entity.direccion.direccionCliente.split(",")[0],
                         latitud: entity.direccion.latitud,
                         longitud: entity.direccion.longitud
                     })
                     .eq('id', direccionPorPlaceId.id);
                 
                 if(uptError) {
-                    console.log("[POST] Error al actualizar la dirección", direccionPorPlaceId.id);
+                    console.log("[POST] Error al actualizar la dirección", uptError);
                     return NextResponse.json({ ok: false, error: "Error al actualizar la dirección" });
-                }
-
-                if(!updDireccion) {
-                    console.log("[POST] Error al actualizar la dirección");
-                    return NextResponse.json({ ok: false, error: "Error al actualizar la "})
                 }
                 direccion.id = direccionPorPlaceId.id;
             }
@@ -235,6 +233,8 @@ export async function POST(req) {
             }
 
             clienteId = entity.id;
+            
+            return NextResponse.json({ ok: true });  
         } else {
             const { data: newCliente, error: createError } = await supabase
                 .from("clientes")
@@ -252,10 +252,9 @@ export async function POST(req) {
             }
 
             clienteId = newCliente.id;
-        }
-
-        console.log("[POST] Nuevo cliente creado:", newCliente);
-        return NextResponse.json({ ok: true, cliente: newCliente });        
+            
+            return NextResponse.json({ ok: true, cliente: newCliente });  
+        }      
     } catch (error) {
         console.error("[POST] ERROR!", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
