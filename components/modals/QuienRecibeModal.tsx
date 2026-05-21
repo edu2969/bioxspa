@@ -1,15 +1,15 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { LiaTimesSolid } from "react-icons/lia";
 import Loader from "../Loader";
+import RutInput from "../_prefabs/RutInput";
 
 interface FormData {
     nombreRetira: string;
-    rutRetiraNum: string;
-    rutRetiraDv: string;
+    rutRetira: string;
 }
 
 export default function QuienRecibeModal({
@@ -19,7 +19,7 @@ export default function QuienRecibeModal({
     ventaId: string;
     onClose: () => void;
 }) {
-    const { handleSubmit, register } = useForm<FormData>();
+    const { handleSubmit, control } = useForm<FormData>();
     const queryClient = useQueryClient();
 
     const { mutate: saveQuienRecibe, isPending: isSaving } = useMutation({
@@ -33,7 +33,7 @@ export default function QuienRecibeModal({
                 body: JSON.stringify({
                     ventaId,
                     nombreRecibe: data.nombreRetira,
-                    rutRecibe: `${data.rutRetiraNum}-${data.rutRetiraDv}`
+                    rutRecibe: data.rutRetira
                 })
             });
 
@@ -82,35 +82,34 @@ export default function QuienRecibeModal({
                     <div className="mt-2 space-y-4 text-left">
                         <div className="flex flex-col">
                             <label htmlFor="nombreRetira" className="text-sm text-gray-500">Nombre</label>
-                            <input
-                                {...register("nombreRetira", { required: true })}
-                                id="nombreRetira"
-                                type="text"
-                                className="border rounded-md px-3 py-2 text-base"
-                                placeholder="Nombre completo"
+                            <Controller
+                                control={control}
+                                name="nombreRetira"
+                                rules={{ required: true }}
+                                render={({ field }) => (
+                                    <input
+                                        {...field}
+                                        id="nombreRetira"
+                                        type="text"
+                                        className="border rounded-md px-3 py-2 text-base"
+                                        placeholder="Nombre completo"
+                                    />
+                                )}
                             />
                         </div>
                         <div className="flex flex-col">
                             <label htmlFor="rutRetira" className="text-sm text-gray-500">RUT</label>
-                            <div className="flex space-x-2">
-                                <input
-                                    id="rutRetiraNum"
-                                    {...register("rutRetiraNum", { required: true })}
-                                    type="text"
-                                    className="border rounded-md px-3 py-2 text-base w-28 text-right"
-                                    placeholder="12.345.678"
-                                    maxLength={10}
-                                />
-                                <span className="text-gray-500 font-bold text-lg mt-2">-</span>
-                                <input
-                                    id="rutRetiraDv"
-                                    type="text"
-                                    className="border rounded-md px-3 py-2 text-base w-10 text-center"
-                                    {...register("rutRetiraDv", { required: true })}
-                                    placeholder="K"
-                                    maxLength={1}
-                                />
-                            </div>
+                            <Controller
+                                control={control}
+                                name="rutRetira"
+                                rules={{ required: true }}
+                                render={({ field }) => (
+                                    <RutInput
+                                        {...field}
+                                        className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"                                        
+                                    />
+                                )}
+                            />
                             <p className="text-xs text-gray-400 mt-1">Ejemplo: 12.345.678-K</p>
                         </div>
                     </div>

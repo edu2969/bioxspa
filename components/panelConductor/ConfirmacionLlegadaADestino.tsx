@@ -10,6 +10,7 @@ import { LuFlagOff } from "react-icons/lu";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import CheckPoint from "./CheckPoint";
+import InputRut from "../_prefabs/RutInput";
 
 const getVentaActual = (rutaDespacho: IRutaConductorView) => {
     const tramoActual = rutaDespacho.destinos.find(tramo => tramo.fechaArribo == null);
@@ -145,11 +146,9 @@ export default function ConfirmacionLlegadaADestino({
                         <h2 className="text-xl font-bold mb-4">Datos de quién {rutaDespacho && getVentaActual(rutaDespacho)?.tipo === TIPO_ORDEN.traslado ? 'entrega' : 'recibe'}</h2>
                         <div className="flex flex-col md:flex-row text-left">
                             <label htmlFor="rut" className="text-xs">RUT</label>
-                            <input
+                            <InputRut 
                                 {...register("rut", { required: true })}
-                                type="text"
                                 className="border border-gray-300 rounded-lg px-3 py-2 w-full md:w-1/2"
-                                placeholder="RUT (opcional)*"
                             />
                             <label htmlFor="nombre" className="text-xs mt-4">Nombre</label>
                             <input

@@ -33,7 +33,7 @@ export default function LoginOut() {
                     router.replace("/");
                 }
             } catch {
-                // Ignorar timeout, igual redirigir
+                router.replace("/");
             }
         }
         cerrarSesion();

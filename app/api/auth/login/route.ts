@@ -11,6 +11,7 @@ import { NextRequest } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { ResponseHelper } from "@/lib/supabase-helpers";
 import { Session } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 // ===============================================
 // TIPOS DE DATOS
@@ -146,6 +147,14 @@ export async function DELETE() {
     if (error) {
       return ResponseHelper.error("Error cerrando sesión", 500);
     }
+
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    allCookies.forEach((cookie) => {
+        if (cookie.name.includes("sb-")) {
+            cookieStore.delete(cookie.name);
+        }
+    });
 
     return ResponseHelper.success({
       message: 'Logout exitoso'

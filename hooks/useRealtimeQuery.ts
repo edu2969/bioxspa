@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { useOnVisibilityChange } from "./useOnVisibilityChange";
+
+import type {
+  RealtimeChannel,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 
 type UseRealtimeQueryOptions = {
   channelName: string;
@@ -23,124 +26,242 @@ export function useRealtimeQuery({
   event = "*",
   enabled = true,
 }: UseRealtimeQueryOptions) {
+
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  const supabase = useMemo(
+    () => createSupabaseBrowserClient(),
+    []
+  );
+
   const queryKeysRef = useRef(queryKeys);
-  const lastStatusRef = useRef<string | null>(null);
+
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     queryKeysRef.current = queryKeys;
   }, [queryKeys]);
 
   useEffect(() => {
+
     if (!enabled) {
       return;
     }
 
-    lastStatusRef.current = null;
+    let channel: RealtimeChannel | null = null;
+
+    let destroyed = false;
+
     const normalizedFilter = filter?.trim();
 
-    const channel = supabase
-      .channel(channelName);
-
-    channel.on(
-        "postgres_changes",
-        {
-          event,
-          schema,
-          table,
-          ...(normalizedFilter ? { filter: normalizedFilter } : {}),
-        } as any,
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-          console.log(`[Realtime] ${table}:`, payload);
-          queryKeysRef.current.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
-          });
-        }
-      )
-      .subscribe((status) => {
-        if (lastStatusRef.current === status) {
-          return;
-        }
-
-        lastStatusRef.current = status;
-
-        if (status === "SUBSCRIBED") {
-          // Sync inicial/reconexion para evitar UI stale si hubo eventos perdidos.
-          queryKeysRef.current.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: key });
-          });
-          return;
-        }
-
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn(`[Realtime] Channel ${channelName} status: ${status}`);     
-          supabase.removeChannel(channel);     
-          channel.subscribe();
-          console.log(`[Realtime] Channel ${channelName} re-subscribed after error/timeout.`);
-        }
+    const invalidateQueries = () => {
+      queryKeysRef.current.forEach((key) => {
+        queryClient.invalidateQueries({
+          queryKey: key,
+        });
       });
-
-    return () => {
-      supabase.removeChannel(channel);
     };
-  }, [channelName, table, schema, filter, event, enabled, queryClient, supabase]);
 
-  useEffect(() => {
-    let subscription: RealtimeChannel
+    const cleanupChannel = async () => {
 
-    const setupRealtimeSubscription = async () => {
-      await unsubscribeRealtimeConnection()
-      subscription = supabase
-        .channel('list-all-channel')
+      if (!channel) {
+        return;
+      }
+
+      try {
+
+        await supabase.removeChannel(channel);
+
+      } catch (error) {
+
+        console.error(
+          `[Realtime] Error removing channel ${channelName}`,
+          error
+        );
+
+      } finally {
+
+        channel = null;
+
+      }
+    };
+
+    const subscribe = async () => {
+
+      if (destroyed) {
+        return;
+      }
+
+      await cleanupChannel();
+
+      console.log(
+        `[Realtime] Creating channel ${channelName}`
+      );
+
+      channel = supabase
+        .channel(`${channelName}-${crypto.randomUUID()}`)
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: '*',
-            schema: 'public',
-            table: 'lists',
-          },
-          (payload) => {
-            
+            event,
+            schema,
+            table,
+            ...(normalizedFilter
+              ? { filter: normalizedFilter }
+              : {}),
+          } as any,
+          (
+            payload: RealtimePostgresChangesPayload<
+              Record<string, unknown>
+            >
+          ) => {
+
+            console.log(
+              `[Realtime] ${table} change detected`,
+              payload
+            );
+
+            invalidateQueries();
+
           }
         )
-        .subscribe((status) => {
-          console.log('List Insert and Update Listener.... ', status)
-        })
-    }
+        .subscribe(async (status) => {
 
-    const unsubscribeRealtimeConnection = async () => {
-      if (subscription) {
-        const message = await subscription.unsubscribe()
-        console.log(`${message} - List realtime listener removed.`)
-      }
-    }
+          console.log(
+            `[Realtime] ${channelName} status:`,
+            status
+          );
+
+          if (destroyed) {
+            return;
+          }
+
+          switch (status) {
+
+            case "SUBSCRIBED":
+
+              invalidateQueries();
+
+              break;
+
+            case "CHANNEL_ERROR":
+
+            case "TIMED_OUT":
+
+            case "CLOSED":
+
+              console.warn(
+                `[Realtime] ${channelName} disconnected (${status}), reconnecting...`
+              );
+
+              if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+              }
+
+              reconnectTimeoutRef.current = setTimeout(
+                async () => {
+
+                  try {
+
+                    const { data } =
+                      await supabase.auth.getSession();
+
+                    if (data.session?.access_token) {
+
+                      supabase.realtime.setAuth(
+                        data.session.access_token
+                      );
+
+                    }
+
+                    await subscribe();
+
+                  } catch (error) {
+
+                    console.error(
+                      `[Realtime] Failed to reconnect ${channelName}`,
+                      error
+                    );
+
+                  }
+
+                },
+                1500
+              );
+
+              break;
+          }
+        });
+    };
+
+    subscribe();
 
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        console.log('Tab is visible again.')
-        if (subscription.state === 'closed') {
-          console.log('SUBSCRIPTION IS CLOSED.')
-          // Token refesh is important to prevent prevent reconnection failure
-          const { data } = await supabase.auth.getSession()
-          if (data.session) {
-            supabase.realtime.setAuth(data.session?.access_token)
-            setupRealtimeSubscription()
-          }
-        }
+
+      if (
+        document.visibilityState !== "visible"
+      ) {
+        return;
       }
-    }
 
-    // Set up initial subscription
-    setupRealtimeSubscription()
+      console.log(
+        `[Realtime] Tab visible again (${channelName})`
+      );
 
-    // Listen for visibility changes
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+      try {
 
-    // Cleanup
+        const { data } =
+          await supabase.auth.getSession();
+
+        if (data.session?.access_token) {
+
+          supabase.realtime.setAuth(
+            data.session.access_token
+          );
+
+        }
+
+        await subscribe();
+
+      } catch (error) {
+
+        console.error(
+          `[Realtime] Visibility reconnect failed`,
+          error
+        );
+
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
     return () => {
-      unsubscribeRealtimeConnection()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, []);
+
+      destroyed = true;
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
+      cleanupChannel();
+    };
+
+  }, [
+    channelName,
+    table,
+    schema,
+    filter,
+    event,
+    enabled,
+    queryClient,
+    supabase,
+  ]);
 }

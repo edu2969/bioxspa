@@ -238,7 +238,7 @@ export function PowerScanOptionsModal({
                                         <Image
                                             width={20}
                                             height={64}
-                                            src={`/ui/tanque_biox${getColorEstanque(categoria)}.png`}
+                                            src={`/ui/tanque_biox${getColorEstanque(categoria?.elemento)}.png`}
                                             style={{ width: "32px", height: "auto" }}
                                             alt="tanque_biox"
                                         />

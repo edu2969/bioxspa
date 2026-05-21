@@ -5,7 +5,7 @@ import Loader from "../Loader";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo, useCallback } from "react";
 import { IoCloseSharp } from "react-icons/io5";
-import InputFilter from "../_prefabs/InputFiler";
+import InputFilter from "../_prefabs/FilerInput";
 import ItemBox from "./ItemBox";
 import ItemEditModal from "./ItemEditModal";
 import { TIPO_CATEGORIA_CATALOGO } from "@/app/utils/constants";

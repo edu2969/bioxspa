@@ -22,7 +22,7 @@ export async function POST(request) {
         }
 
         const { user } = authResult.data;
-        const userId = user.id;        
+        const userId = user.id;
 
         const supabase = await getSupabaseServerClient();
         const nowIso = new Date().toISOString();
@@ -93,26 +93,26 @@ export async function POST(request) {
             .gte("estado", TIPO_ESTADO_RUTA_DESPACHO.preparacion)
             .lt("estado", TIPO_ESTADO_RUTA_DESPACHO.terminado);
 
-        if(activeRutasErr) {
+        if (activeRutasErr) {
             console.error("Error fetching active rutas:", activeRutasErr);
             return NextResponse.json({ ok: false, error: "Error fetching active routes" }, { status: 500 });
         }
 
-        if(activeRutas) {
+        if (activeRutas) {
             const activeRutaIds = activeRutas.map(r => r.id);
             const { data: historiales, error: historialesErr } = await supabase
                 .from("ruta_despacho_historial_carga")
                 .select("id")
                 .in("ruta_despacho_id", activeRutaIds);
 
-            if(historialesErr) {
+            if (historialesErr) {
                 console.error("Error checking if item is already loaded in active routes:", itemsCargadosErr);
                 return NextResponse.json({ ok: false, error: "Error checking item in active routes" }, { status: 500 });
             }
 
             // Debe tener un solo historial, que significa que tiene solo (es_carga = true).
             // Si está el item, no puede cargarlo
-            if(historiales && historiales.length === 1) {
+            if (historiales && historiales.length === 1) {
                 const historialesIds = historiales.map(h => h.id);
                 const { data: itemsMovidos, error: itemsMovidosErr } = await supabase
                     .from("ruta_despacho_historial_carga_items_movidos")
@@ -121,15 +121,15 @@ export async function POST(request) {
                     .eq("item_catalogo_id", itemRow.id)
                     .maybeSingle();
 
-                if(itemsMovidosErr) {
+                if (itemsMovidosErr) {
                     console.error("Error checking if item is already loaded in active routes:", itemsMovidosErr);
                     return NextResponse.json({ ok: false, error: "Error checking item in active routes" }, { status: 500 });
                 }
 
-                if(itemsMovidos) {
+                if (itemsMovidos) {
                     console.log("Item is already loaded in an active route:", itemRow.id);
                     return NextResponse.json({ ok: false, error: "El item ya está cargado en una ruta activa" }, { status: 400 });
-                }                
+                }
             }
         }
 
@@ -163,10 +163,10 @@ export async function POST(request) {
             // create new historial carga
             const { data: created, error: createErr } = await supabase
                 .from("ruta_despacho_historial_carga")
-                .insert({ 
-                    ruta_despacho_id: ruta_id, 
-                    es_carga: true, 
-                    fecha: new Date().toISOString(), 
+                .insert({
+                    ruta_despacho_id: ruta_id,
+                    es_carga: true,
+                    fecha: new Date().toISOString(),
                     usuario_id: userId
                 })
                 .select("id")
@@ -175,6 +175,39 @@ export async function POST(request) {
             if (createErr) throw createErr;
             return created.id;
         }
+
+        const buildItemView = (row) => {
+            console.log("Building item view for row:", row);
+            const sub = row.subcategoria || null;
+            const cat = sub?.categoria || null;
+            return {
+                id: row.id,
+                propietarioId: row.propietario ? { id: row.propietario.id, nombre: row.propietario.nombre, rut: row.propietario.rut } : null,
+                direccionId: row.direccionId,
+                elemento: (cat && cat.elemento) || (sub && sub.nombre) || "",
+                codigo: row.codigo,
+                subcategoria: sub ? {
+                    id: sub.id,
+                    nombre: sub.nombre,
+                    categoria: cat ? {
+                        id: cat.id,
+                        nombre: cat.nombre,
+                        elemento: cat.elemento,
+                        esIndustrial: cat.es_industrial
+                    } : null,
+                    cantidad: sub.cantidad,
+                    unidad: sub.unidad,
+                    sinSifon: sub.sin_sifon,
+                } : null,
+                stockActual: row.stock_actual,
+                stockMinimo: row.stock_minimo,
+                garantiaAnual: row.garantia_anual,
+                estado: row.estado,
+                fechaMantencion: row.fecha_mantencion,
+                direccionInvalida: String(row.direccion?.id) !== String(direccionId),
+                direccionEsperada: expectedDireccion ? { id: expectedDireccion.id, nombre: expectedDireccion.nombre } : null
+            };
+        };
 
         // If rutaId provided: operate on that route
         if (rutaId) {

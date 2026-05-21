@@ -14,7 +14,7 @@ import { IClienteSeachResult } from "../_prefabs/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ICliente } from "@/types/cliente";
 import { IDireccion } from "@/types/direccion";
-import InputRut from "../_prefabs/InputRut";
+import InputRut from "../_prefabs/RutInput";
 
 interface IClienteForm {
     id: string;

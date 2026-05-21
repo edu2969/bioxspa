@@ -12,7 +12,7 @@ type Props = {
   className?: string;
 };
 
-export default function InputAddressAutocomplete({ onSelect, initialAddress, className }: Props) {
+export default function AddressAutocompleteInput({ onSelect, initialAddress, className }: Props) {
   const { isLoaded } = useGoogleMaps();
   const { input, setInput, predictions, getPlaceDetails } = usePlacesAutocomplete();
 

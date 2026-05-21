@@ -4,7 +4,7 @@ import MapWithDraggableMarker from "../maps/MapWithDraggableMarker";
 import { useEffect, useState } from "react";
 import { GoogleMapsProvider } from "../providers/GoogleMapProvider";
 import { IDireccion } from "@/types/direccion";
-import InputAddressAutocomplete from "../_prefabs/InputAddressAutocomplete";
+import InputAddressAutocomplete from "../_prefabs/AddressAutocompleteInput";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from 'react-hot-toast';
 import Loader from "../Loader";

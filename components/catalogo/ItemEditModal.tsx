@@ -3,7 +3,7 @@ import Loader from "../Loader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
-import InputMonto from "../_prefabs/InputMonto";
+import InputMonto from "../_prefabs/MontoInput";
 
 interface IItemEditModal {
     id?: string;

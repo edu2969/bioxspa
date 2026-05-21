@@ -1,5 +1,4 @@
-import React from 'react';
-import { scaleBand, scaleLinear } from 'd3-scale';
+import { scaleBand, scaleLinear } from 'react-d3-library';
 import { motion } from 'framer-motion';
 
 export function BarChart({ data, width, height }) {

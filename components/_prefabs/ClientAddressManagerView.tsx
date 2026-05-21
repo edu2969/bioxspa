@@ -8,7 +8,7 @@ import { useState } from "react";
 import { ClientAddressManagerModal } from "../modals/ClientAddressManagerModal";
 import Loader from "../Loader";
 import { useGoogleMaps } from "../providers/GoogleMapProvider";
-import InputAddressAutocomplete from "./InputAddressAutocomplete";
+import InputAddressAutocomplete from "./AddressAutocompleteInput";
 
 export default function ClientAddressManagerView({
     clienteId,

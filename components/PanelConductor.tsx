@@ -44,7 +44,6 @@ export default function PanelConductor() {
     const { data: ruta, isLoading: isLoadingRuta } = useQuery<IRutaConductorView | null>({
         queryKey: ['ruta-despacho-conductor', userId],
         queryFn: async () => {
-            if (!userId) return null;
             const response = await fetch(`/api/conductor/rutaAsignada?usuarioId=${userId}`);
             const data = await response.json();
             console.log("Ruta de despacho del conductor:", data);
@@ -71,12 +70,12 @@ export default function PanelConductor() {
     const { data: cargados } = useQuery<ICilindroView[]>({
         queryKey: ['carga-vehiculo', userId, ruta?.id],
         queryFn: async () => {
-            if (!ruta || !ruta.id) return [];
-            const response = await fetch(`/api/conductor/cilindrosCargados?rutaId=${ruta.id}`);
+            const response = await fetch(`/api/conductor/cilindrosCargados?rutaId=${ruta?.id}`);
             const data = await response.json();
             return data.cilindrosCargados;
         },
-        enabled: !!userId && !!ruta?.id
+        enabled: Boolean(userId && ruta?.id),
+        initialData: [],
     });
 
     const { data: descarga, isLoading: loadingDescarga } = useQuery<ICilindroView[]>({

@@ -9,7 +9,7 @@ import { TbMoneybagMoveBack } from "react-icons/tb";
 import { useForm } from "react-hook-form";
 import { TIPO_CARGO } from "@/app/utils/constants";
 import Loader from "../Loader";
-import InputMonto from "../_prefabs/InputMonto";
+import MontoInput from "../_prefabs/MontoInput";
 
 interface ISolicitudPrecioForm {    
     subcategoriaCatalogoId: string;
@@ -179,7 +179,7 @@ export default function SolicitudPrecioModal({
                             {hasRole([TIPO_CARGO.cobranza])
                                 && <div className="flex"><div className="flex flex-col w-full">
                                     <label htmlFor="precio" className="text-sm text-gray-500">Precio</label>
-                                    <InputMonto
+                                    <MontoInput
                                         name="valor"
                                         symbol="$"
                                         placeholder="Precio"
