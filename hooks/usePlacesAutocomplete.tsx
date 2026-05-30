@@ -66,7 +66,7 @@ export function usePlacesAutocomplete() {
             resolve({
               direccion: place.formatted_address || '',
               lat: place.geometry.location?.lat() || 0,
-              lng: place.geometry.location?.lng() || 0,
+              lng: place.geometry.location?.lng() || 0              
             });
           } else {
             resolve(null);

@@ -18,7 +18,6 @@ export {
 export { 
   createSupabaseBrowserClient,
   getExistingBrowserClient,
-  destroyBrowserClient,
   hasBrowserClient 
 } from './supabase/browser-client';
 

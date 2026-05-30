@@ -164,7 +164,7 @@ export default function PorAsignar({
                 <div className="absolute -top-0 -left-0 bg-neutral-200 text-black text-lg font-bold px-3 py-2 rounded-br-md rounded-tl-md tracking-wider">
                     ÓRDENES
                 </div>
-                <Link href="/pages/pedidos/nuevo" className="relative ml-auto -mt-2" onClick={() => setRedirecting(true)}>
+                <Link href="/pedidos/nuevo" className="relative ml-auto -mt-2" onClick={() => setRedirecting(true)}>
                     <button className={`flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3 mr-3 ${redirecting ? 'opacity-50 pointer-events-none' : ''}`} 
                     disabled={redirecting}>
                         <FaCartPlus size={32} className="pl-0.5 mr-2" /> NUEVO

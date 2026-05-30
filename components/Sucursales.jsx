@@ -32,14 +32,14 @@ export default function Sucursales() {
                 <div className="relative overflow-x-auto shadow-md sm:rounded-lg p-2">
                     <div className="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pb-4 bg-white dark:bg-gray-900">
                         <div className="flex items-start space-x-4 text-ship-cove-800 pt-4">
-                            <Link href="/pages">
+                            <Link href="/home">
                                 <AiFillHome size="1.4rem" className="text-gray-700 dark:text-gray-300 ml-2" />
                             </Link>
                             <IoIosArrowForward size="1.5rem" className="text-gray-700 dark:text-gray-300" />
                             <span className="text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300">SUCURSALES</span>
                         </div>
                         <div className="pt-4">
-                            <Link href="/pages/configuraciones/sucursales/edit">
+                            <Link href="/configuraciones/sucursales/edit">
                                 <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
                                     NUEVO
                                 </button>
@@ -67,7 +67,7 @@ export default function Sucursales() {
                                     </div>
                                 </div>
                                 <div className="w-1/2 px-2 flex items-center justify-end">
-                                    <Link href={`/pages/configuraciones/sucursales/edicion?id=${branch.id}`}>
+                                    <Link href={`/configuraciones/sucursales/edicion?id=${branch.id}`}>
                                         <button className="bg-yellow-500 text-white px-4 py-0.5 rounded-md hover:bg-yellow-600 flex">
                                             <FaPen size="0.8rem" className="mt-1 mr-2" /> EDITAR
                                         </button>

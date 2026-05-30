@@ -101,16 +101,6 @@ export function getExistingBrowserClient(): SupabaseClient | null {
 }
 
 /**
- * Destruye el cliente cached (útil para logout o testing)
- */
-export function destroyBrowserClient(): void {
-  if (clientCache) {
-    // No hay método destroy en Supabase client, pero limpiamos cache
-    clientCache = null;
-  }
-}
-
-/**
  * Verifica si hay un cliente activo
  */
 export function hasBrowserClient(): boolean {

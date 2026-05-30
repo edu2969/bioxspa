@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { LiaTimesSolid } from "react-icons/lia";
 import Loader from "./Loader";
 import { FaClipboardCheck } from "react-icons/fa";
@@ -10,8 +10,11 @@ import Link from "next/link";
 import { MdAddTask } from "react-icons/md";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Pedido, PedidoItem, PedidoResponse } from "@/app/types/pedidos";
+import { ISucursalSelectable } from "@/app/types/sucursales";
 
-function formatFecha(fecha) {
+function formatFecha(fecha: string) {
     return new Date(fecha).toLocaleDateString("es-CL", {
         day: "2-digit",
         month: "short",
@@ -20,56 +23,49 @@ function formatFecha(fecha) {
     }).toUpperCase();
 }
 
-function amountFormat(num) {
+function amountFormat(num: number) {
     if (!num && num !== 0) return "";
     return num.toLocaleString("es-CL");
 }
 
 export default function GestionPedidos() {
-    const [pedidoEdit, setPedidoEdit] = useState(null);
-    const [pedido, setPedido] = useState({});
-    const [items, setItems] = useState([]);
+    const [sucursalId, setSucursald] = useState<string | null>(null);
+    const [pedidoEdit, setPedidoEdit] = useState<Pedido | null>(null);
+    const [pedido, setPedido] = useState<Pedido | null>(null);
+    const [items, setItems] = useState<PedidoItem[]>([]);
     const [saving, setSaving] = useState(false);
-    const [pedidos, setPedidos] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [credito, setCredito] = useState(null);
+    const [credito, setCredito] = useState<{ autorizado: number, utilizado: number }>({
+        utilizado: 0,
+        autorizado: 0
+    });
     const [redirecting, setRedirecting] = useState(false);
-    const [sucursales, setSucursales] = useState([]);
-    const { setValue, getValues } = useForm();    
+    const { setValue, getValues } = useForm();
 
-    const fetchPedidos = useCallback(async (sucursalId) => {
-        const res = await fetch(`/api/pedidos/borradores${sucursalId ? `?sucursalId=${sucursalId}` : ""}`);
-        if (res.ok) {
+    const { data: sucursales, isLoading: isLoadingSucursales } = useQuery<ISucursalSelectable[]>({
+        queryKey: ['sucursales'],
+        queryFn: async () => {
+            const res = await fetch('/api/sucursales');
             const data = await res.json();
-            console.log("Pedidos obtenidos:", data.pedidos);
-            setPedidos(data.pedidos);
-            setLoading(false);
-        } else {
-            console.error("Error al obtener pedidos");
-        }
-    }, [setPedidos, setLoading]);
+            return data.sucursales;
+        },
+        initialData: []
+    });
 
-    const fetchSucursales = useCallback(async () => {
-        try {
-            const response = await fetch(`/api/pedidos/borradores/sucursales`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch sucursales");
-            }
-            const data = await response.json();
-            setSucursales(data.sucursales);
-            if (data.sucursales.length === 1) {
-                setValue("sucursalId", data.sucursales[0]._id);
-                fetchPedidos(data.sucursales[0]._id);
-            }
-        } catch (error) {
-            console.error("Error fetching sucursales:", error);
-        }
-    }, [setSucursales, setValue, fetchPedidos]);
+    const { data: pedidos, isLoading: isLoadingPedidos } = useQuery<Pedido[]>({
+        queryKey: ['pedidos', sucursalId],
+        queryFn: async () => {
+            const res = await fetch(`/api/pedidos/borradores${sucursalId ? `?sucursalId=${sucursalId}` : ""}`);
+            const data = await res.json();
+            return data.pedidos;
+        },
+        enabled: !!sucursalId,
+        initialData: []
+    });
 
-    const handleOpenPedido = (pedidoData) => {
+    const handleOpenPedido = (pedidoData: Pedido) => {
         const fetchCreditoCliente = async () => {
-            if (!pedidoData.cliente?._id) return;
-            const res = await fetch(`/api/clientes/creditos?id=${pedidoData.cliente._id}`);
+            if (!pedidoData.cliente?.id) return;
+            const res = await fetch(`/api/clientes/creditos?id=${pedidoData.cliente.id}`);
             if (res.ok) {
                 const data = await res.json();
                 setCredito({ ...data });
@@ -78,35 +74,36 @@ export default function GestionPedidos() {
             }
         }
 
-        setPedidoEdit(pedidoData._id);
+        setPedidoEdit(pedidoData);
         setPedido(pedidoData);
         // Deep copy de items, asegurando que los precios vacíos sean string vacío
         setItems(
-            pedidoData.items.map(item => ({
+            pedidoData.items.map((item: PedidoItem) => ({
                 ...item,
-                precio: item.precio !== undefined && item.precio !== null ? Number(item.precio) : ""
+                precio:
+                    item.precio !== undefined
+                        ? item.precio
+                        : undefined
             }))
         );
         fetchCreditoCliente();
     };
 
-    const handlePrecioChange = (idx, value) => {
+    const handlePrecioChange = (idx: number, value: string) => {
         const clean = value.replace(/\D/g, "");
         const newItems = [...items];
         // Si el input está vacío, deja string vacío, si no, número
-        newItems[idx].precio = clean === "" ? "" : Number(clean);
+        newItems[idx].precio = clean === "" ? undefined : Number(clean);
         setItems(newItems);
     };
 
     const allPreciosOk = items.length > 0 && items.every((item) =>
-        item.precio !== "" && Number(item.precio) > 0
+        item.precio !== undefined && Number(item.precio) > 0
     );
 
-    const handleSave = async () => {
-        console.log("Guardando pedido con items:", items);
-        setSaving(true);
-        try {
-            const precios = items
+ const guardarPedidoMutation = useMutation({
+    mutationFn: async () => {
+        const precios = items
                 .map(item => {
                     // Busca el identificador de subcategoría en el item
                     const subcategoriaCatalogoId = item.subcategoriaCatalogoId;
@@ -123,8 +120,7 @@ export default function GestionPedidos() {
                 setSaving(false);
                 return;
             }
-
-            const res = await fetch("/api/pedidos/borradores", {
+const res = await fetch("/api/pedidos/borradores", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -132,21 +128,22 @@ export default function GestionPedidos() {
                     precios
                 })
             });
+      return await res.json();
+    },
+    onSuccess: (data: { ok: boolean }) => {
+      if (data.ok) {
+        toast.success('Pedido guardado con éxito');
+      } else {
+        toast.error('Error: La respuesta no fue exitosa');
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Error desconocido al confirmar el pedido');
+    }
+  });
 
-            const data = await res.json();
-            if (res.ok && data.ok) {
-                toast.success("Pedido aprobado correctamente");
-                setPedidoEdit(null);
-                setItems([]);
-                fetchPedidos();
-            } else {
-                toast.error(data.error || "Error al aprobar pedido");
-            }
-        } catch {
-            toast.error("Error de red al aprobar pedido");
-        } finally {
-            setSaving(false);
-        }
+    const handleSave = async () => {
+        guardarPedidoMutation.mutate();
     };
 
     const onClose = () => {
@@ -154,16 +151,7 @@ export default function GestionPedidos() {
         setItems([]);
     };
 
-    useEffect(() => {
-        fetchSucursales();
-        const sucursalId = localStorage.getItem("sucursalId") || null;
-        if (sucursalId) {
-            setValue("sucursalId", sucursalId);
-        }
-        fetchPedidos(sucursalId);
-    }, [fetchPedidos, setValue, fetchSucursales]);
-
-    const riesgo = (credito) => {
+    const riesgo = (credito: { utilizado: number, autorizado: number }) => {
         if (!credito) return { porcentaje: 0, color: "green" };
         const valor = Math.min(100, Math.max(0, (credito.utilizado / credito.autorizado) * 100));
         return {
@@ -174,17 +162,17 @@ export default function GestionPedidos() {
 
     return (
         <main className="w-full py-4 h-screen bg-gray-50">
-            <div className="flex text-center items-center justify-center space-x-2">                
+            <div className="flex text-center items-center justify-center space-x-2">
                 {sucursales.length > 0 && (
                     <div className="flex justify-start">
                         <div className="flex">
                             {sucursales.map((sucursal, idx) => {
-                                const isActive = getValues("sucursalId") === sucursal._id;
+                                const isActive = getValues("sucursalId") === sucursal.id;
                                 const isFirst = idx === 0;
                                 const isLast = idx === sucursales.length - 1;
                                 return (
                                     <button
-                                        key={sucursal._id}
+                                        key={sucursal.id}
                                         className={`
                                         flex items-center px-5 py-2 font-semibold
                                         ${isFirst && isLast ? "rounded-md" : ""}
@@ -201,10 +189,9 @@ export default function GestionPedidos() {
                                     `}
                                         onClick={() => {
                                             if (isActive) return;
-                                            setValue("sucursalId", sucursal._id);
-                                            localStorage.setItem("sucursalId", sucursal._id);
-                                            setLoading(true);
-                                            fetchPedidos(sucursal._id);
+                                            setValue("sucursalId", sucursal.id);
+                                            localStorage.setItem("sucursalId", sucursal.id);
+                                            setSucursald(sucursal.id);
                                         }}
                                         type="button"
                                     >
@@ -219,7 +206,7 @@ export default function GestionPedidos() {
                     </div>
                 )}
                 <div>
-                    <Link href="/modulos/pedidos/nuevo" className="relative -mt-2" onClick={() => setRedirecting(true)}>
+                    <Link href="/pedidos/nuevo" className="relative -mt-2" onClick={() => setRedirecting(true)}>
                         <button className="flex items-center bg-blue-500 text-white h-10 rounded hover:bg-blue-600 transition-colors font-semibold px-3"
                             disabled={redirecting}>
                             <MdAddTask size={32} className="pl-0.5 mr-2" /> NUEVO
@@ -232,16 +219,16 @@ export default function GestionPedidos() {
                 </div>
             </div>
             <div className="w-full pb-4 px-4 h-[calc(100vh-98px)] overflow-y-scroll">
-                {!loading && pedidos.length > 0 && <div className="flex flex-wrap gap-6">
+                {!isLoadingPedidos && pedidos.length > 0 && <div className="flex flex-wrap gap-6">
                     {pedidos.map((pedido) => (
                         <div
-                            key={pedido._id}
+                            key={pedido.id}
                             className="w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] space-y-6 cursor-pointer"
                             onClick={() => handleOpenPedido(pedido)}
                         >
                             <div
                                 data-edit-pedido
-                                data-id={pedido._id}
+                                data-id={pedido.id}
                                 className={`${'bg-yellow-50'} rounded-lg shadow px-4 pt-4 pb-2 border border-gray-200 hover:shadow-lg hover:scale-105 transition`}
                             >
                                 <div className="flex justify-between items-center mb-2">
@@ -303,7 +290,7 @@ export default function GestionPedidos() {
                                         <li className="flex justify-between items-center text-sm bg-gray-200 px-2 py-1 rounded font-bold rounded-t-none border-yellow-200">
                                             <span>Total</span>
                                             <span className="text-yellow-700">
-                                                ${pedido.items.reduce((acc, item) => acc + ((parseInt(item.cantidad) || 0) * (parseInt(item.precio) || 0)), 0).toLocaleString("es-CL")}
+                                                ${pedido.items.reduce((acc, item: PedidoItem) => acc + ((item.cantidad || 0) * (item.precio || 0)), 0).toLocaleString("es-CL")}
                                             </span>
                                         </li>
                                     </ul>
@@ -312,7 +299,7 @@ export default function GestionPedidos() {
                         </div>
                     ))}
                 </div>}
-                {!loading && pedidos.length === 0 && <div className="flex justify-center items-center h-full">
+                {!isLoadingPedidos && pedidos.length === 0 && <div className="flex justify-center items-center h-full">
                     <p className="text-gray-500">No hay pedidos disponibles</p>
                 </div>}
             </div>
@@ -332,15 +319,15 @@ export default function GestionPedidos() {
                         <div className="flex flex-start">
                             <div className="w-1/3">
                                 <div className="mb-4">
-                                    <div className="mb-1 text-sm text-gray-700 font-semibold">{pedido.cliente?.nombre}</div>
-                                    <div className="text-xs text-gray-500">{pedido.cliente?.rut}</div>
+                                    <div className="mb-1 text-sm text-gray-700 font-semibold">{pedido?.cliente?.nombre}</div>
+                                    <div className="text-xs text-gray-500">{pedido?.cliente?.rut}</div>
                                 </div>
                                 <div className="mb-4">
                                     <div className="text-sm font-medium text-gray-700 mb-1">Solicitante:</div>
                                     <div className="flex items-center gap-2 text-xs text-gray-600">
-                                        <span className="font-semibold">{pedido.solicitante?.nombre}</span>
+                                        <span className="font-semibold">{pedido?.solicitante?.nombre}</span>
                                         <span>|</span>
-                                        <span>{pedido.solicitante?.telefono}</span>
+                                        <span>{pedido?.solicitante?.telefono}</span>
                                     </div>
                                 </div>
                             </div>
@@ -397,9 +384,9 @@ export default function GestionPedidos() {
                                     </thead>
                                     <tbody>
                                         {items.map((item, idx) => {
-                                            const isMissing = item.precio === "" || Number(item.precio) <= 0;
-                                            const precioNum = item.precio === "" ? 0 : Number(item.precio);
-                                            const subtotal = precioNum * Number(item.cantidad);
+                                            const isMissing = item?.precio ?? -1 <= 0;
+                                            const precioNum = item.precio ?? 0;
+                                            const subtotal = precioNum * item.cantidad;
                                             return (
                                                 <tr key={idx} className="border-t border-gray-200">
                                                     <td className="px-3 py-2 text-right">{item.cantidad}</td>
@@ -418,7 +405,7 @@ export default function GestionPedidos() {
                                                                         : "border-green-400 bg-green-50 text-green-700")
                                                                 }
                                                                 placeholder="Precio"
-                                                                value={item.precio === "" ? "" : Number(item.precio).toLocaleString("es-CL")}
+                                                                value={item.precio?.toLocaleString("es-CL")}
                                                                 onChange={e => handlePrecioChange(idx, e.target.value)}
                                                                 inputMode="numeric"
                                                             />
@@ -438,7 +425,7 @@ export default function GestionPedidos() {
                                             <td className="px-3 py-2 font-bold text-right" colSpan={3}>Total</td>
                                             <td className="px-3 py-2 text-right font-bold text-blue-700">
                                                 ${items.reduce((acc, item) => {
-                                                    const precioNum = item.precio === "" ? 0 : Number(item.precio);
+                                                    const precioNum = item.precio ?? 0;
                                                     return acc + precioNum * Number(item.cantidad);
                                                 }, 0).toLocaleString("es-CL")}
                                             </td>
@@ -467,12 +454,12 @@ export default function GestionPedidos() {
                 </div>
             )}
 
-            {loading && <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+            {isLoadingPedidos && <div className="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mb-4"></div>
                 <p className="text-xl font-bold">Cargando borradores</p>
             </div>}
 
-            {!loading && pedidos.length == 0 && (
+            {!isLoadingPedidos && pedidos.length == 0 && (
                 <div className="flex items-center justify-center h-full -mt-16">
                     <div className="w-full mx-auto">
                         <FaClipboardCheck className="text-8xl text-green-500 mb-4 mx-auto" />

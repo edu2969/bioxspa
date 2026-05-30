@@ -37,8 +37,6 @@ export default function ClientAddressManagerView({
 
     const isGoogleApiLoaded = useGoogleMaps();
 
-    console.log("Direcciones", direcciones);
-
     return (<div>
         <div className="flex w-full">
             {tipo != 'comercial' ? <Selector getLabel={d => d.direccionCliente || "Sin nombre"}
@@ -49,7 +47,6 @@ export default function ClientAddressManagerView({
                 defaultValue={direccionInicialId || ''}
                 register={register}
                 onChange={(e) => {   
-                    console.log("------> SELECTED", direcciones?.find(d => d.id === e) || null);
                     setSelectedDireccion(direcciones?.find(d => d.id === e) || null);
                 }}
                 disableAutoSelect={true}

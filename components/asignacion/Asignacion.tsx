@@ -18,12 +18,7 @@ import { IPedidoPorAsignar, IConductoresResponse } from '@/types/types';
 import { useUser } from "@/components/providers/UserProvider";
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { TIPO_CHECKLIST } from '@/app/utils/constants';
-
-interface ISucursalSelectable {
-    id: string;
-    nombre: string;
-    ventasActivas: number;
-}
+import { ISucursalSelectable } from '@/app/types/sucursales';
 
 type PedidoDetalle = {
     id: string;

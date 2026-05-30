@@ -46,7 +46,7 @@ export default function Nav() {
             });
 
             // Navegación dura para asegurar estado limpio en toda la app.
-            router.push('/pages/logout');
+            router.push('/logout');
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
             setIsLoggingOut(false);
@@ -62,7 +62,7 @@ export default function Nav() {
                 </div>
             </div>
             <div className="absolute right-0">
-                <Link href={`/pages`} onClick={() => setMenuActivo(false)}>
+                <Link href={`/home`} onClick={() => setMenuActivo(false)}>
                     <AiFillHome size="1.7rem" className="mt-4 mr-4 text-slate-800 justify-end cursor-pointer" />
                 </Link>
             </div>
@@ -71,7 +71,7 @@ export default function Nav() {
                     onClick={() => setMenuActivo(false)} />
                 <div className="mt-12 grid grid-cols-1 gap-3 text-white">
                     <Can resources={[RESOURCES.CONFIGURACION]} actions={[ACTIONS.READ]}>
-                        <Link href="/pages/configuraciones" onClick={() => setMenuActivo(false)}>
+                        <Link href="/configuraciones" onClick={() => setMenuActivo(false)}>
                             <div className={menuItemClass}>
                                 <div className={menuItemContentClass}>
                                     <IoSettingsSharp size="2.25rem" className={menuIconClass} />
@@ -82,7 +82,7 @@ export default function Nav() {
                     </Can>
                     
                     <Can resources={[RESOURCES.INVENTARIO]} actions={[ACTIONS.READ]}>
-                        <Link href="/pages/operacion" onClick={() => setMenuActivo(false)}>
+                        <Link href="/operacion" onClick={() => setMenuActivo(false)}>
                             <div className={menuItemClass}>
                                 <div className={menuItemContentClass}>
                                     <MdOutlinePropaneTank size="2.25rem" className={menuIconClass} />
@@ -91,7 +91,7 @@ export default function Nav() {
                             </div>
                         </Link>
                     </Can>
-                    <Link href="/pages/pedidos/nuevo" onClick={() => setMenuActivo(false)}>
+                    <Link href="/pedidos/nuevo" onClick={() => setMenuActivo(false)}>
                         <div className={menuItemClass}>
                             <div className={menuItemContentClass}>
                                 <MdSell size="2.25rem" className={menuIconClass} />
@@ -109,7 +109,7 @@ export default function Nav() {
                             <p className={menuLabelClass}>POWER SCAN</p>
                         </div>
                     </button>
-                    <Link href="/pages/about" onClick={() => setMenuActivo(false)}>
+                    <Link href="/about" onClick={() => setMenuActivo(false)}>
                         <div className={menuItemClass}>
                             <div className={menuItemContentClass}>
                                 <AiFillAliwangwang size="2.5rem" className={menuIconClass} />

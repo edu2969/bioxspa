@@ -25,7 +25,7 @@ export default function OperacionesTab({ ventaId } : {
 
     const handleEditVenta = (ventaId?: string) => {
         if (ventaId) {
-            router.push(`/pages/pedidos/editar/${ventaId}`);
+            router.push(`/pedidos/editar/${ventaId}`);
         }
     }
 

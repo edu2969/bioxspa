@@ -1,23 +1,34 @@
-/**
- * BIOX - Contexto de Autenticación con Supabase
- * Sistema de autenticación completamente migrado a Supabase
- */
+"use client";
 
-'use client';
+import {
+  useState,
+  useEffect,
+  useContext,
+  createContext,
+  ReactNode,
+  useRef,
+} from "react";
 
-import { useState, useEffect, useContext, createContext, ReactNode, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient, destroyBrowserClient } from '@/lib/supabase/browser-client';
-import type { 
-  AuthResult, 
-  SessionInfo, 
-  AuthContext
-} from '@/lib/supabase/supabase-auth';
-import type { SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
+import { useRouter } from "next/navigation";
 
-// ===============================================
-// TIPOS DE DATOS
-// ===============================================
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+
+import type {
+  AuthResult,
+  SessionInfo,
+} from "@/lib/supabase/supabase-auth";
+
+import type {
+  SupabaseClient,
+  User as SupabaseUser,
+  Session,
+} from "@supabase/supabase-js";
+
+//
+// ======================================================
+// TIPOS
+// ======================================================
+//
 
 interface User {
   id: string;
@@ -45,601 +56,551 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<AuthResult<User>>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<AuthResult<User>>;
+
   signOut: () => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<AuthResult<User>>;
+
   refreshSession: () => Promise<void>;
+
   hasCargoType: (cargoType: number) => boolean;
+
   hasCargo: (cargoTypes: number[]) => boolean;
+
   isSessionValid: () => boolean;
+
   validateSession: () => Promise<boolean>;
+
   getUserCargos: () => Cargo[];
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+//
+// ======================================================
+// CONTEXT
+// ======================================================
+//
 
-// ===============================================
-// PROVIDER PRINCIPAL
-// ===============================================
+const AuthContextLocal =
+  createContext<AuthContextType | null>(null);
+
+//
+// ======================================================
+// PROVIDER
+// ======================================================
+//
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [cargos, setCargos] = useState<Cargo[]>([]);
-  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
+export function AuthProvider({
+  children,
+}: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(
+    null
+  );
 
-  const getSupabaseClient = () => {
+  const [cargos, setCargos] = useState<Cargo[]>(
+    []
+  );
+
+  const [sessionInfo, setSessionInfo] =
+    useState<SessionInfo | null>(null);
+
+  const [loading, setLoading] = useState(true);
+
+  const initialized = useRef(false);
+
+  const loadingUserRef = useRef(false);
+
+  const supabaseRef =
+    useRef<SupabaseClient | null>(null);
+
+  //
+  // ======================================================
+  // CLIENT
+  // ======================================================
+  //
+
+  const getSupabase = () => {
     if (!supabaseRef.current) {
-      supabaseRef.current = createSupabaseBrowserClient();
+      supabaseRef.current =
+        createSupabaseBrowserClient();
     }
+
     return supabaseRef.current;
   };
 
-  // ===============================================
-  // FUNCIONES DE SUPABASE
-  // ===============================================
+  //
+  // ======================================================
+  // LOAD USER DATA
+  // ======================================================
+  //
 
-  const supabaseSignIn = async (email: string, password: string): Promise<AuthResult<User>> => {
+  const loadUserData = async (
+    session: Session
+  ): Promise<AuthResult<User>> => {
     try {
-      setLoading(true);
-      
-      // Primero intentar con Supabase Auth
-      const { data, error } = await getSupabaseClient().auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        // Fallback a API tradicional si Supabase falla
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-        });
-        
-        const result = await response.json();
-        
-        if (!result.ok) {
-          return { 
-            success: false, 
-            data: null,
-            error: new Error(result.error || 'Credenciales inválidas'),
-            message: 'Error en autenticación'
-          };
-        }
-        
-        // Verificar si se estableció la sesión
-        const { data: newSession } = await getSupabaseClient().auth.getSession();
-        if (newSession?.session?.user) {
-          const userResult = await loadUserData(newSession.session.user.id);
-          return userResult;
-        } else {
-          // Fallback para usuarios que aún no están migrados
-          const fallbackUser: User = {
-            id: result.data?.user?.id || 'temp-id',
-            email: email,
-            nombre: result.data?.user?.name || email
-          };
-          setUser(fallbackUser);
-          return {
-            success: true,
-            data: fallbackUser,
-            error: null,
-            message: 'Sesión iniciada con fallback'
-          };
-        }
-      }
-
-      if (data.user && data.session) {
-        // Login exitoso directo con Supabase
-        const userResult = await loadUserData(data.user.id);
-        return userResult;
-      }
-
-      return { 
-        success: false, 
-        data: null,
-        error: new Error('No se recibieron datos de usuario'),
-        message: 'Error en autenticación'
-      };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        data: null,
-        error: error instanceof Error ? error : new Error(error?.message || 'Error desconocido'),
-        message: 'Fallo interno en autenticación'
-      };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const supabaseSignOut = async () => {
-    try {
-      setLoading(true);
-      await getSupabaseClient().auth.signOut();
-      
-      // Limpiar estado
-      setUser(null);
-      setCargos([]);
-      setSessionInfo(null);
-      
-      // Limpiar cliente cached
-      destroyBrowserClient();
-      supabaseRef.current = null;
-    } catch (error) {
-      console.error('Error en logout de Supabase:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const supabaseSignUp = async (email: string, password: string, name: string): Promise<AuthResult<User>> => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await getSupabaseClient().auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: name
-          }
-        }
-      });
-
-      if (error) {
-        return { 
-          success: false, 
-          data: null,
-          error: new Error(error.message),
-          message: 'Error en registro'
-        };
-      }
-
-      if (data.user) {
-        const newUser: User = {
-          id: data.user.id,
-          email: data.user.email || email,
-          nombre: name,
-          supabaseUser: data.user
-        };
-        
-        return {
-          success: true,
-          data: newUser,
-          error: null,
-          message: 'Registro exitoso'
-        };
-      }
-
-      return {
-        success: false,
-        data: null,
-        error: new Error('No se recibieron datos de usuario'),
-        message: 'Error en registro'
-      };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        data: null,
-        error: error instanceof Error ? error : new Error(error?.message || 'Error desconocido'),
-        message: 'Fallo interno en registro'
-      };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshSession = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Refrescando sesión...');
-      
-      const { data: { session }, error } = await getSupabaseClient().auth.getSession();
-      
-      if (error) {
-        console.error('❌ Error obteniendo sesión:', error);
-        return;
-      }
-      
-      if (session?.user) {
-        console.log('✅ Sesión válida encontrada, actualizando datos...');
-        await loadUserData(session.user.id);
-      } else {
-        console.log('ℹ️ No hay sesión activa');
-        setUser(null);
-        setCargos([]);
-        setSessionInfo(null);
-      }
-    } catch (error) {
-      console.error('❌ Error al refrescar la sesión:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ===============================================
-  // VALIDACIÓN DE SESIÓN
-  // ===============================================
-
-  const isSessionValidLocal = (): boolean => {
-    if (!sessionInfo) return false;
-    
-    // Verificar si la sesión ha expirado
-    if (sessionInfo.expiresAt && sessionInfo.expiresAt < new Date()) {
-      return false;
-    }
-
-    return sessionInfo.isValid && !!sessionInfo.session.access_token;
-  };
-
-  const validateSession = async (): Promise<boolean> => {
-    try {
-      const { data: { session }, error } = await getSupabaseClient().auth.getSession();
-      
-      if (error || !session) {
-        setUser(null);
-        setCargos([]);
-        setSessionInfo(null);
-        return false;
-      }
-      
-      // Actualizar sessionInfo si es necesario
-      if (!sessionInfo || sessionInfo.session.access_token !== session.access_token) {
-        setSessionInfo({
-          user: session.user,
-          session: session,
-          isValid: true,
-          expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null
-        });
-      }
-      
-      return true;
-    } catch (error) {
-      console.warn('Error validando sesión:', error);
-      return false;
-    }
-  };
-
-  // ===============================================
-  // UTILIDADES PARA CARGOS DEL SISTEMA BIOX
-  // ===============================================
-
-  const hasCargoType = (cargoType: number): boolean => {
-    if (!cargos || cargos.length === 0) return false;
-    return cargos.some(cargo => cargo.tipo === cargoType);
-  };
-
-  const hasCargo = (cargoTypes: number[]): boolean => {
-    return cargoTypes.some(cargoType => hasCargoType(cargoType));
-  };
-
-  const getUserCargos = (): Cargo[] => {
-    return cargos || [];
-  };
-
-  const loadUserData = async (userId: string): Promise<AuthResult<User>> => {
-    try {
-      // Obtener usuario básico
-      const supabase = getSupabaseClient();
-      const { data: userData, error: userError } = await supabase
-        .from('usuarios')
-        .select('id, email, nombre')
-        .eq('id', userId)
-        .single();
-
-      if(userError) {
-        console.warn('⚠️ Error consultando datos de usuario en BD:', userError);
-        throw userError;
-      }
-      
-      // Obtener cargos activos por separado
-      const { data: cargosData, error: cargosError } = await supabase
-        .from('cargos')
-        .select(`
-          id,
-          tipo,
-          sucursal_id,
-          dependencia_id,
-          sucursales (id, nombre, codigo)
-        `)
-        .eq('usuario_id', userId)
-        .eq('activo', true)
-        .is('hasta', null);
-
-      if(cargosError) {
-        console.warn('⚠️ Error consultando cargos de usuario en BD:', cargosError);
-        throw cargosError;
-      }
-
-      // Obtener información de sesión en paralelo
-      const { data: sessionData } = await getSupabaseClient().auth.getSession();
-      
-      if (userError) {
-        console.warn('⚠️ Error consultando datos de usuario en BD:', userError);
-        
-        // Fallback usando solo datos de auth
-        const { data: { user: authUser } } = await getSupabaseClient().auth.getUser();
-        if (authUser) {
-          const fallbackUser: User = {
-            id: authUser.id,
-            email: authUser.email || '',
-            nombre: authUser.user_metadata?.name || authUser.email || '',
-            supabaseUser: authUser
-          };
-          
-          setUser(fallbackUser);
-          setCargos([]);
-          
-          // Establecer sessionInfo si hay sesión
-          if (sessionData?.session) {
-            setSessionInfo({
-              user: authUser,
-              session: sessionData.session,
-              isValid: true,
-              expiresAt: sessionData.session.expires_at 
-                ? new Date(sessionData.session.expires_at * 1000) 
-                : null
-            });
-          }
-          
-          return {
-            success: true,
-            data: fallbackUser,
-            error: null,
-            message: 'Usuario cargado con fallback'
-          };
-        }
-        
+      if (loadingUserRef.current) {
         return {
           success: false,
           data: null,
-          error: new Error('No se pudo obtener datos del usuario'),
-          message: 'Error cargando usuario'
+          error: null as any,
+          message: "Ya cargando usuario",
         };
       }
 
-      // Establecer datos del usuario
+      loadingUserRef.current = true;
+
+      const supabase = getSupabase();
+
+      const userId = session.user.id;
+
+      //
+      // USUARIO
+      //
+
+      const {
+        data: userData,
+        error: userError,
+      } = await supabase
+        .from("usuarios")
+        .select("id, email, nombre")
+        .eq("id", userId)
+        .single();
+
+      if (userError) {
+        throw userError;
+      }
+
+      //
+      // CARGOS
+      //
+
+      const {
+        data: cargosData,
+        error: cargosError,
+      } = await supabase
+        .from("cargos")
+        .select(`
+          id,
+          tipo,
+          dependencia_id,
+          sucursales (
+            id,
+            nombre
+          )
+        `)
+        .eq("usuario_id", userId)
+        .eq("activo", true)
+        .is("hasta", null);
+
+      if (cargosError) {
+        console.warn(cargosError);
+      }
+
+      //
+      // USUARIO ENRIQUECIDO
+      //
+
       const enrichedUser: User = {
         id: userData.id,
         email: userData.email,
         nombre: userData.nombre,
-        supabaseUser: sessionData?.session?.user
+        supabaseUser: session.user,
       };
-      
+
       setUser(enrichedUser);
 
-      // Establecer cargos con información completa
+      //
+      // CARGOS
+      //
+
       setCargos(
         (cargosData || []).map((cargo: any) => ({
-          id: cargo.id || `cargo-${cargo.tipo}-${cargo.dependencia_id}`,
-          dependenciaId: cargo.dependencia_id || '',
+          id: cargo.id,
+          dependenciaId:
+            cargo.dependencia_id,
           tipo: cargo.tipo,
           sucursal: cargo.sucursales
             ? {
                 id: cargo.sucursales.id,
-                nombre: cargo.sucursales.nombre,
+                nombre:
+                  cargo.sucursales.nombre,
               }
             : undefined,
         }))
       );
-      
-      // Establecer información de sesión
-      if (sessionData?.session) {
-        setSessionInfo({
-          user: sessionData.session.user,
-          session: sessionData.session,
-          isValid: true,
-          expiresAt: sessionData.session.expires_at 
-            ? new Date(sessionData.session.expires_at * 1000) 
-            : null
-        });
-      }
+
+      //
+      // SESSION INFO
+      //
+
+      setSessionInfo({
+        user: session.user,
+        session,
+        isValid: true,
+        expiresAt: session.expires_at
+          ? new Date(
+              session.expires_at * 1000
+            )
+          : null,
+      });
 
       return {
         success: true,
         data: enrichedUser,
         error: null,
-        message: 'Usuario cargado exitosamente'
+        message: "Usuario cargado",
       };
-      
-    } catch (error) {
-      console.error('❌ Error en loadUserData:', error);
-      
-      // Fallback básico en caso de error
-      const { data: { user } } = await getSupabaseClient().auth.getUser();
-      if (user) {
-        const fallbackUser: User = {
-          id: user.id,
-          email: user.email || '',
-          nombre: user.user_metadata?.name || user.email || '',
-          supabaseUser: user
-        };
-        setUser(fallbackUser);
-        return {
-          success: true,
-          data: fallbackUser,
-          error: null,
-          message: 'Usuario cargado con fallback básico'
-        };
-      }
-      
-      setCargos([]);
-      setSessionInfo(null);
-      
+    } catch (error: any) {
+      console.error(
+        "❌ Error loadUserData",
+        error
+      );
+
       return {
         success: false,
         data: null,
-        error: error instanceof Error ? error : new Error('Error desconocido'),
-        message: 'Fallo cargando datos del usuario'
+        error,
+        message: "Error cargando usuario",
       };
+    } finally {
+      loadingUserRef.current = false;
     }
   };
 
-  // ===============================================
-  // EFECTOS
-  // ===============================================
+  //
+  // ======================================================
+  // SIGN IN
+  // ======================================================
+  //
+
+  const signIn = async (
+    email: string,
+    password: string
+  ): Promise<AuthResult<User>> => {
+    try {
+      setLoading(true);
+
+      const supabase = getSupabase();
+
+      console.log(
+        "🔐 Iniciando login..."
+      );
+
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      console.log(
+        "🔐 Resultado login:",
+        data,
+        error
+      );
+
+      if (error) {
+        return {
+          success: false,
+          data: null,
+          error,
+          message: error.message,
+        };
+      }
+
+      if (!data.session) {
+        return {
+          success: false,
+          data: null,
+          error: new Error(
+            "No existe sesión"
+          ),
+          message: "No existe sesión",
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: data.user.id,
+          email: data.user.email || "",
+          nombre:
+            data.user.user_metadata?.name ||
+            "",
+          supabaseUser: data.user,
+        },
+        error: null,
+        message: "Login exitoso",
+      };
+    } catch (error: any) {
+      console.error(error);
+
+      return {
+        success: false,
+        data: null,
+        error,
+        message:
+          error?.message ||
+          "Error desconocido",
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  //
+  // ======================================================
+  // SIGN OUT
+  // ======================================================
+  //
+
+  const signOut = async () => {
+    try {
+      setLoading(true);
+
+      const supabase = getSupabase();
+
+      await supabase.auth.signOut();
+
+      setUser(null);
+      setCargos([]);
+      setSessionInfo(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  //
+  // ======================================================
+  // REFRESH SESSION
+  // ======================================================
+  //
+
+  const refreshSession = async () => {
+    try {
+      const supabase = getSupabase();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setUser(null);
+        setCargos([]);
+        setSessionInfo(null);
+        return;
+      }
+
+      await loadUserData(session);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  //
+  // ======================================================
+  // VALIDACIONES
+  // ======================================================
+  //
+
+  const isSessionValid = () => {
+    if (!sessionInfo) return false;
+
+    if (
+      sessionInfo.expiresAt &&
+      sessionInfo.expiresAt < new Date()
+    ) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateSession = async () => {
+    try {
+      const supabase = getSupabase();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      return !!session;
+    } catch {
+      return false;
+    }
+  };
+
+  //
+  // ======================================================
+  // CARGOS
+  // ======================================================
+  //
+
+  const hasCargoType = (
+    cargoType: number
+  ) => {
+    return cargos.some(
+      (x) => x.tipo === cargoType
+    );
+  };
+
+  const hasCargo = (
+    cargoTypes: number[]
+  ) => {
+    return cargos.some((x) =>
+      cargoTypes.includes(x.tipo)
+    );
+  };
+
+  const getUserCargos = () => cargos;
+
+  //
+  // ======================================================
+  // INIT
+  // ======================================================
+  //
 
   useEffect(() => {
-    const initAuth = async () => {      
-      try {
-        const { data: { session }, error } = await getSupabaseClient().auth.getSession();
+    if (initialized.current) return;
 
-        if (error) {
-          console.error('❌ Error al recuperar la sesión:', error);
+    initialized.current = true;
+
+    const supabase = getSupabase();
+
+    //
+    // SESSION INICIAL
+    //
+
+    const init = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session) {
+          await loadUserData(session);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+
+    //
+    // AUTH LISTENER
+    //
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log(
+          "🔄 AUTH EVENT:",
+          event
+        );
+
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setCargos([]);
+          setSessionInfo(null);
           return;
         }
 
-        if (session?.user) {
-          await loadUserData(session.user.id);
-        } else {
-          console.log('ℹ️ No se encontró una sesión activa.');
-          setUser(null);
-          setCargos([]);
-          setSessionInfo(null);
+        if (
+          event === "SIGNED_IN" &&
+          session
+        ) {
+          queueMicrotask(async () => {
+            try {
+              await loadUserData(session);
+            } catch (err) {
+              console.error(err);
+            }
+          });
         }
-      } catch (error) {
-        if (error instanceof Error && error.message === 'Auth session missing') {
-          console.warn('⚠️ No hay sesión activa para refrescar.');
-        } else {
-          console.error('❌ Error al inicializar la autenticación:', error);
-        }
-      } finally {
-        setLoading(false);
       }
-    };
-
-    initAuth();
-
-    // Escuchar cambios de autenticación con logging mejorado
-    const { data: subscription } = getSupabaseClient().auth.onAuthStateChange(async (event, session) => {
-      setLoading(true);
-      
-      try {
-        if (session?.user) {
-          await loadUserData(session.user.id);
-        } else {
-          setUser(null);
-          setCargos([]);
-          setSessionInfo(null);
-          
-          // Limpiar cliente si es logout
-          if (event === 'SIGNED_OUT') {
-            destroyBrowserClient();
-            supabaseRef.current = null;
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error procesando cambio de autenticación:', error);
-      } finally {
-        setLoading(false);
-      }
-    });
+    );
 
     return () => {
-      console.log('🔄 Limpiando listener de autenticación');
-      subscription?.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
-  const authenticated = !!user;
+  //
+  // ======================================================
+  // PROVIDER
+  // ======================================================
+  //
 
   return (
-    <AuthContext.Provider
+    <AuthContextLocal.Provider
       value={{
         user,
         cargos,
-        sessionInfo,
         loading,
-        authenticated,
-        signIn: supabaseSignIn,
-        signOut: supabaseSignOut,
-        signUp: supabaseSignUp,
+        authenticated: !!user,
+        sessionInfo,
+
+        signIn,
+        signOut,
         refreshSession,
-        isSessionValid: isSessionValidLocal,
-        validateSession,
+
         hasCargoType,
         hasCargo,
-        getUserCargos
+        getUserCargos,
+
+        isSessionValid,
+        validateSession,
       }}
     >
       {children}
-    </AuthContext.Provider>
+    </AuthContextLocal.Provider>
   );
 }
 
-// ===============================================
-// HOOKS DE USO
-// ===============================================
+//
+// ======================================================
+// HOOKS
+// ======================================================
+//
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context =
+    useContext(AuthContextLocal);
+
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error(
+      "useAuth must be used within AuthProvider"
+    );
   }
+
   return context;
 }
 
 export function useRequireAuth() {
   const { user, loading } = useAuth();
+
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.replace('/');
-      } else {
-        router.replace('/pages');
-      }
+    if (loading) return;
+
+    if (!user) {
+      router.replace("/");
     }
   }, [user, loading, router]);
 
-  return { user, loading };
+  return {
+    user,
+    loading,
+  };
 }
-
-/*
- * ===============================================
- * MEJORAS IMPLEMENTADAS EN AUTHCONTEXT v2.0
- * ===============================================
- * 
- * 1. **Cliente Supabase Optimizado**: 
- *    - Uso de createSupabaseBrowserClient con caché y persistencia automática
- *    - Mejor manejo de estado y configuración
- * 
- * 2. **Tipos Robustos**: 
- *    - AuthResult<T> para respuestas consistentes
- *    - SessionInfo para información completa de sesión
- *    - User extendido con supabaseUser opcional
- * 
- * 3. **Mejor Manejo de Errores**:
- *    - Respuestas estructuradas con success, data, error y message
- *    - Logging detallado con emojis para debugging
- *    - Fallbacks múltiples para garantizar funcionalidad
- * 
- * 4. **Validación de Sesión Avanzada**:
- *    - Verificación de expiración automática
- *    - Sincronización de estado entre cliente y servidor
- *    - Auto-refresh de tokens
- * 
- * 5. **Utilidades para Cargos del Sistema BIOX**:
- *    - hasCargoType(): Verifica tipo de cargo específico
- *    - hasCargo(): Verifica múltiples tipos de cargo
- *    - getUserCargos(): Obtiene lista completa de cargos
- * 
- * 6. **Integración con Constantes del Sistema**:
- *    - Uso de TIPO_CARGO para verificaciones type-safe
- *    - Compatibilidad con roles legacy y nuevos
- * 
- * 7. **Lifecycle Mejorado**:
- *    - Limpieza automática de estado en logout
- *    - Destrucción correcta de cliente cached
- *    - Recovery automático en caso de errores
- */

@@ -52,6 +52,7 @@ export default function DatosDelCliente({
             <ClienteSearchView titulo="Seleccione al cliente" 
                 register={register("clienteId", { required: true })}
                 clienteId={clienteId}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                 isLoading={loadingCliente} />
         </div>}
 
@@ -62,6 +63,7 @@ export default function DatosDelCliente({
             label="Dirección de despacho"
             direccionInicialId={direccionId}
             direcciones={cliente.direccionesDespacho || []}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
             clienteId={clienteId || ""} />)}
 
         {/* DOCUMENTO TRIBUTARIO */}
@@ -72,6 +74,7 @@ export default function DatosDelCliente({
                 getLabel={dt => dt.nombre} getValue={dt => String(dt.id)}
                 defaultValue={cliente.documentoTributarioId || ''}
                 isLoading={loadingDocumentosTributarios}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
                 register={register("documentoTributarioId", { required: true })} />}
 
             {loadingCliente && !cliente && <div className="h-40 flex items-center justify-center">

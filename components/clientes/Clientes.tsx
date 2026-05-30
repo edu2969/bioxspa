@@ -220,7 +220,7 @@ export default function Clientes() {
                                                     className="px-3 py-2 cursor-pointer hover:bg-gray-200"
                                                     onClick={async () => {
                                                         setAutocompleteClienteResults([]);
-                                                        router.push(`/pages/configuraciones/clientes?id=${cliente.id}`);
+                                                        router.push(`/configuraciones/clientes?id=${cliente.id}`);
                                                     }}
                                                 >
                                                     <p>{cliente.nombre}</p>

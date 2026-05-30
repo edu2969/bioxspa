@@ -19,14 +19,16 @@ export default function AddressAutocompleteInput({ onSelect, initialAddress, cla
   const [show, setShow] = useState(false);
 
   const handleSelect = async (p: google.maps.places.AutocompletePrediction) => {
-    const data = await getPlaceDetails(p.place_id);
+    const data = await getPlaceDetails(p.place_id);    
     if (!data) return;
+    const parts = data.direccion.split(",").length;
     const result: IDireccion = {      
       id: initialAddress || '',
       direccionCliente: data.direccion.split(',')[0],
       latitud: data.lat,
       longitud: data.lng,
-      placeId: p.place_id
+      placeId: p.place_id,
+      comuna: data.direccion.split(",")[parts - 2]
     };
 
     setInput(data.direccion.split(",")[0]);
@@ -35,7 +37,6 @@ export default function AddressAutocompleteInput({ onSelect, initialAddress, cla
 
   useEffect(() => {
     if(initialAddress) {
-      console.log("------------------------------------> InicialAddress", initialAddress);
       setInput(initialAddress);
     }
   }, [initialAddress]);

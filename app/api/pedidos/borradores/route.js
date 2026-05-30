@@ -30,15 +30,20 @@ export async function GET(request) {
         (ventas || []).map(async (venta) => {
             const { data: cliente } = await supabase
                 .from('clientes')
-                .select('id, nombre, rut')
+                .select('id, nombre, rut, credito')
                 .eq('id', venta.cliente_id)
                 .single();
 
-            const { data: solicitante } = await supabase
+            const { data: solicitante, error: solicitanteErr } = await supabase
                 .from('users')
                 .select('id, name, persona_id')
                 .eq('id', venta.solicitante_id || venta.vendedor_id)
                 .single();
+
+            if(solicitanteErr) {
+                console.log("[GET Borradores] Error: ", solicitanteErr);
+                return NextResponse.json({ error: 'Error al obtener solcitante', solicitanteErr});
+            }
 
             let telefono = "";
             if (solicitante && solicitante.persona_id) {
@@ -77,17 +82,25 @@ export async function GET(request) {
             );
 
             return {
-                _id: venta.id,
+                id: venta.id,
                 cliente: cliente
-                    ? { nombre: cliente.nombre, rut: cliente.rut, _id: cliente.id }
-                    : { nombre: "Sin cliente", rut: "" },
+                    ? { 
+                        id: cliente.id,
+                        nombre: cliente.nombre, 
+                        rut: cliente.rut,
+                        credito: {
+                            autorizado: cliente.credito,
+                            utilizado: 99999
+                        }
+                    }
+                    : { nombre: "Sin cliente", rut: "", credito: { autorizado: -1, utilizado: -1 }},
                 solicitante: solicitante
                     ? {
-                        _id: solicitante.id,
+                        id: solicitante.id,
                         nombre: solicitante.name || "",
                         telefono,
                     }
-                    : { _id: "", nombre: "", telefono: "" },
+                    : { id: "", nombre: "", telefono: "" },
                 fecha: venta.fecha || venta.created_at,
                 items,
             };

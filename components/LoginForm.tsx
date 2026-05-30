@@ -27,7 +27,7 @@ export default function LoginForm() {
     const result = await signIn(data.email, data.password);
     console.log("Result?", result);
     if(result.success) {
-      router.push('/pages');
+      router.push('/home');
     } else {      
       setStatus(result.message || "Error desconocido");      
     }

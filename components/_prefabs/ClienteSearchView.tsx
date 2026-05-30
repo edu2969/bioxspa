@@ -15,13 +15,15 @@ export default function ClienteSearchView({
     titulo,
     register,
     clienteId,    
-    isLoading,    
+    isLoading,
+    className = "",    
     onChange
 }: {
     titulo?: string;
     register: UseFormRegisterReturn;
     clienteId?: string;    
     isLoading?: boolean;
+    className?: string;
     onChange?: (value: string) => void;
 }) {
     const { hasRole } = useAuthorization();
@@ -70,7 +72,7 @@ export default function ClienteSearchView({
                     id="cliente"
                     type="text"
                     value={textoBusqueda}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
+                    className={className}
                     onChange={(e) => {
                         const value = e.target.value;                        
                         if(value.trim() === '') {
@@ -94,7 +96,7 @@ export default function ClienteSearchView({
                         onClick={() => {
                             if (!isRedirecting && !isLoading) {
                                 setIsRedirecting(true);
-                                router.push(`/pages/configuraciones/clientes${clienteId ? `?id=${clienteId}` : ''}`);
+                                router.push(`/configuraciones/clientes${clienteId ? `?id=${clienteId}` : ''}`);
                             }
                         }}
                         disabled={isRedirecting || searchingClientes}

@@ -7,6 +7,8 @@ import { AuthProvider } from '@/context/AuthContext';
 import { useAuthorization } from '@/lib/auth/useAuthorization';
 import { Suspense } from 'react';
 
+export const dynamic = "force-dynamic";
+
 export default function RootPage() {
   const auth = useAuthorization();
 

@@ -58,7 +58,7 @@ export default function FlotaPanel() {
             <div className="grid grid-cols-5 h-full gap-4 p-4">
                 {!loadingPanel && vehiculos.length > 0 && vehiculos.map((vehiculo, index) => (
                 <div key={index} className="relative w-full border rounded-lg p-4 bg-white shadow-md hover:shadow-xl transition-shadow duration-300 hover:bg-gray-100 cursor-pointer"
-                onClick={() => router.push(`/pages/configuraciones/flota/${vehiculo.id}`)}>
+                onClick={() => router.push(`/configuraciones/flota/${vehiculo.id}`)}>
                     <Image className="absolute top-0 left-0 ml-12 mt-6" src={`/ui/${vehiculo.marca.split(" ")[0].toLowerCase() + "_" + vehiculo.modelo.split(" ")[0].toLowerCase()}.png`} alt="camion" width={188} height={146} />
                     <Image className="absolute top-0 left-0 ml-12 mt-6" src={`/ui/${vehiculo.marca.split(" ")[0].toLowerCase() + "_" + vehiculo.modelo.split(" ")[0].toLowerCase()}_front.png`} alt="camion_frontal" width={188} height={146} />
                     <div className="absolute -left-3 top-2 bg-white">

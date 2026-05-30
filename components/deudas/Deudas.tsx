@@ -153,7 +153,7 @@ export default function Deudas() {
                                                             console.log("CLIENTE", cliente);
                                                             setLoadingCliente(true);
                                                             setValue("cliente", cliente.nombre);
-                                                            router.push(`/pages/cobros/${cliente.id}`);
+                                                            router.push(`/cobros/${cliente.id}`);
                                                         }}
                                                     >
                                                         <p>{cliente.nombre}</p>
@@ -231,7 +231,7 @@ export default function Deudas() {
                                 key={cliente.id}
                                 onClick={() => {
                                     setRedirecting(true);
-                                    router.push(`/pages/cobros/${cliente.id}`);
+                                    router.push(`/cobros/${cliente.id}`);
                                 }}
                                 className="relative w-full sm:w-1/3 max-w-[420px] flex-1 min-w-[300px] rounded-lg shadow p-4 border border-gray-200 flex flex-col hover:scale-105 hover:bg-blue-50 hover:top-2 transition-all cursor-pointer"
                             >

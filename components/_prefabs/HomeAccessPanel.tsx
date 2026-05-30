@@ -1,6 +1,6 @@
 "use client";
 
-import { FaFileContract, FaRoute, FaSignInAlt } from "react-icons/fa";
+import { FaRoute, FaSignInAlt } from "react-icons/fa";
 import { HiUserGroup } from "react-icons/hi";
 import { TbReportMoney, TbTruckLoading } from "react-icons/tb";
 import AccessButton from "./homeAccessPanel/AccessButton";
@@ -14,6 +14,8 @@ import { TIPO_CARGO, TIPO_CHECKLIST } from "@/app/utils/constants";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useChecklist } from "@/context/ChecklistContext";
 import { PiWarningOctagonBold } from "react-icons/pi";
+import HomeGenerencia from "../HomeGerencia";
+import Nav from "../Nav";
 
 const getModulesForUser = (
   auth: ReturnType<typeof useAuthorization>,
@@ -24,27 +26,11 @@ const getModulesForUser = (
   const modules: IAccessButtonProps[] = [];
   const hasSessionRole = (roles: number[]) => roles.some((role) => sessionRoles.includes(role));
 
-  // Módulo de Pedidos para Gestores/Supervisores
-  if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.responsable, TIPO_CARGO.gerente, TIPO_CARGO.encargado])) {
-    modules.push({
-      key: "pedidos_management",
-      href: "/pages/pedidos",
-      icon: <FaFileContract className="mx-auto mb-1" size="6rem" />,
-      label: "PEDIDOS",
-      index: 0,
-      badges: [{
-        color: "bg-red-500",
-        value: contadores[0] > 999999 ? '999999+' : contadores[0],
-        text: "x APROBAR"
-      }],
-    });
-  }
-
   // Módulo de Asignación para Encargados/Responsables
   if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.encargado, TIPO_CARGO.responsable])) {
     modules.push({
       key: "asignacion",
-      href: "/pages/asignacion",
+      href: "/asignacion",
       icon: <FaSignInAlt className="mx-auto mb-1" size="6rem" />,
       label: "ASIGNACION",
       index: 1,
@@ -68,7 +54,7 @@ const getModulesForUser = (
   if (hasSessionRole([TIPO_CARGO.cobranza, TIPO_CARGO.gerente, TIPO_CARGO.neo])) {
     modules.push({
       key: "cobros",
-      href: "/pages/cobros",
+      href: "/cobros",
       icon: <TbReportMoney className="mx-auto mb-1" size="6rem" />,
       label: "COBROS",
       index: 2
@@ -83,7 +69,7 @@ const getModulesForUser = (
   ])) {
     modules.push({
       key: "clientes",
-      href: "/pages/configuraciones/clientes",
+      href: "/configuraciones/clientes",
       icon: <HiUserGroup className="mx-auto mb-1" size="6rem" />,
       label: "CLIENTES",
       index: 3,
@@ -99,7 +85,7 @@ const getModulesForUser = (
   if (hasSessionRole([TIPO_CARGO.conductor])) {
     modules.push({
       key: "rutas_conductor",
-      href: "/pages/homeConductor/pedidos",
+      href: "/homeConductor/pedidos",
       icon: <FaRoute className="mx-auto mb-1" size="6rem" />,
       label: "RUTAS",
       index: 0,
@@ -116,7 +102,7 @@ const getModulesForUser = (
   if (hasSessionRole([TIPO_CARGO.despacho])) {
     modules.push({
       key: "despacho",
-      href: "/pages/homeDespacho/pedidos",
+      href: "/homeDespacho/pedidos",
       icon: <TbTruckLoading className="mx-auto mb-1" size="6rem" />,
       label: "DESPACHO",
       index: 0,
@@ -138,12 +124,15 @@ export default function HomeAccessPanel() {
   const sessionRoles = auth.getUserCargos().map((cargo) => cargo.tipo);
   const userId = auth.user?.id || null;
 
+  const hasSessionRole = (roles: number[]) => roles.some((role) => sessionRoles.includes(role));
+  const esAdmin = hasSessionRole([TIPO_CARGO.gerente, TIPO_CARGO.neo]);
+
   const conductorNeedsPersonal = !hasApprovedChecklist(TIPO_CHECKLIST.personal);
   const conductorNeedsVehiculo = !hasApprovedChecklist(TIPO_CHECKLIST.vehiculo);
-  const conductorWarningMessage = conductorNeedsPersonal || conductorNeedsVehiculo ? 
+  const conductorWarningMessage = conductorNeedsPersonal || conductorNeedsVehiculo ?
     (<div className="absolute top-2 left-2 flex items-center bg-red-100 text-red-700 px-2 py-1 rounded shadow z-20">
-        <PiWarningOctagonBold className="mr-2 text-red-600" />
-        <span className="text-xs font-semibold">Falta checklist</span>
+      <PiWarningOctagonBold className="mr-2 text-red-600" />
+      <span className="text-xs font-semibold">Falta checklist</span>
     </div>) : undefined;
 
   useRealtimeQuery({
@@ -162,7 +151,7 @@ export default function HomeAccessPanel() {
     event: '*',
     queryKeys: [['home-counters', userId]],
     enabled: !!userId,
-  });  
+  });
 
   const { data: homeCounters, isLoading } = useQuery<Array<number>>({
     queryKey: ['home-counters', userId],
@@ -202,8 +191,9 @@ export default function HomeAccessPanel() {
     );
   }
 
-  return (
-    <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
+  return (<>
+
+    {esAdmin ? <HomeGenerencia /> : <main className="w-full min-h-screen flex flex-col justify-center items-center p-4 md:p-6 max-w-2xl mx-auto mt-0">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
         {userModules.map((mod, idx) => (
           <AccessButton
@@ -215,19 +205,22 @@ export default function HomeAccessPanel() {
         ))}
       </div>
 
-      {/* Debug info en desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs">
-          <details>
-            <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
-            <div className="mt-2 space-y-1">
-              <div><strong>Usuario:</strong> {auth.user?.email}</div>
-              <div><strong>Roles:</strong>...</div>
-              <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
-            </div>
-          </details>
-        </div>
-      )}
-    </main>
+    </main>}
+
+    {/* Debug info en desarrollo */}
+    {process.env.NODE_ENV === 'development' && (
+      <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs">
+        <details>
+          <summary className="cursor-pointer font-semibold">Debug: Información de Usuario</summary>
+          <div className="mt-2 space-y-1">
+            <div><strong>Usuario:</strong> {auth.user?.email}</div>
+            <div><strong>Roles:</strong>...</div>
+            <div><strong>Módulos disponibles:</strong> {userModules.length}</div>
+          </div>
+        </details>
+      </div>
+    )}
+    <Nav />
+  </>
   );
 }
