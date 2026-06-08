@@ -2,7 +2,7 @@
 
 import { ConfirmModal } from '../modals/ConfirmModal';
 import Loader from '../Loader';
-import { useContext, useState } from "react";
+import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import PorAsignar from './PorAsignar';
 import Conductores from './Conductores';
@@ -18,7 +18,7 @@ import { IPedidoPorAsignar, IConductoresResponse } from '@/types/types';
 import { useUser } from "@/components/providers/UserProvider";
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { TIPO_CHECKLIST } from '@/app/utils/constants';
-import { ISucursalSelectable } from '@/app/types/sucursales';
+import { useSucursales } from '@/hooks/useSucursales';
 
 type PedidoDetalle = {
     id: string;
@@ -45,10 +45,17 @@ export default function Asignacion() {
     const qryClient = useQueryClient();
     const userContext = useUser(); 
 
+    const { sucursales, isLoading, selectedSucursalId } = useSucursales();
     const sucursalId = useWatch({
         control,
         name: 'sucursalId'
     });
+
+    useEffect(() => {
+        if(selectedSucursalId) {
+            setValue('sucursalId', selectedSucursalId)
+        }
+    }, [setValue, selectedSucursalId])
 
     useRealtimeQuery({
         channelName: `checklists-vehiculo-${sucursalId || 'sin-sucursal'}`,
@@ -80,27 +87,7 @@ export default function Asignacion() {
             ['pedidos-por-asignar', sucursalId],
             ['conductores', sucursalId]],
         enabled: !!sucursalId,
-    });
-
-    const { data: sucursales, isLoading } = useQuery<ISucursalSelectable[]>({
-        queryKey: ['sucursales'],
-        queryFn: async () => {
-            const response = await fetch(`/api/pedidos/asignacion/sucursales`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch sucursales");
-            }
-            const data = await response.json();
-            const localSucursalId = localStorage.getItem("sucursal_id");
-            if (!localSucursalId) {
-                setValue("sucursalId", data.sucursales[0]?.id);
-                localStorage.setItem("sucursal_id", String(data.sucursales[0]?.id));
-            } else {
-                setValue("sucursalId", localSucursalId);
-            }
-            console.log("Fetched sucursales:", data.sucursales);
-            return data.sucursales;
-        }
-    });
+    });    
 
     // Queries para obtener datos de pedidos y conductores
     const { data: pedidos } = useQuery<IPedidoPorAsignar[]>({

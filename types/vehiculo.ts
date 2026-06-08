@@ -1,4 +1,4 @@
-import { IUser } from "./user";
+import { IUser } from "./usuario";
 
 export interface IPosicionActual {
     latitud: number | null;

@@ -1,7 +1,7 @@
-export interface IUser {
+export interface IUsuario {
     id?: string;
     temporalId?: string;
-    name: string;
+    nombre: string;
     email: string;
     password: string;
     personaId?: string;

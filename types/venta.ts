@@ -1,6 +1,6 @@
 import { IDetalleVenta } from "./detalleVenta";
 import { ICliente } from "./cliente";
-import { IUser } from "./user";
+import { IUser } from "./usuario";
 import { ISucursal } from "./sucursal";
 import { IDependencia } from "./dependencia";
 import { IDocumentoTributario } from "./documentoTributario";

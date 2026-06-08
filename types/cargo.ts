@@ -1,16 +1,16 @@
 import { TIPO_CARGO } from "../app/utils/constants";
-import { IUser } from "@/types/user";
+import { IUsuario } from "@/types/usuario";
 import { IDependencia } from "@/types/dependencia";
 import { ISucursal } from "@/types/sucursal";
 
 export interface ICargo {
-    _id?: string;
-    userId: IUser;
+    id?: string;
+    usuario: IUsuario;
     dependenciaId?: IDependencia;
-    sucursalId?: ISucursal;
+    sucursal?: ISucursal;
+    fechaTermino?: Date | string;
     tipo: keyof typeof TIPO_CARGO | number;
     desde: Date | string;
     hasta?: Date | string;
     createdAt?: Date | string;
-    updatedAt?: Date | string;
 }

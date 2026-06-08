@@ -1,6 +1,6 @@
 import { IVenta } from "./venta";
 import { IVehiculo } from "./vehiculo";
-import { IUser } from "./user";
+import { IUser } from "./usuario";
 import { IDependencia } from "./dependencia";
 import { IDireccion } from "./direccion";
 import { IItemCatalogo } from "./itemCatalogo";

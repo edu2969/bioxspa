@@ -1,7 +1,6 @@
 "use client";
 
 import { TIPO_CARGO } from "@/app/utils/constants";
-import { IUser } from "@/types/user";
 import { useQuery } from "@tanstack/react-query";
 import { ISucursal } from "@/types/sucursal";
 import { INuevaVentaSubmit } from "./types";
@@ -9,6 +8,7 @@ import { Selector } from "../_prefabs/Selector";
 import { UseFormRegister, UseFormSetValue } from "react-hook-form";
 import { useAuthorization } from "@/lib/auth/useAuthorization";
 import { useEffect } from "react";
+import { IUsuario } from "@/types/usuario";
 
 export default function DatosGenerales({
     register,
@@ -28,7 +28,7 @@ export default function DatosGenerales({
         }
     });
 
-    const { data: usuarios, isLoading: loadingUsuarios } = useQuery<IUser[]>({
+    const { data: usuarios, isLoading: loadingUsuarios } = useQuery<IUsuario[]>({
         queryKey: ['usuarios-lista'],
         queryFn: async () => {
             if(!user) return [];
@@ -57,7 +57,7 @@ export default function DatosGenerales({
             <Selector options={usuarios || []}
                 label="Seleccione usuario*"
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 sm:text-sm"
-                getLabel={u => u.name}
+                getLabel={u => u.nombre}
                 getValue={u => u.id || ''}
                 register={register("usuarioId", { required: true })}
                 isLoading={loadingUsuarios} />}
