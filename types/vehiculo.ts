@@ -1,4 +1,4 @@
-import { IUser } from "./usuario";
+import { IUsuario } from "./usuario";
 
 export interface IPosicionActual {
     latitud: number | null;
@@ -19,7 +19,7 @@ export interface IVehiculo {
     revisionTecnica: Date | string;
     fechaVencimientoExtintor?: Date | string | null;
     direccionDestinoId?: string | null;
-    choferIds?: (string | IUser | null)[];
+    choferIds?: (string | IUsuario | null)[];
     posicionActual?: IPosicionActual;
     createdAt?: Date | string;
     updatedAt?: Date | string;

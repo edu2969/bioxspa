@@ -42,7 +42,7 @@ export default function ClientAddressManagerView({
             {tipo != 'comercial' ? <Selector getLabel={d => d.direccionCliente || "Sin nombre"}
                 label={label}
                 placeholder={tipo === 'despacho' ? 'Retiro en local' : 'Seleccione'}
-                getValue={d => d.id}
+                getValue={d => d.id ?? ""}
                 options={direcciones || []}
                 defaultValue={direccionInicialId || ''}
                 register={register}

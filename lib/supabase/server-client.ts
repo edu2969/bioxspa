@@ -37,14 +37,16 @@ export async function createSupabaseServerClient(options: ServerClientOptions = 
             return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              try {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
                 cookieStore.set(name, value, options);
-              } catch (error) {
-                // En algunos contextos, las cookies pueden ser read-only
-                console.warn(`No se pudo establecer la cookie '${name}':`, error);
-              }
-            });
+              });
+            } catch {
+              // Esperado al renderizar Server Components: las cookies son de
+              // solo lectura fuera de Server Actions / Route Handlers. El
+              // proxy raíz (proxy.ts) refresca la sesión, así que este fallo
+              // de escritura puede ignorarse de forma segura.
+            }
           }
         }
       }

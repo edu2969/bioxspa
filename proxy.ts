@@ -1,39 +1,39 @@
 /**
- * NEXT.JS MIDDLEWARE
- * 
- * Middleware robusto con autenticación Supabase integrada
- * Maneja sesiones de manera segura sin bloquear el pipeline
+ * NEXT.JS PROXY (antes "middleware")
+ *
+ * En Next.js 16 el middleware se renombró a "proxy". Next.js solo detecta este
+ * archivo si está en la raíz del proyecto (junto a `app/`) como `proxy.ts` y
+ * exporta una función llamada `proxy` (o un default). El objeto `config` debe
+ * declararse estáticamente en este mismo archivo.
+ *
+ * Maneja la sesión de Supabase de forma no bloqueante en cada request.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware-client";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   try {
-    // Crear respuesta inicial
     const response = NextResponse.next();
 
-    // Crear cliente Supabase para middleware
     const supabase = createSupabaseMiddlewareClient(request, response, {
       skipAuth: false,
       onAuthError: (error) => {
-        console.warn('Auth error in middleware:', error.message);
-      }
+        console.warn("Auth error in proxy:", error.message);
+      },
     });
 
-    // Verificar usuario de manera no bloqueante
+    // Verificar/refrescar sesión de manera no bloqueante.
     try {
       await supabase.auth.getUser();
     } catch (authError) {
-      // No fallar el middleware por errores de auth
-      console.warn('Auth verification failed in middleware:', authError);
+      console.warn("Auth verification failed in proxy:", authError);
     }
 
     return response;
-
   } catch (error) {
-    // Middleware nunca debe fallar completamente
-    console.error('Error in middleware:', error);
+    // El proxy nunca debe fallar completamente.
+    console.error("Error in proxy:", error);
     return NextResponse.next();
   }
 }
@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Aplica middleware a todas las rutas excepto:
+     * Aplica el proxy a todas las rutas excepto:
      * - api (API routes)
      * - _next/static (archivos estáticos)
      * - _next/image (optimización de imágenes)

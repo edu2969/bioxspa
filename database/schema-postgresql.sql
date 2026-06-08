@@ -41,6 +41,7 @@ CREATE TABLE dependencias (
     nombre VARCHAR(100) NOT NULL,
     tipo INTEGER NOT NULL, -- 1: sucursal, 10: bodega, 11: sucursal_bodega, 20: bodega_proveedor
     direccion_id UUID REFERENCES direcciones(id),
+    cliente_id UUID, -- cliente opcional asociado; FK agregada más abajo (clientes se define después). Ver migración 20260608
     activa BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -215,9 +216,15 @@ CREATE TABLE cliente_direcciones_despacho (
 );
 
 -- Actualizar items_catalogo para referenciar clientes
-ALTER TABLE items_catalogo 
-ADD CONSTRAINT fk_items_propietario 
+ALTER TABLE items_catalogo
+ADD CONSTRAINT fk_items_propietario
 FOREIGN KEY (propietario_id) REFERENCES clientes(id);
+
+-- Actualizar dependencias para referenciar clientes (cliente opcional por dependencia)
+ALTER TABLE dependencias
+ADD CONSTRAINT dependencias_cliente_id_fkey
+FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL;
+CREATE INDEX idx_dependencias_cliente_id ON dependencias(cliente_id);
 
 -- =========================================
 -- 5. VENTAS Y TRANSACCIONES

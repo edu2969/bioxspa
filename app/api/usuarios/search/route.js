@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET(req) {
     try {
+        const supabase = await getSupabaseServerClient();
         const { searchParams } = req.nextUrl;
         const query = searchParams.get('q');
 
@@ -12,8 +13,8 @@ export async function GET(req) {
 
         const { data: users, error } = await supabase
             .from('usuarios')
-            .select('*')
-            .or(`name.ilike.%${query}%,email.ilike.%${query}%`);
+            .select('id, nombre, email')
+            .or(`nombre.ilike.%${query}%,email.ilike.%${query}%`);
 
         if (error) {
             console.error('Error searching users:', error);

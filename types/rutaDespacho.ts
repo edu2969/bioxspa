@@ -1,6 +1,6 @@
 import { IVenta } from "./venta";
 import { IVehiculo } from "./vehiculo";
-import { IUser } from "./usuario";
+import { IUsuario } from "./usuario";
 import { IDependencia } from "./dependencia";
 import { IDireccion } from "./direccion";
 import { IItemCatalogo } from "./itemCatalogo";
@@ -24,7 +24,7 @@ export interface ICargaHistorial {
 export interface IRutaDespacho {
   id: string;
   vehiculoId?: IVehiculo;
-  choferId: IUser;
+  choferId: IUsuario;
   horaInicio?: Date;
   horaDestino?: Date;
   dependenciaId?: IDependencia;

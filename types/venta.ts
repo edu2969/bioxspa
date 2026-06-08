@@ -1,6 +1,6 @@
 import { IDetalleVenta } from "./detalleVenta";
 import { ICliente } from "./cliente";
-import { IUser } from "./usuario";
+import { IUsuario } from "./usuario";
 import { ISucursal } from "./sucursal";
 import { IDependencia } from "./dependencia";
 import { IDocumentoTributario } from "./documentoTributario";
@@ -8,7 +8,7 @@ import { IDireccion } from "./direccion";
 
 export interface IComentarioCobro {
     fecha: Date;
-    userId: IUser;
+    userId: IUsuario;
     comentario: string;
     createdAt?: Date;
     updatedAt?: Date;
@@ -20,7 +20,7 @@ export interface IVenta {
     tipo: number;
     clienteId?: ICliente;
     codigo?: string;
-    vendedorId?: IUser;
+    vendedorId?: IUsuario;
     sucursalId?: ISucursal;
     dependenciaId?: IDependencia;
     fecha?: Date;

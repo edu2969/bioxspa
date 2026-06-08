@@ -148,7 +148,7 @@ export default function SelectorDeDestino({
             options={destinos.map((destino: IDestinoView): { label: string; value: string } => {
                 const venta = rutaDespacho.ventas?.find(v => v.cliente.direccionesDespacho?.some(d => d.id === destino.direccion.id));
                 return {
-                    value: destino.direccion.id,
+                    value: destino.direccion.id ?? "",
                     label: venta?.cliente.nombre + " - " + destino.direccion.direccionCliente?.split(",")[0] || "?? - ??"
                 }
             })}

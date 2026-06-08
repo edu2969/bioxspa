@@ -49,12 +49,18 @@ export async function GET(req, props) {
                 tipo,
                 activa,
                 direccion_id,
+                cliente_id,
                 direccion:direcciones(
                     id,
                     direccion_cliente,
                     place_id,
                     latitud,
                     longitud
+                ),
+                cliente:clientes(
+                    id,
+                    nombre,
+                    rut
                 ),
                 cargos:cargos(
                     id,
@@ -143,155 +149,151 @@ export async function GET(req, props) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// POST — guarda la sucursal completa (datos principales, cargos y dependencias).
+// Diferencia el estado actual contra el payload: elimina lo que ya no viene,
+// actualiza lo existente (por id) e inserta lo nuevo.
+// ---------------------------------------------------------------------------
 export async function POST(req, props) {
-    const params = await props.params;
-    const body = await req.json();
-    await connectMongoDB();
+    try {
+        const params = await props.params;
+        const sucursalId = params.id;
+        const body = await req.json();
 
-    // 1. FOTO INICIAL DE CARGOS Y DEPENDENCIAS
-    const cargosActualesSucursal = await Cargo.find({ sucursalId: params.id }).lean();
-    const dependenciasActuales = await Dependencia.find({ sucursalId: params.id }).lean();
-
-    // 2. ELIMINAR DEPENDENCIAS Y SUS CARGOS QUE YA NO ESTÁN EN EL BODY
-    const dependenciaIdsInput = body.dependencias.map(dep => dep._id).filter(Boolean);
-    const dependenciasAEliminar = dependenciasActuales.filter(dep => !dependenciaIdsInput.includes(dep._id.toString()));
-    for (const dep of dependenciasAEliminar) {
-        await Cargo.deleteMany({ dependenciaId: dep._id });
-        await Dependencia.findByIdAndDelete(dep._id);
-    }
-
-    // 3. ELIMINAR CARGOS DE SUCURSAL QUE YA NO ESTÁN EN EL BODY
-    const cargoIdsInput = body.cargos.map(cargo => cargo._id).filter(Boolean);
-    const cargosSucursalAEliminar = cargosActualesSucursal.filter(cargo => !cargoIdsInput.includes(cargo._id.toString()));
-    for (const cargo of cargosSucursalAEliminar) {
-        await Cargo.findByIdAndDelete(cargo._id);
-    }
-
-    // 4. ELIMINAR CARGOS DE DEPENDENCIAS QUE YA NO ESTÁN EN EL BODY
-    for (const dependencia of body.dependencias) {
-        if (!dependencia._id) continue;
-        const cargosActualesDep = await Cargo.find({ dependenciaId: dependencia._id }).lean();
-        const cargoIdsInputDep = (dependencia.cargos || []).map(cargo => cargo._id).filter(Boolean);
-        const cargosDepAEliminar = cargosActualesDep.filter(cargo => !cargoIdsInputDep.includes(cargo._id.toString()));
-        for (const cargo of cargosDepAEliminar) {
-            await Cargo.findByIdAndDelete(cargo._id);
-        }
-    }
-
-    // 5. ACTUALIZAR O CREAR DIRECCIONES, DEPENDENCIAS Y CARGOS (como ya lo tienes)
-    // Update or create Direccion for Sucursal
-    let direccionId = body.direccionId;
-    if (body.direccion) {
-        const direccion = await Direccion.findOne({ apiId: body.direccion.apiId });
-        if (direccion && direccion._id) {
-            direccionId = direccion._id;
-        }
-    }
-    if (!direccionId) {
-        const newDireccion = new Direccion(body.direccion);
-        const savedDireccion = await newDireccion.save();
-        direccionId = savedDireccion._id;        
-    }
-
-    // Update or create Cargos for Sucursal
-    for (const cargo of body.cargos) {
-        const cargoData = {
-            userId: cargo.userId,
-            sucursalId: params.id,
-            tipo: cargo.tipo,
-            desde: new Date(cargo.desde),
-            createdAt: cargo.createdAt ? new Date(cargo.createdAt) : new Date(),
-            updatedAt: new Date()
-        };
-        if (cargo.hasta) {
-            cargoData.hasta = new Date(cargo.hasta);
-        }
-        if (cargo._id) {
-            await Cargo.findByIdAndUpdate(cargo._id, cargoData, { new: true, upsert: true });
-        } else {
-            const newCargo = new Cargo(cargoData);
-            const savedCargo = await newCargo.save();
-            if (!savedCargo || !savedCargo._id) {
-                console.error("Error al insertar el cargo sucursal:", cargoData);
-                throw new Error("No se pudo insertar el cargo de sucursal");
-            }
-        }
-    }
-
-    // Update Dependencias and their Direcciones
-    for (const dependencia of body.dependencias) {
-        let direccionId = dependencia.direccionId;
-        
-        // Check if direccion exists
-        if (dependencia.direccion && !direccionId) {
-            const direccion = await Direccion.findOne({ apiId: dependencia.direccion.apiId });
-            if (direccion) {
-                direccionId = direccion._id;
-            } else {
-                const newDireccion = new Direccion(dependencia.direccion);
-                const savedDireccion = await newDireccion.save();
-                direccionId = savedDireccion._id;
-            }
+        const { data: authResult } = await getAuthenticatedUser();
+        if (!authResult || !authResult.userData) {
+            return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const dependenciaData = {
-            sucursalId: params.id,
-            nombre: dependencia.nombre,
-            direccionId: direccionId,
-            operativa: dependencia.operativa,
-            tipo: dependencia.tipo,
-            createdAt: dependencia.createdAt ? new Date(dependencia.createdAt) : new Date(),
-            updatedAt: new Date()
-        };
-        if (dependencia.clienteId) {
-            dependenciaData.clienteId = dependencia.clienteId;
-        }
-        
-        if (dependencia._id) {
-            await Dependencia.findByIdAndUpdate(dependencia._id, dependenciaData, { new: true, upsert: true });
-        } else {
-            const newDependencia = new Dependencia(dependenciaData);
-            await newDependencia.save();
-        }
+        const supabase = await getSupabaseServerClient();
+        const now = new Date().toISOString();
 
-        // Update or create Cargos for Dependencia
-        for (const cargo of dependencia.cargos) {
-            const cargoData = {
-                userId: cargo.userId,
-                dependenciaId: dependencia._id,
-                tipo: cargo.tipo,
-                desde: new Date(cargo.desde),
-                createdAt: cargo.createdAt ? new Date(cargo.createdAt) : new Date(),
-                updatedAt: new Date()
+        // Crea o actualiza una direccion y devuelve su id (o null si no hay datos).
+        const upsertDireccion = async (direccion) => {
+            if (!direccion || !direccion.direccionCliente) return null;
+            const payload = {
+                direccion_cliente: direccion.direccionCliente,
+                place_id: direccion.placeId ?? null,
+                latitud: direccion.latitud ?? null,
+                longitud: direccion.longitud ?? null,
+                comuna: direccion.comuna ?? null,
             };
-            if (cargo.hasta) {
-                cargoData.hasta = new Date(cargo.hasta);
+            if (direccion.id) {
+                const { error } = await supabase.from("direcciones").update(payload).eq("id", direccion.id);
+                if (error) throw new Error(`Error actualizando direccion: ${error.message}`);
+                return direccion.id;
+            }
+            const { data, error } = await supabase.from("direcciones").insert(payload).select("id").single();
+            if (error) throw new Error(`Error creando direccion: ${error.message}`);
+            return data.id;
+        };
+
+        // Sincroniza los cargos de un contenedor (sucursal o dependencia).
+        const syncCargos = async (cargos, owner) => {
+            const incoming = cargos ?? [];
+            const filterColumn = owner.sucursal_id ? "sucursal_id" : "dependencia_id";
+            const filterValue = owner.sucursal_id ?? owner.dependencia_id;
+
+            const { data: existing, error: existingError } = await supabase
+                .from("cargos")
+                .select("id")
+                .eq(filterColumn, filterValue);
+            if (existingError) throw new Error(`Error leyendo cargos: ${existingError.message}`);
+
+            const incomingIds = incoming.map((c) => c.id).filter(Boolean);
+            const toDelete = (existing ?? []).map((c) => c.id).filter((id) => !incomingIds.includes(id));
+            if (toDelete.length) {
+                const { error } = await supabase.from("cargos").delete().in("id", toDelete);
+                if (error) throw new Error(`Error eliminando cargos: ${error.message}`);
             }
 
-            if (cargo._id) {
-                await Cargo.findByIdAndUpdate(cargo._id, cargoData, { new: true, upsert: true });
-            } else {
-                const newCargo = new Cargo(cargoData);
-                await newCargo.save();
+            for (const cargo of incoming) {
+                const row = {
+                    usuario_id: cargo.usuarioId,
+                    tipo: cargo.tipo,
+                    desde: cargo.desde || null,
+                    hasta: cargo.hasta || null,
+                    activo: true,
+                    sucursal_id: owner.sucursal_id ?? null,
+                    dependencia_id: owner.dependencia_id ?? null,
+                    updated_at: now,
+                };
+                if (cargo.id) {
+                    const { error } = await supabase.from("cargos").update(row).eq("id", cargo.id);
+                    if (error) throw new Error(`Error actualizando cargo: ${error.message}`);
+                } else {
+                    const { error } = await supabase.from("cargos").insert(row);
+                    if (error) throw new Error(`Error creando cargo: ${error.message}`);
+                }
             }
+        };
+
+        // 1. Direccion + datos principales de la sucursal.
+        const direccionId = await upsertDireccion(body.direccion);
+        const sucursalUpdate = {
+            nombre: body.nombre,
+            prioridad: body.prioridad ?? null,
+            visible: body.visible ?? true,
+            updated_at: now,
+        };
+        if (direccionId) sucursalUpdate.direccion_id = direccionId;
+
+        const { error: sucursalError } = await supabase
+            .from("sucursales")
+            .update(sucursalUpdate)
+            .eq("id", sucursalId);
+        if (sucursalError) {
+            return NextResponse.json({ error: `Error actualizando sucursal: ${sucursalError.message}` }, { status: 500 });
         }
-    }
 
-    // 6. ACTUALIZAR SUCURSAL
-    const sucursalData = {
-        id: body.id,
-        nombre: body.nombre,
-        visible: body.visible,
-        prioridad: body.prioridad,
-        direccionId: direccionId,
-        createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
-        updatedAt: new Date()
-    };
-    const sucursalUpdated = await Sucursal.findByIdAndUpdate(params.id, sucursalData, { new: true, upsert: true });
+        // 2. Cargos directos de la sucursal.
+        await syncCargos(body.cargos, { sucursal_id: sucursalId });
 
-    // 7. RESPUESTA
-    if (!sucursalUpdated) {
-        return NextResponse.json({ error: "Error updating sucursal" }, { status: 404 });
+        // 3. Dependencias (eliminar las que ya no vienen).
+        const { data: existingDeps, error: depsError } = await supabase
+            .from("dependencias")
+            .select("id")
+            .eq("sucursal_id", sucursalId);
+        if (depsError) throw new Error(`Error leyendo dependencias: ${depsError.message}`);
+
+        const incomingDeps = body.dependencias ?? [];
+        const incomingDepIds = incomingDeps.map((d) => d.id).filter(Boolean);
+        const depsToDelete = (existingDeps ?? []).map((d) => d.id).filter((id) => !incomingDepIds.includes(id));
+        for (const depId of depsToDelete) {
+            await supabase.from("cargos").delete().eq("dependencia_id", depId);
+            const { error } = await supabase.from("dependencias").delete().eq("id", depId);
+            if (error) throw new Error(`Error eliminando dependencia: ${error.message}`);
+        }
+
+        // 4. Crear / actualizar cada dependencia y sus cargos.
+        for (const dep of incomingDeps) {
+            const depDireccionId = await upsertDireccion(dep.direccion);
+            const depRow = {
+                sucursal_id: sucursalId,
+                nombre: dep.nombre,
+                tipo: dep.tipo,
+                activa: dep.operativa ?? true,
+                cliente_id: dep.cliente?.id ?? null,
+                updated_at: now,
+            };
+            if (depDireccionId) depRow.direccion_id = depDireccionId;
+
+            let depId = dep.id;
+            if (depId) {
+                const { error } = await supabase.from("dependencias").update(depRow).eq("id", depId);
+                if (error) throw new Error(`Error actualizando dependencia: ${error.message}`);
+            } else {
+                const { data, error } = await supabase.from("dependencias").insert(depRow).select("id").single();
+                if (error) throw new Error(`Error creando dependencia: ${error.message}`);
+                depId = data.id;
+            }
+
+            await syncCargos(dep.cargos, { dependencia_id: depId });
+        }
+
+        return NextResponse.json({ ok: true });
+    } catch (error) {
+        console.error("Error saving sucursal:", error);
+        return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
     }
-    return NextResponse.json(sucursalUpdated);
 }
